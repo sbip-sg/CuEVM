@@ -1,10 +1,17 @@
+# Object files
+objects = cuevm.o cuevm_test.o stack.o uint256.o
+
+# Compiler
 NVCC = nvcc
-NVCC_FLAGS = -I./include -lstdc++
 
-all: cuEVM
+# Compiler Flags
+NVCC_FLAGS = -I./include -lstdc++ -dc
 
-cuEVM:
-	$(NVCC) $(NVCC_FLAGS) -o cuEVM src/cu_evm.cu
+all: $(objects)
+	$(NVCC) $(objects) -o cuEVM
+
+%.o: src/%.cu
+	$(NVCC) $(NVCC_FLAGS) $< -o $@
 
 clean:
-	rm -f cuEVM
+	rm -f *.o cuEVM

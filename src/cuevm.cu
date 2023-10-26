@@ -2,10 +2,14 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <cuda_runtime.h>
-
+#include "uint256.cuh"
+#include "stack.cuh"
+#include "cuevm_test.h"
+#include "opcode.h"
 #define NUMTHREAD 4096
-
+#define DEBUG 1
 // simple draft kernel for place holder
+// simple testing opcodes and return the popped top of stack value
 __global__ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t bytecode_len, size_t input_len, size_t num_threads)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -26,6 +30,85 @@ __global__ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t byte
                 printf("%02x ", input[i]);
             }
             printf("\n");
+
+        base_uint_stack stack;
+        init_stack(&stack);
+
+        // push(&stack, a);
+        // pop(&stack, &b);
+        // debugging : print_stack(&stack);
+        // define 3 reusable temp uints for binary op
+        base_uint op1, op2, result;
+        for (size_t i = 0; i < bytecode_len; i++)
+        {
+            unsigned char opcode = bytecode[i];
+            switch (opcode)
+            {
+                case ADD: // ADD
+                    // TODO: check stack size
+                    // future optimization : can override push pop ops and modify the stack directly
+                    pop(&stack, &op1);
+                    pop(&stack, &op2);
+                    base_uint_add(&op1, &op2, &result);
+
+                    #if DEBUG
+                    printf("ADD OPCODE: \n");
+                    printf("op1: ");
+                    print_base_uint(&op1);
+                    printf("op2: ");
+                    print_base_uint(&op2);
+                    printf("result: ");
+                    print_base_uint(&result);
+                    printf("\n***************\n");
+                    #endif
+
+                    push(&stack, result);
+                    break;
+
+                case MUL: // MUL
+                    // TODO: check stack size
+                    pop(&stack, &op1);
+                    pop(&stack, &op2);
+                    base_uint_mul(&op1, &op2, &result);
+
+                    #if DEBUG
+                    printf("MUL OPCODE: \n");
+                    printf("op1: ");
+                    print_base_uint(&op1);
+                    printf("op2: ");
+                    print_base_uint(&op2);
+                    printf("result: ");
+                    print_base_uint(&result);
+                    printf("\n***************\n");
+                    #endif
+
+                    push(&stack, result);
+                    break;
+                case PUSH1:
+                    unsigned char push_val = bytecode[++i];
+                    result = { {push_val, 0, 0, 0, 0, 0, 0, 0} };
+                    push(&stack, result);
+
+                    #if DEBUG
+                    printf("PUSH1 OPCODE: \n");
+                    printf("push_val: ");
+                    print_base_uint(&result);
+                    printf("\n***************\n");
+                    #endif
+
+                    break;
+                case POP:
+                    pop(&stack, &result);
+                    printf("Popped Stack value: ");
+                    print_base_uint(&result);
+                    printf("\n***************\n");
+                    break;
+                default:
+                    printf("Unknown opcode 0x%02x at position %zu\n", opcode, i);
+                    return;
+            }
+        }
+
         }
     }
 }
@@ -45,6 +128,8 @@ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int l
     }
 }
 
+
+
 int main(int argc, char *argv[])
 {
     char *byte_code_hex = NULL;
@@ -53,6 +138,7 @@ int main(int argc, char *argv[])
     static struct option long_options[] = {
         {"bytecode", required_argument, 0, 'b'},
         {"input", required_argument, 0, 'i'},
+        {"test", no_argument, 0, 't'},
         {0, 0, 0, 0}};
 
     int opt;
@@ -67,6 +153,10 @@ int main(int argc, char *argv[])
         case 'i':
             input_hex = optarg;
             break;
+        case 't':
+            test_arithmetic_operations();
+            test_stack();
+            exit(0);
         default:
             fprintf(stderr, "Usage: %s --bytecode <hexstring> --input <hexstring>\n", argv[0]);
             exit(EXIT_FAILURE);
