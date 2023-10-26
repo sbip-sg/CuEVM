@@ -6,6 +6,7 @@
 #include "stack.cuh"
 #include "cuevm_test.h"
 #include "opcode.h"
+#include "processor.cuh"
 #define NUMTHREAD 4096
 #define DEBUG 1
 // simple draft kernel for place holder
@@ -31,27 +32,35 @@ __global__ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t byte
             }
             printf("\n");
 
-        base_uint_stack stack;
-        init_stack(&stack);
+            // todo refactor processor.execute to a function outside of this kernel
+            processor evm;
+            evm.programCounter = 0; // redundant but better safe.
+            init_stack(&evm.stack);
 
-        // push(&stack, a);
-        // pop(&stack, &b);
-        // debugging : print_stack(&stack);
-        // define 3 reusable temp uints for binary op
-        base_uint op1, op2, result;
-        for (size_t i = 0; i < bytecode_len; i++)
-        {
-            unsigned char opcode = bytecode[i];
-            switch (opcode)
+            // push(&stack, a);
+            // pop(&stack, &b);
+            // debugging : print_stack(&stack);
+            // define 3 reusable temp uints for binary op
+            base_uint op1, op2, result;
+            uint safe_counter = 0; // safety counter prevent infinite loop
+            while (evm.programCounter < bytecode_len)
             {
+                unsigned char opcode = bytecode[evm.programCounter];
+                safe_counter ++;
+                if (safe_counter > 100) {
+                    printf("Safety counter exceeded, return from execution\n");
+                    return;
+                }
+                switch (opcode)
+                {
                 case ADD: // ADD
                     // TODO: check stack size
                     // future optimization : can override push pop ops and modify the stack directly
-                    pop(&stack, &op1);
-                    pop(&stack, &op2);
+                    pop(&evm.stack, &op1);
+                    pop(&evm.stack, &op2);
                     base_uint_add(&op1, &op2, &result);
 
-                    #if DEBUG
+#if DEBUG
                     printf("ADD OPCODE: \n");
                     printf("op1: ");
                     print_base_uint(&op1);
@@ -60,18 +69,36 @@ __global__ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t byte
                     printf("result: ");
                     print_base_uint(&result);
                     printf("\n***************\n");
-                    #endif
+#endif
 
-                    push(&stack, result);
+                    push(&evm.stack, result);
+                    break;
+                case SUB:
+                    pop(&evm.stack, &op1);
+                    pop(&evm.stack, &op2);
+                    base_uint_sub(&op1, &op2, &result);
+
+#if DEBUG
+                    printf("SUB OPCODE: \n");
+                    printf("op1: ");
+                    print_base_uint(&op1);
+                    printf("op2: ");
+                    print_base_uint(&op2);
+                    printf("result: ");
+                    print_base_uint(&result);
+                    printf("\n***************\n");
+#endif
+
+                    push(&evm.stack, result);
                     break;
 
                 case MUL: // MUL
                     // TODO: check stack size
-                    pop(&stack, &op1);
-                    pop(&stack, &op2);
+                    pop(&evm.stack, &op1);
+                    pop(&evm.stack, &op2);
                     base_uint_mul(&op1, &op2, &result);
 
-                    #if DEBUG
+#if DEBUG
                     printf("MUL OPCODE: \n");
                     printf("op1: ");
                     print_base_uint(&op1);
@@ -80,41 +107,116 @@ __global__ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t byte
                     printf("result: ");
                     print_base_uint(&result);
                     printf("\n***************\n");
-                    #endif
+#endif
 
-                    push(&stack, result);
+                    push(&evm.stack, result);
                     break;
                 case PUSH1:
-                    unsigned char push_val = bytecode[++i];
-                    result = { {push_val, 0, 0, 0, 0, 0, 0, 0} };
-                    push(&stack, result);
+                    unsigned char push_val = bytecode[++evm.programCounter];
+                    result = {{push_val, 0, 0, 0, 0, 0, 0, 0}};
+                    push(&evm.stack, result);
 
-                    #if DEBUG
+#if DEBUG
                     printf("PUSH1 OPCODE: \n");
                     printf("push_val: ");
                     print_base_uint(&result);
                     printf("\n***************\n");
-                    #endif
+#endif
 
                     break;
+                case PUSH2:
+                    // Increment the program counter to point to the first byte of data
+                    evm.programCounter++;
+
+                    // Read the two bytes from the bytecode
+                    unsigned char byte1 = bytecode[evm.programCounter];
+                    unsigned char byte2 = bytecode[++evm.programCounter];
+
+                    // Combine the two bytes into a single 16-bit value
+                    uint16_t push_val_16 = (byte1 << 8) | byte2;
+
+                    // Convert the 16-bit value into your base_uint format
+                    result = {{push_val_16, 0, 0, 0, 0, 0, 0, 0}};
+
+                    // Push the value onto the stack
+                    push(&evm.stack, result);
+
+#if DEBUG
+                    printf("PUSH2 OPCODE: \n");
+                    printf("push_val: ");
+                    print_base_uint(&result);
+                    printf("\n***************\n");
+#endif
+
+                    break;
+
                 case POP:
-                    pop(&stack, &result);
+                    pop(&evm.stack, &result);
                     printf("Popped Stack value: ");
                     print_base_uint(&result);
                     printf("\n***************\n");
                     break;
-                default:
-                    printf("Unknown opcode 0x%02x at position %zu\n", opcode, i);
-                    return;
-            }
-        }
 
+                case SWAP1:
+                    printf("SWAP1 OPCODE BEFORE: \n");
+                    print_base_uint(&evm.stack.items[0]);
+                    print_base_uint(&evm.stack.items[1]);
+                    pop(&evm.stack, &op1);
+                    pop(&evm.stack, &op2);
+                    push(&evm.stack, op1);
+                    push(&evm.stack, op2);
+                    printf("\nSWAP1 OPCODE AFTER: \n");
+                    print_base_uint(&evm.stack.items[0]);
+                    print_base_uint(&evm.stack.items[1]);
+                    break;
+                case JUMPI:
+                    pop(&evm.stack, &op1);
+                    pop(&evm.stack, &op2);
+#if DEBUG
+                    printf("JUMPI OPCODE: \n");
+                    printf("Condition:\n");
+                    print_base_uint(&op2);
+                    printf("Destination:\n");
+                    print_base_uint(&op1);
+                    printf("is ZEROP op1: %d\n", is_zero(&op1));
+#endif
+                    if (!is_zero(&op2))
+                    {
+                        evm.programCounter = op1.pn[0];
+                        // TODO: check JUMPDEST in destiation ?
+                    }
+                    break;
+
+                case JUMP:
+                    pop(&evm.stack, &op1);
+                    evm.programCounter = op1.pn[0];;
+                    // TODO: check JUMPDEST in destiation ?
+                    break;
+
+                case JUMPDEST:
+                    // do nothing
+                    break;
+                case RETURN:
+                    printf("RETURN OPCODE\n");
+                    evm.programCounter = bytecode_len;
+                    break;
+                default:
+                    printf("Unknown opcode %d at position %d\n", opcode, evm.programCounter);
+                    printf("Return from execution\n");
+                    return;
+                }
+
+                evm.programCounter++;
+                printf("Program counter: %d\n", evm.programCounter);
+            }
         }
     }
 }
-int adjustedLength(char** hexString) {
-    if (strncmp(*hexString, "0x", 2) == 0 || strncmp(*hexString, "0X", 2) == 0) {
-        *hexString += 2;  // Skip the "0x" prefix
+int adjustedLength(char **hexString)
+{
+    if (strncmp(*hexString, "0x", 2) == 0 || strncmp(*hexString, "0X", 2) == 0)
+    {
+        *hexString += 2; // Skip the "0x" prefix
         return (strlen(*hexString) / 2);
     }
     return (strlen(*hexString) / 2);
@@ -127,8 +229,6 @@ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int l
         sscanf(&hexString[i], "%2hhx", &byteArray[i / 2]);
     }
 }
-
-
 
 int main(int argc, char *argv[])
 {
