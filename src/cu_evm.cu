@@ -88,18 +88,22 @@ int main(int argc, char *argv[])
     hexStringToByteArray(byte_code_hex, byte_code, bytecode_len * 2);
     hexStringToByteArray(input_hex, input, input_len * 2);
 
+    printf("Pass conversion\n");
     unsigned char *d_bytecode, *d_input;
     cudaMalloc((void **)&d_bytecode, bytecode_len);
     cudaMalloc((void **)&d_input, input_len);
 
     cudaMemcpy(d_bytecode, byte_code, bytecode_len, cudaMemcpyHostToDevice);
     cudaMemcpy(d_input, input, input_len, cudaMemcpyHostToDevice);
+    printf("Pass allocation and memcpy\n");
 
     int blockSize = 256;
     int numBlocks = (NUMTHREAD + blockSize - 1) / blockSize;
     cuEVM<<<numBlocks, blockSize>>>(d_bytecode, d_input, bytecode_len, input_len, NUMTHREAD);
+    printf("RUN\n");
 
     cudaDeviceSynchronize();
+    printf("Syncrhronize\n");
 
     cudaFree(d_bytecode);
     cudaFree(d_input);
