@@ -1,7 +1,6 @@
 #include "cuevm_test.h"
 
-void test_arithmetic_operations()
-{
+void test_arithmetic_operations() {
     base_uint a, b, c, d;
 
     // Test addition
@@ -15,8 +14,7 @@ void test_arithmetic_operations()
 
     printf("%s\n", buffer);
 
-    if (strcmp(buffer, "0000000000000000000000000000000033333333333333333333333333333333") != 0)
-    {
+    if (strcmp(buffer, "0000000000000000000000000000000033333333333333333333333333333333") != 0) {
         printf("Addition failed!\n");
     }
     // Test addition with carry
@@ -29,8 +27,7 @@ void test_arithmetic_operations()
 
     printf("%s\n", buffer);
 
-    if (strcmp(buffer, "0000000000000000000000000000000100000000000000000000000000000000") != 0)
-    {
+    if (strcmp(buffer, "0000000000000000000000000000000100000000000000000000000000000000") != 0) {
         printf("Addition failed!\n");
     }
     // Test addition overflow carry
@@ -43,8 +40,7 @@ void test_arithmetic_operations()
 
     printf("%s\n", buffer);
 
-    if (strcmp(buffer, "0000000000000000000000000000000000000000000000000000000000001233") != 0)
-    {
+    if (strcmp(buffer, "0000000000000000000000000000000000000000000000000000000000001233") != 0) {
         printf("Addition failed!\n");
     }
 
@@ -55,8 +51,7 @@ void test_arithmetic_operations()
     printf("Subtraction Result: ");
     base_uint_get_hex(&c, buffer);
     printf("%s\n", buffer);
-    if (strcmp(buffer, "00000000000000000000000000000000ffffffffffffffffffffffffffffff01") != 0)
-    {
+    if (strcmp(buffer, "00000000000000000000000000000000ffffffffffffffffffffffffffffff01") != 0) {
         printf("Subtraction failed!\n");
     }
 
@@ -67,8 +62,7 @@ void test_arithmetic_operations()
     printf("Subtraction Result: ");
     base_uint_get_hex(&c, buffer);
     printf("%s\n", buffer);
-    if (strcmp(buffer, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff02") != 0)
-    {
+    if (strcmp(buffer, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff02") != 0) {
         printf("Subtraction failed!\n");
     }
 
@@ -79,8 +73,7 @@ void test_arithmetic_operations()
     printf("Multiplication Result: ");
     base_uint_get_hex(&c, buffer);
     printf("%s\n", buffer);
-    if (strcmp(buffer, "00fffffffffffffffffffffffffffffeff000000000000000000000000000001") != 0)
-    {
+    if (strcmp(buffer, "00fffffffffffffffffffffffffffffeff000000000000000000000000000001") != 0) {
         printf("Multiplication failed!\n");
     }
     // Test multiplication overflow
@@ -90,20 +83,17 @@ void test_arithmetic_operations()
     printf("Multiplication Result: ");
     base_uint_get_hex(&c, buffer);
     printf("%s\n", buffer);
-    if (strcmp(buffer, "0000000000000000000000000000000000000000000000000000000000000000") != 0)
-    {
+    if (strcmp(buffer, "0000000000000000000000000000000000000000000000000000000000000000") != 0) {
         printf("Multiplication overflow failed!\n");
     }
-
 }
-
 
 void test_stack() {
     base_uint_stack stack;
     init_stack(&stack);
 
     // Test push and print
-    base_uint a = { {1, 2, 3, 4} };
+    base_uint a = {{1, 2, 3, 4}};
     printf("Pushing: ");
     for (int i = 0; i < WIDTH; i++) printf("%u ", a.pn[i]);
     printf("\n");
@@ -121,7 +111,7 @@ void test_stack() {
 
     // Test swap with top
     push(&stack, a);
-    base_uint c = { {5, 6, 7, 8} };
+    base_uint c = {{5, 6, 7, 8}};
     push(&stack, c);
     printf("Before swap with top:\n");
     print_stack(&stack);

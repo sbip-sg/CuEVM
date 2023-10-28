@@ -53,20 +53,23 @@ PC 0 : 0x6006 PUSH1 0x06
 PC 2 : 0x6007 PUSH1 0x07
 PC 4 : 0x02 MUL  // TOP STACK 42
 PC 5 : 0x5b JUMPDEST  // TAG1_JUMP
-PC 7 : 0x600e PUSH 0x0e
+PC 6 : 0x600e PUSH 0x0e
 PC 8 : 0x90 SWAP1
 PC 9 : 0x03 SUB  // 42 - 14 // condition != 1 jump;
-PC 10 : 0x6005 PUSH1 TAG1_JUMP // destination
-PC 12 : 0x57 JUMPI
-PC 13 : 0x50 POP // for testing
-PC 14 : 0xf3 RETURN // for testing
+PC 10 : 0x80 DUP1  // DUP the result because JUMPI will remove it
+PC 11 : 0x6005 PUSH1 TAG1_JUMP // destination
+PC 13 : 0x57 JUMP I
+PC 14 : 0x50 POP // for testing
+PC 15 : 0xf3 RETURN // for testing
 Bytecode:
-0x60066007025b600e900360055750f3
+0x60066007025b600e90038060055750f3
 ```
 Run
 ```
-./cuEVM --bytecode 0x60066007025b600e900360055750f3 --input 0x1234
+./cuEVM --bytecode 0x60066007025b600e90038060055750f3 --input 0x1234
 ```
+
+Reference tools (www.evm.codes) for testing bytecode sequence : [Simulate test bytecode sequence](https://www.evm.codes/playground?fork=shanghai&unit=Wei&codeType=Bytecode&code=%27%7E6%7E7025b%7Ee900380%7E55750f3%27%7E600%01%7E_)
 
 TODO: change options, configs, and how we use the tool in the future.
 

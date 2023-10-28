@@ -12,6 +12,7 @@
 
 #define SWAP1 0x90
 
+#define DUP1 0x80
 
 #define JUMP 0x56
 #define JUMPI 0x57

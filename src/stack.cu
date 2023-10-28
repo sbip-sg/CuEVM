@@ -1,8 +1,6 @@
 #include "stack.cuh"
 
-__host__ __device__ void init_stack(base_uint_stack* stack) {
-    stack->top = -1;
-}
+__host__ __device__ void init_stack(base_uint_stack* stack) { stack->top = -1; }
 
 __host__ __device__ bool push(base_uint_stack* stack, base_uint item) {
     if (stack->top >= STACK_SIZE - 1) {
