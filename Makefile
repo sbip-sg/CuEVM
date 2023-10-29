@@ -13,9 +13,13 @@ test_gmp: src/test/test_gmp.c
 	$(GCC) -o $(OUT_DIRECTORY)/test_gmp src/test/test_gmp.c $(GCC_FLAGS) 
 
 test_cgbn: src/test/test_cgbn.cu
-	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/test_cgbn src/test/test_cgbn.cu
+	$(NVCC) $(NVCC_FLAGS) -lineinfo -o $(OUT_DIRECTORY)/test_cgbn src/test/test_cgbn.cu
+
+test_stack: src/test/test_stack.cu
+	$(NVCC) $(NVCC_FLAGS) -rdc=true --std c++20 -lcudadevrt -lineinfo -o $(OUT_DIRECTORY)/test_stack src/test/test_stack.cu
 
 clean:
 	rm -f $(OUT_DIRECTORY)/cuEVM
 	rm -f $(OUT_DIRECTORY)/test_gmp
 	rm -f $(OUT_DIRECTORY)/test_cgbn
+	rm -f $(OUT_DIRECTORY)/test_stack
