@@ -2,6 +2,12 @@
     "files.associations": {
         "*.ejs": "html",
         "iostream": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "random": "cpp",
+        "chrono": "cpp",
+        "algorithm": "cpp",
+        "*.tcc": "cpp",
+        "string": "cpp",
+        "functional": "cpp"
     }
 }
