@@ -11,26 +11,24 @@
 #include <cgbn/cgbn.h>
 #endif
 
-// TODO add block details
-
 template<class params>
 struct gpu_tx {
   cgbn_mem_t<params::BITS> origin;
   cgbn_mem_t<params::BITS> gasprice;
 };
 
-template<calss params>
+template<class params>
 struct gpu_contract {
   cgbn_mem_t<params::BITS> address;
   uint32_t size;
   uint8_t *bytecode;
-}
+};
 
 template<class params>
 struct gpu_message_data {
   uint32_t size;
   uint8_t *data;
-}
+};
 
 template<class params>
 struct gpu_message {
@@ -103,15 +101,15 @@ template<class params>
 __host__ gpu_message<params> *generate_gpu_messages(gpu_message<params> *cpu_instances, uint32_t count) {
   gpu_message<params> *gpu_instances;
   cudaMalloc((void **)&gpu_instances, sizeof(gpu_message<params>)*count);
-  cudaMemcpy(gpu_instances, cpu_instances, sizeof(instance_t)*count, cudaMemcpyHostToDevice)
+  cudaMemcpy(gpu_instances, cpu_instances, sizeof(instance_t)*count, cudaMemcpyHostToDevice);
 
   for(uint32_t idx=0; idx<count; idx++) {
     // data
     cudaMalloc((void **)&gpu_instances[idx].data.data, sizeof(uint8_t)*cpu_instances[idx].data.size);
-    cudaMemcpy(gpu_instances[idx].data.data, cpu_instances[idx].data.data, sizeof(uint8_t)*cpu_instances[idx].data.size, cudaMemcpyHostToDevice)
+    cudaMemcpy(gpu_instances[idx].data.data, cpu_instances[idx].data.data, sizeof(uint8_t)*cpu_instances[idx].data.size, cudaMemcpyHostToDevice);
     // contract
     cudaMalloc((void **)&gpu_instances[idx].contract.bytecode, sizeof(uint8_t)*cpu_instances[idx].contract.size);
-    cudaMemcpy(gpu_instances[idx].contract.bytecode, cpu_instances[idx].contract.bytecode, sizeof(uint8_t)*cpu_instances[idx].contract.size, cudaMemcpyHostToDevice)
+    cudaMemcpy(gpu_instances[idx].contract.bytecode, cpu_instances[idx].contract.bytecode, sizeof(uint8_t)*cpu_instances[idx].contract.size, cudaMemcpyHostToDevice);
   }
   return gpu_instances;
 }
@@ -130,9 +128,7 @@ __host__ void free_gpu_messages(gpu_message<params> *gpu_instances, uint32_t cou
 }
 
 template<class params>
-__host__ void write_messages(char *FILE_PATH, gpu_message<params> *cpu_instances, uint32_t count) {
-  FILE *fp;
-  fp = fopen(FILE_PATH, "w");
+__host__ void write_messages(FILE *fp, gpu_message<params> *cpu_instances, uint32_t count) {
   for(uint32_t idx=0; idx<count; idx++) {
     fprintf(fp, "INSTACE: %08x , CALLER: ", idx)
     for(uint32_t jdx=0; jdx<params::BITS/32; jdx++) {

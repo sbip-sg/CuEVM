@@ -10,30 +10,27 @@
 #define __CGBN_H__
 #include <cgbn/cgbn.h>
 #endif
+#include "arith.cuh"
 
 
 template<class params>
 class gpu_stack_t {
   public:
 
-  typedef cgbn_context_t<params::TPI, params>    context_t;
-  typedef cgbn_env_t<context_t, params::BITS>    env_t;
-  typedef typename env_t::cgbn_t                 bn_t;
-  typedef typename env_t::cgbn_wide_t            bn_wide_t;
+  typedef typename arith_env_t<params>::bn_t      bn_t;
+  typedef typename arith_env_t<params>::bn_wide_t bn_wide_t;
   
   typedef struct {
     cgbn_mem_t<params::BITS> values[params::STACK_SIZE];
-  } instance_t;
+  } stack_data_t;
 
 
   cgbn_mem_t<params::BITS> *_stack;
-  uint32_t _top;
-  context_t _context;
-  env_t     _env;
-  uint32_t   _instance;
+  uint32_t  _top;
+  arith_env_t<params>     _arith;
   
   //constructor
-  __device__ __forceinline__ gpu_stack_t(cgbn_monitor_t monitor, cgbn_error_report_t *report, uint32_t instance, cgbn_mem_t<params::BITS> *stack, uint32_t top) : _context(monitor, report, instance), _env(_context), _instance(instance), _stack(stack), _top(top) {
+  __device__ __forceinline__ gpu_stack_t(arith_env_t<params> arith, cgbn_mem_t<params::BITS> *stack, uint32_t top) : _arith(arith), _stack(stack), _top(top) {
   }
 
   //
@@ -43,7 +40,7 @@ class gpu_stack_t {
       return;
     }
     _top--;
-    cgbn_store(_env, _stack + _top, value);
+    cgbn_store(_arith._env, _stack + _top, value);
   }
 
   __device__ __forceinline__ void pop(bn_t &value) {
@@ -51,7 +48,7 @@ class gpu_stack_t {
       printf("Stack underflow\n");
       return;
     }
-    cgbn_load(_env, value, &(_stack[_top]));
+    cgbn_load(_arith._env, value, &(_stack[_top]));
     _top++;
   }
 
@@ -61,10 +58,10 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_add(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_add(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -74,10 +71,10 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_sub(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_sub(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
   
@@ -88,9 +85,9 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_negate(_env, r, a);
-    cgbn_store(_env, &(_stack[_top]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_negate(_arith._env, r, a);
+    cgbn_store(_arith._env, &(_stack[_top]), r);
   }
 
 
@@ -100,10 +97,10 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_mul(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_mul(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -113,13 +110,13 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    if (cgbn_compare_ui32(_env, b, 0) == 0)
-      cgbn_set_ui32(_env, r, 0);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    if (cgbn_compare_ui32(_arith._env, b, 0) == 0)
+      cgbn_set_ui32(_arith._env, r, 0);
     else
-      cgbn_div(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+      cgbn_div(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -129,31 +126,31 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
     bn_t d;
     bn_t e;
-    cgbn_set_ui32(_env, d, 0);
-    cgbn_sub_ui32(_env, d, d, 1);
-    cgbn_set_ui32(_env, e, 1);
-    cgbn_shift_left(_env, e, e, params::BITS-1);
-    uint32_t sign_a = cgbn_extract_bits_ui32(_env, a, params::BITS-1, 1);
-    uint32_t sign_b = cgbn_extract_bits_ui32(_env, b, params::BITS-1, 1);
+    cgbn_set_ui32(_arith._env, d, 0);
+    cgbn_sub_ui32(_arith._env, d, d, 1);
+    cgbn_set_ui32(_arith._env, e, 1);
+    cgbn_shift_left(_arith._env, e, e, params::BITS-1);
+    uint32_t sign_a = cgbn_extract_bits_ui32(_arith._env, a, params::BITS-1, 1);
+    uint32_t sign_b = cgbn_extract_bits_ui32(_arith._env, b, params::BITS-1, 1);
     uint32_t sign = sign_a ^ sign_b;
-    if (cgbn_compare_ui32(_env, b, 0) == 0)
-      cgbn_set_ui32(_env, r, 0);
+    if (cgbn_compare_ui32(_arith._env, b, 0) == 0)
+      cgbn_set_ui32(_arith._env, r, 0);
     else if(
-      (cgbn_compare(_env, b, d) == 0) &&
-      (cgbn_compare(_env, a, e) == 0) ) {
-        cgbn_set(_env, r, e);
+      (cgbn_compare(_arith._env, b, d) == 0) &&
+      (cgbn_compare(_arith._env, a, e) == 0) ) {
+        cgbn_set(_arith._env, r, e);
     } else {
-      cgbn_div(_env, r, a, b);
+      cgbn_div(_arith._env, r, a, b);
       if (sign) {
-        cgbn_negate(_env, r, r);
+        cgbn_negate(_arith._env, r, r);
       }
 
     }
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -163,10 +160,10 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_rem(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_rem(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
   
@@ -176,20 +173,20 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    uint32_t sign_a = cgbn_extract_bits_ui32(_env, a, params::BITS-1, 1);
-    uint32_t sign_b = cgbn_extract_bits_ui32(_env, b, params::BITS-1, 1);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    uint32_t sign_a = cgbn_extract_bits_ui32(_arith._env, a, params::BITS-1, 1);
+    uint32_t sign_b = cgbn_extract_bits_ui32(_arith._env, b, params::BITS-1, 1);
     uint32_t sign = sign_a ^ sign_b;
-    if (cgbn_compare_ui32(_env, b, 0) == 0)
-      cgbn_set_ui32(_env, r, 0);
+    if (cgbn_compare_ui32(_arith._env, b, 0) == 0)
+      cgbn_set_ui32(_arith._env, r, 0);
     else {
-      cgbn_rem(_env, r, a, b);
+      cgbn_rem(_arith._env, r, a, b);
       if (sign) {
-        cgbn_negate(_env, r, r);
+        cgbn_negate(_arith._env, r, r);
       }
     }
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -199,19 +196,19 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, c, m, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_load(_env, m, &(_stack[_top+2]));
-    int32_t carry=cgbn_add(_env, c, a, b);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, m, &(_stack[_top+2]));
+    int32_t carry=cgbn_add(_arith._env, c, a, b);
     bn_wide_t d;
     if (carry) {
-      cgbn_set_ui32(_env, d._high, 1);
-      cgbn_set(_env, d._low, c);
-      cgbn_rem_wide(_env, r, d, m);
+      cgbn_set_ui32(_arith._env, d._high, 1);
+      cgbn_set(_arith._env, d._low, c);
+      cgbn_rem_wide(_arith._env, r, d, m);
     } else {
-      cgbn_rem(_env, r, c, m);
+      cgbn_rem(_arith._env, r, c, m);
     }
-    cgbn_store(_env, &(_stack[_top+2]), r);
+    cgbn_store(_arith._env, &(_stack[_top+2]), r);
     _top=_top+2;
   }
 
@@ -221,13 +218,13 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, m, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_load(_env, m, &(_stack[_top+2]));
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, m, &(_stack[_top+2]));
     bn_wide_t d;
-    cgbn_mul_wide(_env, d, a, b);
-    cgbn_rem_wide(_env, r, d, m);
-    cgbn_store(_env, &(_stack[_top+2]), r);
+    cgbn_mul_wide(_arith._env, d, a, b);
+    cgbn_rem_wide(_arith._env, r, d, m);
+    cgbn_store(_arith._env, &(_stack[_top+2]), r);
     _top=_top+2;
   }
 
@@ -237,26 +234,26 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
     bn_t current, square;
     int32_t bit, last_bit;
-    cgbn_set_ui32(_env, current, 1);
-    cgbn_set(_env, square, a);
-    last_bit=params::BITS-1-cgbn_clz(_env, b);
+    cgbn_set_ui32(_arith._env, current, 1);
+    cgbn_set(_arith._env, square, a);
+    last_bit=params::BITS-1-cgbn_clz(_arith._env, b);
     //^0=1 even for 0^0
     if (last_bit == -1) {
-      cgbn_set_ui32(_env, r, 1);
+      cgbn_set_ui32(_arith._env, r, 1);
     } else {
       for(bit=0;bit<last_bit;bit++) {
-        if(cgbn_extract_bits_ui32(_env, b, bit, 1) == 1) {
-          cgbn_mul(_env, current, current, square);
+        if(cgbn_extract_bits_ui32(_arith._env, b, bit, 1) == 1) {
+          cgbn_mul(_arith._env, current, current, square);
         }
-        cgbn_mul(_env, square, square, square);
+        cgbn_mul(_arith._env, square, square, square);
       }
-      cgbn_set(_env, r, current);
+      cgbn_set(_arith._env, r, current);
     }
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -267,19 +264,19 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
     uint32_t sign;
     uint32_t c;
-    c = cgbn_get_ui32(_env, b);
-    cgbn_set(_env, r, a);
-    sign = cgbn_extract_bits_ui32(_env, a, params::BITS-1 - 8 * (params::BITS/8-c), 1);
+    c = cgbn_get_ui32(_arith._env, b);
+    cgbn_set(_arith._env, r, a);
+    sign = cgbn_extract_bits_ui32(_arith._env, a, params::BITS-1 - 8 * (params::BITS/8-c), 1);
     if ((c <= (params::BITS/8 - 1)) && (sign==1)) {
       for(int i=0;i<=params::BITS/8-c;i++) {
-        cgbn_insert_bits_ui32(_env, r, r, params::BITS - 8 * i, 8, 0xff);
+        cgbn_insert_bits_ui32(_arith._env, r, r, params::BITS - 8 * i, 8, 0xff);
       }
     }
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -290,17 +287,17 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    return cgbn_compare(_env, a, b);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    return cgbn_compare(_arith._env, a, b);
   }
 
   __device__ __forceinline__ void lt() {
     int32_t int_result = compare();
     uint32_t result = (int_result < 0) ? 1 : 0;
     bn_t  r;
-    cgbn_set_ui32(_env, r, result);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_set_ui32(_arith._env, r, result);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -308,8 +305,8 @@ class gpu_stack_t {
     int32_t int_result = compare();
     uint32_t result = (int_result > 0) ? 1 : 0;
     bn_t  r;
-    cgbn_set_ui32(_env, r, result);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_set_ui32(_arith._env, r, result);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
   
@@ -319,16 +316,16 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    uint32_t sign_a = cgbn_extract_bits_ui32(_env, a, params::BITS-1, 1);
-    uint32_t sign_b = cgbn_extract_bits_ui32(_env, b, params::BITS-1, 1);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    uint32_t sign_a = cgbn_extract_bits_ui32(_arith._env, a, params::BITS-1, 1);
+    uint32_t sign_b = cgbn_extract_bits_ui32(_arith._env, b, params::BITS-1, 1);
     if (sign_a == 0 && sign_b == 1) {
       return 1;
     } else if (sign_a == 1 && sign_b == 0) {
       return -1;
     } else {
-      return cgbn_compare(_env, a, b);
+      return cgbn_compare(_arith._env, a, b);
     }
   }
 
@@ -336,8 +333,8 @@ class gpu_stack_t {
     int32_t int_result = scompare();
     uint32_t result = (int_result < 0) ? 1 : 0;
     bn_t  r;
-    cgbn_set_ui32(_env, r, result);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_set_ui32(_arith._env, r, result);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -345,8 +342,8 @@ class gpu_stack_t {
     int32_t int_result = scompare();
     uint32_t result = (int_result > 0) ? 1 : 0;
     bn_t  r;
-    cgbn_set_ui32(_env, r, result);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_set_ui32(_arith._env, r, result);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -354,8 +351,8 @@ class gpu_stack_t {
     int32_t int_result = compare();
     uint32_t result = (int_result == 0) ? 1 : 0;
     bn_t  r;
-    cgbn_set_ui32(_env, r, result);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_set_ui32(_arith._env, r, result);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -365,14 +362,14 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    int32_t compare = cgbn_compare_ui32(_env, a, 0);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    int32_t compare = cgbn_compare_ui32(_arith._env, a, 0);
     if (compare == 0) {
-      cgbn_set_ui32(_env, r, 1);
+      cgbn_set_ui32(_arith._env, r, 1);
     } else {
-      cgbn_set_ui32(_env, r, 1);
+      cgbn_set_ui32(_arith._env, r, 1);
     }
-    cgbn_store(_env, &(_stack[_top]), r);
+    cgbn_store(_arith._env, &(_stack[_top]), r);
   }
 
   __device__ __forceinline__ void bitwise_and() {
@@ -381,10 +378,10 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_bitwise_and(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_bitwise_and(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -394,10 +391,10 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_bitwise_ior(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_bitwise_ior(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -407,10 +404,10 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    cgbn_bitwise_xor(_env, r, a, b);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    cgbn_bitwise_xor(_arith._env, r, a, b);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -420,9 +417,9 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_bitwise_mask_xor(_env, r, a, params::BITS);
-    cgbn_store(_env, &(_stack[_top]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_bitwise_mask_xor(_arith._env, r, a, params::BITS);
+    cgbn_store(_arith._env, &(_stack[_top]), r);
   }
 
   __device__ __forceinline__ void get_byte() {
@@ -431,12 +428,12 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
-    uint32_t index = cgbn_get_ui32(_env, a);
-    uint32_t byte = cgbn_extract_bits_ui32(_env, b, 8 * ((params::BITS/8-1)-index), 8);
-    cgbn_set_ui32(_env, r, byte);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
+    uint32_t index = cgbn_get_ui32(_arith._env, a);
+    uint32_t byte = cgbn_extract_bits_ui32(_arith._env, b, 8 * ((params::BITS/8-1)-index), 8);
+    cgbn_set_ui32(_arith._env, r, byte);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -446,12 +443,12 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
     // TODO maybe compare with params::BITS
-    uint32_t shift = cgbn_get_ui32(_env, a);
-    cgbn_shift_left(_env, r, b, shift);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    uint32_t shift = cgbn_get_ui32(_arith._env, a);
+    cgbn_shift_left(_arith._env, r, b, shift);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -461,12 +458,12 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
     // TODO maybe compare with params::BITS
-    uint32_t shift = cgbn_get_ui32(_env, a);
-    cgbn_shift_right(_env, r, b, shift);
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    uint32_t shift = cgbn_get_ui32(_arith._env, a);
+    cgbn_shift_right(_arith._env, r, b, shift);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -476,16 +473,16 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b, r;
-    cgbn_load(_env, a, &(_stack[_top]));
-    cgbn_load(_env, b, &(_stack[_top+1]));
+    cgbn_load(_arith._env, a, &(_stack[_top]));
+    cgbn_load(_arith._env, b, &(_stack[_top+1]));
     // TODO maybe compare with params::BITS
-    uint32_t shift = cgbn_get_ui32(_env, a);
-    uint32_t sign_b = cgbn_extract_bits_ui32(_env, b, params::BITS-1, 1);
-    cgbn_shift_right(_env, r, b, shift);
+    uint32_t shift = cgbn_get_ui32(_arith._env, a);
+    uint32_t sign_b = cgbn_extract_bits_ui32(_arith._env, b, params::BITS-1, 1);
+    cgbn_shift_right(_arith._env, r, b, shift);
     if (sign_b == 1) {
-      cgbn_bitwise_mask_ior(_env, r, r, -shift);
+      cgbn_bitwise_mask_ior(_arith._env, r, r, -shift);
     }
-    cgbn_store(_env, &(_stack[_top+1]), r);
+    cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
@@ -500,12 +497,12 @@ class gpu_stack_t {
       return;
     }
     bn_t  r;
-    cgbn_set_ui32(_env, r, 0);
+    cgbn_set_ui32(_arith._env, r, 0);
     for(int i=0;i<size;i++) {
-      cgbn_insert_bits_ui32(_env, r, r, params::BITS - 8 * (i+1), 8, value[size-1-i]);
+      cgbn_insert_bits_ui32(_arith._env, r, r, params::BITS - 8 * (i+1), 8, value[size-1-i]);
     }
     _top--;
-    cgbn_store(_env, _stack + _top, r);
+    cgbn_store(_arith._env, _stack + _top, r);
   }
   
 
@@ -523,9 +520,9 @@ class gpu_stack_t {
       return;
     }
     bn_t  r;
-    cgbn_load(_env, r, &(_stack[_top + index - 1]));
+    cgbn_load(_arith._env, r, &(_stack[_top + index - 1]));
     _top--;
-    cgbn_store(_env, _stack + _top, r);
+    cgbn_store(_arith._env, _stack + _top, r);
   }
   
 
@@ -543,15 +540,23 @@ class gpu_stack_t {
       return;
     }
     bn_t  a, b;
-    cgbn_load(_env, a, &(_stack[_top + index - 1]));
-    cgbn_load(_env, b, &(_stack[_top]));
-    cgbn_store(_env, &(_stack[_top]), a);
-    cgbn_store(_env, &(_stack[_top + index - 1]), b);
+    cgbn_load(_arith._env, a, &(_stack[_top + index - 1]));
+    cgbn_load(_arith._env, b, &(_stack[_top]));
+    cgbn_store(_arith._env, &(_stack[_top]), a);
+    cgbn_store(_arith._env, &(_stack[_top + index - 1]), b);
+  }
+
+  __device__ __forceinline__ void copy_stack_data(cgbn_mem_t<params::BITS> *dest) {
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      memcpy(dest, _stack, sizeof(cgbn_mem_t<params::BITS>)*params::STACK_SIZE);
+    }
+    __syncthreads();
   }
   
 // support routine to generate instances
-  __host__ static instance_t *generate_instances(uint32_t count) {
-    instance_t *instances=(instance_t *)malloc(sizeof(instance_t)*count);
+  __host__ static stack_data_t *generate_stack_data(uint32_t count) {
+    stack_data_t *instances=(stack_data_t *)malloc(sizeof(stack_data_t)*count);
 
     for(int index=0;index<count;index++) {
       for(int i=0;i<params::STACK_SIZE;i++) {
@@ -564,7 +569,7 @@ class gpu_stack_t {
   }
 
   // support routine to show the stack on CPU
-  __host__ static void show_results(instance_t *instances, uint32_t count) {
+  __host__ static void show_results(stack_data_t *instances, uint32_t count) {
     
     for(int index=0;index<count;index++) {
       for (int i = 0; i < 10; i++)
