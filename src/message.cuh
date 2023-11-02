@@ -10,6 +10,8 @@
 #define __CGBN_H__
 #include <cgbn/cgbn.h>
 #endif
+#include "contract.cuh"
+#include "utils.h"
 
 template<class params>
 struct gpu_tx {
@@ -18,15 +20,8 @@ struct gpu_tx {
 };
 
 template<class params>
-struct gpu_contract {
-  cgbn_mem_t<params::BITS> address;
-  uint32_t size;
-  uint8_t *bytecode;
-};
-
-template<class params>
 struct gpu_message_data {
-  uint32_t size;
+  size_t size;
   uint8_t *data;
 };
 
@@ -37,50 +32,52 @@ struct gpu_message {
   cgbn_mem_t<params::BITS> to;
   gpu_tx<params> tx;
   gpu_message_data<params> data;
-  gpu_contract<params> contract;
+  typename gpu_global_storage_t<params>::gpu_contract_t *contract;
 };
 
 template<class params>
 __host__ gpu_message<params> *generate_host_messages(uint32_t count) {
   gpu_message<params> *cpu_instances=(gpu_message<params> *)malloc(sizeof(gpu_message<params>)*count);
+  mpz_t caller, value, to, tx_origin, tx_gasprice;
+  char hex_string_value[params::BITS/4+1]; // +1 for null terminator
+  mpz_init(caller);
+  mpz_init(value);
+  mpz_init(to);
+  mpz_init(tx_origin);
+  mpz_init(tx_gasprice);
 
-  // TODO: maybe later change with reading from the files
-  for(uint32_t idx=0; idx<count; idx++) {
+  for(size_t idx=0; idx<count; idx++) {
     // message info
-    cpu_instances[idx].caller._limbs[0]=1;
-    cpu_instances[idx].value._limbs[0]=2;
-    cpu_instances[idx].to._limbs[0]=3;
+    snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+257);
+    mpz_set_str(caller, hex_string_value, 16);
+    snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+1);
+    mpz_set_str(value, hex_string_value, 16);
+    snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+2);
+    mpz_set_str(to, hex_string_value, 16);
+    from_mpz(cpu_instances[idx].caller._limbs, params::BITS/32, caller);
+    from_mpz(cpu_instances[idx].value._limbs, params::BITS/32, value);
+    from_mpz(cpu_instances[idx].to._limbs, params::BITS/32, to);
     // tx
-    cpu_instances[idx].tx.origin._limbs[0]=4;
-    cpu_instances[idx].tx.gasprice._limbs[0]=5;
+    snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+4);
+    mpz_set_str(tx_origin, hex_string_value, 16);
+    snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+5);
+    mpz_set_str(tx_gasprice, hex_string_value, 16);
+    from_mpz(cpu_instances[idx].tx.origin._limbs, params::BITS/32, tx_origin);
+    from_mpz(cpu_instances[idx].tx.gasprice._limbs, params::BITS/32, tx_gasprice);
     // data
-    cpu_instances[idx].data.size=4;
-    cpu_instances[idx].data.data=(uint8_t *) malloc (cpu_instances[instance].data.size);
-    // contract
-    cpu_instances[idx].contract.address._limbs[0]=5;
-    cpu_instances[idx].contract.size=6;
-    cpu_instances[idx].contract.bytecode=(uint8_t *) malloc (cpu_instances[instance].contract.size);
-  
-    for(uint32_t jdx=1; jdx<params::BITS/32; jdx++) {
-      // message info
-      cpu_instances[idx].caller._limbs[jdx]=0;
-      cpu_instances[idx].value._limbs[jdx]=0;
-      cpu_instances[idx].to._limbs[jdx]=0;
-      // tx
-      cpu_instances[idx].tx.origin._limbs[jdx]=0;
-      cpu_instances[idx].tx.gasprice._limbs[jdx]=0;
-      // contract
-      cpu_instances[idx].contract.address._limbs[jdx]=0;
-    }
-    // data
+    cpu_instances[idx].data.size=idx % 30 + 1;
+    cpu_instances[idx].data.data=(uint8_t *) malloc (cpu_instances[idx].data.size);
     for(uint32_t jdx=0; jdx<cpu_instances[idx].data.size; jdx++) {
       cpu_instances[idx].data.data[jdx]=(uint8_t)jdx;
     }
     // contract
-    for(uint32_t jdx=0; jdx<cpu_instances[idx].contract.size; jdx++) {
-      cpu_instances[idx].contract.bytecode[jdx]=(uint8_t)jdx;
-    }
+    cpu_instances[idx].contract = NULL;
   }
+  mpz_clear(caller);
+  mpz_clear(value);
+  mpz_clear(to);
+  mpz_clear(tx_origin);
+  mpz_clear(tx_gasprice);
   return cpu_instances;
 }
 
@@ -91,46 +88,48 @@ __host__ void free_host_messages(gpu_message<params> *cpu_instances, uint32_t co
   for(uint32_t idx=0; idx<count; idx++) {
     // data
     free(cpu_instances[idx].data.data);
-    // contract
-    free(cpu_instances[idx].contract.bytecode);
   }
   free(cpu_instances);
 }
 
 template<class params>
 __host__ gpu_message<params> *generate_gpu_messages(gpu_message<params> *cpu_instances, uint32_t count) {
-  gpu_message<params> *gpu_instances;
-  cudaMalloc((void **)&gpu_instances, sizeof(gpu_message<params>)*count);
-  cudaMemcpy(gpu_instances, cpu_instances, sizeof(instance_t)*count, cudaMemcpyHostToDevice);
+  gpu_message<params> *gpu_instances, *tmp_cpu_instaces;
+  tmp_cpu_instaces = (gpu_message<params> *)malloc(count*sizeof(gpu_message<params>));
+  memcpy(tmp_cpu_instaces, cpu_instances, count*sizeof(gpu_message<params>));
 
+  //write_messages<params>(stdout, tmp_cpu_instaces, count);
   for(uint32_t idx=0; idx<count; idx++) {
     // data
-    cudaMalloc((void **)&gpu_instances[idx].data.data, sizeof(uint8_t)*cpu_instances[idx].data.size);
-    cudaMemcpy(gpu_instances[idx].data.data, cpu_instances[idx].data.data, sizeof(uint8_t)*cpu_instances[idx].data.size, cudaMemcpyHostToDevice);
-    // contract
-    cudaMalloc((void **)&gpu_instances[idx].contract.bytecode, sizeof(uint8_t)*cpu_instances[idx].contract.size);
-    cudaMemcpy(gpu_instances[idx].contract.bytecode, cpu_instances[idx].contract.bytecode, sizeof(uint8_t)*cpu_instances[idx].contract.size, cudaMemcpyHostToDevice);
+    cudaMalloc((void **)&(tmp_cpu_instaces[idx].data.data), sizeof(uint8_t)*tmp_cpu_instaces[idx].data.size);
+    cudaMemcpy(tmp_cpu_instaces[idx].data.data, cpu_instances[idx].data.data, sizeof(uint8_t)*tmp_cpu_instaces[idx].data.size, cudaMemcpyHostToDevice);
   }
+  //write_messages<params>(stdout, tmp_cpu_instaces, count);
+  cudaMalloc((void **)&gpu_instances, sizeof(gpu_message<params>)*count);
+  cudaMemcpy(gpu_instances, tmp_cpu_instaces, sizeof(gpu_message<params>)*count, cudaMemcpyHostToDevice);
+  free(tmp_cpu_instaces);
   return gpu_instances;
 }
 
 
 template<class params>
 __host__ void free_gpu_messages(gpu_message<params> *gpu_instances, uint32_t count) {
+  gpu_message<params> *tmp_cpu_instaces;
+  tmp_cpu_instaces = (gpu_message<params> *)malloc(count*sizeof(gpu_message<params>));
+  cudaMemcpy(tmp_cpu_instaces, gpu_instances, count*sizeof(gpu_message<params>), cudaMemcpyDeviceToHost);
 
   for(uint32_t idx=0; idx<count; idx++) {
     // data
-    cudaFree(gpu_instances[idx].data.data);
-    // contract
-    cudaFree(gpu_instances[idx].contract.bytecode);
+    cudaFree(tmp_cpu_instaces[idx].data.data);
   }
+  free(tmp_cpu_instaces);
   cudaFree(gpu_instances);
 }
 
 template<class params>
 __host__ void write_messages(FILE *fp, gpu_message<params> *cpu_instances, uint32_t count) {
   for(uint32_t idx=0; idx<count; idx++) {
-    fprintf(fp, "INSTACE: %08x , CALLER: ", idx)
+    fprintf(fp, "INSTACE: %08x , CALLER: ", idx);
     for(uint32_t jdx=0; jdx<params::BITS/32; jdx++) {
       fprintf(fp, "%08x ", cpu_instances[idx].caller._limbs[jdx]);
     }
@@ -151,24 +150,25 @@ __host__ void write_messages(FILE *fp, gpu_message<params> *cpu_instances, uint3
       fprintf(fp, "%08x ", cpu_instances[idx].tx.gasprice._limbs[jdx]);
     }
     fprintf(fp, ", DATA_SIZE: ");
-    fprintf(fp, "%08x ", cpu_instances[idx].data.size);
+    fprintf(fp, "%lx ", cpu_instances[idx].data.size);
+    /*
     fprintf(fp, ", DATA: ");
-    for(uint32_t jdx=0; jdx<cpu_instances[idx].data.size; jdx++) {
+    for(size_t jdx=0; jdx<cpu_instances[idx].data.size; jdx++) {
       fprintf(fp, "%02x ", cpu_instances[idx].data.data[jdx]);
     }
     fprintf(fp, ", CONTRACT_ADDRESS: ");
     for(uint32_t jdx=0; jdx<params::BITS/32; jdx++) {
-      fprintf(fp, "%08x ", cpu_instances[idx].contract.address._limbs[jdx]);
+      fprintf(fp, "%08x ", cpu_instances[idx].contract->address._limbs[jdx]);
     }
     fprintf(fp, ", CONTRACT_SIZE: ");
-    fprintf(fp, "%08x ", cpu_instances[idx].contract.size);
+    fprintf(fp, "%lx ", cpu_instances[idx].contract->code_size);
     fprintf(fp, ", CONTRACT_BYTECODE: ");
-    for(uint32_t jdx=0; jdx<cpu_instances[idx].contract.size; jdx++) {
-      fprintf(fp, "%02x ", cpu_instances[idx].contract.bytecode[jdx]);
+    for(size_t jdx=0; jdx<cpu_instances[idx].contract->code_size; jdx++) {
+      fprintf(fp, "%02x ", cpu_instances[idx].contract->bytecode[jdx]);
     }
+    */
     fprintf(fp, "\n");
   }
-  fclose(fp)
 }
 
 #endif

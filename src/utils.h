@@ -93,8 +93,22 @@ class mr_params_t {
   static const uint32_t STACK_SIZE=stack_size;
   static const uint32_t MEMORY_SIZE=memory_size;          // memory size in bytes
   static const uint32_t STORAGE_SIZE=storage_size;          // memory size in bytes
+  static const uint32_t MAX_CODE_SIZE=500;         // total instances official 24576
+  static const uint32_t MAX_STORAGE_SIZE=100;        // words per instance
 };
 
 typedef mr_params_t<8, 256, 1, 1024, 4096, 50> utils_params;
 
+void from_mpz(uint32_t *words, uint32_t count, mpz_t value) {
+  size_t written;
+
+  if(mpz_sizeinbase(value, 2)>count*32) {
+    fprintf(stderr, "from_mpz failed -- result does not fit\n");
+    exit(1);
+  }
+
+  mpz_export(words, &written, -1, sizeof(uint32_t), 0, 0, value);
+  while(written<count)
+    words[written++]=0;
+}
 #endif
