@@ -2,6 +2,7 @@
 #define _EVM_ERRORCODES_H_
 
 // error codes
+#define ERR_NONE 0x00
 
 // stack codes
 #define ERR_STACK_UNDERFLOW 0x01
@@ -19,4 +20,7 @@
 #define ERR_GLOBAL_STORAGE_INVALID_ADDRESS 0x07
 #define ERR_GLOBAL_STORAGE_INVALID_KEY 0x08
 
+
+// operation not implemented
+#define ERR_NOT_IMPLEMENTED 0x09
 #endif

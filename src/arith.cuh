@@ -47,6 +47,18 @@ class arith_env_t {
     }
   }
 
+  __device__ __forceinline__ void from_size_t_to_cgbn(bn_t &a, size_t src) {
+    cgbn_insert_bits_ui32(_env, a, a, 32, 32, (src >> 32));
+    cgbn_insert_bits_ui32(_env, a, a, 0, 32, src);
+  }
+
+  __device__ __forceinline__ size_t from_cgbn_to_size_t(bn_t &a) {
+    size_t dst = 0;
+    dst = cgbn_extract_bits_ui32(_env, a, 0, 32);
+    dst |= ((size_t)cgbn_extract_bits_ui32(_env, a, 32, 32)) << 32;
+    return dst;
+  }
+
 };
 
 #endif

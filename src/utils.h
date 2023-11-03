@@ -34,6 +34,22 @@ IN THE SOFTWARE.
 #include <cgbn/cgbn.h>
 #endif
 
+int adjustedLength(char** hexString) {
+    if (strncmp(*hexString, "0x", 2) == 0 || strncmp(*hexString, "0X", 2) == 0) {
+        *hexString += 2;  // Skip the "0x" prefix
+        return (strlen(*hexString) / 2);
+    }
+    return (strlen(*hexString) / 2);
+}
+
+void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int length)
+{
+    for (int i = 0; i < length; i += 2)
+    {
+        sscanf(&hexString[i], "%2hhx", &byteArray[i / 2]);
+    }
+}
+
 // support routines
 void cuda_check(cudaError_t status, const char *action=NULL, const char *file=NULL, int32_t line=0) {
   // check for cuda errors

@@ -31,6 +31,9 @@ struct gpu_message {
   cgbn_mem_t<params::BITS> value;
   cgbn_mem_t<params::BITS> to;
   gpu_tx<params> tx;
+  cgbn_mem_t<params::BITS> gas;
+  uint32_t depth;
+  uint32_t call_type;
   gpu_message_data<params> data;
   typename gpu_global_storage_t<params>::gpu_contract_t *contract;
 };
@@ -64,6 +67,9 @@ __host__ gpu_message<params> *generate_host_messages(uint32_t count) {
     mpz_set_str(tx_gasprice, hex_string_value, 16);
     from_mpz(cpu_instances[idx].tx.origin._limbs, params::BITS/32, tx_origin);
     from_mpz(cpu_instances[idx].tx.gasprice._limbs, params::BITS/32, tx_gasprice);
+    // depth and call_type
+    cpu_instances[idx].depth=0;
+    cpu_instances[idx].call_type=0;
     // data
     cpu_instances[idx].data.size=idx % 30 + 1;
     cpu_instances[idx].data.data=(uint8_t *) malloc (cpu_instances[idx].data.size);

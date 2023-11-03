@@ -79,6 +79,7 @@
 #define OP_JUMPDEST 0x5B
 
 // push
+#define OP_PUSH0 0x5F
 #define OP_PUSH1 0x60
 #define OP_PUSH2 0x61
 #define OP_PUSH3 0x62
