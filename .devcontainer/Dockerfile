@@ -17,3 +17,5 @@ RUN apt update && apt upgrade -y && apt-get install -y locales && locale-gen "en
 RUN apt-get install -y curl zip unzip git wget
 # install gmp
 RUN apt-get install -y libgmp-dev
+# install cjson
+RUN apt-get install -y libcjson1 libcjson-dev

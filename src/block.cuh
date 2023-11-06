@@ -17,7 +17,7 @@ struct gpu_block {
   cgbn_mem_t<params::BITS> coin_base;
   cgbn_mem_t<params::BITS> time_stamp;
   cgbn_mem_t<params::BITS> number;
-  cgbn_mem_t<params::BITS> dificulty;
+  cgbn_mem_t<params::BITS> difficulty;
   cgbn_mem_t<params::BITS> gas_limit;
   cgbn_mem_t<params::BITS> chain_id;
   cgbn_mem_t<params::BITS> base_fee;
@@ -33,11 +33,11 @@ struct gpu_block_hash {
 template<class params>
 __host__ gpu_block<params> *generate_cpu_blocks(uint32_t count) {
   gpu_block<params> *cpu_instances=(gpu_block<params> *)malloc(sizeof(gpu_block<params>)*count);
-  mpz_t coin_base, time_stamp, number, dificulty, gas_limit, chain_id, base_fee;
+  mpz_t coin_base, time_stamp, number, difficulty, gas_limit, chain_id, base_fee;
   mpz_init(coin_base);
   mpz_init(time_stamp);
   mpz_init(number);
-  mpz_init(dificulty);
+  mpz_init(difficulty);
   mpz_init(gas_limit);
   mpz_init(chain_id);
   mpz_init(base_fee);
@@ -51,7 +51,7 @@ __host__ gpu_block<params> *generate_cpu_blocks(uint32_t count) {
     snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+2);
     mpz_set_str(number, hex_string_value, 16);
     snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+3);
-    mpz_set_str(dificulty, hex_string_value, 16);
+    mpz_set_str(difficulty, hex_string_value, 16);
     snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+4);
     mpz_set_str(gas_limit, hex_string_value, 16);
     snprintf(hex_string_value, params::BITS/4+1, "%lx", idx+5);
@@ -62,7 +62,7 @@ __host__ gpu_block<params> *generate_cpu_blocks(uint32_t count) {
     from_mpz(cpu_instances[idx].coin_base._limbs, params::BITS/32, coin_base);
     from_mpz(cpu_instances[idx].time_stamp._limbs, params::BITS/32, time_stamp);
     from_mpz(cpu_instances[idx].number._limbs, params::BITS/32, number);
-    from_mpz(cpu_instances[idx].dificulty._limbs, params::BITS/32, dificulty);
+    from_mpz(cpu_instances[idx].difficulty._limbs, params::BITS/32, difficulty);
     from_mpz(cpu_instances[idx].gas_limit._limbs, params::BITS/32, gas_limit);
     from_mpz(cpu_instances[idx].chain_id._limbs, params::BITS/32, chain_id);
     from_mpz(cpu_instances[idx].base_fee._limbs, params::BITS/32, base_fee);
@@ -71,7 +71,7 @@ __host__ gpu_block<params> *generate_cpu_blocks(uint32_t count) {
   mpz_clear(coin_base);
   mpz_clear(time_stamp);
   mpz_clear(number);
-  mpz_clear(dificulty);
+  mpz_clear(difficulty);
   mpz_clear(gas_limit);
   mpz_clear(chain_id);
   mpz_clear(base_fee);
@@ -100,7 +100,7 @@ __host__ void write_blocks(FILE *fp, gpu_block<params> *cpu_instances, uint32_t 
     }
     fprintf(fp, ", DIFICULTY: ");
     for(uint32_t jdx=0; jdx<params::BITS/32; jdx++) {
-      fprintf(fp, "%08x ", cpu_instances[idx].dificulty._limbs[jdx]);
+      fprintf(fp, "%08x ", cpu_instances[idx].difficulty._limbs[jdx]);
     }
     fprintf(fp, ", GASLIMIT: ");
     for(uint32_t jdx=0; jdx<params::BITS/32; jdx++) {

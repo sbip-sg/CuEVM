@@ -33,6 +33,10 @@ class gpu_stack_t {
   __device__ __forceinline__ gpu_stack_t(arith_env_t<params> arith, cgbn_mem_t<params::BITS> *stack, uint32_t top) : _arith(arith), _stack(stack), _top(top) {
   }
 
+  __device__ __forceinline__ uint32_t size() {
+    return params::STACK_SIZE - _top;
+  }
+
   //
   __device__ __forceinline__ void push(const bn_t &value) {
     if (_top == 0) {

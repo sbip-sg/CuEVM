@@ -165,6 +165,7 @@
 #define OP_CREATE2 0xF5
 #define OP_STATICCALL 0xFA
 #define OP_REVERT 0xFD
+#define OP_INVALID 0xFE
 #define OP_SELFDESTRUCT 0xFF
 
 #endif

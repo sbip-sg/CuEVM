@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <cjson/cJSON.h>
 #include <cuda.h>
 #include "utils.h"
 #include "arith.cuh"
@@ -30,10 +31,10 @@ typedef struct {
 
 #define MAX_EXECUTION_SIZE 1000
 
-__device__ __global__ interpreter_state_t execution_state[MAX_EXECUTION_SIZE];
+__device__ interpreter_state_t execution_state[MAX_EXECUTION_SIZE];
 
 template<class params>
-__global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename gpu_message<params>::gpu_message *msgs, typename gpu_stack_t<params>::stack_data_t *stacks, memory_data_t *debug_memory, return_data_t *returns, uint32_t instance_count, unit32_t *execution_lengths, uint32_t *errors)
+__global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename gpu_message<params>::gpu_message *msgs, typename gpu_stack_t<params>::stack_data_t *stacks, memory_data_t *debug_memory, return_data_t *returns, uint32_t instance_count, uint32_t *execution_lengths, uint32_t *errors)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
@@ -44,6 +45,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
     uint32_t execution_step;
     memory_data._size=0;
     memory_data._data=NULL;
+    pc = 0;
 
     if(instance>=instance_count)
         return;
@@ -65,8 +67,6 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
     // initialiase the memory
     gpu_memory_t  memory(&memory_data);
 
-    pc = 0;
-    execution_step;
     uint8_t opcode;
         /*execution_state[execution_step].pc=pc;
         execution_state[execution_step].stack_size=stack.size();
@@ -75,7 +75,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
     // auxiliary variables
     bn_t address, key, value, offset, length, index;
     size_t destOffset, srcOffset, size_length;
-    for (execution_step=0; execution_step<MAX_EXECUTION_SIZE; execution_step++) {
+    for (execution_step=0; execution_step<MAX_EXECUTION_SIZE && pc<contract->code_size; execution_step++) {
         opcode=contract->bytecode[pc];
 
         if (opcode&0xF0==0x60 || opcode&0xF0==0x70) {
@@ -95,11 +95,12 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
         } else if (opcode&0xF0==0xA0) {
             // LOG
             uint8_t log_index=opcode&0x0F;
-            errors[instance]=ERR_NOT_IMPLEMENTED
+            errors[instance]=ERR_NOT_IMPLEMENTED;
         } else {
             switch (opcode) {
                 case OP_STOP: // STOP
                     pc=pc;
+                    break;
                 case OP_ADD: // ADD
                     {
                         stack.add();
@@ -207,7 +208,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     break;
                 case OP_BYTE: // BYTE
                     {
-                        stack.byte();
+                        stack.get_byte();
                     }
                     break;
                 case OP_SHL: // SHL
@@ -227,7 +228,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     break;
                 case OP_SHA3: // SHA3
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_ADDRESS: // ADDRESS
@@ -238,7 +239,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     break;
                 case OP_BALANCE: // BALANCE
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_ORIGIN: // ORIGIN
@@ -262,13 +263,13 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                 case OP_CALLDATALOAD: // CALLDATALOAD
                     {
                         stack.pop(index);
-                        airth.from_memory_to_cgbn(value, msgs[instance].data + cgbn_get_uint32(arith._env, index));
+                        arith.from_memory_to_cgbn(value, msgs[instance].data.data + cgbn_get_ui32(arith._env, index));
                         stack.push(value);
                     }
                     break;
                 case OP_CALLDATASIZE: // CALLDATASIZE
                     {
-                        airth.from_size_t_to_cgbn(length, msgs[instance].data_size);
+                        arith.from_size_t_to_cgbn(length, msgs[instance].data.size);
                         stack.push(length);
                     }
                     break;
@@ -280,12 +281,12 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                         destOffset=arith.from_cgbn_to_size_t(offset);
                         srcOffset=arith.from_cgbn_to_size_t(index);
                         size_length=arith.from_cgbn_to_size_t(length);
-                        memory.set(destOffset, msgs[instance].data + srcOffset, size_length);
+                        memory.set(destOffset, size_length, msgs[instance].data.data + srcOffset);
                     }
                     break;
                 case OP_CODESIZE: // CODESIZE
                     {
-                        airth.from_size_t_to_cgbn(length, contract->code_size);
+                        arith.from_size_t_to_cgbn(length, contract->code_size);
                         stack.push(length);
                     }
                     break;
@@ -297,7 +298,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                         destOffset=arith.from_cgbn_to_size_t(offset);
                         srcOffset=arith.from_cgbn_to_size_t(index);
                         size_length=arith.from_cgbn_to_size_t(length);
-                        memory.set(destOffset, contract->bytecode + srcOffset, size_length);
+                        memory.set(destOffset, size_length, contract->bytecode + srcOffset);
                     }
                     break;
                 case OP_GASPRICE: // GASPRICE
@@ -308,22 +309,22 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     break;
                 case OP_EXTCODESIZE: // EXTCODESIZE
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_EXTCODECOPY: // EXTCODECOPY
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_RETURNDATASIZE: // RETURNDATASIZE
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_RETURNDATACOPY: // RETURNDATACOPY
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_BLOCKHASH: // BLOCKHASH
@@ -402,7 +403,8 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     {
                         stack.pop(offset);
                         stack.pop(value);
-                        memory.set(arith.from_cgbn_to_size_t(offset), arith.from_cgbn_to_uint8(value), 32);
+                        arith.from_cgbn_to_memory(&(tmp[0]), value);
+                        memory.set(arith.from_cgbn_to_size_t(offset), 32, &(tmp[0]));
                     }
                     break;
                 case OP_MSTORE8: // MSTORE8
@@ -410,23 +412,23 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                         stack.pop(offset);
                         stack.pop(value);
                         arith.from_cgbn_to_memory(&(tmp[0]), value);
-                        memory.set(arith.from_cgbn_to_size_t(offset), &(tmp[0]), 1);
+                        memory.set(arith.from_cgbn_to_size_t(offset), 1, &(tmp[0]));
                     }
                     break;
                 case OP_SLOAD: // SLOAD
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_SSTORE: // SSTORE
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_JUMP: // JUMP
                     {
                         stack.pop(index);
-                        pc=arith.from_cgbn_to_uint32(index)-1;
+                        pc=arith.from_cgbn_to_size_t(index)-1;
                     }
                     break;
                 case OP_JUMPI: // JUMPI
@@ -434,7 +436,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                         stack.pop(index);
                         stack.pop(value);
                         if (cgbn_compare_ui32(arith._env, value, 0)!=0) {
-                            pc=arith.from_cgbn_to_uint32(index)-1;
+                            pc=arith.from_cgbn_to_size_t(index)-1;
                         }
                     }
                     break;
@@ -446,7 +448,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     break;
                 case OP_MSIZE: // MSIZE
                     {
-                        airth.from_size_t_to_cgbn(length,  memory.size());
+                        arith.from_size_t_to_cgbn(length,  memory.size());
                         stack.push(length);
                     }
                     break;
@@ -470,17 +472,17 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     break;
                 case OP_CREATE: // CREATE
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_CALL: // CALL
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_CALLCODE: // CALLCODE
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_RETURN: // RETURN
@@ -495,17 +497,17 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                     break;
                 case OP_DELEGATECALL: // DELEGATECALL
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_CREATE2: // CREATE2
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_STATICCALL: // STATICCALL
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_REVERT: // REVERT
@@ -516,17 +518,17 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
                         size_length=arith.from_cgbn_to_size_t(length);
                         returns[instance].offset=destOffset;
                         returns[instance].length=size_length;
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_INVALID: // INVALID
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
                 case OP_SELFDESTRUCT: // SELFDESTRUCT
                     {
-                        errors[instance]=ERR_NOT_IMPLEMENTED
+                        errors[instance]=ERR_NOT_IMPLEMENTED;
                     }
                     break;
             }
@@ -540,7 +542,7 @@ __global__ void cu_evm_interpreter_kernel(cgbn_error_report_t *report, typename 
         }
     }
     execution_lengths[instance]=execution_step;
-    memory.copy_memory_data(&(debug_memory[instance]));
+    memory.copy_content_info_to(&(debug_memory[instance]));
 }
 
 template<class params>
@@ -576,15 +578,15 @@ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t bytecode_len, s
     // I consider that it does not have any storage space
     free(cpu_contract[0].bytecode);
     cpu_contract[0].storage_size=0;
-    cpu_contract[0].bytecode_size=bytecode_len;
+    cpu_contract[0].code_size=bytecode_len;
     cpu_contract[0].bytecode=(unsigned char *)malloc(bytecode_len);
     memcpy(cpu_contract[0].bytecode, bytecode, bytecode_len);
     // make the message on CPU and initiliase with the input data
     cpu_messages=generate_host_messages<params>(1);
-    free(cpu_messages[0].data);
-    cpu_messages[0].data_size=input_len;
-    cpu_messages[0].data=(unsigned char *)malloc(input_len);
-    memcpy(cpu_messages[0].data, input, input_len);
+    free(cpu_messages[0].data.data);
+    cpu_messages[0].data.size=input_len;
+    cpu_messages[0].data.data=(unsigned char *)malloc(input_len);
+    memcpy(cpu_messages[0].data.data, input, input_len);
 
     // make the gpu contract and gpu message
     gpu_contract=gpu_global_storage_t<params>::generate_gpu_global_storage(cpu_contract, 1);
@@ -592,7 +594,7 @@ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t bytecode_len, s
     gpu_messages=generate_gpu_messages<params>(cpu_messages, 1);
     
     // allocate the return information
-    cpu_returns=generate_host_returns(1)
+    cpu_returns=generate_host_returns(1);
     gpu_returns=generate_gpu_returns(cpu_returns, 1);
 
     // allocate the execution lengths and errors
@@ -625,7 +627,7 @@ void cuEVM(unsigned char *bytecode, unsigned char *input, size_t bytecode_len, s
     CUDA_CHECK(cudaDeviceSynchronize());
     CGBN_CHECK(report);
 
-    get_memory_from_gpu(cpu_instances, gpu_instances, instance_count);
+    get_memory_from_gpu(cpu_memory, gpu_memory, 1);
 
     // CLEANUP
     printf("Freeing memory\n");
@@ -696,30 +698,37 @@ int main(int argc, char *argv[])
     // call my function
     cuEVM<utils_params>(byte_code, input, bytecode_len, input_len);
 
-    printf("Pass conversion\n");
-    unsigned char *d_bytecode, *d_input;
-    cudaMalloc((void **)&d_bytecode, bytecode_len);
-    cudaMalloc((void **)&d_input, input_len);
-
-    cudaMemcpy(d_bytecode, byte_code, bytecode_len, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_input, input, input_len, cudaMemcpyHostToDevice);
-    printf("Pass allocation and memcpy\n");
-
-
-
-    int blockSize = 256;
-    int numBlocks = (NUMTHREAD + blockSize - 1) / blockSize;
-    cuEVM<<<numBlocks, blockSize>>>(d_bytecode, d_input, bytecode_len, input_len, NUMTHREAD);
-    printf("RUN\n");
-
-    cudaDeviceSynchronize();
-    printf("Syncrhronize\n");
-
-    // clean up
-    cudaFree(d_bytecode);
-    cudaFree(d_input);
-    free(byte_code);
-    free(input);
-
     return 0;
 }
+
+
+/*
+{
+  "success": true,
+  "traces": [
+    {
+      "pc": 0,
+      "opcode": 96,
+      "stack": {
+        "data": []
+      }
+    },
+...
+...
+      }
+    },
+    {
+      "pc": 128,
+      "opcode": 243,
+      "stack": {
+        "data": [
+          "0x27f12a5f",
+          "0x20",
+          "0x80"
+        ]
+      }
+    }
+  ],
+  "output": "0x0000000000000000000000000000000000000000000000000000000000000022"
+  "input" : "0x0000000000000000000000000000000000000000000000000000000000000022"
+*/

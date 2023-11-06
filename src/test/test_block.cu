@@ -59,8 +59,8 @@ __global__ void kernel_global_block(cgbn_error_report_t *report) {
   printf("time_stamp: %08x\n", cgbn_get_ui32(arith._env, a));
   cgbn_load(arith._env, a, &(gpu_current_block.number));
   printf("number: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_current_block.dificulty));
-  printf("dificulty: %08x\n", cgbn_get_ui32(arith._env, a));
+  cgbn_load(arith._env, a, &(gpu_current_block.difficulty));
+  printf("difficulty: %08x\n", cgbn_get_ui32(arith._env, a));
   cgbn_load(arith._env, a, &(gpu_current_block.gas_limit));
   printf("gas_limit: %08x\n", cgbn_get_ui32(arith._env, a));
   cgbn_load(arith._env, a, &(gpu_current_block.chain_id));

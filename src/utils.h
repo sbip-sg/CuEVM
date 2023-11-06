@@ -33,20 +33,23 @@ IN THE SOFTWARE.
 #define __CGBN_H__
 #include <cgbn/cgbn.h>
 #endif
+#include <cjson/cJSON.h>
+#include "opcodes.h"
+#include "error_codes.h"
 
-int adjustedLength(char** hexString) {
-    if (strncmp(*hexString, "0x", 2) == 0 || strncmp(*hexString, "0X", 2) == 0) {
-        *hexString += 2;  // Skip the "0x" prefix
-        return (strlen(*hexString) / 2);
+size_t adjusted_length(char** hex_string) {
+    if (strncmp(*hex_string, "0x", 2) == 0 || strncmp(*hex_string, "0X", 2) == 0) {
+        *hex_string += 2;  // Skip the "0x" prefix
+        return (strlen(*hex_string) / 2);
     }
-    return (strlen(*hexString) / 2);
+    return (strlen(*hex_string) / 2);
 }
 
-void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int length)
+void hex_to_bytes(const char *hex_string, uint8_t *byte_array, size_t length)
 {
-    for (int i = 0; i < length; i += 2)
+    for (size_t idx = 0; idx < length; idx += 2)
     {
-        sscanf(&hexString[i], "%2hhx", &byteArray[i / 2]);
+        sscanf(&hex_string[idx], "%2hhx", &byte_array[idx / 2]);
     }
 }
 
@@ -126,5 +129,46 @@ void from_mpz(uint32_t *words, uint32_t count, mpz_t value) {
   mpz_export(words, &written, -1, sizeof(uint32_t), 0, 0, value);
   while(written<count)
     words[written++]=0;
+}
+
+void to_mpz(mpz_t r, uint32_t *x, uint32_t count) {
+  mpz_import(r, count, -1, sizeof(uint32_t), 0, 0, x);
+}
+
+template<class params>
+void print_bn(cgbn_mem_t<params::BITS> bn) {
+  for(size_t idx=0; idx<params::BITS/32; idx++)
+    printf("%08x ", bn._limbs[idx]);
+}
+
+void print_bytes(uint8_t *bytes, size_t count) {
+  for(size_t idx=0; idx<count; idx++)
+    printf("%02x", bytes[idx]);
+}
+
+char *bytes_to_hex(uint8_t *bytes, size_t count) {
+  char *hex_string = (char *)malloc(count*2+1+2);
+  for(size_t idx=0; idx<count; idx++)
+    sprintf(&hex_string[idx*2], "%02x", bytes[idx]);
+  hex_string[count*2]=0;
+  strcpy(hex_string + 2, hex_string);
+  hex_string[0]='0';
+  hex_string[1]='x';
+  return hex_string;
+}
+
+cJSON *get_json_from_file(const char *filepath) {
+    FILE *fp = fopen(filepath, "r");
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    char *buffer = (char *)malloc(size + 1);
+    fread(buffer, 1, size, fp);
+    fclose(fp);
+    buffer[size] = '\0';
+    // parse
+    cJSON *root = cJSON_Parse(buffer);
+    free(buffer);
+    return root;
 }
 #endif

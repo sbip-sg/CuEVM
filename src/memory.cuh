@@ -310,7 +310,7 @@ __global__ void kernel_get_memory(memory_data_t *dst_instances, memory_data_t *s
     printf("Copying results back to CPU for content info\n");
     cudaMemcpy(cpu_instances, gpu_instances, sizeof(memory_data_t)*instance_count, cudaMemcpyDeviceToHost);
     printf("RUN H D size=%lx\n", cpu_instances[0]._size);
-    printf("RUN H D data address=%08x\n", cpu_instances[0]._data);
+    printf("RUN H D data address=%p\n", cpu_instances[0]._data);
 
     printf("Generate the necesary CPU memory to take the values given the content info\n");
     final_cpu_instaces=gpu_memory_t::generate_memory_data(cpu_instances, instance_count);
