@@ -37,14 +37,12 @@ IN THE SOFTWARE.
 #include "../arith.cuh"
 
 
-typedef typename gpu_block<utils_params>::gpu_block gpu_block_t;
-typedef typename gpu_block_hash<utils_params>::gpu_block_hash gpu_block_hash_t;
+typedef typename block_t<utils_params>::block_t block_t;
 
-__device__ __constant__ gpu_block_t gpu_current_block;
-__device__ __constant__ gpu_block_hash_t gpu_last_blocks_hash[256];
+__device__ __constant__ block_t current_block;
 
 template<class params>
-__global__ void kernel_global_block(cgbn_error_report_t *report) {
+__global__ void kernel_block(cgbn_error_report_t *report) {
   uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
 
   typedef arith_env_t<params> local_arith_t;
@@ -69,43 +67,60 @@ __global__ void kernel_global_block(cgbn_error_report_t *report) {
   printf("base_fee: %08x\n", cgbn_get_ui32(arith._env, a));
 
   //block hash
-  cgbn_load(arith._env, a, &(gpu_last_blocks_hash[1].number));
+  cgbn_load(arith._env, a, &(cpu_block.previous_blocks[0].number));
   printf("BH number: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_last_blocks_hash[1].hash));
+  cgbn_load(arith._env, a, &(cpu_block.previous_blocks[0].hash));
   printf("BH hash: %08x\n", cgbn_get_ui32(arith._env, a));
 }
 
 void run_test() {  
-  gpu_block_t          *cpu_blocks;
-  gpu_block_hash_t     *cpu_blocks_hash;
+  block_t          *cpu_block;
   cgbn_error_report_t     *report;
   
-  printf("Genereating primes and instances ...\n");
-  cpu_blocks=generate_cpu_blocks<utils_params>(1);
-  cpu_blocks_hash=generate_cpu_blocks_hash<utils_params>(256);
-  
-  printf("Copying primes and instances to the GPU ...\n");
-  CUDA_CHECK(cudaMemcpyToSymbol(gpu_current_block, cpu_blocks, sizeof(gpu_block_t)));
-  CUDA_CHECK(cudaMemcpyToSymbol(gpu_last_blocks_hash, cpu_blocks_hash, sizeof(gpu_block_hash_t)*256));
-  
+  //read the json file with the global state
+  cJSON *root = get_json_from_file("input/evm_test.json");
+  if(root == NULL) {
+    printf("Error: could not read the json file\n");
+    exit(1);
+  }
+  const cJSON *test = NULL;
+  test = cJSON_GetObjectItemCaseSensitive(root, "sstoreGas");
+
+  printf("Generating the global block\n");
+  cpu_block=cpu_block_from_json<utils_params>(test);
+  print_block<utils_params>(cpu_block);
+  CUDA_CHECK(cudaMemcpyToSymbol(current_block, cpu_block, sizeof(block_t)));
+  printf("Global block generated\n");
+
   // create a cgbn_error_report for CGBN to report back errors
   CUDA_CHECK(cgbn_error_report_alloc(&report)); 
   
   printf("Running GPU kernel ...\n");
 
-  kernel_global_block<utils_params><<<1, utils_params::TPI>>>(report);
+  kernel_block<utils_params><<<1, utils_params::TPI>>>(report);
 
   // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
   CUDA_CHECK(cudaDeviceSynchronize());
   CGBN_CHECK(report);
     
+  printf("Printing to json files ...\n");
+  cJSON *root = cJSON_CreateObject();
+  cJSON_AddItemToObject(root, "env", block_to_json(cpu_block));
+
+
+  char *json_str=cJSON_Print(root);
+  FILE *fp=fopen("output/evm_block.json", "w");
+  fprintf(fp, "%s", json_str);
+  fclose(fp);
+  free(json_str);
+  cJSON_Delete(root);
+  printf("Json files printed\n");
     
   //read-only memory
   printf("Clean up\n");
   
   // clean up
-  free_host_blocks(cpu_blocks, 1);
-  free_host_blocks_hash(cpu_blocks_hash, 256);
+  free_host_block(cpu_block);
   CUDA_CHECK(cgbn_error_report_free(report));
 }
 

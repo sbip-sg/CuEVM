@@ -212,8 +212,45 @@ class state_t {
         account->modfied_bytecode = 1;
     }
 
+    __device__ __forceinline__ void copy_from_state_t(const state_t &that) {
+        size_t idx, jdx;
+        uint32_t error_code;
+        contract_t *account;
+        for (idx=0; idx<that._content->no_contracts; idx++) {
+            account = get_account(that._content->contracts[idx].address, error_code);
+            if (error_code == ERR_STATE_INVALID_ADDRESS) {
+                // contract does not exist needs to be added
+                error_code = ERR_SUCCESS;
+                set_account(that._content->contracts[idx].address, &(that._content->contracts[idx]), error_code);
+                error_code = ERR_SUCCESS;
+            } else {
+                for (jdx=0; jdx<that._content->contracts[idx].storage_size; jdx++) {
+                    set_value(that._content->contracts[idx].address, that._content->contracts[idx].storage[jdx].key, that._content->contracts[idx].storage[jdx].value, error_code);
+                    error_code = ERR_SUCCESS;
+                }
+                if (that._content->contracts[idx].modfied_bytecode == 1) {
+                    set_local_bytecode(that._content->contracts[idx].address, that._content->contracts[idx].bytecode, that._content->contracts[idx].code_size, error_code);
+                    error_code = ERR_SUCCESS;
+                }
+            }
+        }
+    }
+
+    __device__ __forceinline__ free() {
+        for (size_t idx=0; idx<_content->no_contracts; idx++) {
+            if (_content->contracts[idx].bytecode != NULL) {
+                free(_content->contracts[idx].bytecode);
+            }
+            if (_content->contracts[idx].storage != NULL) {
+                free(_content->contracts[idx].storage);
+            }
+        }
+        free(_content->contracts);
+        free(_content);
+    }
+
     __host__ static state_data_t *from_json(const cJSON *test) {
-        const cJSON *world_state_json = NULL;
+        const cJSON *state_json = NULL;
         const cJSON *contract_json = NULL;
         const cJSON *balance_json = NULL;
         const cJSON *code_json = NULL;
@@ -221,8 +258,8 @@ class state_t {
         const cJSON *storage_json = NULL;
         const cJSON *key_value_json = NULL;
         state_data_t *state=(state_data_t *)malloc(sizeof(state_data_t));
-        world_state_json = cJSON_GetObjectItemCaseSensitive(test, "pre");
-        state->no_contracts = cJSON_GetArraySize(world_state_json);
+        state_json = cJSON_GetObjectItemCaseSensitive(test, "pre");
+        state->no_contracts = cJSON_GetArraySize(state_json);
         if (state->no_contracts == 0) {
             state->contracts = NULL;
             return state;
@@ -236,7 +273,7 @@ class state_t {
         mpz_init(value);
         char *hex_string=NULL;
         size_t idx=0, jdx=0;
-        cJSON_ArrayForEach(contract_json, world_state_json)
+        cJSON_ArrayForEach(contract_json, state_json)
         {
             // set the address
             hex_string = contract_json->string;
@@ -597,8 +634,8 @@ class state_t {
 
     
 
-    __host__ static void print_state_data_to_json(state_data_t *state, cJSON *test) {
-        cJSON *world_state_json = NULL;
+    __host__ static cJSON *state_data_t_to_json(state_data_t *state) {
+        cJSON *state_json = NULL;
         cJSON *contract_json = NULL;
         cJSON *balance_json = NULL;
         cJSON *code_json = NULL;
@@ -614,14 +651,13 @@ class state_t {
         char value_hex_string[67]="0x";
         char *bytes_string=NULL;
         size_t idx=0, jdx=0;
-        world_state_json = cJSON_CreateObject();
-        cJSON_AddItemToObject(test, "pre", world_state_json);
+        state_json = cJSON_CreateObject();
         for (idx=0; idx<state->no_contracts; idx++) {
             contract_json = cJSON_CreateObject();
             // set the address
             to_mpz(address, state->contracts[idx].address._limbs, params::BITS/32);
             strcpy(hex_string+2, mpz_get_str(NULL, 16, address));
-            cJSON_AddItemToObject(world_state_json, hex_string, contract_json);
+            cJSON_AddItemToObject(state_json, hex_string, contract_json);
             // set the balance
             to_mpz(balance, state->contracts[idx].balance._limbs, params::BITS/32);
             strcpy(hex_string+2, mpz_get_str(NULL, 16, balance));
@@ -635,6 +671,12 @@ class state_t {
                 bytes_string = bytes_to_hex(state->contracts[idx].bytecode, state->contracts[idx].code_size);
                 cJSON_AddStringToObject(contract_json, "code", bytes_string);
                 free(bytes_string);
+            }
+            // set if the code was modified
+            if (state->contracts[idx].modfied_bytecode == 1) {
+                cJSON_AddStringToObject(contract_json, "modfied_bytecode", "true");
+            } else {
+                cJSON_AddStringToObject(contract_json, "modfied_bytecode", "false");
             }
             // set the storage
             storage_json = cJSON_CreateObject();
@@ -654,6 +696,7 @@ class state_t {
         mpz_clear(nonce);
         mpz_clear(key);
         mpz_clear(value);
+        return state_json;
     }
 };
 

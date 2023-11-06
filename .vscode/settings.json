@@ -18,6 +18,7 @@
         "limits": "cpp",
         "initializer_list": "cpp",
         "memory": "cpp",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "typeinfo": "cpp"
     }
 }

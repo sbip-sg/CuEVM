@@ -193,6 +193,22 @@ void run_test(uint32_t instance_count) {
   state_t<params>::print_world_data(cpu_global_state);
   printf("Results printed\n");
 
+  // print to json files
+  printf("Printing to json files ...\n");
+  cJSON *root = cJSON_CreateObject();
+  cJSON_AddItemToObject(root, "pre", state_t<params>::state_data_t_to_json(cpu_global_state));
+  cJSON *post = cJSON_CreateArray();
+  for(uint32_t idx=0; idx<instance_count; idx++)
+    cJSON_AddItemToArray(post, state_t<params>::state_data_t_to_json(&(cpu_local_states[idx])));
+  cJSON_AddItemToObject(root, "post", post);
+
+  char *json_str=cJSON_Print(root);
+  FILE *fp=fopen("output/evm_state.json", "w");
+  fprintf(fp, "%s", json_str);
+  fclose(fp);
+  free(json_str);
+  cJSON_Delete(root);
+  printf("Json files printed\n");
   // free the memory
   printf("Freeing the memory ...\n");
   state_t<params>::free_local_states(cpu_local_states, instance_count);
