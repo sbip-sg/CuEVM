@@ -34,4 +34,8 @@
 // message error codes
 #define ERR_MESSAGE_INVALID_INDEX 0x0C
 
+// memory error codes
+#define ERR_MEMEORY_INVALID_INDEX 0x0D
+#define ERR_MEMORY_INVALID_ALLOCATION 0x0E
+
 #endif

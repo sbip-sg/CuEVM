@@ -99,29 +99,6 @@ __global__ void kernel_memory_run(cgbn_error_report_t *report, memory_data_t *in
 }
 
 template<class params>
-__global__ void kernel_memory_get(memory_data_t *dst_instances, memory_data_t *src_instances, uint32_t instance_count) {
-  uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
-  
-  if(instance>=instance_count)
-    return;
-  
-  if (threadIdx.x == 0) {
-    printf("GET size=%08x\n", src_instances->_size);
-    printf("GET data address=%08x\n", src_instances->_data);
-    printf("GET lowestbit=%02x\n", src_instances->_data[31]);
-  }
-
- 
-  gpu_memory_t  memory(&(src_instances[instance]));
-  memory.copy_content_to(&(dst_instances[instance]));
-  if (threadIdx.x == 0) {
-    printf("GET data address=%08x\n", memory._content->_data);
-    printf("GET lowestbit=%02x\n", memory._content->_data[31]);
-  }
-  memory.free_memory();
-}
-
-template<class params>
 void run_test(uint32_t instance_count) {
   
   memory_data_t           *cpu_instances, *gpu_instances;
