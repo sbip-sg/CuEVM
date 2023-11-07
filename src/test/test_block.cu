@@ -34,12 +34,9 @@ IN THE SOFTWARE.
 #endif
 #include "../utils.h"
 #include "../block.cuh"
-#include "../arith.cuh"
 
 
-typedef typename block_t<utils_params>::block_t block_t;
-
-__device__ __constant__ block_t current_block;
+__device__ __constant__ block_t<utils_params>::block_data_t current_block;
 
 template<class params>
 __global__ void kernel_block(cgbn_error_report_t *report) {
@@ -47,35 +44,51 @@ __global__ void kernel_block(cgbn_error_report_t *report) {
 
   typedef arith_env_t<params> local_arith_t;
   typedef typename arith_env_t<params>::bn_t  bn_t;
+  typedef block_t<params> block_t;
   local_arith_t arith(cgbn_report_monitor, report, instance);
+
+  //get the current block
+  block_t block(arith, &current_block);
   
-  bn_t a;
+  bn_t a, b;
   //current block
-  cgbn_load(arith._env, a, &(gpu_current_block.coin_base));
+  block.get_coin_base(a);
   printf("coin_base: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_current_block.time_stamp));
-  printf("time_stamp: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_current_block.number));
-  printf("number: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_current_block.difficulty));
+
+  block.get_difficulty(a);
   printf("difficulty: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_current_block.gas_limit));
+
+  block.get_gas_limit(a);
   printf("gas_limit: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_current_block.chain_id));
+
+  block.get_number(a);
+  printf("number: %08x\n", cgbn_get_ui32(arith._env, a));
+
+  block.get_time_stamp(a);
+  printf("time_stamp: %08x\n", cgbn_get_ui32(arith._env, a));
+
+  block.get_chain_id(a);
   printf("chain_id: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(gpu_current_block.base_fee));
+
+  block.get_base_fee(a);
   printf("base_fee: %08x\n", cgbn_get_ui32(arith._env, a));
 
   //block hash
-  cgbn_load(arith._env, a, &(cpu_block.previous_blocks[0].number));
-  printf("BH number: %08x\n", cgbn_get_ui32(arith._env, a));
-  cgbn_load(arith._env, a, &(cpu_block.previous_blocks[0].hash));
-  printf("BH hash: %08x\n", cgbn_get_ui32(arith._env, a));
+  cgbn_set_ui32(arith._env, b, 0);
+  uint32_t error_code=0;
+  block.get_previous_hash(b, a, error_code);
+  printf("previous hash %08x for number %08x, with error %d\n", cgbn_get_ui32(arith._env, a), cgbn_get_ui32(arith._env, b), error_code);
+
+  //block.print();
 }
 
-void run_test() {  
-  block_t          *cpu_block;
+void run_test() {
+  typedef block_t<utils_params> block_t;
+  typedef typename block_t::block_data_t block_data_t;
+  typedef arith_env_t<utils_params> arith_t;
+  block_data_t            *gpu_block;
   cgbn_error_report_t     *report;
+  arith_t arith(cgbn_report_monitor, 0);
   
   //read the json file with the global state
   cJSON *root = get_json_from_file("input/evm_test.json");
@@ -87,9 +100,10 @@ void run_test() {
   test = cJSON_GetObjectItemCaseSensitive(root, "sstoreGas");
 
   printf("Generating the global block\n");
-  cpu_block=cpu_block_from_json<utils_params>(test);
-  print_block<utils_params>(cpu_block);
-  CUDA_CHECK(cudaMemcpyToSymbol(current_block, cpu_block, sizeof(block_t)));
+  block_t cpu_block(arith, test);
+  cpu_block.print();
+  gpu_block=cpu_block.to_gpu();
+  CUDA_CHECK(cudaMemcpyToSymbol(current_block, gpu_block, sizeof(block_data_t)));
   printf("Global block generated\n");
 
   // create a cgbn_error_report for CGBN to report back errors
@@ -104,8 +118,9 @@ void run_test() {
   CGBN_CHECK(report);
     
   printf("Printing to json files ...\n");
-  cJSON *root = cJSON_CreateObject();
-  cJSON_AddItemToObject(root, "env", block_to_json(cpu_block));
+  cJSON_Delete(root);
+  root = cJSON_CreateObject();
+  cJSON_AddItemToObject(root, "env", cpu_block.to_json());
 
 
   char *json_str=cJSON_Print(root);
@@ -120,7 +135,8 @@ void run_test() {
   printf("Clean up\n");
   
   // clean up
-  free_host_block(cpu_block);
+  cpu_block.free_memory();
+  block_t::free_gpu(gpu_block);
   CUDA_CHECK(cgbn_error_report_free(report));
 }
 

@@ -118,7 +118,7 @@ __global__ void kernel_storage(cgbn_error_report_t *report, typename state_t<par
   printf("address: %08x, key: %08x, value: %08x\n", cgbn_get_ui32(arith._env, address), cgbn_get_ui32(arith._env, key), cgbn_get_ui32(arith._env, value));
   // 2.9 add a new key-value in the local state
   cgbn_set_ui32(arith._env, key, 2);
-  cgbn_set_ui32(arith._env, value, 3);
+  cgbn_set_ui32(arith._env, value, instance);
   local.set_value(address, key, value, error);
   // 2.10 get the value
   local.get_value(address, key, value, error);
@@ -144,11 +144,14 @@ __global__ void kernel_storage(cgbn_error_report_t *report, typename state_t<par
 
 template<class params>
 void run_test(uint32_t instance_count) {
-  typedef typename state_t<params>::state_data_t state_data_t;
+  typedef state_t<params> state_t;
+  typedef typename state_t::state_data_t state_data_t;
+  typedef arith_env_t<params> arith_t;
   
-  state_data_t            *cpu_global_state, *gpu_global_state;
+  state_data_t            *gpu_global_state;
   state_data_t            *cpu_local_states, *gpu_local_states;
   cgbn_error_report_t     *report;
+  arith_t arith(cgbn_report_monitor, 0);
   
   //read the json file with the global state
   cJSON *root = get_json_from_file("input/evm_test.json");
@@ -161,14 +164,14 @@ void run_test(uint32_t instance_count) {
 
 
   printf("Generating global state\n");
-  cpu_global_state=state_t<params>::from_json(test);
-  gpu_global_state=state_t<params>::get_gpu_world_data(cpu_global_state);
+  state_t cpu_global_state(arith, test);
+  gpu_global_state=cpu_global_state.to_gpu();
   CUDA_CHECK(cudaMemcpyToSymbol(global_state, gpu_global_state, sizeof(state_data_t)));
   printf("Global state generated\n");
 
   printf("Generating local states\n");
-  cpu_local_states=state_t<params>::generate_local_states(instance_count);
-  gpu_local_states=state_t<params>::get_gpu_local_states(cpu_local_states, instance_count);
+  cpu_local_states=state_t::get_local_states(instance_count);
+  gpu_local_states=state_t::get_gpu_local_states(cpu_local_states, instance_count);
   printf("Local states generated\n");
   // create a cgbn_error_report for CGBN to report back errors
   CUDA_CHECK(cgbn_error_report_alloc(&report)); 
@@ -177,43 +180,45 @@ void run_test(uint32_t instance_count) {
 
   // launch kernel with blocks=ceil(instance_count/IPB) and threads=TPB
   // TODO: modify with instance_count
-  kernel_storage<params><<<1, params::TPI>>>(report, gpu_local_states, instance_count);
+  kernel_storage<params><<<2, params::TPI>>>(report, gpu_local_states, instance_count);
 
   // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
   CUDA_CHECK(cudaDeviceSynchronize());
   CGBN_CHECK(report);
 
   // copy the results back to the CPU
-  state_t<params>::free_local_states(cpu_local_states, instance_count);
-  cpu_local_states=state_t<params>::get_local_states_from_gpu(gpu_local_states, instance_count);
+  state_t::free_local_states(cpu_local_states, instance_count);
+  cpu_local_states=state_t::get_local_states_from_gpu(gpu_local_states, instance_count);
 
   // print the results
   printf("Printing the results ...\n");
-  state_t<params>::print_local_states(cpu_local_states, instance_count);
-  state_t<params>::print_world_data(cpu_global_state);
+  state_t::print_local_states(cpu_local_states, instance_count);
+  cpu_global_state.print();
   printf("Results printed\n");
 
   // print to json files
   printf("Printing to json files ...\n");
-  cJSON *root = cJSON_CreateObject();
-  cJSON_AddItemToObject(root, "pre", state_t<params>::state_data_t_to_json(cpu_global_state));
+  cJSON_Delete(root);
+  root = cJSON_CreateObject();
+  cJSON_AddItemToObject(root, "pre", cpu_global_state.to_json());
   cJSON *post = cJSON_CreateArray();
-  for(uint32_t idx=0; idx<instance_count; idx++)
-    cJSON_AddItemToArray(post, state_t<params>::state_data_t_to_json(&(cpu_local_states[idx])));
+  for(uint32_t idx=0; idx<instance_count; idx++) {
+    state_t local_state(arith, &(cpu_local_states[idx]));
+    cJSON_AddItemToArray(post, local_state.to_json());
+  }
   cJSON_AddItemToObject(root, "post", post);
-
   char *json_str=cJSON_Print(root);
   FILE *fp=fopen("output/evm_state.json", "w");
   fprintf(fp, "%s", json_str);
   fclose(fp);
   free(json_str);
-  cJSON_Delete(root);
+  //cJSON_Delete(root);
   printf("Json files printed\n");
   // free the memory
   printf("Freeing the memory ...\n");
-  state_t<params>::free_local_states(cpu_local_states, instance_count);
-  state_t<params>::free_world_data(cpu_global_state);
-  state_t<params>::free_gpu_world_data(gpu_global_state);
+  state_t::free_local_states(cpu_local_states, instance_count);
+  cpu_global_state.free_memory();
+  state_t::free_gpu_memory(gpu_global_state);
   cJSON_Delete(root);
   CUDA_CHECK(cgbn_error_report_free(report));
   

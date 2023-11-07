@@ -1,5 +1,5 @@
-#ifndef _GPU_GLOBAL_STORAGE_H_
-#define _GPU_GLOBAL_STORAGE_H_
+#ifndef _STATE_T_H_
+#define _STATE_T_H_
 
 #include <stdio.h>
 #include <stdint.h>
@@ -11,13 +11,13 @@
 #include <cgbn/cgbn.h>
 #endif
 #include "arith.cuh"
-#include "error_codes.h"
 #include "utils.h"
 
 template<class params>
 class state_t {
     public:
-    typedef typename arith_env_t<params>::bn_t      bn_t;
+    typedef arith_env_t<params>                     arith_t;
+    typedef typename arith_t::bn_t                  bn_t;
     typedef cgbn_mem_t<params::BITS>                evm_word_t;
 
     typedef struct {
@@ -42,214 +42,14 @@ class state_t {
     } state_data_t;
 
     state_data_t            *_content;
-    arith_env_t<params>     _arith;
+    arith_t     _arith;
   
     //constructor
-    __device__ __forceinline__ state_t(arith_env_t<params> arith, state_data_t *content) : _arith(arith), _content(content) {
+    __host__ __device__ __forceinline__ state_t(arith_t arith, state_data_t *content) : _arith(arith), _content(content) {
     }
 
-    __device__ __forceinline__ size_t get_account_idx_basic(bn_t &address, uint32_t &error_code) {
-        bn_t local_address;
-        for (size_t idx=0; idx<_content->no_contracts; idx++) {
-            cgbn_load(_arith._env, local_address, &(_content->contracts[idx].address));
-            if (cgbn_compare(_arith._env, local_address, address) == 0) {
-                return idx;
-            }
-        }
-        error_code = ERR_STATE_INVALID_ADDRESS;
-        return 0;
-    }
-
-    __device__ __forceinline__ size_t get_storage_idx_basic(size_t account_idx, bn_t &key, uint32_t &error_code) {
-        bn_t local_key;
-        for (size_t idx=0; idx<_content->contracts[account_idx].storage_size; idx++) {
-            cgbn_load(_arith._env, local_key, &(_content->contracts[account_idx].storage[idx].key));
-            if (cgbn_compare(_arith._env, local_key, key) == 0) {
-                return idx;
-            }
-        }
-        error_code = ERR_STATE_INVALID_KEY;
-        return 0;
-    }
-
-    __device__ __forceinline__ size_t get_storage_idx_basic(contract_t *account, bn_t &key, uint32_t &error_code) {
-        bn_t local_key;
-        for (size_t idx=0; idx<account->storage_size; idx++) {
-            cgbn_load(_arith._env, local_key, &(account->storage[idx].key));
-            if (cgbn_compare(_arith._env, local_key, key) == 0) {
-                return idx;
-            }
-        }
-        error_code = ERR_STATE_INVALID_KEY;
-        return 0;
-    }
-
-    __device__ __forceinline__ contract_t *get_account(bn_t &address, uint32_t &error_code) {
-        size_t account_idx = get_account_idx_basic(address, error_code);
-        return &(_content->contracts[account_idx]);
-    }
-
-    __device__ __forceinline__ void get_value(bn_t &address, bn_t &key, bn_t &value, uint32_t &error_code) {
-        contract_t *account = get_account(address, error_code);
-        size_t storage_idx = get_storage_idx_basic(account, key, error_code);
-        cgbn_load(_arith._env, value, &(account->storage[storage_idx].value));
-    }
-
-    // alocate and free onlt on thread 0
-    __device__ __forceinline__ void set_value(bn_t &address, bn_t &key, bn_t &value, uint32_t &error_code) {
-        contract_t *account = get_account(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            return;
-        }
-        size_t storage_idx = get_storage_idx_basic(account, key, error_code);
-        if (error_code == ERR_STATE_INVALID_KEY) {
-            // add the extra storage key
-            storage_idx = account->storage_size;
-            __syncthreads();
-            if(threadIdx.x == 0) {
-                contract_storage_t *tmp_storage = (contract_storage_t *) malloc((account->storage_size+1)*sizeof(contract_storage_t));
-                if (account->storage_size > 0) {
-                    memcpy(tmp_storage, account->storage, account->storage_size*sizeof(contract_storage_t));
-                    free(account->storage);
-                }
-                account->storage = tmp_storage;
-                account->storage_size++;
-            }
-            __syncthreads();
-            cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);
-            error_code = ERR_SUCCESS;
-        }
-        cgbn_store(_arith._env, &(account->storage[storage_idx].value), value);
-    }
-
-    __device__ __forceinline__ void set_account(bn_t &address, contract_t *account, uint32_t &error_code) {
-        uint32_t account_idx = get_account_idx_basic(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            // contract does not exist needs to be added
-            account_idx = _content->no_contracts;
-            __syncthreads();
-            if(threadIdx.x == 0) {
-                contract_t * tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
-                memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
-                free(_content->contracts);
-                _content->contracts = tmp_contracts;
-                _content->no_contracts++;
-            }
-            __syncthreads();
-            error_code = ERR_SUCCESS;
-        }
-        
-        __syncthreads();
-        if(threadIdx.x == 0) {
-            memcpy(&(_content->contracts[account_idx]), account, sizeof(contract_t));
-            if (account->code_size > 0) {
-                _content->contracts[account_idx].bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
-                memcpy(_content->contracts[account_idx].bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
-            }
-            if (account->storage_size > 0) {
-                _content->contracts[account_idx].storage = (contract_storage_t *) malloc(account->storage_size*sizeof(contract_storage_t));
-                memcpy(_content->contracts[account_idx].storage, account->storage, account->storage_size*sizeof(contract_storage_t));
-            }
-        }
-        __syncthreads();
-    }
-    
-    __device__ __forceinline__ void set_local_account(bn_t &address, contract_t *account, uint32_t &error_code) {
-        uint32_t account_idx = get_account_idx_basic(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            // contract does not exist needs to be added
-            account_idx = _content->no_contracts;
-            __syncthreads();
-            if(threadIdx.x == 0) {
-                contract_t *tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
-                memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
-                free(_content->contracts);
-                _content->contracts = tmp_contracts;
-                _content->no_contracts++;
-            }
-            __syncthreads();
-            error_code = ERR_SUCCESS;
-        }
-        __syncthreads();
-        if(threadIdx.x == 0) {
-            memcpy(&(_content->contracts[account_idx]), account, sizeof(contract_t));
-            if (account->code_size > 0) {
-                _content->contracts[account_idx].bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
-                memcpy(_content->contracts[account_idx].bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
-            }
-        }
-        __syncthreads();
-        // no storage at the begining for a local state, only if we do sets
-        _content->contracts[account_idx].storage_size=0;
-        _content->contracts[account_idx].storage=NULL;
-    }
-
-    __device__ __forceinline__ void set_local_bytecode(bn_t &address, uint8_t *bytecode, size_t code_size, uint32_t &error_code) {
-        contract_t *account = get_account(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            // contract does not exist needs to be added
-            __syncthreads();
-            if(threadIdx.x == 0) {
-                account = (contract_t *) malloc(sizeof(contract_t));
-                memset(account, 0, sizeof(contract_t));
-                cgbn_store(_arith._env, &(account->address), address);
-                set_local_account(address, account, error_code);
-                free(account);
-            }
-            __syncthreads();
-            error_code = ERR_SUCCESS;
-        }
-        __syncthreads();
-        if(threadIdx.x == 0) {
-            if (account->bytecode != NULL) {
-                free(account->bytecode);
-            }
-            account->bytecode = (uint8_t *) malloc(code_size*sizeof(uint8_t));
-            memcpy(account->bytecode, bytecode, code_size*sizeof(uint8_t));
-        }
-        __syncthreads();
-        account->code_size = code_size;
-        account->modfied_bytecode = 1;
-    }
-
-    __device__ __forceinline__ void copy_from_state_t(const state_t &that) {
-        size_t idx, jdx;
-        uint32_t error_code;
-        contract_t *account;
-        for (idx=0; idx<that._content->no_contracts; idx++) {
-            account = get_account(that._content->contracts[idx].address, error_code);
-            if (error_code == ERR_STATE_INVALID_ADDRESS) {
-                // contract does not exist needs to be added
-                error_code = ERR_SUCCESS;
-                set_account(that._content->contracts[idx].address, &(that._content->contracts[idx]), error_code);
-                error_code = ERR_SUCCESS;
-            } else {
-                for (jdx=0; jdx<that._content->contracts[idx].storage_size; jdx++) {
-                    set_value(that._content->contracts[idx].address, that._content->contracts[idx].storage[jdx].key, that._content->contracts[idx].storage[jdx].value, error_code);
-                    error_code = ERR_SUCCESS;
-                }
-                if (that._content->contracts[idx].modfied_bytecode == 1) {
-                    set_local_bytecode(that._content->contracts[idx].address, that._content->contracts[idx].bytecode, that._content->contracts[idx].code_size, error_code);
-                    error_code = ERR_SUCCESS;
-                }
-            }
-        }
-    }
-
-    __device__ __forceinline__ free() {
-        for (size_t idx=0; idx<_content->no_contracts; idx++) {
-            if (_content->contracts[idx].bytecode != NULL) {
-                free(_content->contracts[idx].bytecode);
-            }
-            if (_content->contracts[idx].storage != NULL) {
-                free(_content->contracts[idx].storage);
-            }
-        }
-        free(_content->contracts);
-        free(_content);
-    }
-
-    __host__ static state_data_t *from_json(const cJSON *test) {
+    // host constructor from json with cpu memory
+    __host__ state_t(arith_t arith, const cJSON *test) : _arith(arith) {
         const cJSON *state_json = NULL;
         const cJSON *contract_json = NULL;
         const cJSON *balance_json = NULL;
@@ -257,14 +57,6 @@ class state_t {
         const cJSON *nonce_json = NULL;
         const cJSON *storage_json = NULL;
         const cJSON *key_value_json = NULL;
-        state_data_t *state=(state_data_t *)malloc(sizeof(state_data_t));
-        state_json = cJSON_GetObjectItemCaseSensitive(test, "pre");
-        state->no_contracts = cJSON_GetArraySize(state_json);
-        if (state->no_contracts == 0) {
-            state->contracts = NULL;
-            return state;
-        }
-        state->contracts = (contract_t *)malloc(state->no_contracts*sizeof(contract_t));
         mpz_t address, balance, nonce, key, value;
         mpz_init(address);
         mpz_init(balance);
@@ -273,6 +65,19 @@ class state_t {
         mpz_init(value);
         char *hex_string=NULL;
         size_t idx=0, jdx=0;
+
+        state_data_t *state=(state_data_t *)malloc(sizeof(state_data_t));
+
+        state_json = cJSON_GetObjectItemCaseSensitive(test, "pre");
+
+        state->no_contracts = cJSON_GetArraySize(state_json);
+        if (state->no_contracts == 0) {
+            state->contracts = NULL;
+            _content=state;
+            return;
+        }
+        state->contracts = (contract_t *)malloc(state->no_contracts*sizeof(contract_t));
+
         cJSON_ArrayForEach(contract_json, state_json)
         {
             // set the address
@@ -301,7 +106,7 @@ class state_t {
             state->contracts[idx].code_size = adjusted_length(&hex_string);
             if (state->contracts[idx].code_size > 0) {
                 state->contracts[idx].bytecode = (uint8_t *)malloc(state->contracts[idx].code_size*sizeof(uint8_t));
-                hex_to_bytes(hex_string, state->contracts[idx].bytecode, state->contracts[idx].code_size);
+                hex_to_bytes(hex_string, state->contracts[idx].bytecode, 2 * state->contracts[idx].code_size);
             } else {
                 state->contracts[idx].bytecode = NULL;
             }
@@ -339,42 +144,267 @@ class state_t {
         mpz_clear(nonce);
         mpz_clear(key);
         mpz_clear(value);
-        return state;
+        _content=state;
     }
 
-    __host__ static void free_world_data(state_data_t *state) {
-        if (state->contracts != NULL) {
-            for (size_t idx=0; idx<state->no_contracts; idx++) {
-                if (state->contracts[idx].bytecode != NULL)
-                    free(state->contracts[idx].bytecode);
-                if (state->contracts[idx].storage != NULL)
-                    free(state->contracts[idx].storage);
+
+    __host__ __device__ __forceinline__ size_t get_account_idx_basic(bn_t &address, uint32_t &error_code) {
+        bn_t local_address;
+        for (size_t idx=0; idx<_content->no_contracts; idx++) {
+            cgbn_load(_arith._env, local_address, &(_content->contracts[idx].address));
+            if (cgbn_compare(_arith._env, local_address, address) == 0) {
+                return idx;
             }
-            free(state->contracts);
         }
-        free(state);
+        error_code = ERR_STATE_INVALID_ADDRESS;
+        return 0;
     }
 
-    __host__ static state_data_t *get_gpu_world_data(state_data_t *cpu_state) {
+    __host__ __device__ __forceinline__ size_t get_storage_idx_basic(size_t account_idx, bn_t &key, uint32_t &error_code) {
+        bn_t local_key;
+        for (size_t idx=0; idx<_content->contracts[account_idx].storage_size; idx++) {
+            cgbn_load(_arith._env, local_key, &(_content->contracts[account_idx].storage[idx].key));
+            if (cgbn_compare(_arith._env, local_key, key) == 0) {
+                return idx;
+            }
+        }
+        error_code = ERR_STATE_INVALID_KEY;
+        return 0;
+    }
+
+    __host__ __device__ __forceinline__ size_t get_storage_idx_basic(contract_t *account, bn_t &key, uint32_t &error_code) {
+        bn_t local_key;
+        for (size_t idx=0; idx<account->storage_size; idx++) {
+            cgbn_load(_arith._env, local_key, &(account->storage[idx].key));
+            if (cgbn_compare(_arith._env, local_key, key) == 0) {
+                return idx;
+            }
+        }
+        error_code = ERR_STATE_INVALID_KEY;
+        return 0;
+    }
+
+    __host__ __device__ __forceinline__ contract_t *get_account(bn_t &address, uint32_t &error_code) {
+        size_t account_idx = get_account_idx_basic(address, error_code);
+        return &(_content->contracts[account_idx]);
+    }
+
+    __host__ __device__ __forceinline__ void get_value(bn_t &address, bn_t &key, bn_t &value, uint32_t &error_code) {
+        contract_t *account = get_account(address, error_code);
+        size_t storage_idx = get_storage_idx_basic(account, key, error_code);
+        if (error_code != ERR_SUCCESS) {
+            cgbn_set_ui32(_arith._env, value, 0); // if storage does not exist return 0
+        } else {
+            cgbn_load(_arith._env, value, &(account->storage[storage_idx].value));
+        }
+    }
+
+    // alocate and free onlt on thread 0
+    __host__ __device__ __forceinline__ void set_value(bn_t &address, bn_t &key, bn_t &value, uint32_t &error_code) {
+        contract_t *account = get_account(address, error_code);
+        if (error_code == ERR_STATE_INVALID_ADDRESS) {
+            return;
+        }
+        size_t storage_idx = get_storage_idx_basic(account, key, error_code);
+        if (error_code == ERR_STATE_INVALID_KEY) {
+            // add the extra storage key
+            storage_idx = account->storage_size;
+            #ifdef  __CUDA_ARCH__
+            __syncthreads();
+            if(threadIdx.x == 0) {
+            #endif
+                contract_storage_t *tmp_storage = (contract_storage_t *) malloc((account->storage_size+1)*sizeof(contract_storage_t));
+                if (account->storage_size > 0) {
+                    memcpy(tmp_storage, account->storage, account->storage_size*sizeof(contract_storage_t));
+                    free(account->storage);
+                }
+                account->storage = tmp_storage;
+                account->storage_size++;
+            #ifdef  __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+            cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);
+            error_code = ERR_SUCCESS;
+        }
+        cgbn_store(_arith._env, &(account->storage[storage_idx].value), value);
+    }
+
+    __host__ __device__ __forceinline__ void set_account(bn_t &address, contract_t *account, uint32_t &error_code) {
+        uint32_t account_idx = get_account_idx_basic(address, error_code);
+        if (error_code == ERR_STATE_INVALID_ADDRESS) {
+            // contract does not exist needs to be added
+            account_idx = _content->no_contracts;
+            #ifdef  __CUDA_ARCH__
+            __syncthreads();
+            if(threadIdx.x == 0) {
+            #endif
+                contract_t * tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
+                memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
+                free(_content->contracts);
+                _content->contracts = tmp_contracts;
+                _content->no_contracts++;
+            #ifdef  __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+            error_code = ERR_SUCCESS;
+        }
+        
+        #ifdef  __CUDA_ARCH__
+        __syncthreads();
+        if(threadIdx.x == 0) {
+        #endif
+            memcpy(&(_content->contracts[account_idx]), account, sizeof(contract_t));
+            if (account->code_size > 0) {
+                _content->contracts[account_idx].bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
+                memcpy(_content->contracts[account_idx].bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
+            }
+            if (account->storage_size > 0) {
+                _content->contracts[account_idx].storage = (contract_storage_t *) malloc(account->storage_size*sizeof(contract_storage_t));
+                memcpy(_content->contracts[account_idx].storage, account->storage, account->storage_size*sizeof(contract_storage_t));
+            }
+        #ifdef  __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+    }
+
+    __host__ __device__ __forceinline__ void set_local_account(bn_t &address, contract_t *account, uint32_t &error_code) {
+        uint32_t account_idx = get_account_idx_basic(address, error_code);
+        if (error_code == ERR_STATE_INVALID_ADDRESS) {
+            // contract does not exist needs to be added
+            account_idx = _content->no_contracts;
+            #ifdef  __CUDA_ARCH__
+            __syncthreads();
+            if(threadIdx.x == 0) {
+            #endif
+                contract_t *tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
+                memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
+                free(_content->contracts);
+                _content->contracts = tmp_contracts;
+                _content->no_contracts++;
+            #ifdef  __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+            error_code = ERR_SUCCESS;
+        }
+        #ifdef  __CUDA_ARCH__
+        __syncthreads();
+        if(threadIdx.x == 0) {
+        #endif
+            memcpy(&(_content->contracts[account_idx]), account, sizeof(contract_t));
+            if (account->code_size > 0) {
+                _content->contracts[account_idx].bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
+                memcpy(_content->contracts[account_idx].bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
+            }
+        #ifdef  __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+        // no storage at the begining for a local state, only if we do sets
+        _content->contracts[account_idx].storage_size=0;
+        _content->contracts[account_idx].storage=NULL;
+    }
+
+    __host__ __device__ __forceinline__ void set_local_bytecode(bn_t &address, uint8_t *bytecode, size_t code_size, uint32_t &error_code) {
+        contract_t *account = get_account(address, error_code);
+        if (error_code == ERR_STATE_INVALID_ADDRESS) {
+            // contract does not exist needs to be added
+            #ifdef  __CUDA_ARCH__
+            __syncthreads();
+            if(threadIdx.x == 0) {
+            #endif
+                account = (contract_t *) malloc(sizeof(contract_t));
+                memset(account, 0, sizeof(contract_t));
+                cgbn_store(_arith._env, &(account->address), address);
+                set_local_account(address, account, error_code);
+                free(account);
+            #ifdef  __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+            error_code = ERR_SUCCESS;
+        }
+        #ifdef  __CUDA_ARCH__
+        __syncthreads();
+        if(threadIdx.x == 0) {
+        #endif
+            if (account->bytecode != NULL) {
+                free(account->bytecode);
+            }
+            account->bytecode = (uint8_t *) malloc(code_size*sizeof(uint8_t));
+            memcpy(account->bytecode, bytecode, code_size*sizeof(uint8_t));
+        #ifdef  __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+        account->code_size = code_size;
+        account->modfied_bytecode = 1;
+    }
+
+    __host__ __device__ __forceinline__ void copy_from_state_t(const state_t &that) {
+        size_t idx, jdx;
+        uint32_t error_code;
+        contract_t *account;
+        for (idx=0; idx<that._content->no_contracts; idx++) {
+            account = get_account(that._content->contracts[idx].address, error_code);
+            if (error_code == ERR_STATE_INVALID_ADDRESS) {
+                // contract does not exist needs to be added
+                error_code = ERR_SUCCESS;
+                set_account(that._content->contracts[idx].address, &(that._content->contracts[idx]), error_code);
+                error_code = ERR_SUCCESS;
+            } else {
+                for (jdx=0; jdx<that._content->contracts[idx].storage_size; jdx++) {
+                    set_value(that._content->contracts[idx].address, that._content->contracts[idx].storage[jdx].key, that._content->contracts[idx].storage[jdx].value, error_code);
+                    error_code = ERR_SUCCESS;
+                }
+                if (that._content->contracts[idx].modfied_bytecode == 1) {
+                    set_local_bytecode(that._content->contracts[idx].address, that._content->contracts[idx].bytecode, that._content->contracts[idx].code_size, error_code);
+                    error_code = ERR_SUCCESS;
+                }
+            }
+        }
+    }
+
+    __host__ __device__ __forceinline__ void free_memory() {
+        if (_content->contracts != NULL) {
+            for (size_t idx=0; idx<_content->no_contracts; idx++) {
+                if (_content->contracts[idx].bytecode != NULL) {
+                    free(_content->contracts[idx].bytecode);
+                }
+                if (_content->contracts[idx].storage != NULL) {
+                    free(_content->contracts[idx].storage);
+                }
+            }
+            free(_content->contracts);
+        }
+        if (_content != NULL) {
+            free(_content);
+        }
+    }
+
+    __host__ state_data_t *to_gpu() {
         state_data_t *gpu_state, *tmp_cpu_state;
         tmp_cpu_state=(state_data_t *)malloc(sizeof(state_data_t));
-        tmp_cpu_state->no_contracts = cpu_state->no_contracts;
+        tmp_cpu_state->no_contracts = _content->no_contracts;
         if (tmp_cpu_state->no_contracts > 0) {
             contract_t *tmp_cpu_contracts;
-            tmp_cpu_contracts = (contract_t *)malloc(cpu_state->no_contracts*sizeof(contract_t));
-            memcpy(tmp_cpu_contracts, cpu_state->contracts, cpu_state->no_contracts*sizeof(contract_t));
-            for (size_t idx=0; idx<cpu_state->no_contracts; idx++) {
+            tmp_cpu_contracts = (contract_t *)malloc(_content->no_contracts*sizeof(contract_t));
+            memcpy(tmp_cpu_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
+            for (size_t idx=0; idx<_content->no_contracts; idx++) {
                 if (tmp_cpu_contracts[idx].bytecode != NULL) {
                     cudaMalloc((void **)&(tmp_cpu_contracts[idx].bytecode), tmp_cpu_contracts[idx].code_size*sizeof(uint8_t));
-                    cudaMemcpy(tmp_cpu_contracts[idx].bytecode, cpu_state->contracts[idx].bytecode, tmp_cpu_contracts[idx].code_size*sizeof(uint8_t), cudaMemcpyHostToDevice);
+                    cudaMemcpy(tmp_cpu_contracts[idx].bytecode, _content->contracts[idx].bytecode, tmp_cpu_contracts[idx].code_size*sizeof(uint8_t), cudaMemcpyHostToDevice);
                 }
                 if (tmp_cpu_contracts[idx].storage != NULL) {
                     cudaMalloc((void **)&(tmp_cpu_contracts[idx].storage), tmp_cpu_contracts[idx].storage_size*sizeof(contract_storage_t));
-                    cudaMemcpy(tmp_cpu_contracts[idx].storage, cpu_state->contracts[idx].storage, tmp_cpu_contracts[idx].storage_size*sizeof(contract_storage_t), cudaMemcpyHostToDevice);
+                    cudaMemcpy(tmp_cpu_contracts[idx].storage, _content->contracts[idx].storage, tmp_cpu_contracts[idx].storage_size*sizeof(contract_storage_t), cudaMemcpyHostToDevice);
                 }
             }
-            cudaMalloc((void **)&tmp_cpu_state->contracts, cpu_state->no_contracts*sizeof(contract_t));
-            cudaMemcpy(tmp_cpu_state->contracts, tmp_cpu_contracts, cpu_state->no_contracts*sizeof(contract_t), cudaMemcpyHostToDevice);
+            cudaMalloc((void **)&tmp_cpu_state->contracts, _content->no_contracts*sizeof(contract_t));
+            cudaMemcpy(tmp_cpu_state->contracts, tmp_cpu_contracts, _content->no_contracts*sizeof(contract_t), cudaMemcpyHostToDevice);
             free(tmp_cpu_contracts);
         } else {
             tmp_cpu_state->contracts = NULL;
@@ -385,7 +415,7 @@ class state_t {
         return gpu_state;
     }
 
-    __host__ static void free_gpu_world_data(state_data_t *gpu_state) {
+    __host__ static void free_gpu_memory(state_data_t *gpu_state) {
         state_data_t *tmp_cpu_state;
         tmp_cpu_state=(state_data_t *)malloc(sizeof(state_data_t));
         cudaMemcpy(tmp_cpu_state, gpu_state, sizeof(state_data_t), cudaMemcpyDeviceToHost);
@@ -406,36 +436,38 @@ class state_t {
         cudaFree(gpu_state);
     }
 
-    __host__ static void print_world_data(state_data_t *state) {
-        printf("no_contracts: %lu\n", state->no_contracts);
-        for (size_t idx=0; idx<state->no_contracts; idx++) {
+    __host__ __device__ void print() {
+        printf("no_contracts: %lu\n", _content->no_contracts);
+        for (size_t idx=0; idx<_content->no_contracts; idx++) {
             printf("contract %lu\n", idx);
             printf("address: ");
-            print_bn<params>(state->contracts[idx].address);
+            print_bn<params>(_content->contracts[idx].address);
             printf("\n");
             printf("balance: ");
-            print_bn<params>(state->contracts[idx].balance);
+            print_bn<params>(_content->contracts[idx].balance);
             printf("\n");
             printf("nonce: ");
-            print_bn<params>(state->contracts[idx].nonce);
+            print_bn<params>(_content->contracts[idx].nonce);
             printf("\n");
-            printf("code_size: %lu\n", state->contracts[idx].code_size);
-            printf("code: ");
-            print_bytes(state->contracts[idx].bytecode, state->contracts[idx].code_size);
-            printf("\n");
-            printf("storage_size: %lu\n", state->contracts[idx].storage_size);
-            for (size_t jdx=0; jdx<state->contracts[idx].storage_size; jdx++) {
+            printf("code_size: %lu\n", _content->contracts[idx].code_size);
+            if (_content->contracts[idx].code_size > 0) {
+                printf("code: ");
+                print_bytes(_content->contracts[idx].bytecode, _content->contracts[idx].code_size);
+                printf("\n");
+            }
+            printf("storage_size: %lu\n", _content->contracts[idx].storage_size);
+            for (size_t jdx=0; jdx<_content->contracts[idx].storage_size; jdx++) {
                 printf("storage[%lu].key: ", jdx);
-                print_bn<params>(state->contracts[idx].storage[jdx].key);
+                print_bn<params>(_content->contracts[idx].storage[jdx].key);
                 printf("\n");
                 printf("storage[%lu].value: ", jdx);
-                print_bn<params>(state->contracts[idx].storage[jdx].value);
+                print_bn<params>(_content->contracts[idx].storage[jdx].value);
                 printf("\n");
             }
         }
     }
 
-    __host__ static state_data_t *generate_local_states(uint32_t count) {
+    __host__ static state_data_t *get_local_states(uint32_t count) {
         state_data_t *states=(state_data_t *)malloc(count*sizeof(state_data_t));
         for (size_t idx=0; idx<count; idx++) {
             states[idx].no_contracts = 0;
@@ -514,7 +546,7 @@ class state_t {
         cudaFree(gpu_local_states);
     }
 
-    __host__ static void print_local_states(state_data_t *states, uint32_t count) {
+    __host__ __device__ static void print_local_states(state_data_t *states, uint32_t count) {
         for (size_t idx=0; idx<count; idx++) {
             printf("local state %lu\n", idx);
             printf("no_contracts: %lu\n", states[idx].no_contracts);
@@ -634,12 +666,9 @@ class state_t {
 
     
 
-    __host__ static cJSON *state_data_t_to_json(state_data_t *state) {
+    __host__ cJSON *to_json() {
         cJSON *state_json = NULL;
         cJSON *contract_json = NULL;
-        cJSON *balance_json = NULL;
-        cJSON *code_json = NULL;
-        cJSON *nonce_json = NULL;
         cJSON *storage_json = NULL;
         mpz_t address, balance, nonce, key, value;
         mpz_init(address);
@@ -652,28 +681,30 @@ class state_t {
         char *bytes_string=NULL;
         size_t idx=0, jdx=0;
         state_json = cJSON_CreateObject();
-        for (idx=0; idx<state->no_contracts; idx++) {
+        for (idx=0; idx<_content->no_contracts; idx++) {
             contract_json = cJSON_CreateObject();
             // set the address
-            to_mpz(address, state->contracts[idx].address._limbs, params::BITS/32);
+            to_mpz(address, _content->contracts[idx].address._limbs, params::BITS/32);
             strcpy(hex_string+2, mpz_get_str(NULL, 16, address));
             cJSON_AddItemToObject(state_json, hex_string, contract_json);
             // set the balance
-            to_mpz(balance, state->contracts[idx].balance._limbs, params::BITS/32);
+            to_mpz(balance, _content->contracts[idx].balance._limbs, params::BITS/32);
             strcpy(hex_string+2, mpz_get_str(NULL, 16, balance));
             cJSON_AddStringToObject(contract_json, "balance", hex_string);
             // set the nonce
-            to_mpz(nonce, state->contracts[idx].nonce._limbs, params::BITS/32);
+            to_mpz(nonce, _content->contracts[idx].nonce._limbs, params::BITS/32);
             strcpy(hex_string+2, mpz_get_str(NULL, 16, nonce));
             cJSON_AddStringToObject(contract_json, "nonce", hex_string);
             // set the code
-            if (state->contracts[idx].code_size > 0) {
-                bytes_string = bytes_to_hex(state->contracts[idx].bytecode, state->contracts[idx].code_size);
+            if (_content->contracts[idx].code_size > 0) {
+                bytes_string = bytes_to_hex(_content->contracts[idx].bytecode, _content->contracts[idx].code_size);
                 cJSON_AddStringToObject(contract_json, "code", bytes_string);
                 free(bytes_string);
+            } else {
+                cJSON_AddStringToObject(contract_json, "code", "0x");
             }
             // set if the code was modified
-            if (state->contracts[idx].modfied_bytecode == 1) {
+            if (_content->contracts[idx].modfied_bytecode == 1) {
                 cJSON_AddStringToObject(contract_json, "modfied_bytecode", "true");
             } else {
                 cJSON_AddStringToObject(contract_json, "modfied_bytecode", "false");
@@ -681,11 +712,11 @@ class state_t {
             // set the storage
             storage_json = cJSON_CreateObject();
             cJSON_AddItemToObject(contract_json, "storage", storage_json);
-            if (state->contracts[idx].storage_size > 0) {
-                for (jdx=0; jdx<state->contracts[idx].storage_size; jdx++) {
-                    to_mpz(key, state->contracts[idx].storage[jdx].key._limbs, params::BITS/32);
+            if (_content->contracts[idx].storage_size > 0) {
+                for (jdx=0; jdx<_content->contracts[idx].storage_size; jdx++) {
+                    to_mpz(key, _content->contracts[idx].storage[jdx].key._limbs, params::BITS/32);
                     strcpy(hex_string+2, mpz_get_str(NULL, 16, key));
-                    to_mpz(value, state->contracts[idx].storage[jdx].value._limbs, params::BITS/32);
+                    to_mpz(value, _content->contracts[idx].storage[jdx].value._limbs, params::BITS/32);
                     strcpy(value_hex_string+2, mpz_get_str(NULL, 16, value));
                     cJSON_AddStringToObject(storage_json, hex_string, value_hex_string);
                 }

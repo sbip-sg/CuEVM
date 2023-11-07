@@ -27,4 +27,11 @@
 
 // EVM error codes
 #define ERR_MAX_DEPTH_EXCEEDED 0x0A
+
+// block error codes
+#define ERR_BLOCK_INVALID_NUMBER 0x0B
+
+// message error codes
+#define ERR_MESSAGE_INVALID_INDEX 0x0C
+
 #endif

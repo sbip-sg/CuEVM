@@ -37,29 +37,49 @@ IN THE SOFTWARE.
 #include "../arith.cuh"
 
 
+__device__ state_t<utils_params>::state_data_t global_state;
+
 template<class params>
-__global__ void kernel_message(cgbn_error_report_t *report, typename gpu_message<params>::gpu_message *msgs, uint32_t instance_count) {
+__global__ void kernel_message(cgbn_error_report_t *report, typename message_t<params>::message_content_t *msgs, uint32_t instance_count) {
   uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
 
   if(instance>=instance_count)
     return;
-  typedef arith_env_t<params> local_arith_t;
-  typedef typename arith_env_t<params>::bn_t  bn_t;
-  local_arith_t arith(cgbn_report_monitor, report, instance);
-  typedef typename gpu_global_storage_t<params>::gpu_contract_t gpu_contract_t;
-  gpu_contract_t *contract;
+  typedef state_t<params>                 state_t;
+  typedef message_t<params>               message_t;
+  typedef arith_env_t<params>             arith_t;
+  typedef typename arith_t::bn_t          bn_t;
+  typedef typename state_t::contract_t    contract_t;
+  arith_t arith(cgbn_report_monitor, report, instance);
+  contract_t *contract;
+  message_t message(arith, &(msgs[instance]));
+  state_t global(arith, &(global_state));
 
 
-  bn_t caller, value, to, tx_origin, tx_gasprice;
-  uint32_t error;
-  error = 0;
-  cgbn_load(arith._env, caller, &(msgs[instance].caller));
-  cgbn_load(arith._env, value, &(msgs[instance].value));
-  cgbn_load(arith._env, to, &(msgs[instance].to));
-  cgbn_load(arith._env, tx_origin, &(msgs[instance].tx.origin));
-  cgbn_load(arith._env, tx_gasprice, &(msgs[instance].tx.gasprice));
-  contract=msgs[instance].contract;
-  printf("caller: %08x, value: %08x, to: %08x, tx_origin: %08x, tx_gasprice: %08x, data_size: %lx\n", cgbn_get_ui32(arith._env, caller), cgbn_get_ui32(arith._env, value), cgbn_get_ui32(arith._env, to), cgbn_get_ui32(arith._env, tx_origin), cgbn_get_ui32(arith._env, tx_gasprice), msgs[instance].data.size);
+  bn_t caller, value, nonce, to, tx_origin, tx_gasprice;
+  uint32_t error_code;
+  error_code = ERR_SUCCESS;
+  message.get_caller(caller);
+  message.get_value(value);
+  message.get_nonce(nonce);
+  message.get_to(to);
+  message.get_tx_origin(tx_origin);
+  message.get_tx_gasprice(tx_gasprice);
+  printf("caller: %08x, value: %08x, to: %08x, nonce: %08x, tx_origin: %08x, tx_gasprice: %08x, data_size: %lx, depth: %d, call_type: %d\n", cgbn_get_ui32(arith._env, caller), cgbn_get_ui32(arith._env, value), cgbn_get_ui32(arith._env, to), cgbn_get_ui32(arith._env, nonce), cgbn_get_ui32(arith._env, tx_origin), cgbn_get_ui32(arith._env, tx_gasprice), message.get_data_size(), message.get_depth(), message.get_call_type());
+  uint8_t *data=message.get_data(0, 32, error_code);
+  if (error_code!=ERR_SUCCESS) {
+    printf("Error: %d\n", error_code);
+    error_code=ERR_SUCCESS;
+  } else {
+    printf("data: ");
+    print_bytes(data, 32);
+    printf("\n");
+  }
+  bn_t address;
+  cgbn_set_ui32(arith._env, address, 0x00000001);
+  contract=global.get_account(address, error_code);
+  message.set_contract(contract);
+  contract=message.get_contract();
   bn_t contract_address, contract_balance;
   cgbn_load(arith._env, contract_address, &(contract->address));
   cgbn_load(arith._env, contract_balance, &(contract->balance));
@@ -68,25 +88,41 @@ __global__ void kernel_message(cgbn_error_report_t *report, typename gpu_message
 }
 
 template<class params>
-void run_test(uint32_t instance_count, uint32_t storage_count) {
-  typedef typename gpu_global_storage_t<params>::gpu_contract_t gpu_contract_t;
-  typedef typename gpu_message<params>::gpu_message gpu_message_t;
+void run_test() {
+  typedef state_t<params> state_t;
+  typedef typename state_t::state_data_t state_data_t;
+  typedef arith_env_t<params> arith_t;
+  typedef message_t<params> message_t;
+  typedef typename message_t::message_content_t message_content_t;
   
-  gpu_contract_t          *cpu_global_storage, *gpu_global_storage;
-  gpu_message_t           *cpu_messages, *gpu_messages;
+  state_data_t            *gpu_global_state;
+  message_content_t       *cpu_messages, *gpu_messages;
   cgbn_error_report_t     *report;
+  arith_t arith(cgbn_report_monitor, 0);
   
-  printf("Genereating primes and instances ...\n");
-  cpu_global_storage=gpu_global_storage_t<params>::generate_global_storage(storage_count);
-  cpu_messages=generate_host_messages<params>(instance_count);
-  //write_messages<params>(stdout, cpu_messages, instance_count);
-  
-  printf("Copying primes and instances to the GPU ...\n");
-  gpu_global_storage=gpu_global_storage_t<params>::generate_gpu_global_storage(cpu_global_storage, storage_count);
-  for(size_t idx=0; idx<instance_count; idx++) {
-    cpu_messages[idx].contract=&(gpu_global_storage[1]);
+  //read the json file with the transactions
+  cJSON *root = get_json_from_file("input/evm_test.json");
+  if(root == NULL) {
+    printf("Error: could not read the json file\n");
+    exit(1);
   }
-  gpu_messages=generate_gpu_messages<params>(cpu_messages, instance_count);
+  const cJSON *test = NULL;
+  test = cJSON_GetObjectItemCaseSensitive(root, "sstoreGas");
+
+
+  printf("Generating global state\n");
+  state_t cpu_global_state(arith, test);
+  gpu_global_state=cpu_global_state.to_gpu();
+  CUDA_CHECK(cudaMemcpyToSymbol(global_state, gpu_global_state, sizeof(state_data_t)));
+  printf("Global state generated\n");
+
+  printf("Generating messages\n");
+  size_t messages_count=1;
+  message_t message(arith, test);
+  cpu_messages=message_t::get_messages(test, messages_count);
+  gpu_messages=message_t::get_gpu_messages(cpu_messages, messages_count);
+  message.print();
+  printf("Messages generated\n");
   
   // create a cgbn_error_report for CGBN to report back errors
   CUDA_CHECK(cgbn_error_report_alloc(&report)); 
@@ -94,28 +130,40 @@ void run_test(uint32_t instance_count, uint32_t storage_count) {
   printf("Running GPU kernel ...\n");
 
   // launch kernel with blocks=ceil(instance_count/IPB) and threads=TPB
-  kernel_message<params><<<1, params::TPI>>>(report, gpu_messages, instance_count);
+  kernel_message<params><<<1, params::TPI>>>(report, gpu_messages, messages_count);
 
   // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
   CUDA_CHECK(cudaDeviceSynchronize());
   CGBN_CHECK(report);
     
     
-  //read-only memory
+  // print to json files
+  printf("Printing to json files ...\n");
+  cJSON_Delete(root);
+  root = cJSON_CreateObject();
+  cJSON_AddItemToObject(root, "transaction", message.to_json());
+  cJSON *post = cJSON_CreateArray();
+  for(uint32_t idx=0; idx<messages_count; idx++) {
+    message_t local_message(arith, &(cpu_messages[idx]));
+    cJSON_AddItemToArray(post, local_message.to_json());
+  }
+  cJSON_AddItemToObject(root, "post", post);
+  char *json_str=cJSON_Print(root);
+  FILE *fp=fopen("output/evm_message.json", "w");
+  fprintf(fp, "%s", json_str);
+  fclose(fp);
+  free(json_str);
+  printf("Json files printed\n");
   
-  printf("Verifying the results ...\n");
-  
-  // clean up
-  gpu_global_storage_t<params>::free_global_storage(cpu_global_storage, storage_count);
-  gpu_global_storage_t<params>::free_gpu_global_storage(gpu_global_storage, storage_count);
-  free_host_messages<params>(cpu_messages, instance_count);
-  free_gpu_messages<params>(gpu_messages, instance_count);
+  // free the memory
+  printf("Freeing the memory ...\n");
+  message.free_memory();
+  message_t::free_messages(cpu_messages, messages_count);
+  message_t::free_gpu_messages(gpu_messages, messages_count);
+  //cJSON_Delete(root);
   CUDA_CHECK(cgbn_error_report_free(report));
 }
 
-#define INSTANCES 1
-
-
 int main() {
-  run_test<utils_params>(INSTANCES, 100);
+  run_test<utils_params>();
 }
