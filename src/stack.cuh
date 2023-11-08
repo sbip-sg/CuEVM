@@ -14,51 +14,57 @@
 
 
 template<class params>
-class gpu_stack_t {
+class stack_t {
   public:
 
+  typedef arith_env_t<params>                     arith_t;
   typedef typename arith_env_t<params>::bn_t      bn_t;
   typedef typename arith_env_t<params>::bn_wide_t bn_wide_t;
+  typedef cgbn_mem_t<params::BITS>                evm_word_t;
+  static const uint32_t                           STACK_SIZE = params::STACK_SIZE;
   
   typedef struct {
-    cgbn_mem_t<params::BITS> values[params::STACK_SIZE];
+    evm_word_t values[params::STACK_SIZE];
   } stack_data_t;
 
 
-  cgbn_mem_t<params::BITS> *_stack;
-  uint32_t  _top;
-  arith_env_t<params>     _arith;
+  evm_word_t  *_stack;
+  uint32_t    _top;
+  arith_t     _arith;
   
   //constructor
-  __device__ __forceinline__ gpu_stack_t(arith_env_t<params> arith, cgbn_mem_t<params::BITS> *stack, uint32_t top) : _arith(arith), _stack(stack), _top(top) {
+  __host__ __device__ __forceinline__ stack_t(arith_t arith, evm_word_t *stack, uint32_t top) : _arith(arith), _stack(stack), _top(top) {
+  }
+  __host__ __device__ __forceinline__ stack_t(arith_t arith, evm_word_t *stack) : _arith(arith), _stack(stack), _top(STACK_SIZE) {
   }
 
-  __device__ __forceinline__ uint32_t size() {
-    return params::STACK_SIZE - _top;
+  __host__ __device__ __forceinline__ uint32_t size() {
+    return STACK_SIZE - _top;
   }
 
   //
-  __device__ __forceinline__ void push(const bn_t &value) {
+  __host__ __device__ __forceinline__ void push(const bn_t &value, uint32_t &error_code) {
     if (_top == 0) {
-      printf("Stack overflow\n");
+      error_code=ERR_STACK_OVERFLOW;
       return;
     }
     _top--;
     cgbn_store(_arith._env, _stack + _top, value);
   }
 
-  __device__ __forceinline__ void pop(bn_t &value) {
-    if (_top == params::STACK_SIZE) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void pop(bn_t &value, uint32_t &error_code) {
+    if (_top == STACK_SIZE) {
+      error_code=ERR_STACK_UNDERFLOW;
+      cgbn_set_ui32(_arith._env, value, 0);
       return;
     }
     cgbn_load(_arith._env, value, &(_stack[_top]));
     _top++;
   }
 
-  __device__ __forceinline__ void add() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void add(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
@@ -69,9 +75,9 @@ class gpu_stack_t {
     _top++;
   }
 
-  __device__ __forceinline__ void sub() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void sub(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
@@ -83,9 +89,9 @@ class gpu_stack_t {
   }
   
   
-  __device__ __forceinline__ void negate() {
-    if (_top > params::STACK_SIZE - 1) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void negate(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 1)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, r;
@@ -95,9 +101,9 @@ class gpu_stack_t {
   }
 
 
-  __device__ __forceinline__ void mul() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void mul(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
@@ -108,25 +114,27 @@ class gpu_stack_t {
     _top++;
   }
 
-  __device__ __forceinline__ void div() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void div(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
     cgbn_load(_arith._env, a, &(_stack[_top]));
     cgbn_load(_arith._env, b, &(_stack[_top+1]));
-    if (cgbn_compare_ui32(_arith._env, b, 0) == 0)
+    if (cgbn_compare_ui32(_arith._env, b, 0) == 0) {
       cgbn_set_ui32(_arith._env, r, 0);
+      //division by zero no error
+    }
     else
       cgbn_div(_arith._env, r, a, b);
     cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
-  __device__ __forceinline__ void sdiv() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void sdiv(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
@@ -152,28 +160,30 @@ class gpu_stack_t {
       if (sign) {
         cgbn_negate(_arith._env, r, r);
       }
-
     }
     cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
 
-  __device__ __forceinline__ void mod() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void mod(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
     cgbn_load(_arith._env, a, &(_stack[_top]));
     cgbn_load(_arith._env, b, &(_stack[_top+1]));
-    cgbn_rem(_arith._env, r, a, b);
+    if (cgbn_compare_ui32(_arith._env, b, 0) == 0)
+      cgbn_set_ui32(_arith._env, r, 0);
+    else
+      cgbn_rem(_arith._env, r, a, b);
     cgbn_store(_arith._env, &(_stack[_top+1]), r);
     _top++;
   }
   
-  __device__ __forceinline__ void smod() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void smod(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
@@ -194,9 +204,9 @@ class gpu_stack_t {
     _top++;
   }
 
-  __device__ __forceinline__ void addmod() {
-    if (_top > params::STACK_SIZE - 3) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void addmod(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 3)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, c, m, r;
@@ -216,9 +226,9 @@ class gpu_stack_t {
     _top=_top+2;
   }
 
-  __device__ __forceinline__ void mulmod() {
-    if (_top > params::STACK_SIZE - 3) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void mulmod(uint32_t &error_code) {
+    if (_top > (STACK_SIZE - 3)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, m, r;
@@ -232,9 +242,9 @@ class gpu_stack_t {
     _top=_top+2;
   }
 
-  __device__ __forceinline__ void exp() {
-    if (_top > params::STACK_SIZE - 2) {
-      printf("Stack underflow\n");
+  __host__ __device__ __forceinline__ void exp(uint32_t &error_code, bn_t &gas_cost) {
+    if (_top > (STACK_SIZE - 2)) {
+      error_code=ERR_STACK_UNDERFLOW;
       return;
     }
     bn_t  a, b, r;
@@ -244,6 +254,7 @@ class gpu_stack_t {
     int32_t bit, last_bit;
     cgbn_set_ui32(_arith._env, current, 1);
     cgbn_set(_arith._env, square, a);
+    // TODO very last bit for 0x01 and than compute the number of exponents
     last_bit=params::BITS-1-cgbn_clz(_arith._env, b);
     //^0=1 even for 0^0
     if (last_bit == -1) {
