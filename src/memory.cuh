@@ -34,13 +34,6 @@ class memory_t {
     return _content->size;
   }
 
-  
-  //get the size of the memory with gas cost
-  __host__ __device__ __forceinline__ size_t size(bn_t &gas_cost) {
-    cgbn_set_ui32(_arith._env, gas_cost, 2);
-    return _content->size;
-  }
-
 
   //get the all data of the memory
   __host__ __device__ __forceinline__ uint8_t *get_data() {
@@ -58,6 +51,16 @@ class memory_t {
     if (threadIdx.x == 0) {
     #endif
       uint8_t *new_data = (uint8_t *)malloc(no_pages * PAGE_SIZE);
+      /*
+      printf("new_data=%p\n", new_data);
+      printf("new_size=%lx\n", new_size);
+      printf("no_pages=%lx\n", no_pages);
+      printf("PAGE_SIZE=%lx\n", PAGE_SIZE);
+      printf("new alloc size=%lx\n", no_pages * PAGE_SIZE);
+      printf("old data=%p\n", _content->data);
+      printf("old size=%lx\n", _content->size);
+      printf("old alloc size=%lx\n", _content->alocated_size);
+      */
       if (new_data == NULL) {
         error_code = ERR_MEMORY_INVALID_ALLOCATION;
         return;
@@ -74,7 +77,7 @@ class memory_t {
     #endif
   }
 
-  __host__ __device__ __forceinline__ void grow_cost(size_t new_size, bn_t &gas_cost) {
+  __host__ __device__ __forceinline__ void grow_cost(size_t &new_size, bn_t &gas_cost) {
       size_t memory_size_word = (_content->size + 31) / 32;
       size_t new_memory_size_word = (new_size + 31) / 32;
       size_t memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word;
@@ -83,6 +86,8 @@ class memory_t {
       bn_t new_cost_bn;
       _arith.from_size_t_to_cgbn(new_cost_bn, new_cost);
       cgbn_add(_arith._env, gas_cost, gas_cost, new_cost_bn);
+      // because size is always a multiple of 32
+      new_size = new_memory_size_word * 32;
   }
 
   __host__ __device__ __forceinline__ void grow(size_t offset, bn_t &gas_cost, uint32_t &error_code) {
@@ -97,14 +102,12 @@ class memory_t {
 
   //get the data of the memory at a specific index and length
   __host__ __device__ __forceinline__ uint8_t *get(size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
-    cgbn_set_ui32(_arith._env, gas_cost, 3);
     grow(index + length, gas_cost, error_code);
     return _content->data + index;
   }
 
   //set the data of the memory at a specific index and length
   __host__ __device__ __forceinline__ void set(uint8_t *data, size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
-    cgbn_set_ui32(_arith._env, gas_cost, 3);
     grow(index + length, gas_cost, error_code);
     #ifdef __CUDA_ARCH__
     if (threadIdx.x == 0) {
@@ -134,17 +137,21 @@ class memory_t {
 
   // copy content to another memory
   __host__ __device__ __forceinline__ void copy_content(memory_data_t *dest) {
+    /*
     #ifdef __CUDA_ARCH__
     __syncthreads();
     if (threadIdx.x == 0) {
     #endif
+    */
       dest->alocated_size = _content->size;
       dest->size = _content->size;
       memcpy(dest->data, _content->data, _content->size);
+    /*
     #ifdef __CUDA_ARCH__
     }
     __syncthreads();
     #endif
+    */
   }
 
   __device__ __forceinline__ void free_memory() {
@@ -199,7 +206,7 @@ class memory_t {
     }
     free(cpu_memories);
   }
-   __host__ static void get_memories_from_gpu(memory_data_t  *gpu_memories, uint32_t count) {
+   __host__ static memory_data_t  *get_memories_from_gpu(memory_data_t  *gpu_memories, uint32_t count) {
     memory_data_t  *cpu_memories;
     cpu_memories=(memory_data_t *)malloc(sizeof(memory_data_t) * count);
     cudaMemcpy(cpu_memories, gpu_memories, sizeof(memory_data_t)*count, cudaMemcpyDeviceToHost);
@@ -279,24 +286,30 @@ class memory_t {
   }
 };
 
+template<class params>
 __global__ void kernel_get_memory(typename memory_t<params>::memory_data_t *dst_instances, typename memory_t<params>::memory_data_t *src_instances, uint32_t instance_count) {
   uint32_t instance=blockIdx.x*blockDim.x + threadIdx.x;
-  typedef typename memory_t<params>::memory_t memory_t;
+  typedef memory_t<params>    memory_t;
+  typedef arith_env_t<params> arith_t;
   
   if(instance>=instance_count)
     return;
 
-  if (threadIdx.x == 0) {
-    printf("GET size=%08x\n", src_instances->size);
-    printf("GET data address=%08x\n", src_instances->data);
-    printf("GET lowestbit=%02x\n", src_instances->data[31]);
-  }
-  memory_t  memory(&(src_instances[instance]));
-  memory.copy_content_to(&(dst_instances[instance]));
-  if (threadIdx.x == 0) {
-    printf("GET data address=%08x\n", memory._content->data);
-    printf("GET lowestbit=%02x\n", memory._content->data[31]);
-  }
+  // setup arithmetic
+  arith_t arith(cgbn_report_monitor);
+  /*
+  printf("GET size=%lu\n", src_instances[instance].size);
+  printf("GET data address=%p\n", src_instances[instance].data);
+  printf("GET lowestbit=%02x\n", src_instances[instance].data[31]);
+  */
+  memory_t  memory(arith, &(src_instances[instance]));
+  memory.copy_content(&(dst_instances[instance]));
+  /*
+  printf("GET data address=%p\n", memory._content->data);
+  printf("GET lowestbit=%02x\n", memory._content->data[31]);
+  printf("GET D data address=%p\n", dst_instances[instance].data);
+  printf("GET D lowestbit=%02x\n", dst_instances[instance].data[31]);
+  */
   memory.free_memory();
 }
 

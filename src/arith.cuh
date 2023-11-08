@@ -28,6 +28,8 @@ class arith_env_t {
   //constructor
   __device__ __forceinline__ arith_env_t(cgbn_monitor_t monitor, cgbn_error_report_t *report, uint32_t instance) : _context(monitor, report, instance), _env(_context), _instance(instance) {
   }
+  __device__ __forceinline__ arith_env_t(cgbn_monitor_t monitor) : _context(monitor), _env(_context), _instance(0) {
+  }
 
   //constructor
   __host__ __forceinline__ arith_env_t(cgbn_monitor_t monitor, uint32_t instance) : _context(monitor), _env(_context), _instance(instance) {

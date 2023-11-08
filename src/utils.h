@@ -115,6 +115,7 @@ class mr_params_t {
   static const uint32_t STORAGE_SIZE=storage_size;          // memory size in bytes
   static const uint32_t MAX_CODE_SIZE=500;         // total instances official 24576
   static const uint32_t MAX_STORAGE_SIZE=100;        // words per instance
+  static const uint32_t PAGE_SIZE=1024;        // words per instance
 };
 
 typedef mr_params_t<8, 256, 1, 1024, 4096, 50> utils_params;
