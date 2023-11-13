@@ -8,14 +8,14 @@
 
 typedef struct {
   size_t offset;
-  size_t length;
+  size_t size;
 } return_data_t;
 
 __host__ return_data_t *generate_host_returns(uint32_t count) {
   return_data_t *cpu_instances=(return_data_t *)malloc(sizeof(return_data_t)*count);
   for(size_t idx=0; idx<count; idx++) {
     cpu_instances[idx].offset = 0;
-    cpu_instances[idx].length = 32;
+    cpu_instances[idx].size = 0;
   }
   return cpu_instances;
 }
@@ -40,7 +40,7 @@ __host__ void free_gpu_returns(return_data_t *gpu_instances, uint32_t count) {
 template<class params>
 __host__ void write_returns(FILE *fp, return_data_t *cpu_instances, uint32_t count) {
   for(size_t idx=0; idx<count; idx++) {
-    fprintf(fp, "INSTACE: %08x , OFFSET: %lx , LENGTH: %lx\n", idx, cpu_instances[idx].offset, cpu_instances[idx].length);
+    fprintf(fp, "INSTACE: %08x , OFFSET: %lx , size: %lx\n", idx, cpu_instances[idx].offset, cpu_instances[idx].size);
   }
 }
 

@@ -19,6 +19,7 @@
         "initializer_list": "cpp",
         "memory": "cpp",
         "stdlib.h": "c",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "cstdint": "cpp"
     }
 }

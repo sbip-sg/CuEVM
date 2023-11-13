@@ -112,11 +112,45 @@ class message_t {
     }
 
     __host__ __device__ __forceinline__ uint8_t *get_data(size_t index, size_t length, uint32_t &error_code) {
-      if (index + length > _content->data.size) {
-        error_code = ERR_MESSAGE_INVALID_INDEX;
-        return NULL;
+      __shared__ uint8_t *data;
+      #ifdef __CUDA_ARCH__
+      if (threadIdx.x == 0) {
+      #endif
+        data = malloc(sizeof(uint8_t)*length);
+      #ifdef __CUDA_ARCH__
       }
-      return _content->data.data + index;
+      __syncthreads();
+      #endif
+      if (index + length <= _content->data.size) {
+        #ifdef __CUDA_ARCH__
+        if (threadIdx.x == 0) {
+        #endif
+          memcpy(data, _content->data.data + index, sizeof(uint8_t)*length);
+        #ifdef __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+      } else if (index < _content->data.size) {
+        #ifdef __CUDA_ARCH__
+        if (threadIdx.x == 0) {
+        #endif
+          memset(data, 0, sizeof(uint8_t)*length);
+          memcpy(data, _content->data.data + index, sizeof(uint8_t)*(_content->data.size - index));
+        #ifdef __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+      } else {
+        #ifdef __CUDA_ARCH__
+        if (threadIdx.x == 0) {
+        #endif
+          memset(data, 0, sizeof(uint8_t)*length);
+        #ifdef __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+      }
+      return data;
     }
 
     __host__ __device__ __forceinline__ void set_contract(contract_t *contract) {

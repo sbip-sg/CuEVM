@@ -48,8 +48,7 @@ class state_t {
     __host__ __device__ __forceinline__ state_t(arith_t arith, state_data_t *content) : _arith(arith), _content(content) {
     }
 
-    // host constructor from json with cpu memory
-    __host__ state_t(arith_t arith, const cJSON *test) : _arith(arith) {
+    __host__ static state_data_t *get_global_state(const cJSON *test) {
         const cJSON *state_json = NULL;
         const cJSON *contract_json = NULL;
         const cJSON *balance_json = NULL;
@@ -144,7 +143,12 @@ class state_t {
         mpz_clear(nonce);
         mpz_clear(key);
         mpz_clear(value);
-        _content=state;
+        return state;
+    }
+
+    // host constructor from json with cpu memory
+    __host__ state_t(arith_t arith, const cJSON *test) : _arith(arith) {
+        _content=get_global_state(test);
     }
 
 
@@ -344,6 +348,11 @@ class state_t {
         account->modfied_bytecode = 1;
     }
 
+    __host__ __device__ __forceinline__ void copy_to_state_data_t(state_data_t *that) {
+        that->no_contracts = _content->no_contracts;
+        that->contracts = _content->contracts;
+    }
+
     __host__ __device__ __forceinline__ void copy_from_state_t(const state_t &that) {
         size_t idx, jdx;
         uint32_t error_code;
@@ -368,50 +377,59 @@ class state_t {
         }
     }
 
-    __host__ __device__ __forceinline__ void free_memory() {
-        if (_content->contracts != NULL) {
-            for (size_t idx=0; idx<_content->no_contracts; idx++) {
-                if (_content->contracts[idx].bytecode != NULL) {
-                    free(_content->contracts[idx].bytecode);
+    __host__ static void free_instance(state_data_t *instance) {
+        if (instance->contracts != NULL) {
+            for (size_t idx=0; idx<instance->no_contracts; idx++) {
+                if (instance->contracts[idx].bytecode != NULL) {
+                    free(instance->contracts[idx].bytecode);
                 }
-                if (_content->contracts[idx].storage != NULL) {
-                    free(_content->contracts[idx].storage);
+                if (instance->contracts[idx].storage != NULL) {
+                    free(instance->contracts[idx].storage);
                 }
             }
-            free(_content->contracts);
+            free(instance->contracts);
         }
-        if (_content != NULL) {
-            free(_content);
+        if (instance != NULL) {
+            free(instance);
         }
     }
 
-    __host__ state_data_t *to_gpu() {
-        state_data_t *gpu_state, *tmp_cpu_state;
-        tmp_cpu_state=(state_data_t *)malloc(sizeof(state_data_t));
-        tmp_cpu_state->no_contracts = _content->no_contracts;
-        if (tmp_cpu_state->no_contracts > 0) {
+    __host__ __device__ __forceinline__ void free_memory() {
+        free_instance(_content);
+    }
+
+    __host__ static state_data_t *from_cpu_to_gpu(state_data_t *instance) {
+        state_data_t *gpu_instance, *tmp_cpu_instance;
+        tmp_cpu_instance=(state_data_t *)malloc(sizeof(state_data_t));
+        tmp_cpu_instance->no_contracts = instance->no_contracts;
+        if (tmp_cpu_instance->no_contracts > 0) {
             contract_t *tmp_cpu_contracts;
-            tmp_cpu_contracts = (contract_t *)malloc(_content->no_contracts*sizeof(contract_t));
-            memcpy(tmp_cpu_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
-            for (size_t idx=0; idx<_content->no_contracts; idx++) {
+            tmp_cpu_contracts = (contract_t *)malloc(instance->no_contracts*sizeof(contract_t));
+            memcpy(tmp_cpu_contracts, instance->contracts, instance->no_contracts*sizeof(contract_t));
+            for (size_t idx=0; idx<instance->no_contracts; idx++) {
                 if (tmp_cpu_contracts[idx].bytecode != NULL) {
                     cudaMalloc((void **)&(tmp_cpu_contracts[idx].bytecode), tmp_cpu_contracts[idx].code_size*sizeof(uint8_t));
-                    cudaMemcpy(tmp_cpu_contracts[idx].bytecode, _content->contracts[idx].bytecode, tmp_cpu_contracts[idx].code_size*sizeof(uint8_t), cudaMemcpyHostToDevice);
+                    cudaMemcpy(tmp_cpu_contracts[idx].bytecode, instance->contracts[idx].bytecode, tmp_cpu_contracts[idx].code_size*sizeof(uint8_t), cudaMemcpyHostToDevice);
                 }
                 if (tmp_cpu_contracts[idx].storage != NULL) {
                     cudaMalloc((void **)&(tmp_cpu_contracts[idx].storage), tmp_cpu_contracts[idx].storage_size*sizeof(contract_storage_t));
-                    cudaMemcpy(tmp_cpu_contracts[idx].storage, _content->contracts[idx].storage, tmp_cpu_contracts[idx].storage_size*sizeof(contract_storage_t), cudaMemcpyHostToDevice);
+                    cudaMemcpy(tmp_cpu_contracts[idx].storage, instance->contracts[idx].storage, tmp_cpu_contracts[idx].storage_size*sizeof(contract_storage_t), cudaMemcpyHostToDevice);
                 }
             }
-            cudaMalloc((void **)&tmp_cpu_state->contracts, _content->no_contracts*sizeof(contract_t));
-            cudaMemcpy(tmp_cpu_state->contracts, tmp_cpu_contracts, _content->no_contracts*sizeof(contract_t), cudaMemcpyHostToDevice);
+            cudaMalloc((void **)&tmp_cpu_instance->contracts, instance->no_contracts*sizeof(contract_t));
+            cudaMemcpy(tmp_cpu_instance->contracts, tmp_cpu_contracts, instance->no_contracts*sizeof(contract_t), cudaMemcpyHostToDevice);
             free(tmp_cpu_contracts);
         } else {
-            tmp_cpu_state->contracts = NULL;
+            tmp_cpu_instance->contracts = NULL;
         }
-        cudaMalloc((void **)&gpu_state, sizeof(state_data_t));
-        cudaMemcpy(gpu_state, tmp_cpu_state, sizeof(state_data_t), cudaMemcpyHostToDevice);
-        free(tmp_cpu_state);
+        cudaMalloc((void **)&gpu_instance, sizeof(state_data_t));
+        cudaMemcpy(gpu_instance, tmp_cpu_instance, sizeof(state_data_t), cudaMemcpyHostToDevice);
+        free(tmp_cpu_instance);
+        return gpu_instance;
+    }
+
+    __host__ state_data_t *to_gpu() {
+        state_data_t *gpu_state=from_cpu_to_gpu(_content);
         return gpu_state;
     }
 

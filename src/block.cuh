@@ -44,7 +44,7 @@ class block_t {
   __device__ block_t(arith_t arith, block_data_t *content)  : _arith(arith), _content(content) {
   }
 
-  __host__ block_t(arith_t arith, const cJSON * test)  : _arith(arith) {
+  __host__ static block_data_t *get_instance(const cJSON * test) {
     block_data_t *cpu_block=(block_data_t *)malloc(sizeof(block_data_t));
     // block related info
     mpz_t coin_base, time_stamp, number, difficulty, gas_limit, chain_id, base_fee;
@@ -167,17 +167,30 @@ class block_t {
     mpz_clear(base_fee);
     mpz_clear(number_prev);
     mpz_clear(hash_prev);
-    _content=cpu_block;
+    return cpu_block;
+  }
+
+  __host__ block_t(arith_t arith, const cJSON * test)  : _arith(arith) {
+    _content=get_instance(test);
+  }
+
+  __host__ static void free_instance(block_data_t *cpu_block) {
+    free(cpu_block);
   }
 
   __host__ void free_memory() {
-    free(_content);
+    free_instance(_content);
+  }
+
+  __host__ static block_data_t *from_cpu_to_gpu(block_data_t *cpu_block) {
+    block_data_t *gpu_block=NULL;
+    cudaMalloc((void **)&gpu_block, sizeof(block_data_t));
+    cudaMemcpy(gpu_block, cpu_block, sizeof(block_data_t), cudaMemcpyHostToDevice);
+    return gpu_block;
   }
 
   __host__ block_data_t *to_gpu() {
-    block_data_t *gpu_block=NULL;
-    cudaMalloc((void **)&gpu_block, sizeof(block_data_t));
-    cudaMemcpy(gpu_block, _content, sizeof(block_data_t), cudaMemcpyHostToDevice);
+    block_data_t *gpu_block=from_cpu_to_gpu(_content);
     return gpu_block;
   }
 
