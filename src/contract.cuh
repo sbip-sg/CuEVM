@@ -31,7 +31,7 @@ class state_t {
         evm_word_t nonce;
         size_t code_size;
         size_t storage_size;
-        size_t modfied_bytecode; // 0 - no, 1 - yes; only for local states TODO: find a different way to do this
+        size_t changes; // 0 - no, | 1 bytecode, | 2 balance, | 4 nonce, | 8 storage
         uint8_t *bytecode;
         contract_storage_t *storage;
     } contract_t;
@@ -72,8 +72,7 @@ class state_t {
         state->no_contracts = cJSON_GetArraySize(state_json);
         if (state->no_contracts == 0) {
             state->contracts = NULL;
-            _content=state;
-            return;
+            return state;
         }
         state->contracts = (contract_t *)malloc(state->no_contracts*sizeof(contract_t));
 
@@ -109,7 +108,7 @@ class state_t {
             } else {
                 state->contracts[idx].bytecode = NULL;
             }
-            state->contracts[idx].modfied_bytecode = 0;
+            state->contracts[idx].changes = 0;
 
             // set the storage
             storage_json = cJSON_GetObjectItemCaseSensitive(contract_json, "storage");
@@ -345,7 +344,7 @@ class state_t {
         __syncthreads();
         #endif
         account->code_size = code_size;
-        account->modfied_bytecode = 1;
+        account->changes = 1;
     }
 
     __host__ __device__ __forceinline__ void copy_to_state_data_t(state_data_t *that) {
@@ -369,7 +368,7 @@ class state_t {
                     set_value(that._content->contracts[idx].address, that._content->contracts[idx].storage[jdx].key, that._content->contracts[idx].storage[jdx].value, error_code);
                     error_code = ERR_SUCCESS;
                 }
-                if (that._content->contracts[idx].modfied_bytecode == 1) {
+                if (that._content->contracts[idx].changes == 1) {
                     set_local_bytecode(that._content->contracts[idx].address, that._content->contracts[idx].bytecode, that._content->contracts[idx].code_size, error_code);
                     error_code = ERR_SUCCESS;
                 }
@@ -722,10 +721,10 @@ class state_t {
                 cJSON_AddStringToObject(contract_json, "code", "0x");
             }
             // set if the code was modified
-            if (_content->contracts[idx].modfied_bytecode == 1) {
-                cJSON_AddStringToObject(contract_json, "modfied_bytecode", "true");
+            if (_content->contracts[idx].changes == 1) {
+                cJSON_AddStringToObject(contract_json, "changes", "true");
             } else {
-                cJSON_AddStringToObject(contract_json, "modfied_bytecode", "false");
+                cJSON_AddStringToObject(contract_json, "changes", "false");
             }
             // set the storage
             storage_json = cJSON_CreateObject();

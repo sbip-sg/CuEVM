@@ -1,16 +1,6 @@
 #ifndef _MESSAGE_H_
 #define _MESSAGE_H_
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <cuda.h>
-#include <gmp.h>
-#ifndef __CGBN_H__
-#define __CGBN_H__
-#include <cgbn/cgbn.h>
-#endif
-#include "contract.cuh"
 #include "utils.h"
 
 template<class params>
@@ -19,7 +9,6 @@ class message_t {
     typedef arith_env_t<params>                     arith_t;
     typedef typename arith_t::bn_t                  bn_t;
     typedef cgbn_mem_t<params::BITS>                evm_word_t;
-    typedef typename state_t<params>::contract_t    contract_t;
   
     typedef struct {
       evm_word_t origin;
@@ -39,9 +28,8 @@ class message_t {
       tx_t            tx;
       evm_word_t      gas;
       uint32_t        depth;
-      uint32_t        call_type;
+      uint32_t        call_type; // OP_CALL - call, OP_CALLCODE - callcode, OP_STATICCALL - static call, OP_DELEGATECALL - delegate call, OP_CREATE - create, OP_CREATE2 - create2
       message_data_t  data;
-      contract_t      *contract;
     } message_content_t;
 
     message_content_t *_content;
@@ -112,11 +100,13 @@ class message_t {
     }
 
     __host__ __device__ __forceinline__ uint8_t *get_data(size_t index, size_t length, uint32_t &error_code) {
-      __shared__ uint8_t *data;
       #ifdef __CUDA_ARCH__
+      __shared__ uint8_t *data;
       if (threadIdx.x == 0) {
+      #else
+      uint8_t *data;
       #endif
-        data = malloc(sizeof(uint8_t)*length);
+        data = (uint8_t*) malloc(sizeof(uint8_t)*length);
       #ifdef __CUDA_ARCH__
       }
       __syncthreads();
@@ -151,14 +141,6 @@ class message_t {
         #endif
       }
       return data;
-    }
-
-    __host__ __device__ __forceinline__ void set_contract(contract_t *contract) {
-      _content->contract = contract;
-    }
-
-    __host__ __device__ __forceinline__ contract_t *get_contract() {
-      return _content->contract;
     }
 
     __host__ message_content_t *to_gpu() {
@@ -309,9 +291,15 @@ class message_t {
       mpz_set_str(nonce, hex_string, 16);
 
       const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(messages_json, "to");
+      uint32_t call_type = OP_CALL;
       hex_string = to_json->valuestring;
-      adjusted_length(&hex_string);
-      mpz_set_str(to, hex_string, 16);
+      if (strlen(hex_string) == 0) {
+        mpz_set_ui(to, 0);
+        call_type=OP_CREATE; //to see if it is not create2
+      } else {
+        adjusted_length(&hex_string);
+        mpz_set_str(to, hex_string, 16);
+      }
 
 
       const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(messages_json, "value");
@@ -365,8 +353,7 @@ class message_t {
             from_mpz(cpu_messages[instance_idx].tx.gasprice._limbs, params::BITS/32, tx_gasprice);
             from_mpz(cpu_messages[instance_idx].gas._limbs, params::BITS/32, gas);
             cpu_messages[instance_idx].depth=0;
-            cpu_messages[instance_idx].call_type=0;
-            cpu_messages[instance_idx].contract = NULL;
+            cpu_messages[instance_idx].call_type=call_type;
             instance_idx++;
           }
         }

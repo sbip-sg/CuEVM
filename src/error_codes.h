@@ -17,7 +17,6 @@
 #define ERR_INVALID_ZERO_DIVIDE 0x07
 #define ERR_INVALID_MODULUS 0x08
 
-// execution codes
 
 // global storage error codes
 #define ERR_STATE_INVALID_ADDRESS 0x09
@@ -39,5 +38,8 @@
 // memory error codes
 #define ERR_MEMEORY_INVALID_INDEX 0x0F
 #define ERR_MEMORY_INVALID_ALLOCATION 0x10
+
+// execution codes
+#define ERR_INVALID_JUMP_DESTINATION 0x11
 
 #endif

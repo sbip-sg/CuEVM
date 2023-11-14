@@ -25,7 +25,10 @@ test_cgbn: src/test/test_cgbn.cu
 	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ $<
 
 cu_evm_interpreter: src/cu_evm_interpreter.cu
-	$(NVCC) $(NVCC_FLAGS) -rdc=true --std c++20 -lcudadevrt -lineinfo -o $(OUT_DIRECTORY)/cu_evm_interpreter src/cu_evm_interpreter.cu
+	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/cu_evm_interpreter src/cu_evm_interpreter.cu
+
+interpreter: src/interpreter.cu
+	$(NVCC) -D TRACER $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/interpreter src/interpreter.cu
 
 clean:
 	rm -f $(OUT_DIRECTORY)/*
