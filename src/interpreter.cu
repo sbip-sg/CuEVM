@@ -5,108 +5,111 @@
 
 
 template<class params>
-__global__ void kernel_evm(cgbn_error_report_t *report, typename evm_t<params>::evm_instances_t *instances) {
-  uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
-
-  if(instance >= instances->count)
-    return;
-
-  typedef arith_env_t<params> arith_t;
-  typedef typename arith_t::bn_t  bn_t;
-  typedef evm_t<params> evm_t;
-  
-  // setup evm
-  evm_t evm(cgbn_report_monitor, report, instance, instances->block, instances->world_state);
-
-  // run the evm
-  evm.run(
-    &(instances->msgs[instance]),
-    &(instances->stacks[instance]),
-    &(instances->return_datas[instance]),
-    &(instances->memories[instance]),
-    &(instances->access_states[instance]),
-    &(instances->parents_write_states[instance]),
-    &(instances->write_states[instance]),
-    #ifdef GAS
-    &(instances->gas_left_a[instance]),
-    #endif
-    #ifdef TRACER
-    &(instances->tracers[instance]),
-    #endif
-    instances->errors[instance]
-  );
-}
-
-template<class params>
-void run_test(char *read_json_filename, char *write_json_filename) {
+void run_interpreter(char *read_json_filename, char *write_json_filename) {
   typedef evm_t<params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
   typedef arith_env_t<params> arith_t;
   
-  evm_instances_t         cpu_instances, tmp_gpu_instances, *gpu_instances;
+  evm_instances_t         cpu_instances;
+  #ifndef ONLY_CPU
+  evm_instances_t tmp_gpu_instances, *gpu_instances;
+  #endif
   cgbn_error_report_t     *report;
 
   arith_t arith(cgbn_report_monitor, 0);
   
   //read the json file with the global state
-  cJSON *root = get_json_from_file(read_json_filename);
-  if(root == NULL) {
+  cJSON *read_root = get_json_from_file(read_json_filename);
+  if(read_root == NULL) {
     printf("Error: could not read the json file\n");
     exit(EXIT_FAILURE);
   }
+  cJSON *write_root = cJSON_CreateObject();
   const cJSON *test = NULL;
-  test = cJSON_GetObjectItemCaseSensitive(root, "arith");
+  cJSON_ArrayForEach(test, read_root) {
+    // get instaces to run
+    printf("Generating instances\n");
+    evm_t::get_instances(cpu_instances, test);
+    #ifndef ONLY_CPU
+    evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
+    CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
+    CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
+    #endif
+    printf("Instances generated\n");
 
-  // get instaces to run
-  printf("Generating instances\n");
-  evm_t::get_instances(cpu_instances, test);
-  evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
-  CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
-  CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
-  printf("Instances generated\n");
+    // create a cgbn_error_report for CGBN to report back errors
+    #ifndef ONLY_CPU
+    CUDA_CHECK(cgbn_error_report_alloc(&report)); 
+    #endif
 
-  // create a cgbn_error_report for CGBN to report back errors
-  CUDA_CHECK(cgbn_error_report_alloc(&report)); 
+    // evm
+    evm_t evm(cgbn_report_monitor, 0, cpu_instances.block, cpu_instances.world_state);
 
-  printf("Running GPU kernel ...\n");
-  kernel_evm<params><<<cpu_instances.count, params::TPI>>>(report, gpu_instances);
 
-  // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
-  CUDA_CHECK(cudaDeviceSynchronize());
-  printf("GPU kernel finished\n");
-  CGBN_CHECK(report);
+    #ifndef ONLY_CPU
+    printf("Running GPU kernel ...\n");
+    kernel_evm<params><<<cpu_instances.count, params::TPI>>>(report, gpu_instances);
 
-  // copy the results back to the CPU
-  printf("Copying results back to CPU\n");
-  CUDA_CHECK(cudaMemcpy(&tmp_gpu_instances, gpu_instances, sizeof(evm_instances_t), cudaMemcpyDeviceToHost));
-  evm_t::get_cpu_from_gpu_instances(cpu_instances, tmp_gpu_instances);
-  printf("Results copied\n");
+    // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
+    CUDA_CHECK(cudaDeviceSynchronize());
+    printf("GPU kernel finished\n");
+    CGBN_CHECK(report);
 
-  // print the results
-  printf("Printing the results ...\n");
-  evm_t evm(cgbn_report_monitor, 0, cpu_instances.block, cpu_instances.world_state);
-  evm.print_instances(cpu_instances);
-  printf("Results printed\n");
+    // copy the results back to the CPU
+    printf("Copying results back to CPU\n");
+    CUDA_CHECK(cudaMemcpy(&tmp_gpu_instances, gpu_instances, sizeof(evm_instances_t), cudaMemcpyDeviceToHost));
+    evm_t::get_cpu_from_gpu_instances(cpu_instances, tmp_gpu_instances);
+    printf("Results copied\n");
+    #else
+    printf("Running CPU EVM\n");
+    // run the evm
+    for(size_t instance = 0; instance < cpu_instances.count; instance++) {
+      evm.run(
+        &(cpu_instances.msgs[instance]),
+        &(cpu_instances.stacks[instance]),
+        &(cpu_instances.return_datas[instance]),
+        &(cpu_instances.memories[instance]),
+        &(cpu_instances.access_states[instance]),
+        &(cpu_instances.parents_write_states[instance]),
+        &(cpu_instances.write_states[instance]),
+        #ifdef GAS
+        &(cpu_instances.gas_left_a[instance]),
+        #endif
+        #ifdef TRACER
+        &(cpu_instances.tracers[instance]),
+        #endif
+        cpu_instances.errors[instance]
+      );
+    }
+    printf("CPU EVM finished\n");
+    #endif
 
-  // print to json files
-  printf("Printing to json files ...\n");
-  cJSON_Delete(root);
-  root = cJSON_CreateObject();
-  cJSON_AddItemToObject(root, "test", evm.instances_to_json(cpu_instances));
-  char *json_str=cJSON_Print(root);
+
+    // print the results
+    printf("Printing the results ...\n");
+    evm.print_instances(cpu_instances);
+    printf("Results printed\n");
+
+    // print to json files
+    printf("Printing to json files ...\n");
+    cJSON_AddItemToObject(write_root, test->string, evm.instances_to_json(cpu_instances));
+    printf("Json files printed\n");
+
+    // free the memory
+    printf("Freeing the memory ...\n");
+    evm_t::free_instances(cpu_instances);
+    #ifndef ONLY_CPU
+    CUDA_CHECK(cudaFree(gpu_instances));
+    CUDA_CHECK(cgbn_error_report_free(report));
+    #endif
+  }
+  cJSON_Delete(read_root);
+  char *json_str=cJSON_Print(write_root);
   FILE *fp=fopen(write_json_filename, "w");
   fprintf(fp, "%s", json_str);
   fclose(fp);
   free(json_str);
-  cJSON_Delete(root);
-  printf("Json files printed\n");
-
-  // free the memory
-  printf("Freeing the memory ...\n");
-  evm_t::free_instances(cpu_instances);
-  CUDA_CHECK(cudaFree(gpu_instances));
-  CUDA_CHECK(cgbn_error_report_free(report));
-  
+  cJSON_Delete(write_root);
 }
 
 int main(int argc, char *argv[]) {//getting the input
@@ -139,5 +142,5 @@ int main(int argc, char *argv[]) {//getting the input
       fprintf(stderr, "Both --input and --output flags are required\n");
       exit(EXIT_FAILURE);
   }
-  run_test<utils_params>(read_json_filename, write_json_filename);
+  run_interpreter<utils_params>(read_json_filename, write_json_filename);
 }

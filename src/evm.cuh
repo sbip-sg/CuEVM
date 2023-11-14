@@ -1039,4 +1039,37 @@ class evm_t {
 };
 
 
+template<class params>
+__global__ void kernel_evm(cgbn_error_report_t *report, typename evm_t<params>::evm_instances_t *instances) {
+  uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
+
+  if(instance >= instances->count)
+    return;
+
+  typedef arith_env_t<params> arith_t;
+  typedef typename arith_t::bn_t  bn_t;
+  typedef evm_t<params> evm_t;
+  
+  // setup evm
+  evm_t evm(cgbn_report_monitor, report, instance, instances->block, instances->world_state);
+
+  // run the evm
+  evm.run(
+    &(instances->msgs[instance]),
+    &(instances->stacks[instance]),
+    &(instances->return_datas[instance]),
+    &(instances->memories[instance]),
+    &(instances->access_states[instance]),
+    &(instances->parents_write_states[instance]),
+    &(instances->write_states[instance]),
+    #ifdef GAS
+    &(instances->gas_left_a[instance]),
+    #endif
+    #ifdef TRACER
+    &(instances->tracers[instance]),
+    #endif
+    instances->errors[instance]
+  );
+}
+
 #endif

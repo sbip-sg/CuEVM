@@ -1,7 +1,9 @@
 NVCC = nvcc
 NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo
 GCC = gcc
-GCC_FLAGS = -lgmp -lcjson
+GCC_FLAGS = -lm -lgmp -lcjson
+GPP = g++
+GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson 
 OUT_DIRECTORY = ./out
 
 all: cuEVM
@@ -21,14 +23,14 @@ test_cjson_evm: src/test/test_cjson_evm.c
 test_cgbn: src/test/test_cgbn.cu
 	$(NVCC) $(NVCC_FLAGS) -lineinfo -o $(OUT_DIRECTORY)/test_cgbn src/test/test_cgbn.cu
 
+interpreter: src/interpreter.cu
+	$(NVCC) -D TRACER $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ $<
+
+cpu_interpreter: src/interpreter.cu
+	$(NVCC) -D TRACER -D ONLY_CPU $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ $<
+
 % :: src/test/%.cu
 	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ $<
-
-cu_evm_interpreter: src/cu_evm_interpreter.cu
-	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/cu_evm_interpreter src/cu_evm_interpreter.cu
-
-interpreter: src/interpreter.cu
-	$(NVCC) -D TRACER $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/interpreter src/interpreter.cu
 
 clean:
 	rm -f $(OUT_DIRECTORY)/*

@@ -27,7 +27,9 @@ IN THE SOFTWARE.
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#ifdef __CUDA_ARCH__
 #include <cuda.h>
+#endif
 #include <gmp.h>
 #ifndef __CGBN_H__
 #define __CGBN_H__
