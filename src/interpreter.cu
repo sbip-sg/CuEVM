@@ -43,7 +43,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     #endif
 
     // evm
-    evm_t evm(cgbn_report_monitor, 0, cpu_instances.block, cpu_instances.world_state);
+    evm_t evm(cgbn_report_monitor, 0, &(cpu_instances.sha3_parameters[0]), cpu_instances.block, cpu_instances.world_state);
 
 
     #ifndef ONLY_CPU

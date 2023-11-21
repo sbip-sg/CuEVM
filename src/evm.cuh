@@ -10,6 +10,7 @@
 #include "block.cuh"
 #include "tracer.cuh"
 #include "contract.cuh"
+#include "keccak.cuh"
 
 template<class params>
 class evm_t {
@@ -38,11 +39,16 @@ class evm_t {
         // tracer information
         typedef tracer_t<params>                        tracer_t;
         typedef typename tracer_t::tracer_content_t     tracer_content_t;
+        // keccak information
+        typedef keccak::keccak_t               keccak_t;
+        typedef typename keccak_t::sha3_parameters_t    sha3_parameters_t;
+
         // constants
         static const uint32_t                           MAX_DEPTH=1024;
         static const uint32_t                           WORD_BITS = params::BITS;
         static const uint32_t                           WORD_BYTES = params::BITS/8;
         static const uint32_t                           MAX_EXECUTION_STEPS = 10000;
+        static const uint32_t                           HASH_BYTES = 32;
 
         typedef struct {
             message_content_t   *msgs;
@@ -52,6 +58,7 @@ class evm_t {
             state_data_t        *access_states;
             state_data_t        *parents_write_states;
             state_data_t        *write_states;
+            sha3_parameters_t   *sha3_parameters;
             block_data_t        *block;
             state_data_t        *world_state;
             #ifdef GAS
@@ -70,23 +77,26 @@ class evm_t {
         state_t     _global_state;
         block_t     _current_block;
         uint32_t    _instance;
+        keccak_t    _keccak;
 
         //constructor
         __device__  __forceinline__ evm_t(
             cgbn_monitor_t          monitor,
             cgbn_error_report_t     *report,
             uint32_t                instance,
+            sha3_parameters_t       *sha3_parameters,
             block_data_t            *block, 
             state_data_t            *world_state
-        ) : _arith(monitor, report, instance), _current_block(_arith, block), _global_state(_arith, world_state), _instance(instance) {
+        ) : _arith(monitor, report, instance), _keccak(sha3_parameters->rndc, sha3_parameters->rotc, sha3_parameters->piln, sha3_parameters->state), _current_block(_arith, block), _global_state(_arith, world_state), _instance(instance) {
         }
         
         __host__ evm_t(
-            cgbn_monitor_t  monitor,
-            uint32_t        instance,
-            block_data_t    *block, 
-            state_data_t    *world_state
-        ) : _arith(monitor, instance), _current_block(_arith, block), _global_state(_arith, world_state), _instance(instance) {
+            cgbn_monitor_t      monitor,
+            uint32_t            instance,
+            sha3_parameters_t   *sha3_parameters,
+            block_data_t        *block, 
+            state_data_t        *world_state
+        ) : _arith(monitor, instance), _keccak(sha3_parameters->rndc, sha3_parameters->rotc, sha3_parameters->piln, sha3_parameters->state), _current_block(_arith, block), _global_state(_arith, world_state), _instance(instance) {
         }
 
         __host__ __device__ void run(
@@ -394,7 +404,25 @@ class evm_t {
                             break;
                         case OP_SHA3: // SHA3
                             {
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                cgbn_set_ui32(_arith._env, gas_cost, 30);
+                                
+                                // get the values from stack
+                                stack.pop(offset, error_code);
+                                stack.pop(length, error_code);
+                                src_offset_s=_arith.from_cgbn_to_size_t(offset);
+                                length_s=_arith.from_cgbn_to_size_t(length);
+                                
+                                // dynamic cost on size
+                                minimum_word_size = (length_s + 31) / 32;
+                                _arith.from_size_t_to_cgbn(aux_gas_cost, minimum_word_size);
+                                cgbn_mul_ui32(_arith._env, aux_gas_cost, aux_gas_cost, 6);
+                                cgbn_add(_arith._env, gas_cost, gas_cost, aux_gas_cost);
+
+                                // get data from memory and hash
+                                byte_data=memory.get(src_offset_s, length_s, gas_cost, error_code);
+                                _keccak.sha3(byte_data, length_s, &(tmp_memory[0]), HASH_BYTES);
+                                _arith.from_memory_to_cgbn(value, &(tmp_memory[0]));
+                                stack.push(value, error_code);
                             }
                             break;
                         case OP_ADDRESS: // ADDRESS
@@ -839,6 +867,8 @@ class evm_t {
             instances.access_states=state_t::get_local_states(instances.count);
             instances.parents_write_states=state_t::get_local_states(instances.count);
             instances.write_states=state_t::get_local_states(instances.count);
+            // keccak parameters
+            instances.sha3_parameters=keccak_t::get_cpu_instances(instances.count);
             instances.world_state=state_t::get_global_state(test);
             instances.block=block_t::get_instance(test);
             #ifdef GAS
@@ -874,6 +904,8 @@ class evm_t {
             gpu_instances.access_states=state_t::get_gpu_local_states(cpu_instances.access_states, cpu_instances.count);
             gpu_instances.parents_write_states=state_t::get_gpu_local_states(cpu_instances.parents_write_states, cpu_instances.count);
             gpu_instances.write_states=state_t::get_gpu_local_states(cpu_instances.write_states, cpu_instances.count);
+            // keccak parameters
+            gpu_instances.sha3_parameters=keccak_t::get_gpu_instances(cpu_instances.sha3_parameters, cpu_instances.count);
             // block
             gpu_instances.block=block_t::from_cpu_to_gpu(cpu_instances.block);
             //block_t::free_instance(cpu_block);
@@ -914,6 +946,8 @@ class evm_t {
             cpu_instances.parents_write_states=state_t::get_local_states_from_gpu(gpu_instances.parents_write_states, cpu_instances.count);
             state_t::free_local_states(cpu_instances.write_states, cpu_instances.count);
             cpu_instances.write_states=state_t::get_local_states_from_gpu(gpu_instances.write_states, cpu_instances.count);
+            // keccak
+            keccak_t::free_gpu_instances(gpu_instances.sha3_parameters, cpu_instances.count);
             // block
             block_t::free_gpu(gpu_instances.block);
             // world state
@@ -940,6 +974,7 @@ class evm_t {
             state_t::free_local_states(cpu_instances.access_states, cpu_instances.count);
             state_t::free_local_states(cpu_instances.parents_write_states, cpu_instances.count);
             state_t::free_local_states(cpu_instances.write_states, cpu_instances.count);
+            keccak_t::free_cpu_instances(cpu_instances.sha3_parameters, cpu_instances.count);
             block_t::free_instance(cpu_instances.block);
             state_t::free_instance(cpu_instances.world_state);
             #ifdef GAS
@@ -1051,7 +1086,7 @@ __global__ void kernel_evm(cgbn_error_report_t *report, typename evm_t<params>::
   typedef evm_t<params> evm_t;
   
   // setup evm
-  evm_t evm(cgbn_report_monitor, report, instance, instances->block, instances->world_state);
+  evm_t evm(cgbn_report_monitor, report, instance, &(instances->sha3_parameters[instance]), instances->block, instances->world_state);
 
   // run the evm
   evm.run(

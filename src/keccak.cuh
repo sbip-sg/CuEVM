@@ -46,17 +46,18 @@ namespace keccak {
         } sha3_ctx_t;
 
         typedef struct {
-            uint64_t *rndc;
-            int *rotc;
-            int *piln;
+            uint64_t *rndc; // shared
+            int *rotc; //shared
+            int *piln; //shared
+            sha3_ctx_t *state; //specific to every instance
         } sha3_parameters_t;
 
         uint64_t *_rndc;
         int *_rotc;
         int *_piln;
-        sha3_ctx_t _content;
+        sha3_ctx_t *_content;
 
-        __host__ __device__ keccak_t(uint64_t *rndc, int *rotc, int *piln) : _rndc(rndc), _rotc(rotc), _piln(piln) {
+        __host__ __device__ keccak_t(uint64_t *rndc, int *rotc, int *piln, sha3_ctx_t *content) : _rndc(rndc), _rotc(rotc), _piln(piln), _content(content) {
 
         }
 
@@ -139,33 +140,33 @@ namespace keccak {
         __host__ __device__ void sha3_init(int mdlen) {
             uint32_t idx;
             for (idx = 0; idx < 25; idx++)
-                _content.st.q[idx] = 0;
-            _content.mdlen = mdlen;
-            _content.rsiz = 200 - 2 * mdlen;
-            _content.pt = 0;
+                _content->st.q[idx] = 0;
+            _content->mdlen = mdlen;
+            _content->rsiz = 200 - 2 * mdlen;
+            _content->pt = 0;
         }
 
         __host__ __device__ void sha3_update(const uint8_t *data, size_t len) {
             size_t  idx;
             int j;
-            j=_content.pt;
+            j=_content->pt;
             for (idx = 0; idx < len; idx++) {
-                _content.st.b[j++] ^= data[idx];
-                if (j >= _content.rsiz) {
-                    sha3_keccakf(_content.st.q);
+                _content->st.b[j++] ^= data[idx];
+                if (j >= _content->rsiz) {
+                    sha3_keccakf(_content->st.q);
                     j = 0;
                 }
             }
-            _content.pt = j;
+            _content->pt = j;
         }
 
         __host__ __device__ void sha3_final(uint8_t *md) {
             int idx;
-            _content.st.b[_content.pt] ^= 0x01; //why not _rndc[0]? 0x06 for sha3, 0x1F for shake, 0x01 for keccak
-            _content.st.b[_content.rsiz - 1] ^= 0x80;
-            sha3_keccakf(_content.st.q);
-            for (idx = 0; idx < _content.mdlen; idx++)
-                md[idx] = _content.st.b[idx];
+            _content->st.b[_content->pt] ^= 0x01; //why not _rndc[0]? 0x06 for sha3, 0x1F for shake, 0x01 for keccak
+            _content->st.b[_content->rsiz - 1] ^= 0x80;
+            sha3_keccakf(_content->st.q);
+            for (idx = 0; idx < _content->mdlen; idx++)
+                md[idx] = _content->st.b[idx];
         }
 
         __host__ __device__ void sha3(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen) {
@@ -175,24 +176,24 @@ namespace keccak {
         }
         // SHAKE128 and SHAKE256 extensible-output functions
         __host__ __device__ void shake_xof(uint8_t *md, int len) {
-            _content.st.b[_content.pt] ^= 0x1F;
-            _content.st.b[_content.rsiz - 1] ^= 0x80;
-            sha3_keccakf(_content.st.q);
-            _content.pt = 0;
+            _content->st.b[_content->pt] ^= 0x1F;
+            _content->st.b[_content->rsiz - 1] ^= 0x80;
+            sha3_keccakf(_content->st.q);
+            _content->pt = 0;
         }
 
         __host__ __device__ void shake_out(uint8_t *out, size_t len) {
             size_t idx;
             int j;
-            j = _content.pt;
+            j = _content->pt;
             for (idx = 0; idx < len; idx++) {
-                if (j >= _content.rsiz) {
-                    sha3_keccakf(_content.st.q);
+                if (j >= _content->rsiz) {
+                    sha3_keccakf(_content->st.q);
                     j = 0;
                 }
-                ((uint8_t *)out)[idx] = _content.st.b[j++];
+                ((uint8_t *)out)[idx] = _content->st.b[j++];
             }
-            _content.pt = j;
+            _content->pt = j;
         }
 
         __host__ __device__ void shae128_init() {
@@ -215,48 +216,70 @@ namespace keccak {
             sha3(in, inlen, md, 64);
         }
 
-        __host__ static sha3_parameters_t *get_cpu_instance() {
-            sha3_parameters_t *cpu_instance= (sha3_parameters_t *)malloc(sizeof(sha3_parameters_t));
-            cpu_instance->rndc = (uint64_t *)malloc(sizeof(uint64_t) * 24);
-            cpu_instance->rotc = (int *)malloc(sizeof(int) * 24);
-            cpu_instance->piln = (int *)malloc(sizeof(int) * 24);
-            memcpy(cpu_instance->rndc, keccakf_rndc, sizeof(uint64_t) * 24);
-            memcpy(cpu_instance->rotc, keccakf_rotc, sizeof(int) * 24);
-            memcpy(cpu_instance->piln, keccakf_piln, sizeof(int) * 24);
-            return cpu_instance;
+        __host__ static sha3_parameters_t *get_cpu_instances(uint32_t count) {
+            sha3_parameters_t *cpu_instances= (sha3_parameters_t *)malloc(sizeof(sha3_parameters_t) * count);
+            uint64_t *rndc = (uint64_t *)malloc(sizeof(uint64_t) * 24);
+            int *rotc = (int *)malloc(sizeof(int) * 24);
+            int *piln = (int *)malloc(sizeof(int) * 24);
+            memcpy(rndc, keccakf_rndc, sizeof(uint64_t) * 24);
+            memcpy(rotc, keccakf_rotc, sizeof(int) * 24);
+            memcpy(piln, keccakf_piln, sizeof(int) * 24);
+            for (uint32_t idx = 0; idx < count; idx++) {
+                cpu_instances[idx].rndc = rndc;
+                cpu_instances[idx].rotc = rotc;
+                cpu_instances[idx].piln = piln;
+                cpu_instances[idx].state = (sha3_ctx_t *)malloc(sizeof(sha3_ctx_t));
+            }
+            return cpu_instances;
         }
 
-        __host__ static void free_cpu_instance(sha3_parameters_t *cpu_instance) {
-            free(cpu_instance->rndc);
-            free(cpu_instance->rotc);
-            free(cpu_instance->piln);
-            free(cpu_instance);
+        __host__ static void free_cpu_instances(sha3_parameters_t *cpu_instances, uint32_t count) {
+            free(cpu_instances[0].rndc);
+            free(cpu_instances[0].rotc);
+            free(cpu_instances[0].piln);
+            for (uint32_t idx = 0; idx < count; idx++) {
+                free(cpu_instances[idx].state);
+            }
+            free(cpu_instances);
         }
 
-        __host__ static sha3_parameters_t *get_gpu_instance(sha3_parameters_t *cpu_instance) {
-            sha3_parameters_t *gpu_instance, *tmp_cpu_instance;
-            cudaMalloc((void **)&gpu_instance, sizeof(sha3_parameters_t));
-            tmp_cpu_instance = (sha3_parameters_t *)malloc(sizeof(sha3_parameters_t));
-            cudaMalloc((void **)&tmp_cpu_instance->rndc, sizeof(uint64_t) * 24);
-            cudaMalloc((void **)&tmp_cpu_instance->rotc, sizeof(int) * 24);
-            cudaMalloc((void **)&tmp_cpu_instance->piln, sizeof(int) * 24);
-            cudaMemcpy(tmp_cpu_instance->rndc, cpu_instance->rndc, sizeof(uint64_t) * 24, cudaMemcpyHostToDevice);
-            cudaMemcpy(tmp_cpu_instance->rotc, cpu_instance->rotc, sizeof(int) * 24, cudaMemcpyHostToDevice);
-            cudaMemcpy(tmp_cpu_instance->piln, cpu_instance->piln, sizeof(int) * 24, cudaMemcpyHostToDevice);
-            cudaMemcpy(gpu_instance, tmp_cpu_instance, sizeof(sha3_parameters_t), cudaMemcpyHostToDevice);
-            free(tmp_cpu_instance);
-            return gpu_instance;
+        __host__ static sha3_parameters_t *get_gpu_instances(sha3_parameters_t *cpu_instances, uint32_t count) {
+            sha3_parameters_t *gpu_instances, *tmp_cpu_instances;
+            cudaMalloc((void **)&gpu_instances, sizeof(sha3_parameters_t) * count);
+            tmp_cpu_instances = (sha3_parameters_t *)malloc(sizeof(sha3_parameters_t) * count);
+            uint64_t *rndc;
+            int *rotc;
+            int *piln;
+            cudaMalloc((void **)&rndc, sizeof(uint64_t) * 24);
+            cudaMalloc((void **)&rotc, sizeof(int) * 24);
+            cudaMalloc((void **)&piln, sizeof(int) * 24);
+            cudaMemcpy(rndc, cpu_instances[0].rndc, sizeof(uint64_t) * 24, cudaMemcpyHostToDevice);
+            cudaMemcpy(rotc, cpu_instances[0].rotc, sizeof(int) * 24, cudaMemcpyHostToDevice);
+            cudaMemcpy(piln, cpu_instances[0].piln, sizeof(int) * 24, cudaMemcpyHostToDevice);
+            for (uint32_t idx = 0; idx < count; idx++) {
+                tmp_cpu_instances[idx].rndc = rndc;
+                tmp_cpu_instances[idx].rotc = rotc;
+                tmp_cpu_instances[idx].piln = piln;
+                cudaMalloc((void **)&tmp_cpu_instances[idx].state, sizeof(sha3_ctx_t));
+            }
+            cudaMemcpy(gpu_instances, tmp_cpu_instances, sizeof(sha3_parameters_t), cudaMemcpyHostToDevice);
+            free(tmp_cpu_instances);
+            return gpu_instances;
         }
 
-        __host__ static void free_gpu_instance(sha3_parameters_t *gpu_instance) {
-            sha3_parameters_t *tmp_cpu_instance;
-            tmp_cpu_instance = (sha3_parameters_t *)malloc(sizeof(sha3_parameters_t));
-            cudaMemcpy(tmp_cpu_instance, gpu_instance, sizeof(sha3_parameters_t), cudaMemcpyDeviceToHost);
+        __host__ static void free_gpu_instances(sha3_parameters_t *gpu_instance, uint32_t count) {
+            sha3_parameters_t *tmp_cpu_instances;
+            tmp_cpu_instances = (sha3_parameters_t *)malloc(sizeof(sha3_parameters_t) * count);
+            cudaMemcpy(tmp_cpu_instances, gpu_instance, sizeof(sha3_parameters_t), cudaMemcpyDeviceToHost);
+            sha3_parameters_t *tmp_cpu_instance = &tmp_cpu_instances[0];
             cudaFree(tmp_cpu_instance->rndc);
             cudaFree(tmp_cpu_instance->rotc);
             cudaFree(tmp_cpu_instance->piln);
+            for (uint32_t idx = 0; idx < count; idx++) {
+                cudaFree(tmp_cpu_instances[idx].state);
+            }
             cudaFree(gpu_instance);
-            free(tmp_cpu_instance);
+            free(tmp_cpu_instances);
         }
     };
 }

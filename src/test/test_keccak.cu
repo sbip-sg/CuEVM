@@ -10,7 +10,7 @@ __global__ void kernel_keccak(cgbn_error_report_t *report, typename keccak::kecc
 
     if(instance>=instance_count)
         return;
-    keccak::keccak_t    keccak_obj(parameters[instance].rndc, parameters[instance].rotc, parameters[instance].piln);
+    keccak::keccak_t    keccak_obj(parameters[instance].rndc, parameters[instance].rotc, parameters[instance].piln, parameters[instance].state);
 
     keccak_obj.sha3(&(input_data[INPUT_DATA_COUNT*instance]), INPUT_DATA_COUNT, &(hash_data[HASH_DATA_COUNT*instance]), HASH_DATA_COUNT);
   
@@ -25,8 +25,8 @@ void run_test() {
     uint32_t instance_count=1;
 
     printf("Generating parameters\n");
-    cpu_parameters=keccak_t::get_cpu_instance();
-    gpu_parameters=keccak_t::get_gpu_instance(cpu_parameters);
+    cpu_parameters=keccak_t::get_cpu_instances(instance_count);
+    gpu_parameters=keccak_t::get_gpu_instances(cpu_parameters, instance_count);
     // create a cgbn_error_report for CGBN to report back errors
     CUDA_CHECK(cgbn_error_report_alloc(&report)); 
     printf("Parameters generated\n");
@@ -82,8 +82,8 @@ void run_test() {
 
     // free the memory
     printf("Freeing the memory ...\n");
-    keccak_t::free_cpu_instance(cpu_parameters);
-    keccak_t::free_gpu_instance(gpu_parameters);
+    keccak_t::free_cpu_instances(cpu_parameters, instance_count);
+    keccak_t::free_gpu_instances(gpu_parameters, instance_count);
     free(cpu_input_data);
     cudaFree(gpu_input_data);
     free(cpu_hash_data);
