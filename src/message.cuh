@@ -9,12 +9,12 @@ class message_t {
     typedef arith_env_t<params>                     arith_t;
     typedef typename arith_t::bn_t                  bn_t;
     typedef cgbn_mem_t<params::BITS>                evm_word_t;
-  
+
     typedef struct {
       evm_word_t origin;
       evm_word_t gasprice;
     } tx_t;
-    
+
     typedef struct {
       size_t    size;
       uint8_t   *data;
@@ -207,40 +207,40 @@ class message_t {
       mpz_init(tx_origin);
       mpz_init(tx_gasprice);
       mpz_init(gas);
-      
+
       // set the caller
       to_mpz(caller, _content->caller._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, caller));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, caller));
       cJSON_AddStringToObject(transaction_json, "sender", hex_string);
-      
+
       // set the value
       to_mpz(value, _content->value._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, value));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, value));
       cJSON_AddStringToObject(transaction_json, "value", hex_string);
 
       // set the to
       to_mpz(to, _content->to._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, to));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, to));
       cJSON_AddStringToObject(transaction_json, "to", hex_string);
 
       // set the nonce
       to_mpz(nonce, _content->nonce._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, nonce));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, nonce));
       cJSON_AddStringToObject(transaction_json, "nonce", hex_string);
 
       // set the tx.origin
       to_mpz(tx_origin, _content->tx.origin._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, tx_origin));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, tx_origin));
       cJSON_AddStringToObject(transaction_json, "origin", hex_string);
 
       // set the tx.gasprice
       to_mpz(tx_gasprice, _content->tx.gasprice._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, tx_gasprice));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, tx_gasprice));
       cJSON_AddStringToObject(transaction_json, "gasPrice", hex_string);
 
       // set the gas
       to_mpz(gas, _content->gas._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, gas));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, gas));
       cJSON_AddStringToObject(transaction_json, "gasLimit", hex_string);
 
       // set the data
@@ -369,7 +369,7 @@ class message_t {
       return cpu_messages;
     }
 
-    
+
     __host__ static void free_messages(message_content_t *cpu_messages, size_t count) {
       for(size_t idx=0; idx<count; idx++) {
         // data
@@ -397,7 +397,7 @@ class message_t {
       free(tmp_cpu_messages);
       return gpu_messages;
     }
-  
+
     __host__ static void free_gpu_messages(message_content_t *gpu_messages, size_t count) {
       message_content_t *tmp_cpu_messages;
       tmp_cpu_messages = (message_content_t *)malloc(count*sizeof(message_content_t));

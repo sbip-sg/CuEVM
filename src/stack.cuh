@@ -25,7 +25,7 @@ class stack_t {
   static const uint32_t                           STACK_SIZE = params::STACK_SIZE;
   static const uint32_t                           WORD_BITS = params::BITS;
   static const uint32_t                           WORD_BYTES = params::BITS/8;
-  
+
   typedef struct {
     evm_word_t values[params::STACK_SIZE];
   } stack_content_data_t;
@@ -37,7 +37,7 @@ class stack_t {
 
   stack_data_t  *_content;
   arith_t     _arith;
-  
+
   //constructor
   __host__ __device__ __forceinline__ stack_t(arith_t arith, stack_data_t *content) : _arith(arith), _content(content) {
   }
@@ -90,8 +90,8 @@ class stack_t {
     cgbn_sub(_arith._env, r, a, b);
     push(r, error_code);
   }
-  
-  
+
+
   __host__ __device__ __forceinline__ void negate(uint32_t &error_code) {
     bn_t  a, r;
     pop(a, error_code);
@@ -159,7 +159,7 @@ class stack_t {
       cgbn_rem(_arith._env, r, a, b);
     push(r, error_code);
   }
-  
+
   __host__ __device__ __forceinline__ void smod(uint32_t &error_code) {
     bn_t  a, b, r;
     pop(a, error_code);
@@ -291,7 +291,7 @@ class stack_t {
     cgbn_set_ui32(_arith._env, r, result);
     push(r, error_code);
   }
-  
+
   __host__ __device__ __forceinline__ int32_t scompare(uint32_t &error_code) {
     bn_t  a, b;
     pop(a, error_code);
@@ -423,7 +423,7 @@ class stack_t {
 
     if (cgbn_compare_ui32(_arith._env, shift, WORD_BITS-1) == 1)
       shift_right = WORD_BITS;
-   
+
     cgbn_shift_right(_arith._env, r, value, shift_right);
     if (sign_b == 1) {
       cgbn_bitwise_mask_ior(_arith._env, r, r, -shift_right);
@@ -452,7 +452,7 @@ class stack_t {
     }
     return _content->stack_base + _content->stack_offset - index;
   }
-  
+
 
   __host__ __device__ __forceinline__ void dupx(uint32_t index, uint32_t &error_code) {
     if (index < 1 || index > 16) {
@@ -467,7 +467,7 @@ class stack_t {
     cgbn_load(_arith._env, r, value);
     push(r, error_code);
   }
-  
+
 
   __host__ __device__ __forceinline__ void swapx(uint32_t index, uint32_t &error_code) {
     if (index < 1 || index > 16) {
@@ -536,7 +536,7 @@ class stack_t {
     mpz_init(mpz_stack_value);
     cJSON *stack_json = cJSON_CreateObject();
 
-    
+
     mpz_set_ui(mpz_stack_size, size());
     // as hex string
     //strcpy(hex_string+2, mpz_get_str(NULL, 16, mpz_stack_size));
@@ -548,7 +548,7 @@ class stack_t {
     uint32_t print_size = full ? STACK_SIZE : size();
     for(uint32_t idx=0;idx<print_size;idx++) {
       to_mpz(mpz_stack_value, _content->stack_base[idx]._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, mpz_stack_value));
+      strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, mpz_stack_value));
       cJSON_AddItemToArray(stack_data_json, cJSON_CreateString(hex_string));
     }
     cJSON_AddItemToObject(stack_json, "data", stack_data_json);
@@ -557,7 +557,7 @@ class stack_t {
     return stack_json;
   }
 
-  
+
   // support routine to generate instances
   __host__ static stack_data_t *get_stacks(uint32_t count) {
     stack_data_t *stacks=(stack_data_t *)malloc(sizeof(stack_data_t)*count);

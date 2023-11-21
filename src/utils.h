@@ -39,6 +39,7 @@ IN THE SOFTWARE.
 #include "opcodes.h"
 #include "error_codes.h"
 #include "arith.cuh"
+#include <string.h>
 
 __host__ size_t adjusted_length(char** hex_string) {
     if (strncmp(*hex_string, "0x", 2) == 0 || strncmp(*hex_string, "0X", 2) == 0) {
@@ -103,7 +104,7 @@ template<uint32_t tpi, uint32_t bits, uint32_t window_bits, uint32_t stack_size,
 class mr_params_t {
   public:
   // parameters used by the CGBN context
-  static const uint32_t TPB=0;                     // get TPB from blockDim.x  
+  static const uint32_t TPB=0;                     // get TPB from blockDim.x
   static const uint32_t MAX_ROTATION=4;            // good default value
   static const uint32_t SHM_LIMIT=0;               // no shared mem available
   static const bool     CONSTANT_TIME=false;       // constant time implementations aren't available yet
@@ -162,6 +163,33 @@ char *bytes_to_hex(uint8_t *bytes, size_t count) {
   return_string[1]='x';
   return return_string;
 }
+
+char *pad_with_zero_if_odd(char *str, int base, const mpz_t op) {
+    // Convert to hex string without padding
+    char *tmp = mpz_get_str(str, base, op);
+
+    // Check if the length is odd
+    size_t tmp_length = strlen(tmp);
+    if (tmp_length % 2 == 0) {
+        return tmp; // Length is even, no padding needed
+    }
+
+    // Length is odd, allocate space for one more character
+    char *result = (char *) malloc(tmp_length + 2); // +2 for extra zero and null terminator
+    if (result == NULL) {
+        free(tmp);
+        return NULL; // Handle allocation failure
+    }
+
+    // Add one zero at the beginning
+    result[0] = '0';
+    // Copy the original string after the zero
+    strcpy(result + 1, tmp);
+
+    free(tmp);
+    return result;
+}
+
 
 __host__ cJSON *get_json_from_file(const char *filepath) {
     FILE *fp = fopen(filepath, "r");

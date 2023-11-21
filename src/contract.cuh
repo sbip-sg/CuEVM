@@ -43,7 +43,7 @@ class state_t {
 
     state_data_t            *_content;
     arith_t     _arith;
-  
+
     //constructor
     __host__ __device__ __forceinline__ state_t(arith_t arith, state_data_t *content) : _arith(arith), _content(content) {
     }
@@ -253,7 +253,7 @@ class state_t {
             #endif
             error_code = ERR_SUCCESS;
         }
-        
+
         #ifdef  __CUDA_ARCH__
         __syncthreads();
         if(threadIdx.x == 0) {
@@ -681,7 +681,7 @@ class state_t {
         return cpu_local_states;
     }
 
-    
+
 
     __host__ cJSON *to_json() {
         cJSON *state_json = NULL;
@@ -702,15 +702,15 @@ class state_t {
             contract_json = cJSON_CreateObject();
             // set the address
             to_mpz(address, _content->contracts[idx].address._limbs, params::BITS/32);
-            strcpy(hex_string+2, mpz_get_str(NULL, 16, address));
+            strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, address));
             cJSON_AddItemToObject(state_json, hex_string, contract_json);
             // set the balance
             to_mpz(balance, _content->contracts[idx].balance._limbs, params::BITS/32);
-            strcpy(hex_string+2, mpz_get_str(NULL, 16, balance));
+            strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, balance));
             cJSON_AddStringToObject(contract_json, "balance", hex_string);
             // set the nonce
             to_mpz(nonce, _content->contracts[idx].nonce._limbs, params::BITS/32);
-            strcpy(hex_string+2, mpz_get_str(NULL, 16, nonce));
+            strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, nonce));
             cJSON_AddStringToObject(contract_json, "nonce", hex_string);
             // set the code
             if (_content->contracts[idx].code_size > 0) {
@@ -732,9 +732,9 @@ class state_t {
             if (_content->contracts[idx].storage_size > 0) {
                 for (jdx=0; jdx<_content->contracts[idx].storage_size; jdx++) {
                     to_mpz(key, _content->contracts[idx].storage[jdx].key._limbs, params::BITS/32);
-                    strcpy(hex_string+2, mpz_get_str(NULL, 16, key));
+                    strcpy(hex_string+2, pad_with_zero_if_odd(NULL, 16, key));
                     to_mpz(value, _content->contracts[idx].storage[jdx].value._limbs, params::BITS/32);
-                    strcpy(value_hex_string+2, mpz_get_str(NULL, 16, value));
+                    strcpy(value_hex_string+2, pad_with_zero_if_odd(NULL, 16, value));
                     cJSON_AddStringToObject(storage_json, hex_string, value_hex_string);
                 }
             }
