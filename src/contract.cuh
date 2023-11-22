@@ -150,6 +150,24 @@ class state_t {
         _content=get_global_state(test);
     }
 
+    __host__ __device__ __forceinline__ contract_t *get_empty_account(bn_t &address) {
+        #ifdef  __CUDA_ARCH__
+        __shared__ contract_t *account;
+        __syncthreads();
+        if(threadIdx.x == 0) {
+        #else
+        contract_t *account;
+        #endif
+            account = (contract_t *) malloc(sizeof(contract_t));
+            memset(account, 0, sizeof(contract_t));
+            cgbn_store(_arith._env, &(account->address), address);
+        #ifdef __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+        return account;
+    }
+
 
     __host__ __device__ __forceinline__ size_t get_account_idx_basic(bn_t &address, uint32_t &error_code) {
         bn_t local_address;
@@ -163,17 +181,11 @@ class state_t {
         return 0;
     }
 
-    __host__ __device__ __forceinline__ size_t get_storage_idx_basic(size_t account_idx, bn_t &key, uint32_t &error_code) {
-        bn_t local_key;
-        for (size_t idx=0; idx<_content->contracts[account_idx].storage_size; idx++) {
-            cgbn_load(_arith._env, local_key, &(_content->contracts[account_idx].storage[idx].key));
-            if (cgbn_compare(_arith._env, local_key, key) == 0) {
-                return idx;
-            }
-        }
-        error_code = ERR_STATE_INVALID_KEY;
-        return 0;
+    __host__ __device__ __forceinline__ contract_t *get_local_account(bn_t &address, uint32_t &error_code) {
+        size_t account_idx = get_account_idx_basic(address, error_code);
+        return &(_content->contracts[account_idx]);
     }
+    
 
     __host__ __device__ __forceinline__ size_t get_storage_idx_basic(contract_t *account, bn_t &key, uint32_t &error_code) {
         bn_t local_key;
@@ -187,29 +199,123 @@ class state_t {
         return 0;
     }
 
-    __host__ __device__ __forceinline__ contract_t *get_account(bn_t &address, uint32_t &error_code) {
-        size_t account_idx = get_account_idx_basic(address, error_code);
-        return &(_content->contracts[account_idx]);
-    }
-
-    __host__ __device__ __forceinline__ void get_value(bn_t &address, bn_t &key, bn_t &value, uint32_t &error_code) {
-        contract_t *account = get_account(address, error_code);
-        size_t storage_idx = get_storage_idx_basic(account, key, error_code);
+    __host__ __device__ __forceinline__ void get_local_value(bn_t &address, bn_t &key, bn_t &value, uint32_t &error_code) {
+        contract_t *account = get_local_account(address, error_code);
         if (error_code != ERR_SUCCESS) {
-            cgbn_set_ui32(_arith._env, value, 0); // if storage does not exist return 0
+            cgbn_set_ui32(_arith._env, value, 0); // if account does not exist return 0
         } else {
-            cgbn_load(_arith._env, value, &(account->storage[storage_idx].value));
+            size_t storage_idx = get_storage_idx_basic(account, key, error_code);
+            if (error_code != ERR_SUCCESS) {
+                cgbn_set_ui32(_arith._env, value, 0); // if storage does not exist return 0
+            } else {
+                cgbn_load(_arith._env, value, &(account->storage[storage_idx].value));
+            }
         }
     }
 
-    // alocate and free onlt on thread 0
-    __host__ __device__ __forceinline__ void set_value(bn_t &address, bn_t &key, bn_t &value, uint32_t &error_code) {
-        contract_t *account = get_account(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            return;
+    __host__ __device__ __forceinline__ static contract_t *duplicate_contract(
+        contract_t *account,
+        uint32_t type=0 // 0 - all // 1 - without storage
+    ) {
+        #ifdef  __CUDA_ARCH__
+        __shared__ contract_t *new_account;
+        __syncthreads();
+        if(threadIdx.x == 0) {
+        #else
+        contract_t *new_account;
+        #endif
+        new_account = (contract_t *) malloc(sizeof(contract_t));
+        memcpy(new_account, account, sizeof(contract_t));
+        if (account->code_size > 0) {
+            new_account->bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
+            memcpy(new_account->bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
         }
-        size_t storage_idx = get_storage_idx_basic(account, key, error_code);
-        if (error_code == ERR_STATE_INVALID_KEY) {
+        if (type == 1) {
+            new_account->storage_size=0;
+            new_account->storage=NULL;
+        } else {
+            if (account->storage_size > 0) {
+                new_account->storage = (contract_storage_t *) malloc(account->storage_size*sizeof(contract_storage_t));
+                memcpy(new_account->storage, account->storage, account->storage_size*sizeof(contract_storage_t));
+            }
+        }
+        #ifdef  __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+        return new_account;
+    }
+
+    __host__ __device__ __forceinline__ void set_local_account(bn_t &address, contract_t *account, uint32_t type=0) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        uint32_t account_idx = get_account_idx_basic(address, tmp_error_code);
+        #ifdef  __CUDA_ARCH__
+        __shared__ contract_t *dup_account;
+        __syncthreads();
+        #else
+        contract_t *dup_account;
+        #endif
+        dup_account = duplicate_contract(account, type);
+
+        if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            // contract does not exist needs to be added
+            account_idx = _content->no_contracts;
+            #ifdef  __CUDA_ARCH__
+            __syncthreads();
+            if(threadIdx.x == 0) {
+            #endif
+                contract_t *tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
+                memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
+                free(_content->contracts);
+                _content->contracts = tmp_contracts;
+                _content->no_contracts++;
+                memcpy(&(_content->contracts[account_idx]), dup_account, sizeof(contract_t));
+                free(dup_account);
+            #ifdef  __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+            tmp_error_code = ERR_SUCCESS;
+        } else {
+            #ifdef  __CUDA_ARCH__
+            __syncthreads();
+            if(threadIdx.x == 0) {
+            #endif
+                if (_content->contracts[account_idx].code_size > 0) {
+                    free(_content->contracts[account_idx].bytecode);
+                }
+                if (_content->contracts[account_idx].storage_size > 0) {
+                    free(_content->contracts[account_idx].storage);
+                }
+                memcpy(&(_content->contracts[account_idx]), dup_account, sizeof(contract_t));
+                free(dup_account);
+            #ifdef  __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+        }
+    }
+
+    
+    __host__ __device__ __forceinline__ void set_local_value(bn_t &address, bn_t &key, bn_t &value) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        contract_t *account = get_local_account(address, tmp_error_code);
+        if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            account = get_empty_account(address);
+            set_local_account(address, account, 1); //without storage
+            #ifdef  __CUDA_ARCH__
+            __syncthreads();
+            if(threadIdx.x == 0) {
+            #endif
+            free(account);
+            #ifdef  __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+        }
+        account = get_local_account(address, tmp_error_code);
+        size_t storage_idx = get_storage_idx_basic(account, key, tmp_error_code);
+        if (tmp_error_code == ERR_STATE_INVALID_KEY) {
             // add the extra storage key
             storage_idx = account->storage_size;
             #ifdef  __CUDA_ARCH__
@@ -228,123 +334,303 @@ class state_t {
             __syncthreads();
             #endif
             cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);
-            error_code = ERR_SUCCESS;
+            tmp_error_code = ERR_SUCCESS;
         }
         cgbn_store(_arith._env, &(account->storage[storage_idx].value), value);
     }
 
-    __host__ __device__ __forceinline__ void set_account(bn_t &address, contract_t *account, uint32_t &error_code) {
-        uint32_t account_idx = get_account_idx_basic(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            // contract does not exist needs to be added
-            account_idx = _content->no_contracts;
-            #ifdef  __CUDA_ARCH__
-            __syncthreads();
-            if(threadIdx.x == 0) {
-            #endif
-                contract_t * tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
-                memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
-                free(_content->contracts);
-                _content->contracts = tmp_contracts;
-                _content->no_contracts++;
-            #ifdef  __CUDA_ARCH__
+    __host__ __device__ __forceinline__ contract_t *get_account(
+        bn_t &address,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost,
+        uint32_t call_type // 0 - balance // 1- nonce // 2 - code
+    ) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        size_t  warm_address=1; // we consider that it is a warm address
+        contract_t *account = get_local_account(address, tmp_error_code);
+
+        if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            // account does not exist in the current environment
+            // we have too look up
+            tmp_error_code = ERR_SUCCESS;
+            account = parents.get_local_account(address, tmp_error_code);
+            if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+                tmp_error_code = ERR_SUCCESS;
+                account = access_list.get_local_account(address, tmp_error_code);
+                if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) { // we have to go to global state
+                    warm_address=0;
+                    tmp_error_code = ERR_SUCCESS;
+                    account = global.get_local_account(address, tmp_error_code);
+                    if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+                        // account does not exist in the global state
+                        // we have to create it
+                        account = get_empty_account(address);
+                        access_list.set_local_account(address, account, 1); //without storage
+                        #ifdef  __CUDA_ARCH__
+                        __syncthreads();
+                        if(threadIdx.x == 0) {
+                        #endif
+                        free(account);
+                        #ifdef  __CUDA_ARCH__
+                        }
+                        __syncthreads();
+                        #endif
+                    } else {
+                        // account exists in the global state
+                        // we have to add it to the access list
+                        access_list.set_local_account(address, account, 1); //without storage
+                    }
+                }
             }
-            __syncthreads();
-            #endif
-            error_code = ERR_SUCCESS;
         }
+        contract_t *access_account = access_list.get_local_account(address, tmp_error_code);
+        if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            // account does not exist in the access list
+            // we have to add it
+            // REAL PROBLEM HERE no suposed to be here
+            access_list.set_local_account(address, account, 1); //without storage
+        }
+        access_account->changes |= (1 << call_type);
+        if (warm_address == 1) {
+            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 100);
+        } else {
+            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 2600);
+        }
+
+        return account;
         
-        #ifdef  __CUDA_ARCH__
-        __syncthreads();
-        if(threadIdx.x == 0) {
-        #endif
-            memcpy(&(_content->contracts[account_idx]), account, sizeof(contract_t));
-            if (account->code_size > 0) {
-                _content->contracts[account_idx].bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
-                memcpy(_content->contracts[account_idx].bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
-            }
-            if (account->storage_size > 0) {
-                _content->contracts[account_idx].storage = (contract_storage_t *) malloc(account->storage_size*sizeof(contract_storage_t));
-                memcpy(_content->contracts[account_idx].storage, account->storage, account->storage_size*sizeof(contract_storage_t));
-            }
-        #ifdef  __CUDA_ARCH__
-        }
-        __syncthreads();
-        #endif
     }
 
-    __host__ __device__ __forceinline__ void set_local_account(bn_t &address, contract_t *account, uint32_t &error_code) {
-        uint32_t account_idx = get_account_idx_basic(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            // contract does not exist needs to be added
-            account_idx = _content->no_contracts;
-            #ifdef  __CUDA_ARCH__
-            __syncthreads();
-            if(threadIdx.x == 0) {
-            #endif
-                contract_t *tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
-                memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
-                free(_content->contracts);
-                _content->contracts = tmp_contracts;
-                _content->no_contracts++;
-            #ifdef  __CUDA_ARCH__
-            }
-            __syncthreads();
-            #endif
-            error_code = ERR_SUCCESS;
-        }
-        #ifdef  __CUDA_ARCH__
-        __syncthreads();
-        if(threadIdx.x == 0) {
-        #endif
-            memcpy(&(_content->contracts[account_idx]), account, sizeof(contract_t));
-            if (account->code_size > 0) {
-                _content->contracts[account_idx].bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
-                memcpy(_content->contracts[account_idx].bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
-            }
-        #ifdef  __CUDA_ARCH__
-        }
-        __syncthreads();
-        #endif
-        // no storage at the begining for a local state, only if we do sets
-        _content->contracts[account_idx].storage_size=0;
-        _content->contracts[account_idx].storage=NULL;
+    __host__ __device__ __forceinline__ void get_account_balance(
+        bn_t &address,
+        bn_t &value,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        contract_t *account = get_account(address, global, access_list, parents, gas_cost, 0);
+        cgbn_load(_arith._env, value, &(account->balance));
     }
 
-    __host__ __device__ __forceinline__ void set_local_bytecode(bn_t &address, uint8_t *bytecode, size_t code_size, uint32_t &error_code) {
-        contract_t *account = get_account(address, error_code);
-        if (error_code == ERR_STATE_INVALID_ADDRESS) {
-            // contract does not exist needs to be added
-            #ifdef  __CUDA_ARCH__
-            __syncthreads();
-            if(threadIdx.x == 0) {
-            #endif
-                account = (contract_t *) malloc(sizeof(contract_t));
-                memset(account, 0, sizeof(contract_t));
-                cgbn_store(_arith._env, &(account->address), address);
-                set_local_account(address, account, error_code);
-                free(account);
-            #ifdef  __CUDA_ARCH__
-            }
-            __syncthreads();
-            #endif
-            error_code = ERR_SUCCESS;
+    __host__ __device__ __forceinline__ void get_account_nonce(
+        bn_t &address,
+        bn_t &value,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        contract_t *account = get_account(address, global, access_list, parents, gas_cost, 1);
+        cgbn_load(_arith._env, value, &(account->nonce));
+    }
+
+    __host__ __device__ __forceinline__ size_t get_account_code_size(
+        bn_t &address,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        contract_t *account = get_account(address, global, access_list, parents, gas_cost, 2);
+        return account->code_size;
+    }
+
+    __host__ __device__ __forceinline__ uint8_t *get_account_code(
+        bn_t &address,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        contract_t *account = get_account(address, global, access_list, parents, gas_cost, 2);
+        return account->bytecode;
+    }
+
+    
+
+    __host__ __device__ __forceinline__ void set_account_balance(
+        bn_t &address,
+        bn_t &value,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        contract_t *account = get_local_account(address, tmp_error_code);
+        if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            account = get_account(address, global, access_list, parents, gas_cost, 0);
+            set_local_account(address, account, 1); //without storage
+            account = get_local_account(address, tmp_error_code);
+        }
+        cgbn_store(_arith._env, &(account->balance), value);
+    }
+
+    __host__ __device__ __forceinline__ void set_account_nonce(
+        bn_t &address,
+        bn_t &value,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        contract_t *account = get_local_account(address, tmp_error_code);
+        if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            account = get_account(address, global, access_list, parents, gas_cost, 1);
+            set_local_account(address, account, 1); //without storage
+            account = get_local_account(address, tmp_error_code);
+        }
+        cgbn_store(_arith._env, &(account->nonce), value);
+    }
+
+    __host__ __device__ __forceinline__ void set_account_code(
+        bn_t &address,
+        uint8_t *bytecode,
+        size_t code_size,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        contract_t *account = get_local_account(address, tmp_error_code);
+        if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            account = get_account(address, global, access_list, parents, gas_cost, 2);
+            set_local_account(address, account, 1); //without storage
+            account = get_local_account(address, tmp_error_code);
+        }
+        if (account->code_size > 0) {
+            free(account->bytecode);
         }
         #ifdef  __CUDA_ARCH__
         __syncthreads();
         if(threadIdx.x == 0) {
         #endif
-            if (account->bytecode != NULL) {
-                free(account->bytecode);
-            }
-            account->bytecode = (uint8_t *) malloc(code_size*sizeof(uint8_t));
-            memcpy(account->bytecode, bytecode, code_size*sizeof(uint8_t));
-        #ifdef  __CUDA_ARCH__
-        }
-        __syncthreads();
-        #endif
+        account->bytecode = (uint8_t *) malloc(code_size*sizeof(uint8_t));
+        memcpy(account->bytecode, bytecode, code_size*sizeof(uint8_t));
         account->code_size = code_size;
-        account->changes = 1;
+        #ifdef  __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
+    }
+    
+    __host__ __device__ __forceinline__ void get_value(
+        bn_t &address,
+        bn_t &key,
+        bn_t &value,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost
+    ) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        size_t  warm_key=1; // we consider that it is a warm key
+        get_local_value(address, key, value, tmp_error_code);
+
+        if (tmp_error_code != ERR_SUCCESS) {
+            // account does not exist in the current environment
+            // we have too look up
+            tmp_error_code = ERR_SUCCESS;
+            parents.get_local_value(address, key, value, tmp_error_code);
+            if (tmp_error_code != ERR_SUCCESS) {
+                tmp_error_code = ERR_SUCCESS;
+                access_list.get_local_value(address, key, value, tmp_error_code);
+                if (tmp_error_code != ERR_SUCCESS) { // we have to go to global state
+                    warm_key=0;
+                    tmp_error_code = ERR_SUCCESS;
+                    global.get_local_value(address, key, value, tmp_error_code);
+                    // set in access list
+                    access_list.set_local_value(address, key, value);
+                }
+            }
+        }
+        if (warm_key == 1) {
+            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 100);
+        } else {
+            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 2100);
+        }
+    }
+
+    __host__ __device__ __forceinline__ void set_value(
+        bn_t &address,
+        bn_t &key,
+        bn_t &value,
+        state_t &global,
+        state_t &access_list,
+        state_t &parents,
+        bn_t &gas_cost,
+        bn_t &gas_refund
+    ) {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        size_t  warm_key=1; // we consider that it is a warm key
+        bn_t original_value;
+        bn_t current_value;
+        bn_t dummy_gas_cost;
+        access_list.get_local_value(address, key, original_value, tmp_error_code);
+        get_value(address, key, current_value, global, access_list, parents, dummy_gas_cost);
+        if (tmp_error_code != ERR_SUCCESS) {
+            warm_key=0;
+            access_list.get_local_value(address, key, original_value, tmp_error_code);
+        }
+        set_local_value(address, key, value);
+
+        if (cgbn_compare(_arith._env, value, current_value) == 0) {
+            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 100);
+        } else {
+            if(cgbn_compare(_arith._env, current_value, original_value) == 0) {
+                if(cgbn_compare_ui32(_arith._env, original_value, 0) == 0) {
+                    cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 20000);
+                } else {
+                    cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 2900);
+                }
+            } else {
+                cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 100);
+            }
+        }
+
+        // gas refund
+        if (cgbn_compare(_arith._env, value, current_value) != 0) {
+            if (cgbn_compare(_arith._env, current_value, original_value) == 0) {
+                if ( (cgbn_compare_ui32(_arith._env, original_value, 0) != 0) &&
+                     (cgbn_compare_ui32(_arith._env, value, 0) == 0) ) {
+                    cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 4800);
+                }
+            } else {
+                if (cgbn_compare(_arith._env, value, original_value) == 0) {
+                    if (cgbn_compare_ui32(_arith._env, original_value, 0) == 0) {
+                        cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 19900);
+                    } else {
+                        if (warm_key == 1) {
+                            cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 2800);
+                        } else {
+                            cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 4900);
+                        }
+                    }
+                }
+
+                if(cgbn_compare_ui32(_arith._env, original_value, 0) != 0) {
+                    if (cgbn_compare_ui32(_arith._env, current_value, 0) == 0) {
+                        //cgbn_sub_ui32(_arith._env, gas_refund, gas_refund, 4800);
+                        // better to add to gas cost TODO: look later
+                        cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 4800);
+                    }
+                    if (cgbn_compare_ui32(_arith._env, value, 0) == 0) {
+                        cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 4800);
+                    }
+                }
+            }
+        }
+
+        if (warm_key == 1) {
+            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 0);
+        } else {
+            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 2100);
+        }
     }
 
     __host__ __device__ __forceinline__ void copy_to_state_data_t(state_data_t *that) {
@@ -356,27 +642,30 @@ class state_t {
         size_t idx, jdx;
         uint32_t error_code;
         contract_t *account;
+        bn_t address, key, value;
         for (idx=0; idx<that._content->no_contracts; idx++) {
-            account = get_account(that._content->contracts[idx].address, error_code);
+            cgbn_load(_arith._env, address, &(that._content->contracts[idx].address));
+            account = get_local_account(address, error_code);
             if (error_code == ERR_STATE_INVALID_ADDRESS) {
                 // contract does not exist needs to be added
                 error_code = ERR_SUCCESS;
-                set_account(that._content->contracts[idx].address, &(that._content->contracts[idx]), error_code);
-                error_code = ERR_SUCCESS;
+                set_local_account(address, &(that._content->contracts[idx]), 0); //with storage
             } else {
                 for (jdx=0; jdx<that._content->contracts[idx].storage_size; jdx++) {
-                    set_value(that._content->contracts[idx].address, that._content->contracts[idx].storage[jdx].key, that._content->contracts[idx].storage[jdx].value, error_code);
-                    error_code = ERR_SUCCESS;
-                }
-                if (that._content->contracts[idx].changes == 1) {
-                    set_local_bytecode(that._content->contracts[idx].address, that._content->contracts[idx].bytecode, that._content->contracts[idx].code_size, error_code);
+                    cgbn_load(_arith._env, key, &(that._content->contracts[idx].storage[jdx].key));
+                    cgbn_load(_arith._env, value, &(that._content->contracts[idx].storage[jdx].value));
+                    set_local_value(address, key, value);
                     error_code = ERR_SUCCESS;
                 }
             }
         }
     }
 
-    __host__ static void free_instance(state_data_t *instance) {
+    __host__ __device__ static void free_instance(state_data_t *instance) {
+        #ifdef  __CUDA_ARCH__
+        __syncthreads();
+        if(threadIdx.x == 0) {
+        #endif
         if (instance->contracts != NULL) {
             for (size_t idx=0; idx<instance->no_contracts; idx++) {
                 if (instance->contracts[idx].bytecode != NULL) {
@@ -391,6 +680,10 @@ class state_t {
         if (instance != NULL) {
             free(instance);
         }
+        #ifdef  __CUDA_ARCH__
+        }
+        __syncthreads();
+        #endif
     }
 
     __host__ __device__ __forceinline__ void free_memory() {
