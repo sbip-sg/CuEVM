@@ -195,7 +195,7 @@ class evm_t {
             // TODO: get the current contract
             // go thorugh all of them and don't pay
             msg.get_to(to);
-            contract=_global_state.get_account(to, error_code);
+            contract=_global_state.get_local_account(to, error_code);
             cgbn_load(_arith._env, contract_address, &(contract->address));
             cgbn_load(_arith._env, contract_balance, &(contract->balance));
             write_state.set_local_account(contract_address, contract, error_code);
@@ -672,7 +672,7 @@ class evm_t {
                                 stack.pop(key, error_code);
                                 stack.pop(value, error_code);
                                 uint32_t tmp_error_code;
-                                write_state.set_value(contract_address, key, value, tmp_error_code);
+                                write_state.set_local_value(contract_address, key, value);
                                 //error_code=ERR_NOT_IMPLEMENTED;
                             }
                             break;

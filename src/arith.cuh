@@ -20,6 +20,7 @@ class arith_env_t {
   typedef cgbn_env_t<context_t, params::BITS>    env_t;
   typedef typename env_t::cgbn_t                 bn_t;
   typedef typename env_t::cgbn_wide_t            bn_wide_t;
+  typedef cgbn_mem_t<params::BITS>               evm_word_t;
   
   context_t _context;
   env_t     _env;
@@ -63,6 +64,16 @@ class arith_env_t {
     dst = cgbn_extract_bits_ui32(_env, a, 0, 32);
     dst |= ((size_t)cgbn_extract_bits_ui32(_env, a, 32, 32)) << 32;
     return dst;
+  }
+
+  __host__ void from_cgbn_memory_to_hex(evm_word_t &a, char *hex_string, size_t count=params::BITS/32) {
+    //char *hex_string = (char *) malloc(sizeof(char) * (count*8+3));
+    hex_string[0] = '0';
+    hex_string[1] = 'x';
+    for(size_t idx = 0; idx < count; idx++) {
+      sprintf(hex_string+2+idx*8, "%08x", a._limbs[count-1-idx]);
+    }
+    hex_string[count*8+2] = '\0';
   }
 
 };

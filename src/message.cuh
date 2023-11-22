@@ -197,51 +197,36 @@ class message_t {
 
     __host__ cJSON *to_json() {
       cJSON *transaction_json = cJSON_CreateObject();
-      char hex_string[67]="0x";
+      char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
       char *bytes_string=NULL;
-      mpz_t caller, value, nonce, to, tx_origin, tx_gasprice, gas;
-      mpz_init(caller);
-      mpz_init(value);
-      mpz_init(to);
-      mpz_init(nonce);
-      mpz_init(tx_origin);
-      mpz_init(tx_gasprice);
-      mpz_init(gas);
       
       // set the caller
-      to_mpz(caller, _content->caller._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, caller));
-      cJSON_AddStringToObject(transaction_json, "sender", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->caller, hex_string_ptr);
+      cJSON_AddStringToObject(transaction_json, "sender", hex_string_ptr);
       
       // set the value
-      to_mpz(value, _content->value._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, value));
-      cJSON_AddStringToObject(transaction_json, "value", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->value, hex_string_ptr);
+      cJSON_AddStringToObject(transaction_json, "value", hex_string_ptr);
 
       // set the to
-      to_mpz(to, _content->to._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, to));
-      cJSON_AddStringToObject(transaction_json, "to", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->to, hex_string_ptr);
+      cJSON_AddStringToObject(transaction_json, "to", hex_string_ptr);
 
       // set the nonce
-      to_mpz(nonce, _content->nonce._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, nonce));
-      cJSON_AddStringToObject(transaction_json, "nonce", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->nonce, hex_string_ptr);
+      cJSON_AddStringToObject(transaction_json, "nonce", hex_string_ptr);
 
       // set the tx.origin
-      to_mpz(tx_origin, _content->tx.origin._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, tx_origin));
-      cJSON_AddStringToObject(transaction_json, "origin", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->tx.origin, hex_string_ptr);
+      cJSON_AddStringToObject(transaction_json, "origin", hex_string_ptr);
 
       // set the tx.gasprice
-      to_mpz(tx_gasprice, _content->tx.gasprice._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, tx_gasprice));
-      cJSON_AddStringToObject(transaction_json, "gasPrice", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->tx.gasprice, hex_string_ptr);
+      cJSON_AddStringToObject(transaction_json, "gasPrice", hex_string_ptr);
 
       // set the gas
-      to_mpz(gas, _content->gas._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, gas));
-      cJSON_AddStringToObject(transaction_json, "gasLimit", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->gas, hex_string_ptr);
+      cJSON_AddStringToObject(transaction_json, "gasLimit", hex_string_ptr);
 
       // set the data
       if (_content->data.size > 0) {
@@ -252,13 +237,7 @@ class message_t {
         cJSON_AddStringToObject(transaction_json, "data", "0x");
       }
 
-      mpz_clear(caller);
-      mpz_clear(value);
-      mpz_clear(to);
-      mpz_clear(nonce);
-      mpz_clear(tx_origin);
-      mpz_clear(tx_gasprice);
-      mpz_clear(gas);
+      free(hex_string_ptr);
       return transaction_json;
     }
 

@@ -278,78 +278,56 @@ class block_t {
 
   __host__ cJSON *to_json() {
     uint32_t idx=0;
-    char hex_string[67]="0x";
-    mpz_t coin_base, time_stamp, number, difficulty, gas_limit, chain_id, base_fee;
-    mpz_t number_prev, hash_prev;
+    char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
+    char *value_hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
     cJSON *block_json=NULL;
     cJSON *previous_blocks_json=NULL;
     cJSON *previous_block_json=NULL;
-    mpz_init(coin_base);
-    mpz_init(time_stamp);
-    mpz_init(number);
-    mpz_init(difficulty);
-    mpz_init(gas_limit);
-    mpz_init(chain_id);
-    mpz_init(base_fee);
-    mpz_init(number_prev);
-    mpz_init(hash_prev);
 
     block_json=cJSON_CreateObject();
 
-    to_mpz(coin_base, _content->coin_base._limbs, params::BITS/32);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, coin_base));
-    cJSON_AddStringToObject(block_json, "currentCoinbase", hex_string);
+    _arith.from_cgbn_memory_to_hex(_content->coin_base, hex_string_ptr);
+    cJSON_AddStringToObject(block_json, "currentCoinbase", hex_string_ptr);
     
-    to_mpz(time_stamp, _content->time_stamp._limbs, params::BITS/32);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, time_stamp));
-    cJSON_AddStringToObject(block_json, "currentTimestamp", hex_string);
+    _arith.from_cgbn_memory_to_hex(_content->time_stamp, hex_string_ptr);
+    cJSON_AddStringToObject(block_json, "currentTimestamp", hex_string_ptr);
+    
+    _arith.from_cgbn_memory_to_hex(_content->number, hex_string_ptr);
+    cJSON_AddStringToObject(block_json, "currentNumber", hex_string_ptr);
+    
+    _arith.from_cgbn_memory_to_hex(_content->difficulty, hex_string_ptr);
+    cJSON_AddStringToObject(block_json, "currentDifficulty", hex_string_ptr);
+    
+    _arith.from_cgbn_memory_to_hex(_content->gas_limit, hex_string_ptr);
+    cJSON_AddStringToObject(block_json, "currentGasLimit", hex_string_ptr);
 
-    to_mpz(number, _content->number._limbs, params::BITS/32);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, number));
-    cJSON_AddStringToObject(block_json, "currentNumber", hex_string);
+    _arith.from_cgbn_memory_to_hex(_content->chain_id, hex_string_ptr);
+    cJSON_AddStringToObject(block_json, "currentChainId", hex_string_ptr);
 
-    to_mpz(difficulty, _content->difficulty._limbs, params::BITS/32);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, difficulty));
-    cJSON_AddStringToObject(block_json, "currentDifficulty", hex_string);
-
-    to_mpz(gas_limit, _content->gas_limit._limbs, params::BITS/32);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, gas_limit));
-    cJSON_AddStringToObject(block_json, "currentGasLimit", hex_string);
-
-    to_mpz(chain_id, _content->chain_id._limbs, params::BITS/32);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, chain_id));
-    cJSON_AddStringToObject(block_json, "currentChainId", hex_string);
-
-    to_mpz(base_fee, _content->base_fee._limbs, params::BITS/32);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, base_fee));
-    cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string);
+    _arith.from_cgbn_memory_to_hex(_content->base_fee, hex_string_ptr);
+    cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string_ptr);
 
     previous_blocks_json=cJSON_CreateArray();
+    bn_t number;
     for(idx=0; idx<256; idx++) {
       previous_block_json=cJSON_CreateObject();
       
-      to_mpz(number_prev, _content->previous_blocks[idx].number._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, number_prev));
-      cJSON_AddStringToObject(previous_block_json, "number", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->previous_blocks[idx].number, hex_string_ptr);
+      cJSON_AddStringToObject(previous_block_json, "number", hex_string_ptr);
 
-      to_mpz(hash_prev, _content->previous_blocks[idx].hash._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, hash_prev));
-      cJSON_AddStringToObject(previous_block_json, "hash", hex_string);
+      _arith.from_cgbn_memory_to_hex(_content->previous_blocks[idx].hash, hex_string_ptr);
+      cJSON_AddStringToObject(previous_block_json, "hash", hex_string_ptr);
 
       cJSON_AddItemToArray(previous_blocks_json, previous_block_json);
+
+      cgbn_load(_arith._env, number, &(_content->previous_blocks[idx].number));
+      if (cgbn_compare_ui32(_arith._env, number, 0) == 0) {
+        break;
+      }
     }
 
     cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
-
-    mpz_clear(coin_base);
-    mpz_clear(time_stamp);
-    mpz_clear(number);
-    mpz_clear(difficulty);
-    mpz_clear(gas_limit);
-    mpz_clear(chain_id);
-    mpz_clear(base_fee);
-    mpz_clear(number_prev);
-    mpz_clear(hash_prev);
+    free(hex_string_ptr);
     return block_json;
   }
 };

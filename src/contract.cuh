@@ -980,31 +980,22 @@ class state_t {
         cJSON *state_json = NULL;
         cJSON *contract_json = NULL;
         cJSON *storage_json = NULL;
-        mpz_t address, balance, nonce, key, value;
-        mpz_init(address);
-        mpz_init(balance);
-        mpz_init(nonce);
-        mpz_init(key);
-        mpz_init(value);
-        char hex_string[67]="0x";
-        char value_hex_string[67]="0x";
         char *bytes_string=NULL;
+        char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
+        char *value_hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
         size_t idx=0, jdx=0;
         state_json = cJSON_CreateObject();
         for (idx=0; idx<_content->no_contracts; idx++) {
             contract_json = cJSON_CreateObject();
             // set the address
-            to_mpz(address, _content->contracts[idx].address._limbs, params::BITS/32);
-            strcpy(hex_string+2, mpz_get_str(NULL, 16, address));
-            cJSON_AddItemToObject(state_json, hex_string, contract_json);
+            _arith.from_cgbn_memory_to_hex(_content->contracts[idx].address, hex_string_ptr, 5);
+            cJSON_AddItemToObject(state_json, hex_string_ptr, contract_json);
             // set the balance
-            to_mpz(balance, _content->contracts[idx].balance._limbs, params::BITS/32);
-            strcpy(hex_string+2, mpz_get_str(NULL, 16, balance));
-            cJSON_AddStringToObject(contract_json, "balance", hex_string);
+            _arith.from_cgbn_memory_to_hex(_content->contracts[idx].balance, hex_string_ptr);
+            cJSON_AddStringToObject(contract_json, "balance", hex_string_ptr);
             // set the nonce
-            to_mpz(nonce, _content->contracts[idx].nonce._limbs, params::BITS/32);
-            strcpy(hex_string+2, mpz_get_str(NULL, 16, nonce));
-            cJSON_AddStringToObject(contract_json, "nonce", hex_string);
+            _arith.from_cgbn_memory_to_hex(_content->contracts[idx].nonce, hex_string_ptr);
+            cJSON_AddStringToObject(contract_json, "nonce", hex_string_ptr);
             // set the code
             if (_content->contracts[idx].code_size > 0) {
                 bytes_string = bytes_to_hex(_content->contracts[idx].bytecode, _content->contracts[idx].code_size);
@@ -1014,7 +1005,7 @@ class state_t {
                 cJSON_AddStringToObject(contract_json, "code", "0x");
             }
             // set if the code was modified
-            if (_content->contracts[idx].changes == 1) {
+            if (_content->contracts[idx].changes != 0) {
                 cJSON_AddStringToObject(contract_json, "changes", "true");
             } else {
                 cJSON_AddStringToObject(contract_json, "changes", "false");
@@ -1024,19 +1015,14 @@ class state_t {
             cJSON_AddItemToObject(contract_json, "storage", storage_json);
             if (_content->contracts[idx].storage_size > 0) {
                 for (jdx=0; jdx<_content->contracts[idx].storage_size; jdx++) {
-                    to_mpz(key, _content->contracts[idx].storage[jdx].key._limbs, params::BITS/32);
-                    strcpy(hex_string+2, mpz_get_str(NULL, 16, key));
-                    to_mpz(value, _content->contracts[idx].storage[jdx].value._limbs, params::BITS/32);
-                    strcpy(value_hex_string+2, mpz_get_str(NULL, 16, value));
-                    cJSON_AddStringToObject(storage_json, hex_string, value_hex_string);
+                    _arith.from_cgbn_memory_to_hex(_content->contracts[idx].storage[jdx].key, hex_string_ptr);
+                    _arith.from_cgbn_memory_to_hex(_content->contracts[idx].storage[jdx].value, value_hex_string_ptr);
+                    cJSON_AddStringToObject(storage_json, hex_string_ptr, value_hex_string_ptr);
                 }
             }
         }
-        mpz_clear(address);
-        mpz_clear(balance);
-        mpz_clear(nonce);
-        mpz_clear(key);
-        mpz_clear(value);
+        free(hex_string_ptr);
+        free(value_hex_string_ptr);
         return state_json;
     }
 };

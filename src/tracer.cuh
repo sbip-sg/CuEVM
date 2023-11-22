@@ -76,21 +76,19 @@ class tracer_t {
     }
 
     __host__ cJSON *to_json() {
-        char hex_string[67]="0x";
-        mpz_t address;
-        mpz_init(address);
+        char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
         cJSON *tracer_json = cJSON_CreateArray();
         for(size_t idx=0; idx<_content->size;idx++) {
             cJSON *item = cJSON_CreateObject();
-            to_mpz(address, _content->data[idx].address._limbs, params::BITS/32);
-            strcpy(hex_string+2, mpz_get_str(NULL, 16, address));
-            cJSON_AddStringToObject(item, "address", hex_string);
+            _arith.from_cgbn_memory_to_hex(_content->data[idx].address, hex_string_ptr, 5);
+            cJSON_AddStringToObject(item, "address", hex_string_ptr);
             cJSON_AddNumberToObject(item, "pc", _content->data[idx].pc);
             cJSON_AddNumberToObject(item, "opcode", _content->data[idx].opcode);
             stack_t local_stack(_arith, &_content->data[idx].stack);
             cJSON_AddItemToObject(item, "stack", local_stack.to_json());
             cJSON_AddItemToArray(tracer_json, item);
         }
+        free(hex_string_ptr);
         return tracer_json;
     }
 

@@ -530,30 +530,19 @@ class stack_t {
   }
 
   __host__ cJSON *to_json(bool full=false) {
-    char hex_string[67]="0x";
-    mpz_t mpz_stack_size, mpz_stack_value;
-    mpz_init(mpz_stack_size);
-    mpz_init(mpz_stack_value);
+    char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
     cJSON *stack_json = cJSON_CreateObject();
 
     
-    mpz_set_ui(mpz_stack_size, size());
-    // as hex string
-    //strcpy(hex_string+2, mpz_get_str(NULL, 16, mpz_stack_size));
-    //cJSON_AddStringToObject(stack_json, "size", hex_string);
-    // as number
-    //cJSON_AddNumberToObject(stack_json, "size", size());
 
     cJSON *stack_data_json = cJSON_CreateArray();
     uint32_t print_size = full ? STACK_SIZE : size();
     for(uint32_t idx=0;idx<print_size;idx++) {
-      to_mpz(mpz_stack_value, _content->stack_base[idx]._limbs, params::BITS/32);
-      strcpy(hex_string+2, mpz_get_str(NULL, 16, mpz_stack_value));
-      cJSON_AddItemToArray(stack_data_json, cJSON_CreateString(hex_string));
+      _arith.from_cgbn_memory_to_hex(_content->stack_base[idx], hex_string_ptr);
+      cJSON_AddItemToArray(stack_data_json, cJSON_CreateString(hex_string_ptr));
     }
     cJSON_AddItemToObject(stack_json, "data", stack_data_json);
-    mpz_clear(mpz_stack_size);
-    mpz_clear(mpz_stack_value);
+    free(hex_string_ptr);
     return stack_json;
   }
 
