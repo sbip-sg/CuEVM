@@ -122,6 +122,14 @@ class mr_params_t {
 
 typedef mr_params_t<8, 256, 1, 1024, 4096, 50> utils_params;
 
+
+typedef struct
+{
+  size_t size;
+  uint8_t *data;
+} data_content_t;
+
+
 __host__ void from_mpz(uint32_t *words, uint32_t count, mpz_t value) {
   size_t written;
 
@@ -190,7 +198,11 @@ __host__ __device__ uint8_t *expand_memory(uint8_t *memory, size_t current_size,
     #endif
         new_memory = (uint8_t *)malloc(new_size);
         memset(new_memory, 0, new_size);
-        memcpy(new_memory, memory, current_size);
+        if ((memory != NULL) && (current_size > 0))
+          if (current_size > new_size)
+            memcpy(new_memory, memory, new_size);
+          else
+            memcpy(new_memory, memory, current_size);
     #ifdef __CUDA_ARCH__
     }
     __syncthreads();

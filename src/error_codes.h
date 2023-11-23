@@ -46,4 +46,7 @@
 #define ERR_RETURN_DATA_INVALID_SIZE 0x12
 #define ERR_RETURN_DATA_OVERFLOW 0x13
 
+// static call error
+#define ERR_STATIC_CALL_CONTEXT 0x14
+
 #endif

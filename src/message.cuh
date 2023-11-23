@@ -14,11 +14,6 @@ class message_t {
       evm_word_t origin;
       evm_word_t gasprice;
     } tx_t;
-    
-    typedef struct {
-      size_t    size;
-      uint8_t   *data;
-    } message_data_t;
 
     typedef struct  {
       evm_word_t      caller;
@@ -29,7 +24,8 @@ class message_t {
       evm_word_t      gas;
       uint32_t        depth;
       uint32_t        call_type; // OP_CALL - call, OP_CALLCODE - callcode, OP_STATICCALL - static call, OP_DELEGATECALL - delegate call, OP_CREATE - create, OP_CREATE2 - create2
-      message_data_t  data;
+      evm_word_t      storage;
+      data_content_t  data;
     } message_content_t;
 
     message_content_t *_content;
@@ -53,10 +49,16 @@ class message_t {
     }
 
     __host__ __device__ void free_memory() {
-      if (_content->data.size > 0) {
-        free(_content->data.data);
+      #ifdef __CUDA_ARCH__
+      if (threadIdx.x == 0) {
+      #endif
+        if (_content->data.size > 0) {
+          free(_content->data.data);
+        }
+        free(_content);
+      #ifdef __CUDA_ARCH__
       }
-      free(_content);
+      #endif
     }
 
     __host__ __device__ __forceinline__ void get_caller(bn_t &caller) {
@@ -93,6 +95,10 @@ class message_t {
 
     __host__ __device__ __forceinline__ uint32_t get_call_type() {
       return _content->call_type;
+    }
+
+    __host__ __device__ __forceinline__ void get_storage(bn_t &storage) {
+      cgbn_load(_arith._env, storage, &(_content->storage));
     }
 
     __host__ __device__ __forceinline__ size_t get_data_size() {

@@ -1,7 +1,7 @@
 #include "../returndata.cuh"
 #include "../utils.h"
  
-__global__ void kernel_return_run(cgbn_error_report_t *report, typename return_data_t::return_data_content_t *instances, uint32_t instance_count) {
+__global__ void kernel_return_run(cgbn_error_report_t *report, data_content_t *instances, uint32_t instance_count) {
   
   uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x);
   
@@ -13,22 +13,20 @@ __global__ void kernel_return_run(cgbn_error_report_t *report, typename return_d
   // printf("Instance %d:  ", instance);
   uint8_t tmp[32];
   for(uint32_t idx=0; idx<32; idx++) {
-    tmp[idx]=(instace+1)*idx;
+    tmp[idx]=(instance+1)*idx;
   }
   return_data.set(&(tmp[0]), 32);
 
-  printf("size %d:  ", return_data.size());
+  printf("size %lu:  ", return_data.size());
 
   return_data.print();
   
 }
 
 void run_test(uint32_t instance_count) {
-  typedef typename return_data_t::return_data_content_t return_data_content_t;
 
-  return_data_content_t   *cpu_returns, *gpu_returns;
+  data_content_t   *cpu_returns, *gpu_returns;
   cgbn_error_report_t     *report;
-  arith_t arith(cgbn_report_monitor, 0);
   
   
   printf("Generating returns info\n");

@@ -345,7 +345,7 @@ class state_t {
         state_t &access_list,
         state_t &parents,
         bn_t &gas_cost,
-        uint32_t call_type // 0 - balance // 1- nonce // 2 - code
+        uint32_t call_type // 1 - balance // 2 - nonce // 4 - code
     ) {
         uint32_t tmp_error_code = ERR_SUCCESS;
         size_t  warm_address=1; // we consider that it is a warm address
@@ -392,7 +392,7 @@ class state_t {
             // REAL PROBLEM HERE no suposed to be here
             access_list.set_local_account(address, account, 1); //without storage
         }
-        access_account->changes |= (1 << call_type);
+        access_account->changes |= call_type;
         if (warm_address == 1) {
             cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 100);
         } else {
@@ -462,7 +462,7 @@ class state_t {
         uint32_t tmp_error_code = ERR_SUCCESS;
         contract_t *account = get_local_account(address, tmp_error_code);
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
-            account = get_account(address, global, access_list, parents, gas_cost, 0);
+            account = get_account(address, global, access_list, parents, gas_cost, 1);
             set_local_account(address, account, 1); //without storage
             account = get_local_account(address, tmp_error_code);
         }
@@ -480,7 +480,7 @@ class state_t {
         uint32_t tmp_error_code = ERR_SUCCESS;
         contract_t *account = get_local_account(address, tmp_error_code);
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
-            account = get_account(address, global, access_list, parents, gas_cost, 1);
+            account = get_account(address, global, access_list, parents, gas_cost, 2);
             set_local_account(address, account, 1); //without storage
             account = get_local_account(address, tmp_error_code);
         }
@@ -499,7 +499,7 @@ class state_t {
         uint32_t tmp_error_code = ERR_SUCCESS;
         contract_t *account = get_local_account(address, tmp_error_code);
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
-            account = get_account(address, global, access_list, parents, gas_cost, 2);
+            account = get_account(address, global, access_list, parents, gas_cost, 4);
             set_local_account(address, account, 1); //without storage
             account = get_local_account(address, tmp_error_code);
         }
@@ -643,6 +643,7 @@ class state_t {
         uint32_t error_code;
         contract_t *account;
         bn_t address, key, value;
+        bn_t balance, nonce;
         for (idx=0; idx<that._content->no_contracts; idx++) {
             cgbn_load(_arith._env, address, &(that._content->contracts[idx].address));
             account = get_local_account(address, error_code);
@@ -657,6 +658,11 @@ class state_t {
                     set_local_value(address, key, value);
                     error_code = ERR_SUCCESS;
                 }
+                // override the other variables
+                cgbn_load(_arith._env, balance, &(that._content->contracts[idx].balance));
+                cgbn_load(_arith._env, nonce, &(that._content->contracts[idx].nonce));
+                cgbn_store(_arith._env, &(account->balance), balance);
+                cgbn_store(_arith._env, &(account->nonce), nonce);
             }
         }
     }

@@ -36,8 +36,6 @@ class evm_t {
         // message information
         typedef message_t<params>                       message_t;
         typedef message_t::message_content_t            message_content_t;
-        // return data information
-        typedef typename return_data_t::return_data_content_t   return_data_content_t;
         // tracer information
         typedef tracer_t<params>                        tracer_t;
         typedef typename tracer_t::tracer_content_t     tracer_content_t;
@@ -55,7 +53,7 @@ class evm_t {
         typedef struct {
             message_content_t   *msgs;
             stack_data_t        *stacks;
-            return_data_content_t       *return_datas;
+            data_content_t      *return_datas;
             memory_data_t       *memories;
             state_data_t        *access_states;
             state_data_t        *parents_write_states;
@@ -104,7 +102,7 @@ class evm_t {
         __host__ __device__ void run(
             message_content_t   *call_msg,
             stack_data_t        *call_stack,
-            return_data_content_t       *call_return_data,
+            data_content_t      *call_return_data,
             memory_data_t       *call_memory,
             state_data_t        *call_access_state,
             state_data_t        *call_parents_write_state,
@@ -121,12 +119,6 @@ class evm_t {
             return_data_t returns(call_return_data);
             if (call_msg->depth > MAX_DEPTH) {
                 error=ERR_MAX_DEPTH_EXCEEDED;
-                returns.set(NULL, 0);
-                // probabily revert the state
-                return;
-            }
-            if (call_msg->call_type!=OP_CALL) {
-                error=ERR_NOT_IMPLEMENTED;
                 returns.set(NULL, 0);
                 // probabily revert the state
                 return;
@@ -157,14 +149,7 @@ class evm_t {
             memory_t memory(_arith, &memory_data);
 
             // local state initiliasation
-            #ifdef __CUDA_ARCH__
-            __shared__ state_data_t               local_state;
-            #else
-            state_data_t                          local_state;
-            #endif
-            local_state.no_contracts=0;
-            local_state.contracts=NULL;
-            state_t write_state(_arith, &local_state);
+            state_t write_state(_arith, call_write_state);
             state_t parents_state(_arith, call_parents_write_state);
             state_t access_state(_arith, call_access_state);
 
@@ -183,12 +168,13 @@ class evm_t {
             error_code=ERR_SUCCESS;
 
             // last return data
-            uint32_t external_call=0;
             #ifdef __CUDA_ARCH__
-            __shared__ return_data_content_t last_return_data;
+            __shared__ data_content_t last_return_data;
             #else
-            return_data_content_t last_return_data;
+            data_content_t last_return_data;
             #endif
+            last_return_data.data=NULL;
+            last_return_data.size=0;
             return_data_t external_return_data(&last_return_data);
 
             // auxiliary variables
@@ -201,20 +187,44 @@ class evm_t {
             bn_t gas_cost, aux_gas_cost, gas_refund;
             uint8_t *byte_data;
             uint32_t minimum_word_size;
-
-
-            // TODO: get the current contract
-            // go thorugh all of them and don't pay
             msg.get_to(to);
-            contract=_global_state.get_local_account(to, error_code);
+            msg.get_caller(caller);
+            bn_t dummy_gas;
+            
+            // add to access list the caller and the contract called
+            contract=write_state.get_account(to, _global_state, access_state, parents_state, dummy_gas, 4); //get the code
+            // TODO: maybe see a way of making the contract local
             cgbn_load(_arith._env, contract_address, &(contract->address));
             cgbn_load(_arith._env, contract_balance, &(contract->balance));
-            write_state.set_local_account(contract_address, contract, error_code);
-            // verify for null contract
+            write_state.get_account(caller, _global_state, access_state, parents_state, dummy_gas, 1); //get the balance
+            // TODO: for gas maybe verify if the balance is enough
 
-            // TODO: depend on the type of call
-            cgbn_load(_arith._env, storage_address, &(contract->address));
 
+            // depending on the call type take action
+            switch (msg.get_call_type())
+            {
+            case OP_CALL:
+                cgbn_set(_arith._env, storage_address, to);
+                /* code */
+                break;
+            case OP_CALLCODE:
+                msg.get_storage(storage_address);
+                /* code */
+                break;
+            case OP_DELEGATECALL:
+                msg.get_storage(storage_address);
+                /* code */
+                break;
+            case OP_STATICCALL:
+                cgbn_set(_arith._env, storage_address, to);
+                /* code */
+                break;
+            
+            default:
+                error=ERR_NOT_IMPLEMENTED;
+                returns.set(NULL, 0);
+                break;
+            }
 
             // get the gas from message
             msg.get_gas(remaining_gas);
@@ -262,8 +272,7 @@ class evm_t {
                         case OP_STOP: // STOP
                             {
                                 // only for contracts without code
-                                call_return_data->offset=0;
-                                call_return_data->size=0;
+                                returns.set(NULL, 0);
                                 pc=pc;
                             }
                             break;
@@ -490,7 +499,13 @@ class evm_t {
                                 byte_data=msg.get_data(index_s, 32, size_s);
                                 byte_data=expand_memory(byte_data, size_s, 32);
                                 _arith.from_memory_to_cgbn(value, byte_data);
+                                #ifdef __CUDA_ARCH__
+                                if (threadIdx.x==0) {
+                                #endif
                                 free(byte_data);
+                                #ifdef __CUDA_ARCH__
+                                }
+                                #endif
                                 stack.push(value, error_code);
                             }
                             break;
@@ -523,7 +538,13 @@ class evm_t {
                                 byte_data=msg.get_data(index_s, length_s, size_s);
                                 byte_data=expand_memory(byte_data, size_s, length_s);
                                 memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
+                                #ifdef __CUDA_ARCH__
+                                if (threadIdx.x==0) {
+                                #endif
                                 free(byte_data);
+                                #ifdef __CUDA_ARCH__
+                                }
+                                #endif
                             }
                             break;
                         case OP_CODESIZE: // CODESIZE
@@ -545,8 +566,12 @@ class evm_t {
                                 index_s=_arith.from_cgbn_to_size_t(index);
                                 length_s=_arith.from_cgbn_to_size_t(length);
                                 
-                                // TODO: maybe test the code size and length for adding zeros instead
-                                memory.set(contract->bytecode + index_s, dst_offset_s, length_s, gas_cost, error_code);
+                                if (index_s >= contract->code_size) {
+                                    byte_data=expand_memory(NULL, 0, length_s);
+                                } else {
+                                    byte_data=expand_memory(contract->bytecode + index_s, contract->code_size - index_s, length_s);
+                                }
+                                memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
                             }
                             break;
                         case OP_GASPRICE: // GASPRICE
@@ -587,11 +612,23 @@ class evm_t {
                                     access_state,
                                     parents_state,
                                     gas_cost,
-                                    2 //code
+                                    4 //code
                                 );
-                                byte_data=expand_memory(tmp_contract->bytecode + index_s, tmp_contract->code_size - index_s, length_s);
+                                
+                                if (index_s >= tmp_contract->code_size) {
+                                    byte_data=expand_memory(NULL, 0, length_s);
+                                } else {
+                                    byte_data=expand_memory(tmp_contract->bytecode + index_s, tmp_contract->code_size - index_s, length_s);
+                                }
                                 memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
+                                
+                                #ifdef __CUDA_ARCH__
+                                if (threadIdx.x==0) {
+                                #endif
                                 free(byte_data);
+                                #ifdef __CUDA_ARCH__
+                                }
+                                #endif
                             }
                             break;
                         case OP_RETURNDATASIZE: // RETURNDATASIZE
@@ -670,9 +707,7 @@ class evm_t {
                         case OP_SELFBALANCE: // SELFBALANCE
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 2);
-                                // TODO: 
-                                cgbn_load(_arith._env, value, &(contract->balance));
-                                stack.push(value, error_code);
+                                stack.push(contract_balance, error_code);
                             }
                             break;
                         case OP_BASEFEE: // BASEFEE
@@ -829,14 +864,48 @@ class evm_t {
                             break;
                         case OP_CALL: // CALL
                             {
-                                // TODO: implement
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                call(
+                                    contract_address,
+                                    storage_address,
+                                    msg,
+                                    stack,
+                                    external_return_data,
+                                    memory,
+                                    access_state,
+                                    parents_state,
+                                    write_state,
+                                    #ifdef GAS
+                                    remaining_gas,
+                                    #endif
+                                    #ifdef TRACER
+                                    tracer,
+                                    #endif
+                                    OP_CALL,
+                                    error_code
+                                );
                             }
                             break;
                         case OP_CALLCODE: // CALLCODE
                             {
-                                // TODO: implement
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                call(
+                                    contract_address,
+                                    storage_address,
+                                    msg,
+                                    stack,
+                                    external_return_data,
+                                    memory,
+                                    access_state,
+                                    parents_state,
+                                    write_state,
+                                    #ifdef GAS
+                                    remaining_gas,
+                                    #endif
+                                    #ifdef TRACER
+                                    tracer,
+                                    #endif
+                                    OP_CALLCODE,
+                                    error_code
+                                );
                             }
                             break;
                         case OP_RETURN: // RETURN
@@ -846,15 +915,32 @@ class evm_t {
                                 offset_s=_arith.from_cgbn_to_size_t(offset);
                                 stack.pop(length, error_code);
                                 length_s=_arith.from_cgbn_to_size_t(length);
-                                call_return_data->offset=offset_s;
-                                call_return_data->size=length_s;
+                                byte_data=memory.get(offset_s, length_s, gas_cost, error_code);
+                                returns.set(byte_data, length_s);
                                 error_code=ERR_RETURN;
                             }
                             break;
                         case OP_DELEGATECALL: // DELEGATECALL
                             {
-                                // TODO: implement
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                call(
+                                    contract_address,
+                                    storage_address,
+                                    msg,
+                                    stack,
+                                    external_return_data,
+                                    memory,
+                                    access_state,
+                                    parents_state,
+                                    write_state,
+                                    #ifdef GAS
+                                    remaining_gas,
+                                    #endif
+                                    #ifdef TRACER
+                                    tracer,
+                                    #endif
+                                    OP_DELEGATECALL,
+                                    error_code
+                                );
                             }
                             break;
                         case OP_CREATE2: // CREATE2
@@ -865,8 +951,25 @@ class evm_t {
                             break;
                         case OP_STATICCALL: // STATICCALL
                             {
-                                // TODO: implement
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                call(
+                                    contract_address,
+                                    storage_address,
+                                    msg,
+                                    stack,
+                                    external_return_data,
+                                    memory,
+                                    access_state,
+                                    parents_state,
+                                    write_state,
+                                    #ifdef GAS
+                                    remaining_gas,
+                                    #endif
+                                    #ifdef TRACER
+                                    tracer,
+                                    #endif
+                                    OP_STATICCALL,
+                                    error_code
+                                );
                             }
                             break;
                         case OP_REVERT: // REVERT
@@ -876,8 +979,8 @@ class evm_t {
                                 offset_s=_arith.from_cgbn_to_size_t(offset);
                                 stack.pop(length, error_code);
                                 length_s=_arith.from_cgbn_to_size_t(length);
-                                call_return_data->offset=offset_s;
-                                call_return_data->size=length_s;
+                                byte_data=memory.get(offset_s, length_s, gas_cost, error_code);
+                                returns.set(byte_data, length_s);
                                 error_code=ERR_REVERT;
                             }
                             break;
@@ -917,18 +1020,244 @@ class evm_t {
                 pc=pc+1;
             }
             if (pc >= contract->code_size) {
-                call_return_data->offset=0;
-                call_return_data->size=0;
+                returns.set(NULL, 0);
                 #ifdef TRACER
                 tracer.push(contract_address, pc, OP_STOP, &stack);
                 #endif
             }
-            stack.copy_stack_data(call_stack, 0);
-            memory.copy_info(call_memory);
-            // TODO: if not revert, update the state
-            write_state.copy_to_state_data_t(call_write_state);
+            if (msg.get_depth()==0) {
+                stack.copy_stack_data(call_stack, 0);
+                memory.copy_info(call_memory);
+            }
             #ifdef GAS
             cgbn_store(_arith._env, call_gas_left, remaining_gas);
+            #endif
+        }
+
+        __host__ __device__ __forceinline__ void call(
+            bn_t &contract_address,
+            bn_t &storage_address,
+            message_t &msg,
+            stack_t &stack,
+            return_data_t &returns,
+            memory_t &memory,
+            state_t &access_state,
+            state_t &parents_state,
+            state_t &write_state,
+            #ifdef GAS
+            bn_t &remaining_gas,
+            #endif
+            #ifdef TRACER
+            tracer_t &tracer,
+            #endif
+            uint32_t call_type,
+            uint32_t &error_code
+        ) {
+            #ifdef __CUDA_ARCH__
+            __shared__ message_content_t *external_call_msg;
+            __shared__ state_data_t *external_call_parents_write_state;
+            __shared__ state_data_t *external_call_write_state;
+            #else
+            state_data_t *external_call_parents_write_state;
+            state_data_t *external_call_write_state;
+            message_content_t *external_call_msg;
+            #endif
+
+            
+            #ifdef __CUDA_ARCH__
+            if (threadIdx.x==0) {
+            #endif
+            external_call_msg=(message_content_t *) malloc(sizeof(message_content_t));
+            external_call_parents_write_state=(state_data_t *) malloc(sizeof(state_data_t));
+            external_call_write_state=(state_data_t *) malloc(sizeof(state_data_t));
+            #ifdef __CUDA_ARCH__
+            }
+            __syncthreads();
+            #endif
+            // get the values from the stack
+            bn_t gas;
+            bn_t to;
+            bn_t value;
+            bn_t caller;
+            bn_t nonce;
+            bn_t tx_origin;
+            bn_t tx_gasprice;
+            bn_t storage;
+            bn_t dummy_gas_cost;
+            bn_t gas_cost;
+            bn_t capped_gas;
+            cgbn_set_ui32(_arith._env, gas_cost, 0);
+            stack.pop(gas, error_code);
+            #ifdef GAS
+            cgbn_div_ui32(_arith._env, capped_gas, remaining_gas, 64);
+            cgbn_sub(_arith._env, capped_gas, remaining_gas, capped_gas);
+            if (cgbn_compare(_arith._env, gas, capped_gas)==1) {
+                cgbn_set(_arith._env, gas, capped_gas);
+            }
+            cgbn_sub(_arith._env, remaining_gas, remaining_gas, gas);
+            #endif
+            stack.pop(to, error_code);
+            // make the cost for accesing the state
+            contract_t *contract=write_state.get_account(
+                to,
+                _global_state,
+                access_state,
+                parents_state,
+                gas_cost,
+                4 //code
+            );
+            if (call_type==OP_CALL) {
+                stack.pop(value, error_code);
+                cgbn_set(_arith._env, caller, contract_address);
+                cgbn_set_ui32(_arith._env, storage, 0);
+                // if th empty account is called
+                bn_t balance;
+                contract=write_state.get_account(
+                    to,
+                    _global_state,
+                    access_state,
+                    parents_state,
+                    dummy_gas_cost,
+                    3 //balance nonce
+                );
+                cgbn_load(_arith._env, balance, &(contract->balance));
+                cgbn_load(_arith._env, nonce, &(contract->nonce));
+                if (cgbn_compare_ui32(_arith._env, balance, 0)==0 &&
+                    cgbn_compare_ui32(_arith._env, nonce, 0)==0 &&
+                    contract->code_size==0) {
+                    cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 25000);
+                }
+            } else if (call_type==OP_CALLCODE) {
+                stack.pop(value, error_code);
+                cgbn_set(_arith._env, caller, contract_address);
+                cgbn_set(_arith._env, storage, storage_address);
+            } else if (call_type==OP_DELEGATECALL) {
+                msg.get_value(value);
+                msg.get_caller(caller);
+                cgbn_set(_arith._env, storage, storage_address);
+            } else if (call_type==OP_STATICCALL) {
+                cgbn_set_ui32(_arith._env, value, 0);
+                cgbn_set(_arith._env, caller, contract_address);
+                cgbn_set_ui32(_arith._env, storage, 0);
+            } else {
+                error_code=ERR_NOT_IMPLEMENTED;
+                return;
+            }
+            // positive value cost
+            if (cgbn_compare_ui32(_arith._env, value, 0)==1) {
+                if (msg.get_call_type() == OP_STATICCALL) {
+                    error_code=ERR_STATIC_CALL_CONTEXT;
+                }
+                cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 9000);
+                // TODO: something with fallback function refund 2300
+            }
+
+
+            write_state.get_account_nonce(
+                caller,
+                nonce,
+                _global_state,
+                access_state,
+                parents_state,
+                dummy_gas_cost
+            );
+            msg.get_tx_origin(tx_origin);
+            msg.get_tx_gasprice(tx_gasprice);
+            // setup the message
+            cgbn_store(_arith._env, &(external_call_msg->caller), caller);
+            cgbn_store(_arith._env, &(external_call_msg->value), value);
+            cgbn_store(_arith._env, &(external_call_msg->to), to);
+            cgbn_store(_arith._env, &(external_call_msg->nonce), nonce);
+            cgbn_store(_arith._env, &(external_call_msg->tx.gasprice), tx_gasprice);
+            cgbn_store(_arith._env, &(external_call_msg->tx.origin), tx_origin);
+            cgbn_store(_arith._env, &(external_call_msg->gas), gas);
+            external_call_msg->depth=msg.get_depth()+1;
+            external_call_msg->call_type=call_type;
+            cgbn_store(_arith._env, &(external_call_msg->storage), storage);
+            // msg call data
+            bn_t offset, length;
+            size_t offset_s, length_s;
+            uint8_t *byte_data;
+            stack.pop(offset, error_code);
+            stack.pop(length, error_code);
+            offset_s=_arith.from_cgbn_to_size_t(offset);
+            length_s=_arith.from_cgbn_to_size_t(length);
+            byte_data=memory.get(offset_s, length_s, gas_cost, error_code);
+            byte_data=expand_memory(byte_data, length_s, length_s);
+            external_call_msg->data.size=length_s;
+            external_call_msg->data.data=byte_data;
+            // return data offset
+            stack.pop(offset, error_code);
+            stack.pop(length, error_code);
+            offset_s=_arith.from_cgbn_to_size_t(offset);
+            length_s=_arith.from_cgbn_to_size_t(length);
+            // make the union of parents writes
+            // and the new child write state
+            external_call_parents_write_state->contracts==NULL;
+            external_call_parents_write_state->no_contracts=0;
+            external_call_write_state->contracts==NULL;
+            external_call_write_state->no_contracts=0;
+            state_t external_parents_write_state(_arith, external_call_parents_write_state);
+            external_parents_write_state.copy_from_state_t(parents_state);
+            external_parents_write_state.copy_from_state_t(write_state);
+            // error_code
+            uint32_t external_error_code;
+            // gas left
+            #ifdef GAS
+            emv_word_t call_gas_left;
+            cgbn_set_ui32(_arith._env, gas, 0);
+            cgbn_store(_arith._env, &call_gas_left, gas);
+            #endif
+            
+
+            // make the call TODO: look on gas
+            run(
+                external_call_msg,
+                NULL,
+                returns._content,
+                NULL,
+                access_state._content,
+                external_call_parents_write_state,
+                external_call_write_state,
+                #ifdef GAS
+                &call_gas_left,
+                #endif
+                #ifdef TRACER
+                tracer._content,
+                #endif
+                external_error_code
+            );
+            // TODO: maybe here an erorr if size is less than return data size
+            uint32_t tmp_error_code;
+            byte_data=returns.get(0, returns.size(), tmp_error_code);
+            byte_data=expand_memory(byte_data, length_s, length_s);
+            memory.set(byte_data, offset_s, length_s, gas_cost, error_code);
+            
+            #ifdef GAS
+            cgbn_load(_arith._env, gas, &call_gas_left);
+            cgbn_add(_arith._env, remaining_gas, remaining_gas, gas);
+            if (cgbn_compare(_arith._env, remaining_gas, gas_cost)==-1) {
+                external_error_code=ERR_OUT_OF_GAS;
+            }
+            #endif
+            if (external_error_code==ERR_NONE || external_error_code==ERR_RETURN) {
+                state_t external_write_state(_arith, external_call_write_state);
+                // save the state
+                write_state.copy_from_state_t(external_write_state);
+            }
+
+            
+            #ifdef __CUDA_ARCH__
+            if (threadIdx.x==0) {
+            #endif
+            free(byte_data);
+            message_t external_msg(_arith, external_call_msg);
+            external_msg.free_memory();
+            state_t::free_instance(external_call_parents_write_state);
+            state_t::free_instance(external_call_write_state);
+            // TODO: free the other allocated memory
+            #ifdef __CUDA_ARCH__
+            }
             #endif
         }
 
@@ -973,7 +1302,7 @@ class evm_t {
             // stack
             gpu_instances.stacks=stack_t::get_gpu_stacks(cpu_instances.stacks, cpu_instances.count);
             // return data
-            gpu_instances.return_datas=eturn_data_t::get_gpu_returns(cpu_instances.return_datas, cpu_instances.count);
+            gpu_instances.return_datas=return_data_t::get_gpu_returns(cpu_instances.return_datas, cpu_instances.count);
             // memory
             gpu_instances.memories=memory_t::get_gpu_memories_info(cpu_instances.memories, cpu_instances.count);
             // state
