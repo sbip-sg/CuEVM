@@ -99,48 +99,17 @@ class message_t {
       return _content->data.size;
     }
 
-    __host__ __device__ __forceinline__ uint8_t *get_data(size_t index, size_t length, uint32_t &error_code) {
-      #ifdef __CUDA_ARCH__
-      __shared__ uint8_t *data;
-      if (threadIdx.x == 0) {
-      #else
-      uint8_t *data;
-      #endif
-        data = (uint8_t*) malloc(sizeof(uint8_t)*length);
-      #ifdef __CUDA_ARCH__
-      }
-      __syncthreads();
-      #endif
+    __host__ __device__ __forceinline__ uint8_t *get_data(size_t index, size_t length, size_t &available_size) {
+      available_size = length;
       if (index + length <= _content->data.size) {
-        #ifdef __CUDA_ARCH__
-        if (threadIdx.x == 0) {
-        #endif
-          memcpy(data, _content->data.data + index, sizeof(uint8_t)*length);
-        #ifdef __CUDA_ARCH__
-        }
-        __syncthreads();
-        #endif
+        return _content->data.data + index;
       } else if (index < _content->data.size) {
-        #ifdef __CUDA_ARCH__
-        if (threadIdx.x == 0) {
-        #endif
-          memset(data, 0, sizeof(uint8_t)*length);
-          memcpy(data, _content->data.data + index, sizeof(uint8_t)*(_content->data.size - index));
-        #ifdef __CUDA_ARCH__
-        }
-        __syncthreads();
-        #endif
+        available_size = _content->data.size - index;
+        return _content->data.data + index;
       } else {
-        #ifdef __CUDA_ARCH__
-        if (threadIdx.x == 0) {
-        #endif
-          memset(data, 0, sizeof(uint8_t)*length);
-        #ifdef __CUDA_ARCH__
-        }
-        __syncthreads();
-        #endif
+        available_size = 0;
+        return _content->data.data;
       }
-      return data;
     }
 
     __host__ message_content_t *to_gpu() {

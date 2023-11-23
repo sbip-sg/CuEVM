@@ -36,11 +36,13 @@ class evm_t {
         // message information
         typedef message_t<params>                       message_t;
         typedef message_t::message_content_t            message_content_t;
+        // return data information
+        typedef typename return_data_t::return_data_content_t   return_data_content_t;
         // tracer information
         typedef tracer_t<params>                        tracer_t;
         typedef typename tracer_t::tracer_content_t     tracer_content_t;
         // keccak information
-        typedef keccak::keccak_t               keccak_t;
+        typedef keccak::keccak_t                        keccak_t;
         typedef typename keccak_t::sha3_parameters_t    sha3_parameters_t;
 
         // constants
@@ -53,7 +55,7 @@ class evm_t {
         typedef struct {
             message_content_t   *msgs;
             stack_data_t        *stacks;
-            return_data_t       *return_datas;
+            return_data_content_t       *return_datas;
             memory_data_t       *memories;
             state_data_t        *access_states;
             state_data_t        *parents_write_states;
@@ -102,7 +104,7 @@ class evm_t {
         __host__ __device__ void run(
             message_content_t   *call_msg,
             stack_data_t        *call_stack,
-            return_data_t       *call_return_data,
+            return_data_content_t       *call_return_data,
             memory_data_t       *call_memory,
             state_data_t        *call_access_state,
             state_data_t        *call_parents_write_state,
@@ -115,17 +117,17 @@ class evm_t {
             #endif
             uint32_t            &error
         ) {
+            // return data
+            return_data_t returns(call_return_data);
             if (call_msg->depth > MAX_DEPTH) {
                 error=ERR_MAX_DEPTH_EXCEEDED;
-                call_return_data->offset=0;
-                call_return_data->size=0;
+                returns.set(NULL, 0);
                 // probabily revert the state
                 return;
             }
             if (call_msg->call_type!=OP_CALL) {
                 error=ERR_NOT_IMPLEMENTED;
-                call_return_data->offset=0;
-                call_return_data->size=0;
+                returns.set(NULL, 0);
                 // probabily revert the state
                 return;
             }
@@ -180,14 +182,23 @@ class evm_t {
             uint32_t error_code;
             error_code=ERR_SUCCESS;
 
+            // last return data
+            uint32_t external_call=0;
+            #ifdef __CUDA_ARCH__
+            __shared__ return_data_content_t last_return_data;
+            #else
+            return_data_content_t last_return_data;
+            #endif
+            return_data_t external_return_data(&last_return_data);
+
             // auxiliary variables
-            contract_t *contract;
-            bn_t contract_address, contract_balance;
+            contract_t *contract, *tmp_contract;
+            bn_t contract_address, contract_balance, storage_address;
             bn_t caller, value, nonce, to, tx_origin, tx_gasprice;
             bn_t address, key, offset, length, index, src_offset, dst_offset;
-            size_t dst_offset_s, src_offset_s, length_s, index_s, offset_s;
+            size_t dst_offset_s, src_offset_s, length_s, index_s, offset_s, size_s;
             bn_t remaining_gas;
-            bn_t gas_cost, aux_gas_cost;
+            bn_t gas_cost, aux_gas_cost, gas_refund;
             uint8_t *byte_data;
             uint32_t minimum_word_size;
 
@@ -200,6 +211,10 @@ class evm_t {
             cgbn_load(_arith._env, contract_balance, &(contract->balance));
             write_state.set_local_account(contract_address, contract, error_code);
             // verify for null contract
+
+            // TODO: depend on the type of call
+            cgbn_load(_arith._env, storage_address, &(contract->address));
+
 
             // get the gas from message
             msg.get_gas(remaining_gas);
@@ -433,8 +448,17 @@ class evm_t {
                             break;
                         case OP_BALANCE: // BALANCE
                             {
-                                // TODO: get from lcoal/global state
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                cgbn_set_ui32(_arith._env, gas_cost, 0);
+                                stack.pop(address, error_code);
+                                write_state.get_account_balance(
+                                    address,
+                                    value,
+                                    _global_state,
+                                    access_state,
+                                    parents_state,
+                                    gas_cost
+                                );
+                                stack.push(value, error_code);
                             }
                             break;
                         case OP_ORIGIN: // ORIGIN
@@ -463,7 +487,8 @@ class evm_t {
                                 cgbn_set_ui32(_arith._env, gas_cost, 3);
                                 stack.pop(index, error_code);
                                 index_s=_arith.from_cgbn_to_size_t(index);
-                                byte_data=msg.get_data(index_s, 32, error_code);
+                                byte_data=msg.get_data(index_s, 32, size_s);
+                                byte_data=expand_memory(byte_data, size_s, 32);
                                 _arith.from_memory_to_cgbn(value, byte_data);
                                 free(byte_data);
                                 stack.push(value, error_code);
@@ -495,7 +520,8 @@ class evm_t {
                                 cgbn_add(_arith._env, gas_cost, gas_cost, aux_gas_cost);
 
                                 // get data from msg and set on memory
-                                byte_data=msg.get_data(index_s, length_s, error_code);
+                                byte_data=msg.get_data(index_s, length_s, size_s);
+                                byte_data=expand_memory(byte_data, size_s, length_s);
                                 memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
                                 free(byte_data);
                             }
@@ -532,30 +558,63 @@ class evm_t {
                             break;
                         case OP_EXTCODESIZE: // EXTCODESIZE
                             {
-                                cgbn_set_ui32(_arith._env, gas_cost, 100);
-                                // TODO: get from local/global state
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                cgbn_set_ui32(_arith._env, gas_cost, 0);
+                                stack.pop(address, error_code);
+                                length_s = write_state.get_account_code_size(
+                                    address,
+                                    _global_state,
+                                    access_state,
+                                    parents_state,
+                                    gas_cost
+                                );
+                                _arith.from_size_t_to_cgbn(length, length_s);
+                                stack.push(length, error_code);
                             }
                             break;
                         case OP_EXTCODECOPY: // EXTCODECOPY
                             {
-                                cgbn_set_ui32(_arith._env, gas_cost, 100);
-                                // TODO: get from local/global state
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                cgbn_set_ui32(_arith._env, gas_cost, 0);
+                                stack.pop(address, error_code);
+                                stack.pop(offset, error_code);
+                                stack.pop(index, error_code);
+                                stack.pop(length, error_code);
+                                dst_offset_s=_arith.from_cgbn_to_size_t(offset);
+                                index_s=_arith.from_cgbn_to_size_t(index);
+                                length_s=_arith.from_cgbn_to_size_t(length);
+                                tmp_contract=write_state.get_account(
+                                    address,
+                                    _global_state,
+                                    access_state,
+                                    parents_state,
+                                    gas_cost,
+                                    2 //code
+                                );
+                                byte_data=expand_memory(tmp_contract->bytecode + index_s, tmp_contract->code_size - index_s, length_s);
+                                memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
+                                free(byte_data);
                             }
                             break;
                         case OP_RETURNDATASIZE: // RETURNDATASIZE
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 2);
-                                // TODO: make a way of testing if the return data is set
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                _arith.from_size_t_to_cgbn(length, external_return_data.size());
+                                stack.push(length, error_code);
                             }
                             break;
                         case OP_RETURNDATACOPY: // RETURNDATACOPY
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 3);
-                                // TODO: make a way of testing if the return data is set
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                stack.pop(offset, error_code);
+                                stack.pop(index, error_code);
+                                stack.pop(length, error_code);
+                                dst_offset_s=_arith.from_cgbn_to_size_t(offset);
+                                index_s=_arith.from_cgbn_to_size_t(index);
+                                length_s=_arith.from_cgbn_to_size_t(length);
+                                minimum_word_size=(length_s+31)/32;
+                                _arith.from_size_t_to_cgbn(aux_gas_cost, 3*minimum_word_size);
+                                cgbn_add(_arith._env, gas_cost, gas_cost, aux_gas_cost);
+                                byte_data=external_return_data.get(index_s, length_s, error_code);
+                                memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
                             }
                             break;
                         case OP_BLOCKHASH: // BLOCKHASH
@@ -661,21 +720,40 @@ class evm_t {
                         case OP_SLOAD: // SLOAD
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 0);
-                                // TODO: use the states
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                stack.pop(key, error_code);
+                                write_state.get_value(
+                                    storage_address,
+                                    key,
+                                    value,
+                                    _global_state,
+                                    access_state,
+                                    parents_state,
+                                    gas_cost
+                                );
+                                stack.push(value, error_code);
                             }
                             break;
                         case OP_SSTORE: // SSTORE
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 0);
-                                // TODO: use the states
+                                cgbn_set_ui32(_arith._env, gas_refund, 0);
                                 stack.pop(key, error_code);
                                 stack.pop(value, error_code);
-                                uint32_t tmp_error_code;
-                                write_state.set_local_value(contract_address, key, value);
-                                //error_code=ERR_NOT_IMPLEMENTED;
+                                write_state.set_value(
+                                    storage_address,
+                                    key,
+                                    value,
+                                    _global_state,
+                                    access_state,
+                                    parents_state,
+                                    gas_cost,
+                                    gas_refund
+                                );
+                                cgbn_add(_arith._env, remaining_gas, remaining_gas, gas_refund);
                             }
                             break;
+                        // TODO: for jump verify is PUSHX the jump destination
+                        // needs testing to see if it is correct
                         case OP_JUMP: // JUMP
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 8);
@@ -723,11 +801,9 @@ class evm_t {
                         case OP_GAS: // GAS
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 2);
-                                // TODO: reduce or very the gas before
                                 cgbn_set(_arith._env, value, remaining_gas);
                                 cgbn_sub(_arith._env, value, value, gas_cost);
                                 stack.push(value, error_code);
-                                // stack.push(remaining_gas, error_code);
                             }
                             break;
                         case OP_JUMPDEST: // JUMPDEST
@@ -802,7 +878,7 @@ class evm_t {
                                 length_s=_arith.from_cgbn_to_size_t(length);
                                 call_return_data->offset=offset_s;
                                 call_return_data->size=length_s;
-                                error_code=ERR_NOT_IMPLEMENTED;
+                                error_code=ERR_REVERT;
                             }
                             break;
                         case OP_INVALID: // INVALID
@@ -862,7 +938,7 @@ class evm_t {
         ) {
             instances.msgs=message_t::get_messages(test, instances.count);
             instances.stacks=stack_t::get_stacks(instances.count);
-            instances.return_datas=generate_host_returns(instances.count);
+            instances.return_datas=return_data_t::get_returns(instances.count);
             instances.memories=memory_t::get_memories_info(instances.count);
             instances.access_states=state_t::get_local_states(instances.count);
             instances.parents_write_states=state_t::get_local_states(instances.count);
@@ -897,7 +973,7 @@ class evm_t {
             // stack
             gpu_instances.stacks=stack_t::get_gpu_stacks(cpu_instances.stacks, cpu_instances.count);
             // return data
-            gpu_instances.return_datas=generate_gpu_returns(cpu_instances.return_datas, cpu_instances.count);
+            gpu_instances.return_datas=eturn_data_t::get_gpu_returns(cpu_instances.return_datas, cpu_instances.count);
             // memory
             gpu_instances.memories=memory_t::get_gpu_memories_info(cpu_instances.memories, cpu_instances.count);
             // state
@@ -934,8 +1010,8 @@ class evm_t {
             cpu_instances.stacks=stack_t::get_cpu_stacks_from_gpu(gpu_instances.stacks, cpu_instances.count);
             stack_t::free_gpu_stacks(gpu_instances.stacks, cpu_instances.count);
             // return datas
-            cudaMemcpy(cpu_instances.return_datas, gpu_instances.return_datas, sizeof(return_data_t) * cpu_instances.count, cudaMemcpyDeviceToHost);
-            free_gpu_returns(gpu_instances.return_datas, cpu_instances.count);
+            return_data_t::free_host_returns(cpu_instances.return_datas, cpu_instances.count);
+            cpu_instances.return_datas=return_data_t::get_cpu_returns_from_gpu(gpu_instances.return_datas, cpu_instances.count);
             // memories
             memory_t::free_memories_info(cpu_instances.memories, cpu_instances.count);
             cpu_instances.memories=memory_t::get_memories_from_gpu(gpu_instances.memories, cpu_instances.count);
@@ -969,7 +1045,7 @@ class evm_t {
         ) {
             message_t::free_messages(cpu_instances.msgs, cpu_instances.count);
             stack_t::free_stacks(cpu_instances.stacks, cpu_instances.count);
-            free_host_returns(cpu_instances.return_datas, cpu_instances.count);
+            return_data_t::free_host_returns(cpu_instances.return_datas, cpu_instances.count);
             memory_t::free_memory_data(cpu_instances.memories, cpu_instances.count);
             state_t::free_local_states(cpu_instances.access_states, cpu_instances.count);
             state_t::free_local_states(cpu_instances.parents_write_states, cpu_instances.count);
@@ -1000,7 +1076,8 @@ class evm_t {
                 message.print();
                 stack_t stack(_arith, &(instances.stacks[idx]));
                 stack.print();
-                printf("Return data offset: %lu, size: %lu\n", instances.return_datas[idx].offset, instances.return_datas[idx].size);
+                return_data_t returns(&(instances.return_datas[idx]));
+                returns.print();
                 memory_t memory(_arith, &(instances.memories[idx]));
                 memory.print();
                 state_t access_state(_arith, &(instances.access_states[idx]));
@@ -1027,7 +1104,9 @@ class evm_t {
         ) {
             mpz_t mpz_gas_left;
             mpz_init(mpz_gas_left);
-            char hex_string[67]="0x";
+            #ifdef GAS
+            char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
+            #endif
             cJSON *root = cJSON_CreateObject();
             cJSON_AddItemToObject(root, "pre", _global_state.to_json());
             cJSON_AddItemToObject(root, "env", _current_block.to_json());
@@ -1040,10 +1119,8 @@ class evm_t {
                 cJSON_AddItemToObject(instance_json, "msg", message.to_json());
                 stack_t stack(_arith, &(instances.stacks[idx]));
                 cJSON_AddItemToObject(instance_json, "stack", stack.to_json());
-                cJSON *return_json = cJSON_CreateObject();
-                cJSON_AddItemToObject(instance_json, "return", return_json);
-                cJSON_AddItemToObject(return_json, "offset", cJSON_CreateNumber(instances.return_datas[idx].offset));
-                cJSON_AddItemToObject(return_json, "size", cJSON_CreateNumber(instances.return_datas[idx].size));
+                return_data_t returns(&(instances.return_datas[idx]));
+                cJSON_AddItemToObject(instance_json, "return", returns.to_json());
                 memory_t memory(_arith, &(instances.memories[idx]));
                 cJSON_AddItemToObject(instance_json, "memory", memory.to_json());
                 state_t access_state(_arith, &(instances.access_states[idx]));
@@ -1053,9 +1130,8 @@ class evm_t {
                 state_t write_state(_arith, &(instances.write_states[idx]));
                 cJSON_AddItemToObject(instance_json, "write_state", write_state.to_json());
                 #ifdef GAS
-                to_mpz(mpz_gas_left, instances.gas_left_a[idx]._limbs, params::BITS/32);
-                strcpy(hex_string+2, mpz_get_str(NULL, 16, mpz_stack_value));
-                cJSON_AddItemToObject(instance_json, "gas_left", cJSON_CreateString(hex_string));
+                _arith.from_cgbn_memory_to_hex(instances.gas_left_a[idx], hex_string_ptr);
+                cJSON_AddItemToObject(instance_json, "gas_left", cJSON_CreateString(hex_string_ptr));
                 #endif
                 #ifdef TRACER
                 tracer_t tracer(_arith, &(instances.tracers[idx]));
@@ -1068,6 +1144,9 @@ class evm_t {
                     (instances.errors[idx]==ERR_SUCCESS)
                 ));
             }
+            #ifdef GAS
+            free(hex_string_ptr);
+            #endif
             mpz_clear(mpz_gas_left);
             return root;
         }

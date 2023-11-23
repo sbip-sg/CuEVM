@@ -177,4 +177,24 @@ __host__ cJSON *get_json_from_file(const char *filepath) {
     free(buffer);
     return root;
 }
+
+__host__ __device__ uint8_t *expand_memory(uint8_t *memory, size_t current_size, size_t new_size) {
+    #ifdef __CUDA_ARCH__
+    __shared__ uint8_t *new_memory;
+    #else
+    uint8_t *new_memory;
+    #endif
+    
+    #ifdef __CUDA_ARCH__
+    if (threadIdx.x == 0) {
+    #endif
+        new_memory = (uint8_t *)malloc(new_size);
+        memset(new_memory, 0, new_size);
+        memcpy(new_memory, memory, current_size);
+    #ifdef __CUDA_ARCH__
+    }
+    __syncthreads();
+    #endif
+    return new_memory;
+}
 #endif

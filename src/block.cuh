@@ -249,30 +249,35 @@ class block_t {
 
     
   __host__ __device__ void print() {
-    uint32_t idx=0, jdx=0;
-      printf("BLOCK: \n");
-      printf("COINBASE: ");
-      print_bn<params>(_content->coin_base);
-      printf(", TIMESTAMP: ");
-      print_bn<params>(_content->time_stamp);
-      printf(", NUMBER: ");
-      print_bn<params>(_content->number);
-      printf(", DIFICULTY: ");
-      print_bn<params>(_content->difficulty);
-      printf(", GASLIMIT: ");
-      print_bn<params>(_content->gas_limit);
-      printf(", CHAINID: ");
-      print_bn<params>(_content->chain_id);
-      printf(", BASE_FEE: ");
-      print_bn<params>(_content->base_fee);
-      printf("PREVIOUS_BLOCKS: \n");
-      for(idx=0; idx<256; idx++) {
-        printf("NUMBER: ");
-        print_bn<params>(_content->previous_blocks[idx].number);
-        printf(", HASH: ");
-        print_bn<params>(_content->previous_blocks[idx].hash);
-        printf("\n");
+    uint32_t idx=0;
+    bn_t number;
+    printf("BLOCK: \n");
+    printf("COINBASE: ");
+    print_bn<params>(_content->coin_base);
+    printf(", TIMESTAMP: ");
+    print_bn<params>(_content->time_stamp);
+    printf(", NUMBER: ");
+    print_bn<params>(_content->number);
+    printf(", DIFICULTY: ");
+    print_bn<params>(_content->difficulty);
+    printf(", GASLIMIT: ");
+    print_bn<params>(_content->gas_limit);
+    printf(", CHAINID: ");
+    print_bn<params>(_content->chain_id);
+    printf(", BASE_FEE: ");
+    print_bn<params>(_content->base_fee);
+    printf("PREVIOUS_BLOCKS: \n");
+    for(idx=0; idx<256; idx++) {
+      printf("NUMBER: ");
+      print_bn<params>(_content->previous_blocks[idx].number);
+      printf(", HASH: ");
+      print_bn<params>(_content->previous_blocks[idx].hash);
+      printf("\n");
+      cgbn_load(_arith._env, number, &(_content->previous_blocks[idx].number));
+      if (cgbn_compare_ui32(_arith._env, number, 0) == 0) {
+        break;
       }
+    }
   }
 
 

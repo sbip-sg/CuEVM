@@ -42,4 +42,8 @@
 // execution codes
 #define ERR_INVALID_JUMP_DESTINATION 0x11
 
+// return data errors
+#define ERR_RETURN_DATA_INVALID_SIZE 0x12
+#define ERR_RETURN_DATA_OVERFLOW 0x13
+
 #endif
