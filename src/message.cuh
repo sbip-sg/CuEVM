@@ -201,7 +201,7 @@ class message_t {
       char *bytes_string=NULL;
       
       // set the caller
-      _arith.from_cgbn_memory_to_hex(_content->caller, hex_string_ptr);
+      _arith.from_cgbn_memory_to_hex(_content->caller, hex_string_ptr, 5); //address
       cJSON_AddStringToObject(transaction_json, "sender", hex_string_ptr);
       
       // set the value
@@ -209,7 +209,7 @@ class message_t {
       cJSON_AddStringToObject(transaction_json, "value", hex_string_ptr);
 
       // set the to
-      _arith.from_cgbn_memory_to_hex(_content->to, hex_string_ptr);
+      _arith.from_cgbn_memory_to_hex(_content->to, hex_string_ptr, 5); //address
       cJSON_AddStringToObject(transaction_json, "to", hex_string_ptr);
 
       // set the nonce
@@ -217,7 +217,7 @@ class message_t {
       cJSON_AddStringToObject(transaction_json, "nonce", hex_string_ptr);
 
       // set the tx.origin
-      _arith.from_cgbn_memory_to_hex(_content->tx.origin, hex_string_ptr);
+      _arith.from_cgbn_memory_to_hex(_content->tx.origin, hex_string_ptr, 5); //address
       cJSON_AddStringToObject(transaction_json, "origin", hex_string_ptr);
 
       // set the tx.gasprice

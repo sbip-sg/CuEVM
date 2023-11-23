@@ -286,7 +286,7 @@ class block_t {
 
     block_json=cJSON_CreateObject();
 
-    _arith.from_cgbn_memory_to_hex(_content->coin_base, hex_string_ptr);
+    _arith.from_cgbn_memory_to_hex(_content->coin_base, hex_string_ptr, 5); //address
     cJSON_AddStringToObject(block_json, "currentCoinbase", hex_string_ptr);
     
     _arith.from_cgbn_memory_to_hex(_content->time_stamp, hex_string_ptr);
