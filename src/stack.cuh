@@ -141,6 +141,13 @@ class stack_t {
       (cgbn_compare(_arith._env, a, e) == 0) ) {
         cgbn_set(_arith._env, r, e); // -2^254 / -1 = -2^254
     } else {
+      // div between absolute values
+      if (sign_a == 1) {
+        cgbn_negate(_arith._env, a, a);
+      }
+      if (sign_b == 1) {
+        cgbn_negate(_arith._env, b, b);
+      }
       cgbn_div(_arith._env, r, a, b);
       if (sign) {
         cgbn_negate(_arith._env, r, r);
@@ -170,6 +177,13 @@ class stack_t {
     if (cgbn_compare_ui32(_arith._env, b, 0) == 0)
       cgbn_set_ui32(_arith._env, r, 0);
     else {
+      // mod between absolute values
+      if (sign_a == 1) {
+        cgbn_negate(_arith._env, a, a);
+      }
+      if (sign_b == 1) {
+        cgbn_negate(_arith._env, b, b);
+      }
       cgbn_rem(_arith._env, r, a, b);
       if (sign) {
         cgbn_negate(_arith._env, r, r);
@@ -183,14 +197,18 @@ class stack_t {
     pop(a, error_code);
     pop(b, error_code);
     pop(N, error_code);
-    int32_t carry=cgbn_add(_arith._env, c, a, b);
-    bn_wide_t d;
-    if (carry) {
-      cgbn_set_ui32(_arith._env, d._high, 1);
-      cgbn_set(_arith._env, d._low, c);
-      cgbn_rem_wide(_arith._env, r, d, N);
+    if (cgbn_compare_ui32(_arith._env, N, 0) == 0) {
+      cgbn_set_ui32(_arith._env, r, 0);
     } else {
-      cgbn_rem(_arith._env, r, c, N);
+      int32_t carry=cgbn_add(_arith._env, c, a, b);
+      bn_wide_t d;
+      if (carry == 1) {
+        cgbn_set_ui32(_arith._env, d._high, 1);
+        cgbn_set(_arith._env, d._low, c);
+        cgbn_rem_wide(_arith._env, r, d, N);
+      } else {
+        cgbn_rem(_arith._env, r, c, N);
+      }
     }
     push(r, error_code);
   }
@@ -200,9 +218,13 @@ class stack_t {
     pop(a, error_code);
     pop(b, error_code);
     pop(N, error_code);
-    bn_wide_t d;
-    cgbn_mul_wide(_arith._env, d, a, b);
-    cgbn_rem_wide(_arith._env, r, d, N);
+    if (cgbn_compare_ui32(_arith._env, N, 0) == 0) {
+      cgbn_set_ui32(_arith._env, r, 0);
+    } else {
+      bn_wide_t d;
+      cgbn_mul_wide(_arith._env, d, a, b);
+      cgbn_rem_wide(_arith._env, r, d, N);
+    }
     push(r, error_code);
   }
 
@@ -409,7 +431,7 @@ class stack_t {
       cgbn_set_ui32(_arith._env, r, 0);
     } else {
       uint32_t shift_right = cgbn_get_ui32(_arith._env, shift);
-      cgbn_shift_right(_arith._env, value, value, shift_right);
+      cgbn_shift_right(_arith._env, r, value, shift_right);
     }
     push(r, error_code);
   }
@@ -439,7 +461,7 @@ class stack_t {
     }
     bn_t  r;
     cgbn_set_ui32(_arith._env, r, 0);
-    for(int i=0;i<size;i++) {
+    for(uint32_t i=0;i<size;i++) {
       cgbn_insert_bits_ui32(_arith._env, r, r, i*8, 8, value[size-1-i]);
     }
     push(r, error_code);
@@ -450,12 +472,12 @@ class stack_t {
       error_code=ERR_STACK_UNDERFLOW;
       return NULL;
     }
-    return _content->stack_base + _content->stack_offset - index;
+    return _content->stack_base + (size() - index);
   }
   
 
   __host__ __device__ __forceinline__ void dupx(uint32_t index, uint32_t &error_code) {
-    if (index < 1 || index > 16) {
+    if ( (index < 1) || (index > 16)) {
       error_code=ERR_STACK_INVALID_SIZE;
       return;
     }
@@ -470,7 +492,7 @@ class stack_t {
   
 
   __host__ __device__ __forceinline__ void swapx(uint32_t index, uint32_t &error_code) {
-    if (index < 1 || index > 16) {
+    if ((index < 1) || (index > 16)) {
       error_code=ERR_STACK_INVALID_SIZE;
       return;
     }
@@ -492,18 +514,16 @@ class stack_t {
   *             2 - copy the size without allocation
   */
   __host__ __device__ __forceinline__ void copy_stack_data(stack_data_t *dest, uint32_t copy_type=0) {
-    #ifdef __CUDA_ARCH__
-    __syncthreads();
-    if (threadIdx.x == 0) {
-    #endif
+    ONE_THREAD_PER_INSTANCE(
       if (copy_type == 0) {
         dest->stack_offset = _content->stack_offset;
         memcpy(dest->stack_base, _content->stack_base, sizeof(evm_word_t)*STACK_SIZE);
       } else if (copy_type == 1) {
-        dest->stack_offset = _content->stack_offset;
-        if (dest->stack_base != NULL) {
+        if (dest->stack_offset > 0) {
           free(dest->stack_base);
         }
+        dest->stack_base = NULL;
+        dest->stack_offset = _content->stack_offset;
         if (dest->stack_offset == 0) {
           dest->stack_base = NULL;
         } else {
@@ -514,10 +534,7 @@ class stack_t {
         dest->stack_offset = _content->stack_offset;
         memcpy(dest->stack_base, _content->stack_base, sizeof(evm_word_t)*dest->stack_offset);
       }
-    #ifdef __CUDA_ARCH__
-    }
-    __syncthreads();
-    #endif
+    )
   }
 
   __host__ __device__ void print(bool full=false) {

@@ -42,20 +42,15 @@ class return_data_t {
   }
 
   __host__ __device__ __forceinline__ void set(uint8_t *data, size_t size) {    
-    #ifdef __CUDA_ARCH__
-    if (threadIdx.x == 0) {
-    #endif
-    if (_content->size > 0) {
-      free(_content->data);
-    }
-    if (size > 0) {
-        _content->data = (uint8_t *)malloc(size);
-        memcpy(_content->data, data, size);
-    }
-    #ifdef __CUDA_ARCH__
-    }
-    __syncthreads();
-    #endif
+    ONE_THREAD_PER_INSTANCE(
+      if (_content->size > 0) {
+        free(_content->data);
+      }
+      if (size > 0) {
+          _content->data = (uint8_t *)malloc(size);
+          memcpy(_content->data, data, size);
+      }
+    )
     _content->size = size;
   }
 
@@ -71,7 +66,7 @@ class return_data_t {
 
   __host__ static void free_host_returns(data_content_t *cpu_instances, uint32_t count) {
     for(size_t idx=0; idx<count; idx++) {
-      if (cpu_instances[idx].size > 0) {
+      if ( (cpu_instances[idx].size > 0) && (cpu_instances[idx].data != NULL) ) {
         free(cpu_instances[idx].data);
       }
     }
@@ -116,6 +111,7 @@ class return_data_t {
     
     // 2. call the kernel to copy the memory between the gpu memories
     kernel_get_returns<<<1, count>>>(new_gpu_instances, gpu_instances, count);
+    CUDA_CHECK(cudaDeviceSynchronize());
     cudaFree(gpu_instances);
     gpu_instances=new_gpu_instances;
 

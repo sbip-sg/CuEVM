@@ -115,6 +115,7 @@ class evm_t {
             #endif
             uint32_t            &error
         ) {
+            printf("ajunge run-1\n");
             // return data
             return_data_t returns(call_return_data);
             if (call_msg->depth > MAX_DEPTH) {
@@ -124,42 +125,39 @@ class evm_t {
                 return;
             }
 
+            printf("ajunge run-2\n");
             // stack initiliasation
-            #ifdef __CUDA_ARCH__
-            __shared__ stack_content_data_t       stack_content;
-            #else
-            stack_content_data_t                  stack_content;
-            #endif
-            stack_data_t                          stack_data;
+            SHARED_MEMORY stack_content_data_t       stack_content;
+            stack_data_t                             stack_data;
             stack_data.stack_offset=0;
             stack_data.stack_base=&(stack_content.values[0]);
             stack_t stack(_arith, &stack_data);
 
+            printf("ajunge run-3\n");
             // (heap) memory initiliasation
-            #ifdef __CUDA_ARCH__
-            __shared__ memory_data_t              memory_data;
-            __shared__ uint8_t                    tmp_memory[WORD_BYTES];
-            #else
-            memory_data_t                         memory_data;
-            uint8_t                               tmp_memory[WORD_BYTES];
-            #endif
+            SHARED_MEMORY memory_data_t                         memory_data;
+            SHARED_MEMORY uint8_t                               tmp_memory[WORD_BYTES];
             memory_data.size=0;
             memory_data.alocated_size=0;
             memory_data.data=NULL;
             memory_t memory(_arith, &memory_data);
 
+            printf("ajunge run-4\n");
             // local state initiliasation
             state_t write_state(_arith, call_write_state);
             state_t parents_state(_arith, call_parents_write_state);
             state_t access_state(_arith, call_access_state);
 
+            printf("ajunge run-5\n");
             // msg initiliasation
             message_t msg(_arith, call_msg);
 
+            printf("ajunge run-6\n");
             // tracer initiliasation
             #ifdef TRACER
             tracer_t tracer(_arith, call_tracer);
             #endif
+            printf("ajunge run-7\n");
 
             // evm run internal information
             uint32_t pc;
@@ -168,14 +166,11 @@ class evm_t {
             error_code=ERR_SUCCESS;
 
             // last return data
-            #ifdef __CUDA_ARCH__
-            __shared__ data_content_t last_return_data;
-            #else
-            data_content_t last_return_data;
-            #endif
+            SHARED_MEMORY data_content_t last_return_data;
             last_return_data.data=NULL;
             last_return_data.size=0;
             return_data_t external_return_data(&last_return_data);
+            printf("ajunge run-8\n");
 
             // auxiliary variables
             contract_t *contract, *tmp_contract;
@@ -187,17 +182,27 @@ class evm_t {
             bn_t gas_cost, aux_gas_cost, gas_refund;
             uint8_t *byte_data;
             uint32_t minimum_word_size;
+            
+            printf("ajunge run-9\n");
             msg.get_to(to);
             msg.get_caller(caller);
             bn_t dummy_gas;
             
+            printf("Initial access list 1\n");
+            uint8_t *byte_data2 = new uint8_t[32];
+            printf("Initial access list 2\n");
+            delete[] byte_data2;
+            printf("Initial access list 3\n");
             // add to access list the caller and the contract called
+            printf("Initial access list 1\n");
             contract=write_state.get_account(to, _global_state, access_state, parents_state, dummy_gas, 4); //get the code
+            printf("Initial access list 2\n");
             // TODO: maybe see a way of making the contract local
             cgbn_load(_arith._env, contract_address, &(contract->address));
             cgbn_load(_arith._env, contract_balance, &(contract->balance));
             write_state.get_account(caller, _global_state, access_state, parents_state, dummy_gas, 1); //get the balance
             // TODO: for gas maybe verify if the balance is enough
+            printf("Initial access list 3\n");
 
 
             // depending on the call type take action
@@ -242,13 +247,14 @@ class evm_t {
             {
 
                 opcode=contract->bytecode[pc];
+                printf("pc: %d opcode: %d\n", pc, opcode);
                 #ifdef TRACER
                 trace_pc=pc;
                 #endif
                 if ( ((opcode&0xF0)==0x60) || ((opcode&0xF0)==0x70) ) {
                     // PUSH
                     cgbn_set_ui32(_arith._env, gas_cost, 3);
-                    uint8_t push_size=(opcode&0x0F)+1;
+                    uint8_t push_size=(opcode&0x1F)+1;
                     byte_data=&(contract->bytecode[pc+1]);
                     pc=pc+push_size;
                     stack.pushx(byte_data, push_size, error_code);
@@ -274,6 +280,8 @@ class evm_t {
                                 // only for contracts without code
                                 returns.set(NULL, 0);
                                 pc=pc;
+                                // TODO: maybe modify later
+                                error_code=ERR_RETURN;
                             }
                             break;
                         case OP_ADD: // ADD
@@ -498,14 +506,11 @@ class evm_t {
                                 index_s=_arith.from_cgbn_to_size_t(index);
                                 byte_data=msg.get_data(index_s, 32, size_s);
                                 byte_data=expand_memory(byte_data, size_s, 32);
+                                // TODO: reverse the byte_data
                                 _arith.from_memory_to_cgbn(value, byte_data);
-                                #ifdef __CUDA_ARCH__
-                                if (threadIdx.x==0) {
-                                #endif
-                                free(byte_data);
-                                #ifdef __CUDA_ARCH__
-                                }
-                                #endif
+                                ONE_THREAD_PER_INSTANCE(
+                                    free(byte_data);
+                                )
                                 stack.push(value, error_code);
                             }
                             break;
@@ -538,13 +543,9 @@ class evm_t {
                                 byte_data=msg.get_data(index_s, length_s, size_s);
                                 byte_data=expand_memory(byte_data, size_s, length_s);
                                 memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
-                                #ifdef __CUDA_ARCH__
-                                if (threadIdx.x==0) {
-                                #endif
-                                free(byte_data);
-                                #ifdef __CUDA_ARCH__
-                                }
-                                #endif
+                                ONE_THREAD_PER_INSTANCE(
+                                    free(byte_data);
+                                )
                             }
                             break;
                         case OP_CODESIZE: // CODESIZE
@@ -621,14 +622,9 @@ class evm_t {
                                     byte_data=expand_memory(tmp_contract->bytecode + index_s, tmp_contract->code_size - index_s, length_s);
                                 }
                                 memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
-                                
-                                #ifdef __CUDA_ARCH__
-                                if (threadIdx.x==0) {
-                                #endif
-                                free(byte_data);
-                                #ifdef __CUDA_ARCH__
-                                }
-                                #endif
+                                ONE_THREAD_PER_INSTANCE(
+                                    free(byte_data);
+                                )
                             }
                             break;
                         case OP_RETURNDATASIZE: // RETURNDATASIZE
@@ -728,7 +724,23 @@ class evm_t {
                                 cgbn_set_ui32(_arith._env, gas_cost, 3);
                                 stack.pop(offset, error_code);
                                 offset_s=_arith.from_cgbn_to_size_t(offset);
+                                printf("OFFSET %lu\n", offset_s);
+                                // print the memory
+                                printf("MEMORY MG before: ");
+                                byte_data=memory._content->data;
+                                for (int i=0; i<memory._content->alocated_size; i++) {
+                                    printf("%02x", byte_data[i]);
+                                }
+                                printf("\n");
                                 _arith.from_memory_to_cgbn(value, memory.get(offset_s, 32, gas_cost, error_code));
+                                // print the memory
+                                printf("MEMORY MG: ");
+                                byte_data=memory._content->data;
+                                for (int i=0; i<memory._content->alocated_size; i++) {
+                                    printf("%02x", byte_data[i]);
+                                }
+                                printf("\n");
+
                                 stack.push(value, error_code);
                             }
                             break;
@@ -740,6 +752,13 @@ class evm_t {
                                 stack.pop(value, error_code);
                                 _arith.from_cgbn_to_memory(&(tmp_memory[0]), value);
                                 memory.set(&(tmp_memory[0]), offset_s, 32, gas_cost, error_code);
+                                // print the memory
+                                printf("MEMORY MS: ");
+                                byte_data=memory._content->data;
+                                for (int i=0; i<memory._content->alocated_size; i++) {
+                                    printf("%02x", byte_data[i]);
+                                }
+                                printf("\n");
                             }
                             break;
                         case OP_MSTORE8: // MSTORE8
@@ -750,6 +769,13 @@ class evm_t {
                                 stack.pop(value, error_code);
                                 _arith.from_cgbn_to_memory(&(tmp_memory[0]), value);
                                 memory.set(&(tmp_memory[0]), offset_s, 1, gas_cost, error_code);
+                                // print the memory
+                                printf("MEMORY MS8: ");
+                                byte_data=memory._content->data;
+                                for (int i=0; i<memory._content->alocated_size; i++) {
+                                    printf("%02x", byte_data[i]);
+                                }
+                                printf("\n");
                             }
                             break;
                         case OP_SLOAD: // SLOAD
@@ -774,6 +800,7 @@ class evm_t {
                                 cgbn_set_ui32(_arith._env, gas_refund, 0);
                                 stack.pop(key, error_code);
                                 stack.pop(value, error_code);
+                                printf("ajunge 1\n");
                                 write_state.set_value(
                                     storage_address,
                                     key,
@@ -784,6 +811,7 @@ class evm_t {
                                     gas_cost,
                                     gas_refund
                                 );
+                                printf("ajunge X\n");
                                 cgbn_add(_arith._env, remaining_gas, remaining_gas, gas_refund);
                             }
                             break;
@@ -879,6 +907,8 @@ class evm_t {
                                     #endif
                                     #ifdef TRACER
                                     tracer,
+                                    trace_pc,
+                                    opcode,
                                     #endif
                                     OP_CALL,
                                     error_code
@@ -902,6 +932,8 @@ class evm_t {
                                     #endif
                                     #ifdef TRACER
                                     tracer,
+                                    trace_pc,
+                                    opcode,
                                     #endif
                                     OP_CALLCODE,
                                     error_code
@@ -937,6 +969,8 @@ class evm_t {
                                     #endif
                                     #ifdef TRACER
                                     tracer,
+                                    trace_pc,
+                                    opcode,
                                     #endif
                                     OP_DELEGATECALL,
                                     error_code
@@ -966,6 +1000,8 @@ class evm_t {
                                     #endif
                                     #ifdef TRACER
                                     tracer,
+                                    trace_pc,
+                                    opcode,
                                     #endif
                                     OP_STATICCALL,
                                     error_code
@@ -1003,7 +1039,8 @@ class evm_t {
                     }
                 }
                 #ifdef TRACER
-                tracer.push(contract_address, trace_pc, opcode, &stack);
+                if (opcode!=OP_CALL && opcode!=OP_CALLCODE && opcode!=OP_DELEGATECALL && opcode!=OP_STATICCALL)
+                    tracer.push(contract_address, trace_pc, opcode, &stack);
                 #endif
                 #ifdef GAS
                 if (cgbn_compare(_arith._env, remaining_gas, gas_cost)==-1) {
@@ -1049,31 +1086,22 @@ class evm_t {
             #endif
             #ifdef TRACER
             tracer_t &tracer,
+            uint32_t trace_pc,
+            uint8_t opcode,
             #endif
             uint32_t call_type,
             uint32_t &error_code
         ) {
-            #ifdef __CUDA_ARCH__
-            __shared__ message_content_t *external_call_msg;
-            __shared__ state_data_t *external_call_parents_write_state;
-            __shared__ state_data_t *external_call_write_state;
-            #else
-            state_data_t *external_call_parents_write_state;
-            state_data_t *external_call_write_state;
-            message_content_t *external_call_msg;
-            #endif
+            SHARED_MEMORY state_data_t *external_call_parents_write_state;
+            SHARED_MEMORY state_data_t *external_call_write_state;
+            SHARED_MEMORY message_content_t *external_call_msg;
 
             
-            #ifdef __CUDA_ARCH__
-            if (threadIdx.x==0) {
-            #endif
-            external_call_msg=(message_content_t *) malloc(sizeof(message_content_t));
-            external_call_parents_write_state=(state_data_t *) malloc(sizeof(state_data_t));
-            external_call_write_state=(state_data_t *) malloc(sizeof(state_data_t));
-            #ifdef __CUDA_ARCH__
-            }
-            __syncthreads();
-            #endif
+            ONE_THREAD_PER_INSTANCE(
+                external_call_msg=(message_content_t *) malloc(sizeof(message_content_t));
+                external_call_parents_write_state=(state_data_t *) malloc(sizeof(state_data_t));
+                external_call_write_state=(state_data_t *) malloc(sizeof(state_data_t));
+            )
             // get the values from the stack
             bn_t gas;
             bn_t to;
@@ -1086,6 +1114,7 @@ class evm_t {
             bn_t dummy_gas_cost;
             bn_t gas_cost;
             bn_t capped_gas;
+            bn_t return_value;
             cgbn_set_ui32(_arith._env, gas_cost, 0);
             stack.pop(gas, error_code);
             #ifdef GAS
@@ -1098,6 +1127,7 @@ class evm_t {
             #endif
             stack.pop(to, error_code);
             // make the cost for accesing the state
+            printf("ajunge call- 1\n");
             contract_t *contract=write_state.get_account(
                 to,
                 _global_state,
@@ -1106,6 +1136,7 @@ class evm_t {
                 gas_cost,
                 4 //code
             );
+            printf("ajunge call- 2\n");
             if (call_type==OP_CALL) {
                 stack.pop(value, error_code);
                 cgbn_set(_arith._env, caller, contract_address);
@@ -1152,7 +1183,8 @@ class evm_t {
                 // TODO: something with fallback function refund 2300
             }
 
-
+            
+            printf("ajunge call- 3\n");
             write_state.get_account_nonce(
                 caller,
                 nonce,
@@ -1161,6 +1193,8 @@ class evm_t {
                 parents_state,
                 dummy_gas_cost
             );
+            
+            printf("ajunge call- 4\n");
             msg.get_tx_origin(tx_origin);
             msg.get_tx_gasprice(tx_gasprice);
             // setup the message
@@ -1204,12 +1238,17 @@ class evm_t {
             uint32_t external_error_code;
             // gas left
             #ifdef GAS
-            emv_word_t call_gas_left;
+            evm_word_t call_gas_left;
             cgbn_set_ui32(_arith._env, gas, 0);
             cgbn_store(_arith._env, &call_gas_left, gas);
             #endif
             
-
+            
+            printf("ajunge call- 5\n");
+            #ifdef TRACER
+            tracer.push(contract_address, trace_pc, opcode, &stack);
+            #endif
+            printf("ajunge call- 6\n");
             // make the call TODO: look on gas
             run(
                 external_call_msg,
@@ -1227,11 +1266,32 @@ class evm_t {
                 #endif
                 external_error_code
             );
+            printf("ajunge call- 7\n");
             // TODO: maybe here an erorr if size is less than return data size
             uint32_t tmp_error_code;
+            printf("MEMORY BFR: ");
+            byte_data=memory._content->data;
+            for (int i=0; i<memory._content->alocated_size; i++) {
+                printf("%02x", byte_data[i]);
+            }
+            printf("\n");
+            // priunt the return data
+            printf("MEMORY RETURNS: ");
+            byte_data=returns._content->data;
+            for (int i=0; i<returns._content->size; i++) {
+                printf("%02x", byte_data[i]);
+            }
+            printf("\n");
             byte_data=returns.get(0, returns.size(), tmp_error_code);
-            byte_data=expand_memory(byte_data, length_s, length_s);
+            byte_data=expand_memory(byte_data, returns.size(), length_s);
+            uint8_t *tmp_memory=byte_data;
             memory.set(byte_data, offset_s, length_s, gas_cost, error_code);
+            printf("MEMORY AFR: ");
+            byte_data=memory._content->data;
+            for (int i=0; i<memory._content->alocated_size; i++) {
+                printf("%02x", byte_data[i]);
+            }
+            printf("\n");
             
             #ifdef GAS
             cgbn_load(_arith._env, gas, &call_gas_left);
@@ -1243,22 +1303,31 @@ class evm_t {
             if (external_error_code==ERR_NONE || external_error_code==ERR_RETURN) {
                 state_t external_write_state(_arith, external_call_write_state);
                 // save the state
+                printf("ajunge z\n");
                 write_state.copy_from_state_t(external_write_state);
+                cgbn_set_ui32(_arith._env, return_value, 1);
+            } else {
+                cgbn_set_ui32(_arith._env, return_value, 0);
             }
+            stack.push(return_value, error_code);
+            #ifdef TRACER
+            // modify the stack with curret stack
+            tracer.modify_last_stack(&stack);
+            #endif
 
             
-            #ifdef __CUDA_ARCH__
-            if (threadIdx.x==0) {
-            #endif
-            free(byte_data);
+            ONE_THREAD_PER_INSTANCE(
+                free(tmp_memory);
+            )
+            printf("ajunge a\n");
             message_t external_msg(_arith, external_call_msg);
             external_msg.free_memory();
+            printf("ajunge b\n");
             state_t::free_instance(external_call_parents_write_state);
+            printf("ajunge b\n");
             state_t::free_instance(external_call_write_state);
+            printf("ajunge b\n");
             // TODO: free the other allocated memory
-            #ifdef __CUDA_ARCH__
-            }
-            #endif
         }
 
         __host__ static void get_instances(
@@ -1277,7 +1346,7 @@ class evm_t {
             instances.world_state=state_t::get_global_state(test);
             instances.block=block_t::get_instance(test);
             #ifdef GAS
-            instances.gas_left_a= (emv_word_t *) malloc(sizeof(emv_word_t) * instances.count);
+            instances.gas_left_a= (evm_word_t *) malloc(sizeof(evm_word_t) * instances.count);
             // TODO: maybe it works with memset
             for(size_t idx=0; idx<instances.count; idx++) {
                 for(size_t jdx=0; jdx<params::BITS/32; jdx++) {
@@ -1317,8 +1386,8 @@ class evm_t {
             gpu_instances.world_state=state_t::from_cpu_to_gpu(cpu_instances.world_state);
             //state_t::free_instance(cpu_world_state);
             #ifdef GAS
-            cudaMalloc((void **)&gpu_instances.gas_left_a, sizeof(emv_word_t) * cpu_instances.count);
-            cudaMemcpy(gpu_instances.gas_left_a, cpu_instances.cpu_gas_left_a, sizeof(emv_word_t) * cpu_instances.count, cudaMemcpyHostToDevice);
+            cudaMalloc((void **)&gpu_instances.gas_left_a, sizeof(evm_word_t) * cpu_instances.count);
+            cudaMemcpy(gpu_instances.gas_left_a, cpu_instances.cpu_gas_left_a, sizeof(evm_word_t) * cpu_instances.count, cudaMemcpyHostToDevice);
             #endif
             #ifdef TRACER
             gpu_instances.tracers=tracer_t::get_gpu_tracers(cpu_instances.tracers, cpu_instances.count);
@@ -1333,40 +1402,54 @@ class evm_t {
             evm_instances_t &gpu_instances
         ) {
             // msgs
+            printf("ajunge 1\n");
             message_t::free_gpu_messages(gpu_instances.msgs, cpu_instances.count);
             // stacks
+            printf("ajunge 2\n");
             stack_t::free_stacks(cpu_instances.stacks, cpu_instances.count);
             cpu_instances.stacks=stack_t::get_cpu_stacks_from_gpu(gpu_instances.stacks, cpu_instances.count);
             stack_t::free_gpu_stacks(gpu_instances.stacks, cpu_instances.count);
             // return datas
+            printf("ajunge 3\n");
             return_data_t::free_host_returns(cpu_instances.return_datas, cpu_instances.count);
             cpu_instances.return_datas=return_data_t::get_cpu_returns_from_gpu(gpu_instances.return_datas, cpu_instances.count);
             // memories
+            printf("ajunge 4\n");
             memory_t::free_memories_info(cpu_instances.memories, cpu_instances.count);
             cpu_instances.memories=memory_t::get_memories_from_gpu(gpu_instances.memories, cpu_instances.count);
             // states
+            printf("ajunge 5\n");
             state_t::free_local_states(cpu_instances.access_states, cpu_instances.count);
             cpu_instances.access_states=state_t::get_local_states_from_gpu(gpu_instances.access_states, cpu_instances.count);
+            printf("ajunge 6\n");
             state_t::free_local_states(cpu_instances.parents_write_states, cpu_instances.count);
             cpu_instances.parents_write_states=state_t::get_local_states_from_gpu(gpu_instances.parents_write_states, cpu_instances.count);
+            printf("ajunge 7\n");
             state_t::free_local_states(cpu_instances.write_states, cpu_instances.count);
-            cpu_instances.write_states=state_t::get_local_states_from_gpu(gpu_instances.write_states, cpu_instances.count);
+            //cpu_instances.write_states=state_t::get_local_states_from_gpu(gpu_instances.write_states, cpu_instances.count);
+            printf("ajunge 8\n");
             // keccak
             keccak_t::free_gpu_instances(gpu_instances.sha3_parameters, cpu_instances.count);
+            printf("ajunge 9\n");
             // block
             block_t::free_gpu(gpu_instances.block);
+            printf("ajunge 10\n");
             // world state
             state_t::free_gpu_memory(gpu_instances.world_state);
+            printf("ajunge 11\n");
             #ifdef GAS
             cudaMemcpy(cpu_instances.gas_left_a, gpu_instances.gas_left_a, sizeof(evm_word_t) * cpu_instances.count, cudaMemcpyDeviceToHost);
             cudaFree(gpu_instances.gas_left_a);
             #endif
+            printf("ajunge 12\n");
             #ifdef TRACER
             tracer_t::free_tracers(cpu_instances.tracers, cpu_instances.count);
-            cpu_instances.tracers=tracer_t::get_cpu_tracers_from_gpu(gpu_instances.tracers, cpu_instances.count);
+            //cpu_instances.tracers=tracer_t::get_cpu_tracers_from_gpu(gpu_instances.tracers, cpu_instances.count);
             #endif
+            printf("ajunge 13\n");
             cudaMemcpy(cpu_instances.errors, gpu_instances.errors, sizeof(uint32_t) * cpu_instances.count, cudaMemcpyDeviceToHost);
             cudaFree(gpu_instances.errors);
+            printf("ajunge 14\n");
         }
 
         __host__ static void free_instances(
@@ -1378,7 +1461,7 @@ class evm_t {
             memory_t::free_memory_data(cpu_instances.memories, cpu_instances.count);
             state_t::free_local_states(cpu_instances.access_states, cpu_instances.count);
             state_t::free_local_states(cpu_instances.parents_write_states, cpu_instances.count);
-            state_t::free_local_states(cpu_instances.write_states, cpu_instances.count);
+            //state_t::free_local_states(cpu_instances.write_states, cpu_instances.count);
             keccak_t::free_cpu_instances(cpu_instances.sha3_parameters, cpu_instances.count);
             block_t::free_instance(cpu_instances.block);
             state_t::free_instance(cpu_instances.world_state);
@@ -1386,7 +1469,7 @@ class evm_t {
             free(cpu_instances.gas_left_a);
             #endif
             #ifdef TRACER
-            tracer_t::free_tracers(cpu_instances.tracers, cpu_instances.count);
+            //tracer_t::free_tracers(cpu_instances.tracers, cpu_instances.count);
             #endif
             free(cpu_instances.errors);
         }
@@ -1413,16 +1496,16 @@ class evm_t {
                 access_state.print();
                 state_t parents_state(_arith, &(instances.parents_write_states[idx]));
                 parents_state.print();
-                state_t write_state(_arith, &(instances.write_states[idx]));
-                write_state.print();
+                //state_t write_state(_arith, &(instances.write_states[idx]));
+                //write_state.print();
                 #ifdef GAS
                 printf("Gas left: ");
                 print_bn<params>(instances.gas_left_a[idx]);
                 printf("\n");
                 #endif
                 #ifdef TRACER
-                tracer_t tracer(_arith, &(instances.tracers[idx]));
-                tracer.print();
+                //tracer_t tracer(_arith, &(instances.tracers[idx]));
+                //tracer.print();
                 #endif
                 printf("Error: %u\n", instances.errors[idx]);
             }
@@ -1456,15 +1539,15 @@ class evm_t {
                 cJSON_AddItemToObject(instance_json, "access_state", access_state.to_json());
                 state_t parents_state(_arith, &(instances.parents_write_states[idx]));
                 cJSON_AddItemToObject(instance_json, "parents_state", parents_state.to_json());
-                state_t write_state(_arith, &(instances.write_states[idx]));
-                cJSON_AddItemToObject(instance_json, "write_state", write_state.to_json());
+                //state_t write_state(_arith, &(instances.write_states[idx]));
+                //cJSON_AddItemToObject(instance_json, "write_state", write_state.to_json());
                 #ifdef GAS
                 _arith.from_cgbn_memory_to_hex(instances.gas_left_a[idx], hex_string_ptr);
                 cJSON_AddItemToObject(instance_json, "gas_left", cJSON_CreateString(hex_string_ptr));
                 #endif
                 #ifdef TRACER
-                tracer_t tracer(_arith, &(instances.tracers[idx]));
-                cJSON_AddItemToObject(instance_json, "traces", tracer.to_json());
+                //tracer_t tracer(_arith, &(instances.tracers[idx]));
+                //cJSON_AddItemToObject(instance_json, "traces", tracer.to_json());
                 #endif
                 cJSON_AddItemToObject(instance_json, "error", cJSON_CreateNumber(instances.errors[idx]));
                 cJSON_AddItemToObject(instance_json, "success", cJSON_CreateBool(
@@ -1493,6 +1576,16 @@ __global__ void kernel_evm(cgbn_error_report_t *report, typename evm_t<params>::
   typedef typename arith_t::bn_t  bn_t;
   typedef evm_t<params> evm_t;
   
+  
+    printf("Initial access list 1\n");
+    uint8_t *byte_data2 = (uint8_t *)__nv_aligned_device_malloc(32*sizeof(uint8_t), 32);
+    if (byte_data2==NULL) {
+        printf("Error allocating memory\n");
+        return;
+    }
+    printf("Initial access list 2\n");
+    free(byte_data2);
+    printf("Initial access list 3\n");
   // setup evm
   evm_t evm(cgbn_report_monitor, report, instance, &(instances->sha3_parameters[instance]), instances->block, instances->world_state);
 

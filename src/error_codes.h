@@ -49,4 +49,7 @@
 // static call error
 #define ERR_STATIC_CALL_CONTEXT 0x14
 
+// gas
+#define ERR_OUT_OF_GAS 0x15
+
 #endif

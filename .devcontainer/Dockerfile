@@ -19,3 +19,7 @@ RUN apt-get install -y curl zip unzip git wget
 RUN apt-get install -y libgmp-dev
 # install cjson
 RUN apt-get install -y libcjson1 libcjson-dev
+# isntall rustup for REVMI
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o sh.rustup.rs && sh sh.rustup.rs -y && rm sh.rustup.rs
+# isntall clang
+RUN apt-get install libclang-dev -y

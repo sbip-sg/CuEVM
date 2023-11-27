@@ -13,9 +13,9 @@
 				"GitHub.vscode-pull-request-github",
 				"GitHub.copilot",
 				"ms-vscode.makefile-tools",
-				//"ms-vscode.cpptools",
 				"NVIDIA.nsight-vscode-edition",
-				"ms-vscode.cpptools-extension-pack"
+				"ms-vscode.cpptools-extension-pack",
+				"ccimage.jsonviewer"
 			]
 		}
 	}//,

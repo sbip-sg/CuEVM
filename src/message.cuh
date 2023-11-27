@@ -49,16 +49,12 @@ class message_t {
     }
 
     __host__ __device__ void free_memory() {
-      #ifdef __CUDA_ARCH__
-      if (threadIdx.x == 0) {
-      #endif
+      ONE_THREAD_PER_INSTANCE(
         if (_content->data.size > 0) {
           free(_content->data.data);
         }
         free(_content);
-      #ifdef __CUDA_ARCH__
-      }
-      #endif
+      )
     }
 
     __host__ __device__ __forceinline__ void get_caller(bn_t &caller) {
@@ -107,7 +103,21 @@ class message_t {
 
     __host__ __device__ __forceinline__ uint8_t *get_data(size_t index, size_t length, size_t &available_size) {
       available_size = length;
-      if (index + length <= _content->data.size) {
+      size_t last_offset = index + length;
+      // verify for overflow
+      // TODO: verify also in evm in opcode if the value is larger than size_t
+      if ( (last_offset < index) || (last_offset < length)) {
+        if (index < _content->data.size) {
+          available_size = _content->data.size - index;
+          return _content->data.data + index;
+        } else {
+          available_size = 0;
+          return _content->data.data;
+        }
+      } else if (index >= _content->data.size) {
+        available_size = 0;
+        return _content->data.data;
+      } else if (index + length <= _content->data.size) {
         return _content->data.data + index;
       } else if (index < _content->data.size) {
         available_size = _content->data.size - index;
@@ -123,8 +133,8 @@ class message_t {
       tmp_cpu_content = (message_content_t *)malloc(sizeof(message_content_t));
       memcpy(tmp_cpu_content, _content, sizeof(message_content_t));
       if (tmp_cpu_content->data.size > 0) {
-        tmp_cpu_content->data.data = (uint8_t *)malloc(sizeof(uint8_t)*tmp_cpu_content->data.size);
-        memcpy(tmp_cpu_content->data.data, _content->data.data, sizeof(uint8_t)*tmp_cpu_content->data.size);
+        cudaMalloc((void **)&(tmp_cpu_content->data.data), sizeof(uint8_t)*tmp_cpu_content->data.size);
+        cudaMemcpy(tmp_cpu_content->data.data, _content->data.data, sizeof(uint8_t)*tmp_cpu_content->data.size, cudaMemcpyHostToDevice);
       } else {
         tmp_cpu_content->data.data = NULL;
       }
@@ -358,7 +368,7 @@ class message_t {
       cudaMemcpy(tmp_cpu_messages, gpu_messages, count*sizeof(message_content_t), cudaMemcpyDeviceToHost);
 
       for(size_t idx=0; idx<count; idx++) {
-        if (tmp_cpu_messages[idx].data.size > 0) {
+        if ( (tmp_cpu_messages[idx].data.size > 0) && (tmp_cpu_messages[idx].data.data != NULL) ) {
           cudaFree(tmp_cpu_messages[idx].data.data);
         }
       }

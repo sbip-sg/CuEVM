@@ -46,35 +46,24 @@ class memory_t {
       return;
     }
     size_t no_pages = (new_size / PAGE_SIZE) + 1;
-    #ifdef __CUDA_ARCH__
-    __syncthreads();
-    if (threadIdx.x == 0) {
-    #endif
-      uint8_t *new_data = (uint8_t *)malloc(no_pages * PAGE_SIZE);
-      /*
-      printf("new_data=%p\n", new_data);
-      printf("new_size=%lx\n", new_size);
-      printf("no_pages=%lx\n", no_pages);
-      printf("PAGE_SIZE=%lx\n", PAGE_SIZE);
-      printf("new alloc size=%lx\n", no_pages * PAGE_SIZE);
-      printf("old data=%p\n", _content->data);
-      printf("old size=%lx\n", _content->size);
-      printf("old alloc size=%lx\n", _content->alocated_size);
-      */
+    SHARED_MEMORY uint8_t *new_data;
+    ONE_THREAD_PER_INSTANCE(
+      new_data = (uint8_t *)malloc(no_pages * PAGE_SIZE);
       if (new_data == NULL) {
         error_code = ERR_MEMORY_INVALID_ALLOCATION;
         return;
       }
       // 0 all the data
       memset(new_data, 0, no_pages * PAGE_SIZE);
-      memcpy(new_data, _content->data, _content->size);
+      if ( (_content->alocated_size > 0) && (_content->data != NULL)) {
+        memcpy(new_data, _content->data, _content->size);
+        free(_content->data);
+        _content->data = NULL;
+        _content->alocated_size = 0;
+      }
       _content->alocated_size = no_pages * PAGE_SIZE;
-      free(_content->data);
       _content->data = new_data;
-    #ifdef __CUDA_ARCH__
-    }
-    __syncthreads();
-    #endif
+    )
   }
 
   __host__ __device__ __forceinline__ void grow_cost(size_t &new_size, bn_t &gas_cost) {
@@ -91,12 +80,12 @@ class memory_t {
   }
 
   __host__ __device__ __forceinline__ void grow(size_t offset, bn_t &gas_cost, uint32_t &error_code) {
-    if (offset > _content->alocated_size) {
-      allocate_pages(offset, error_code);
-    }
     if (offset > _content->size) {
       grow_cost(offset, gas_cost);
       _content->size = offset;
+    }
+    if (offset > _content->alocated_size) {
+      allocate_pages(offset, error_code);
     }
   }
 
@@ -109,30 +98,19 @@ class memory_t {
   //set the data of the memory at a specific index and length
   __host__ __device__ __forceinline__ void set(uint8_t *data, size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
     grow(index + length, gas_cost, error_code);
-    #ifdef __CUDA_ARCH__
-    if (threadIdx.x == 0) {
-    #endif
+    ONE_THREAD_PER_INSTANCE(
       memcpy(_content->data + index, data, length);
-    #ifdef __CUDA_ARCH__
-    }
-    __syncthreads();
-    #endif
+    )
   }
 
 
   // copy the data information
   __host__ __device__ __forceinline__ void copy_info(memory_data_t *dest) {
-    #ifdef __CUDA_ARCH__
-    __syncthreads();
-    if (threadIdx.x == 0) {
-    #endif
+    ONE_THREAD_PER_INSTANCE(
       dest->alocated_size = _content->alocated_size;
       dest->size = _content->size;
       dest->data = _content->data;
-    #ifdef __CUDA_ARCH__
-    }
-    __syncthreads();
-    #endif
+    )
   }
 
   // copy content to another memory
@@ -155,16 +133,10 @@ class memory_t {
   }
 
   __device__ __forceinline__ void free_memory() {
-    #ifdef __CUDA_ARCH__
-    __syncthreads();
-    if (threadIdx.x == 0) {
-    #endif
-      if(_content->alocated_size>0)
+    ONE_THREAD_PER_INSTANCE(
+      if(_content->alocated_size>0 && _content->data!=NULL)
         free(_content->data);
-    #ifdef __CUDA_ARCH__
-    }
-    __syncthreads();
-    #endif
+    )
     _content->alocated_size = 0;
     _content->size = 0;
     _content->data = NULL;
@@ -201,8 +173,11 @@ class memory_t {
   //free the memory content structure on the device from the info from gpu
   __host__ static void free_memory_data(memory_data_t *cpu_memories, uint32_t count) {
     for (uint32_t idx = 0; idx < count; idx++) {
-      if(cpu_memories[idx].data!=NULL)
+      if( (cpu_memories[idx].data!=NULL) && (cpu_memories[idx].alocated_size>0)) {
         free(cpu_memories[idx].data);
+        cpu_memories[idx].data=NULL;
+        cpu_memories[idx].alocated_size=0;
+      }
     }
     free(cpu_memories);
   }
@@ -230,6 +205,7 @@ class memory_t {
 
     // 2. call the kernel to copy the memory between the gpu memories
     kernel_get_memory<params><<<1, count>>>(new_gpu_memories, gpu_memories, count);
+    CUDA_CHECK(cudaDeviceSynchronize());
     cudaFree(gpu_memories);
     gpu_memories=new_gpu_memories;
 
@@ -297,19 +273,8 @@ __global__ void kernel_get_memory(typename memory_t<params>::memory_data_t *dst_
 
   // setup arithmetic
   arith_t arith(cgbn_report_monitor);
-  /*
-  printf("GET size=%lu\n", src_instances[instance].size);
-  printf("GET data address=%p\n", src_instances[instance].data);
-  printf("GET lowestbit=%02x\n", src_instances[instance].data[31]);
-  */
   memory_t  memory(arith, &(src_instances[instance]));
   memory.copy_content(&(dst_instances[instance]));
-  /*
-  printf("GET data address=%p\n", memory._content->data);
-  printf("GET lowestbit=%02x\n", memory._content->data[31]);
-  printf("GET D data address=%p\n", dst_instances[instance].data);
-  printf("GET D lowestbit=%02x\n", dst_instances[instance].data[31]);
-  */
   memory.free_memory();
 }
 

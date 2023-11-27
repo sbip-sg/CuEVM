@@ -40,6 +40,19 @@ IN THE SOFTWARE.
 #include "error_codes.h"
 #include "arith.cuh"
 
+#ifdef __CUDA_ARCH__
+#ifndef MULTIPLE_THREADS_PER_INSTANCE
+#define MULTIPLE_THREADS_PER_INSTANCE
+#endif
+#endif
+#ifdef MULTIPLE_THREADS_PER_INSTANCE
+#define ONE_THREAD_PER_INSTANCE(X) if (threadIdx.x == 0) { X } __syncthreads();
+#define SHARED_MEMORY __shared__
+#else
+#define ONE_THREAD_PER_INSTANCE(X) X
+#define SHARED_MEMORY
+#endif
+
 __host__ size_t adjusted_length(char** hex_string) {
     if (strncmp(*hex_string, "0x", 2) == 0 || strncmp(*hex_string, "0X", 2) == 0) {
         *hex_string += 2;  // Skip the "0x" prefix
@@ -187,26 +200,17 @@ __host__ cJSON *get_json_from_file(const char *filepath) {
 }
 
 __host__ __device__ uint8_t *expand_memory(uint8_t *memory, size_t current_size, size_t new_size) {
-    #ifdef __CUDA_ARCH__
-    __shared__ uint8_t *new_memory;
-    #else
-    uint8_t *new_memory;
-    #endif
-    
-    #ifdef __CUDA_ARCH__
-    if (threadIdx.x == 0) {
-    #endif
-        new_memory = (uint8_t *)malloc(new_size);
-        memset(new_memory, 0, new_size);
-        if ((memory != NULL) && (current_size > 0))
-          if (current_size > new_size)
-            memcpy(new_memory, memory, new_size);
-          else
-            memcpy(new_memory, memory, current_size);
-    #ifdef __CUDA_ARCH__
-    }
-    __syncthreads();
-    #endif
-    return new_memory;
+  SHARED_MEMORY uint8_t *new_memory;
+
+  ONE_THREAD_PER_INSTANCE(
+    new_memory = (uint8_t *)malloc(new_size);
+    memset(new_memory, 0, new_size);
+    if ((memory != NULL) && (current_size > 0))
+      if (current_size > new_size)
+        memcpy(new_memory, memory, new_size);
+      else
+        memcpy(new_memory, memory, current_size);
+  )
+  return new_memory;
 }
 #endif

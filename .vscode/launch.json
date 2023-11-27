@@ -8,7 +8,8 @@
             "name": "CUDA C++: Launch",
             "type": "cuda-gdb",
             "request": "launch",
-            "program": "${workspaceFolder}/out/test_stack"
+            "program": "${workspaceFolder}/out/interpreter",
+            "args": "--input ${workspaceFolder}/input/evm_test.json --output ${workspaceFolder}/output/evm_test.json",
         },
         {
             "name": "CUDA C++: Attach",

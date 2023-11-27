@@ -40,6 +40,13 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     // create a cgbn_error_report for CGBN to report back errors
     #ifndef ONLY_CPU
     CUDA_CHECK(cgbn_error_report_alloc(&report)); 
+    size_t heap_size;
+    cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024*1024*1024));
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
+    printf("Heap size: %zu\n", heap_size);
+    cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
+    printf("Heap size: %zu\n", heap_size);
     #endif
 
     // evm
@@ -49,7 +56,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     #ifndef ONLY_CPU
     printf("Running GPU kernel ...\n");
     kernel_evm<params><<<cpu_instances.count, params::TPI>>>(report, gpu_instances);
-
+    //CUDA_CHECK(cudaPeekAtLastError());
     // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
     CUDA_CHECK(cudaDeviceSynchronize());
     printf("GPU kernel finished\n");

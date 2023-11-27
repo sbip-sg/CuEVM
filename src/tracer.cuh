@@ -35,21 +35,19 @@ class tracer_t {
     }
 
     __host__ __device__ __forceinline__ void grow() {
-        _content->capacity += PAGE_SIZE;
-        #ifdef __CUDA_ARCH__
-        __syncthreads();
-        if (threadIdx.x == 0) {
-        #endif
-            tracer_data_t *new_data = (tracer_data_t *)malloc(sizeof(tracer_data_t) * _content->capacity);
+        ONE_THREAD_PER_INSTANCE(
+            tracer_data_t *new_data = (tracer_data_t *)malloc(sizeof(tracer_data_t) * (_content->capacity + PAGE_SIZE) );
             memcpy(new_data, _content->data, sizeof(tracer_data_t) * _content->size);
-            if (_content->data != NULL) {
+            if ( (_content->data != NULL) && (_content->capacity > 0) ) {
                 free(_content->data);
             }
+            _content->capacity += PAGE_SIZE;
+            for (size_t idx=_content->size; idx<_content->capacity; idx++) {
+                new_data[idx].stack.stack_base = NULL;
+                new_data[idx].stack.stack_offset = 0;
+            }
             _content->data = new_data;
-        #ifdef __CUDA_ARCH__
-        }
-        __syncthreads();
-        #endif
+        )
     }
 
     __host__ __device__ __forceinline__ void push(bn_t &address, uint32_t pc, uint8_t opcode, stack_t *stack) {
@@ -61,6 +59,10 @@ class tracer_t {
         _content->data[_content->size].opcode = opcode;
         stack->copy_stack_data(&_content->data[_content->size].stack, 1);
         _content->size++;
+    }
+
+    __host__ __device__ __forceinline__ void modify_last_stack(stack_t *stack) {
+        stack->copy_stack_data(&_content->data[_content->size-1].stack, 1);
     }
 
     __host__ __device__ void print() {
@@ -84,8 +86,8 @@ class tracer_t {
             cJSON_AddStringToObject(item, "address", hex_string_ptr);
             cJSON_AddNumberToObject(item, "pc", _content->data[idx].pc);
             cJSON_AddNumberToObject(item, "opcode", _content->data[idx].opcode);
-            stack_t local_stack(_arith, &_content->data[idx].stack);
-            cJSON_AddItemToObject(item, "stack", local_stack.to_json());
+            //stack_t local_stack(_arith, &_content->data[idx].stack);
+            //cJSON_AddItemToObject(item, "stack", local_stack.to_json());
             cJSON_AddItemToArray(tracer_json, item);
         }
         free(hex_string_ptr);
@@ -111,9 +113,9 @@ class tracer_t {
 
     __host__ static void free_tracers(tracer_content_t *cpu_tracers, uint32_t count) {
         for(uint32_t idx=0; idx<count; idx++) {
-            if (cpu_tracers[idx].data != NULL) {
+            if ( (cpu_tracers[idx].data != NULL) && (cpu_tracers[idx].size > 0) ) {
                 for (size_t jdx=0; jdx<cpu_tracers[idx].size; jdx++) {
-                    if (cpu_tracers[idx].data[jdx].stack.stack_base != NULL) {
+                    if ( (cpu_tracers[idx].data[jdx].stack.stack_base != NULL) && (cpu_tracers[idx].data[jdx].stack.stack_offset > 0) ) {
                         free(cpu_tracers[idx].data[jdx].stack.stack_base);
                     }
                 }
@@ -168,6 +170,7 @@ class tracer_t {
         free(tmp_cpu_tracers);
         // STATE 1.3 call the kernel
         kernel_get_tracers_S1<params><<<1, count>>>(new_gpu_tracers, gpu_tracers, count);
+        CUDA_CHECK(cudaDeviceSynchronize());
         // STATE 1.4 free unnecasry memory
         cudaFree(gpu_tracers);
         gpu_tracers = new_gpu_tracers;
@@ -199,6 +202,7 @@ class tracer_t {
         free(tmp_cpu_tracers);
         // STATE 2.3 call the kernel
         kernel_get_tracers_S2<params><<<1, count>>>(new_gpu_tracers, gpu_tracers, count);
+        CUDA_CHECK(cudaDeviceSynchronize());
         // STATE 2.4 free unnecasry memory
         for (size_t idx=0; idx<count; idx++) {
             if (cpu_tracers[idx].data != NULL) {
