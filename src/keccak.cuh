@@ -35,7 +35,7 @@ namespace keccak {
 
         static const uint32_t KECCAK_ROUNDS = 24;
 
-        typedef struct
+        typedef struct alignas(32)
         {
             union
             {                   // state:
@@ -250,6 +250,7 @@ namespace keccak {
             uint64_t *rndc;
             int *rotc;
             int *piln;
+            sha3_ctx_t *state;
             cudaMalloc((void **)&rndc, sizeof(uint64_t) * 24);
             cudaMalloc((void **)&rotc, sizeof(int) * 24);
             cudaMalloc((void **)&piln, sizeof(int) * 24);
@@ -260,9 +261,19 @@ namespace keccak {
                 tmp_cpu_instances[idx].rndc = rndc;
                 tmp_cpu_instances[idx].rotc = rotc;
                 tmp_cpu_instances[idx].piln = piln;
-                cudaMalloc((void **)&tmp_cpu_instances[idx].state, sizeof(sha3_ctx_t));
+                cudaMalloc((void **)&(state), sizeof(sha3_ctx_t));
+                tmp_cpu_instances[idx].state = state;
+                printf("allocating %d pointer:%p\n", idx, tmp_cpu_instances[idx].state);
             }
-            cudaMemcpy(gpu_instances, tmp_cpu_instances, sizeof(sha3_parameters_t), cudaMemcpyHostToDevice);
+            // print the instances
+            for (uint32_t idx = 0; idx < count; idx++) {
+                printf("allocating %d pointer:%p\n", idx, tmp_cpu_instances[idx].state);
+                printf("sha3_parameters->piln: %p\n", tmp_cpu_instances[idx].piln);
+                printf("sha3_parameters->rotc: %p\n", tmp_cpu_instances[idx].rotc);
+                printf("sha3_parameters->rndc: %p\n", tmp_cpu_instances[idx].rndc);
+
+            }
+            cudaMemcpy(gpu_instances, tmp_cpu_instances, sizeof(sha3_parameters_t) * count, cudaMemcpyHostToDevice);
             free(tmp_cpu_instances);
             return gpu_instances;
         }
@@ -270,12 +281,12 @@ namespace keccak {
         __host__ static void free_gpu_instances(sha3_parameters_t *gpu_instance, uint32_t count) {
             sha3_parameters_t *tmp_cpu_instances;
             tmp_cpu_instances = (sha3_parameters_t *)malloc(sizeof(sha3_parameters_t) * count);
-            cudaMemcpy(tmp_cpu_instances, gpu_instance, sizeof(sha3_parameters_t), cudaMemcpyDeviceToHost);
-            sha3_parameters_t *tmp_cpu_instance = &tmp_cpu_instances[0];
-            cudaFree(tmp_cpu_instance->rndc);
-            cudaFree(tmp_cpu_instance->rotc);
-            cudaFree(tmp_cpu_instance->piln);
+            cudaMemcpy(tmp_cpu_instances, gpu_instance, sizeof(sha3_parameters_t) * count, cudaMemcpyDeviceToHost);
+            cudaFree(tmp_cpu_instances[0].rndc);
+            cudaFree(tmp_cpu_instances[0].rotc);
+            cudaFree(tmp_cpu_instances[0].piln);
             for (uint32_t idx = 0; idx < count; idx++) {
+                printf("freeing %d pointer:%p\n", idx, tmp_cpu_instances[idx].state);
                 cudaFree(tmp_cpu_instances[idx].state);
             }
             cudaFree(gpu_instance);

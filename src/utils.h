@@ -164,11 +164,13 @@ template<class params>
 __host__ __device__ void print_bn(cgbn_mem_t<params::BITS> bn) {
   for(size_t idx=0; idx<params::BITS/32; idx++)
     printf("%08x ", bn._limbs[params::BITS/32 - 1 - idx]);
+  printf("\n");
 }
 
 __host__ __device__ void print_bytes(uint8_t *bytes, size_t count) {
   for(size_t idx=0; idx<count; idx++)
     printf("%02x", bytes[idx]);
+  printf("\n");
 }
 
 char *bytes_to_hex(uint8_t *bytes, size_t count) {
@@ -203,13 +205,17 @@ __host__ __device__ uint8_t *expand_memory(uint8_t *memory, size_t current_size,
   SHARED_MEMORY uint8_t *new_memory;
 
   ONE_THREAD_PER_INSTANCE(
-    new_memory = (uint8_t *)malloc(new_size);
-    memset(new_memory, 0, new_size);
-    if ((memory != NULL) && (current_size > 0))
-      if (current_size > new_size)
-        memcpy(new_memory, memory, new_size);
-      else
-        memcpy(new_memory, memory, current_size);
+    new_memory = NULL;
+    if (new_size != 0) {
+      new_memory = (uint8_t *)malloc(new_size);
+      memset(new_memory, 0, new_size);
+      if ((memory != NULL) && (current_size > 0))
+        if (current_size > new_size)
+          memcpy(new_memory, memory, new_size);
+        else
+          memcpy(new_memory, memory, current_size);
+
+    }
   )
   return new_memory;
 }

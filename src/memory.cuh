@@ -99,7 +99,8 @@ class memory_t {
   __host__ __device__ __forceinline__ void set(uint8_t *data, size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
     grow(index + length, gas_cost, error_code);
     ONE_THREAD_PER_INSTANCE(
-      memcpy(_content->data + index, data, length);
+      if (data != NULL && length > 0)
+        memcpy(_content->data + index, data, length);
     )
   }
 

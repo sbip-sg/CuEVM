@@ -31,6 +31,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     printf("Generating instances\n");
     evm_t::get_instances(cpu_instances, test);
     #ifndef ONLY_CPU
+    CUDA_CHECK(cudaDeviceReset());
     evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
     CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
     CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
@@ -108,6 +109,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     #ifndef ONLY_CPU
     CUDA_CHECK(cudaFree(gpu_instances));
     CUDA_CHECK(cgbn_error_report_free(report));
+    CUDA_CHECK(cudaDeviceReset());
     #endif
   }
   cJSON_Delete(read_root);

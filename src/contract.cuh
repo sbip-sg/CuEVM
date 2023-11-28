@@ -209,17 +209,16 @@ class state_t {
         contract_t *account,
         uint32_t type=0 // 0 - all // 1 - without storage
     ) {
-        printf("ajunge 3-1\n");
         contract_t *new_account = (contract_t *) malloc(sizeof(contract_t));
-        printf("ajunge 3-1-1\n");
-        printf("ajunge 3-1-1 %p\n", account);
         memcpy(new_account, account, sizeof(contract_t));
-        printf("ajunge 3-1-2\n");
-        if (account->code_size > 0) {
+        if ( (account->code_size > 0) && (account->bytecode != NULL)) {
             new_account->bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
             memcpy(new_account->bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
+            new_account->code_size = account->code_size;
+        } else {
+            new_account->bytecode = NULL;
+            new_account->code_size = 0;
         }
-        printf("ajunge 3-2\n");
         if (type == 1) {
             new_account->storage_size=0;
             new_account->storage=NULL;
@@ -229,48 +228,53 @@ class state_t {
                 memcpy(new_account->storage, account->storage, account->storage_size*sizeof(contract_storage_t));
             }
         }
-        printf("ajunge 3-3\n");
         return new_account;
     }
 
     __host__ __device__ __forceinline__ void set_local_account(bn_t &address, contract_t *account, uint32_t type=0, uint32_t empty=0) {
         uint32_t tmp_error_code = ERR_SUCCESS;
         uint32_t account_idx = get_account_idx_basic(address, tmp_error_code);
-        printf("ajunge 2-1\n");
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
             account_idx = _content->no_contracts;
         }
         SHARED_MEMORY contract_t dup_account;
+
 
         ONE_THREAD_PER_INSTANCE(
             //contract_t *dup_account;
             if (empty == 1) {
                 // we have to add an empty account
                 //dup_account = get_empty_account();
-                printf("ajunge 5-1\n");
+                dup_account.code_size = 0;
+                dup_account.bytecode = NULL;
+                dup_account.storage_size = 0;
+                dup_account.storage = NULL;
             } else {
                 //dup_account = duplicate_contract(account, type);
                 //dup_account = (contract_t *) malloc(sizeof(contract_t));
-                printf("ajunge 3-1-1\n");
-                printf("ajunge 3-1-1 %p\n", account);
                 memcpy(&dup_account, account, sizeof(contract_t));
-                printf("ajunge 3-1-2\n");
-                if (account->code_size > 0) {
+                if ( (account->code_size > 0) && (account->bytecode != NULL)) {
                     dup_account.bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
                     memcpy(dup_account.bytecode, account->bytecode, account->code_size*sizeof(uint8_t));
+                    dup_account.code_size = account->code_size;
+                } else {
+                    dup_account.bytecode = NULL;
+                    dup_account.code_size = 0;
                 }
-                printf("ajunge 3-2\n");
                 if (type == 1) {
                     dup_account.storage_size=0;
                     dup_account.storage=NULL;
                 } else {
-                    if (account->storage_size > 0) {
+                    if ( (account->storage_size > 0) && (account->storage != NULL)) {
                         dup_account.storage = (contract_storage_t *) malloc(account->storage_size*sizeof(contract_storage_t));
                         memcpy(dup_account.storage, account->storage, account->storage_size*sizeof(contract_storage_t));
+                        dup_account.storage_size = account->storage_size;
+                    } else {
+                        dup_account.storage_size = 0;
+                        dup_account.storage = NULL;
                     }
                 }
             }
-            printf("ajunge 2-2\n");
             if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
                 // contract does not exist needs to be added
                 //account_idx = _content->no_contracts;
@@ -293,24 +297,17 @@ class state_t {
             //free(dup_account);
         )
         if (empty == 1) {
-            printf("ajunge 2-3\n");
             cgbn_store(_arith._env, &(_content->contracts[account_idx].address), address);
         }
-        printf("ajunge 2-3\n");
     }
 
     
     __host__ __device__ __forceinline__ void set_local_value(bn_t &address, bn_t &key, bn_t &value) {
         uint32_t tmp_error_code = ERR_SUCCESS;
         contract_t *account = get_local_account(address, tmp_error_code);
-        printf("ajunge 1\n");
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
-            printf("ajunge 2\n");
             set_local_account(address, account, 1, 1); //without storage // empy account
-            printf("ajunge 2\n");
-            printf("ajunge 2\n");
         }
-        printf("ajunge 1\n");
         account = get_local_account(address, tmp_error_code);
         size_t storage_idx = get_storage_idx_basic(account, key, tmp_error_code);
         if (tmp_error_code == ERR_STATE_INVALID_KEY) {
@@ -328,7 +325,6 @@ class state_t {
             cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);
             tmp_error_code = ERR_SUCCESS;
         }
-        printf("ajunge 1\n");
         cgbn_store(_arith._env, &(account->storage[storage_idx].value), value);
     }
 
@@ -359,12 +355,10 @@ class state_t {
                     if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
                         // account does not exist in the global state
                         // we have to create it
-                        printf("ajunge 0\n");
                         access_list.set_local_account(address, account, 1, 1); //without storage empty account
                     } else {
                         // account exists in the global state
                         // we have to add it to the access list
-                        printf ("il ia din global\n");
                         access_list.set_local_account(address, account, 1); //without storage
                     }
                 }
@@ -491,12 +485,17 @@ class state_t {
             account = get_local_account(address, tmp_error_code);
         }
         ONE_THREAD_PER_INSTANCE(
-            if (account->code_size > 0) {
+            if ( (account->code_size > 0) && (account->bytecode != NULL)) {
                 free(account->bytecode);
             }
-            account->bytecode = (uint8_t *) malloc(code_size*sizeof(uint8_t));
-            memcpy(account->bytecode, bytecode, code_size*sizeof(uint8_t));
-            account->code_size = code_size;
+            if ( (code_size > 0) && (bytecode != NULL)) {
+                account->bytecode = (uint8_t *) malloc(code_size*sizeof(uint8_t));
+                memcpy(account->bytecode, bytecode, code_size*sizeof(uint8_t));
+                account->code_size = code_size;
+            } else {
+                account->bytecode = NULL;
+                account->code_size = 0;
+            }
         )
     }
     
@@ -554,14 +553,11 @@ class state_t {
         bn_t dummy_gas_cost;
         access_list.get_local_value(address, key, original_value, tmp_error_code);
         get_value(address, key, current_value, global, access_list, parents, dummy_gas_cost);
-        printf("ajunge 2\n");
         if (tmp_error_code != ERR_SUCCESS) {
             warm_key=0;
             access_list.get_local_value(address, key, original_value, tmp_error_code);
         }
-        printf("ajunge 3\n");
         set_local_value(address, key, value);
-        printf("ajunge 3\n");
 
         if (cgbn_compare(_arith._env, value, current_value) == 0) {
             cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 100);
@@ -577,7 +573,6 @@ class state_t {
             }
         }
         
-        printf("ajunge 4\n");
 
         // gas refund
         if (cgbn_compare(_arith._env, value, current_value) != 0) {
@@ -611,13 +606,11 @@ class state_t {
                 }
             }
         }
-        printf("ajunge 5\n");
         if (warm_key == 1) {
             cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 0);
         } else {
             cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 2100);
         }
-        printf("ajunge 6\n");
     }
 
     __host__ __device__ __forceinline__ void copy_to_state_data_t(state_data_t *that) {
@@ -637,9 +630,7 @@ class state_t {
             if (error_code == ERR_STATE_INVALID_ADDRESS) {
                 // contract does not exist needs to be added
                 error_code = ERR_SUCCESS;
-                printf("ajunge y\n");
                 set_local_account(address, &(that._content->contracts[idx]), 0); //with storage
-                printf("ajunge y-2\n");
             } else {
                 for (jdx=0; jdx<that._content->contracts[idx].storage_size; jdx++) {
                     cgbn_load(_arith._env, key, &(that._content->contracts[idx].storage[jdx].key));
@@ -647,7 +638,7 @@ class state_t {
                     set_local_value(address, key, value);
                     error_code = ERR_SUCCESS;
                 }
-                // override the other variables
+                // override the other variables /// TODO only if modifeid // who knows
                 cgbn_load(_arith._env, balance, &(that._content->contracts[idx].balance));
                 cgbn_load(_arith._env, nonce, &(that._content->contracts[idx].nonce));
                 cgbn_store(_arith._env, &(account->balance), balance);
@@ -1046,6 +1037,7 @@ __global__ void kernel_get_local_states_S2(typename state_t<params>::state_data_
     if (src_instances[instance].contracts != NULL) {
         for(size_t idx=0; idx<src_instances[instance].no_contracts; idx++) {
             if ( (src_instances[instance].contracts[idx].bytecode != NULL) && (src_instances[instance].contracts[idx].code_size > 0) ) {
+                //TODO: look on it
                 memcpy(dst_instances[instance].contracts[idx].bytecode, src_instances[instance].contracts[idx].bytecode, src_instances[instance].contracts[idx].code_size*sizeof(uint8_t));
                 free(src_instances[instance].contracts[idx].bytecode);
             }

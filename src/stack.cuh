@@ -199,6 +199,8 @@ class stack_t {
     pop(N, error_code);
     if (cgbn_compare_ui32(_arith._env, N, 0) == 0) {
       cgbn_set_ui32(_arith._env, r, 0);
+    } else if (cgbn_compare_ui32(_arith._env, N, 1) == 0) {
+      cgbn_set_ui32(_arith._env, r, 0);
     } else {
       int32_t carry=cgbn_add(_arith._env, c, a, b);
       bn_wide_t d;
@@ -222,6 +224,8 @@ class stack_t {
       cgbn_set_ui32(_arith._env, r, 0);
     } else {
       bn_wide_t d;
+      cgbn_rem(_arith._env, a, a, N);
+      cgbn_rem(_arith._env, b, b, N);
       cgbn_mul_wide(_arith._env, d, a, b);
       cgbn_rem_wide(_arith._env, r, d, N);
     }
@@ -272,8 +276,8 @@ class stack_t {
     } else {
       uint32_t c = cgbn_get_ui32(_arith._env, b) + 1;
       uint32_t sign = cgbn_extract_bits_ui32(_arith._env, x, c*8-1, 1);
+      int32_t numbits = int32_t(c);
       if (sign==1) {
-        int32_t numbits = int32_t(c);
         numbits = int32_t(WORD_BITS) - 8 * numbits;
         numbits = -numbits;
         cgbn_bitwise_mask_ior(_arith._env, r, x, numbits);
@@ -284,7 +288,9 @@ class stack_t {
         }
         */
       } else {
-        cgbn_set(_arith._env, r, x);
+        // needs and it seems
+        cgbn_bitwise_mask_and(_arith._env, r, x, 8*numbits);
+        //cgbn_set(_arith._env, r, x);
       }
     }
     push(r, error_code);
@@ -519,7 +525,7 @@ class stack_t {
         dest->stack_offset = _content->stack_offset;
         memcpy(dest->stack_base, _content->stack_base, sizeof(evm_word_t)*STACK_SIZE);
       } else if (copy_type == 1) {
-        if (dest->stack_offset > 0) {
+        if ( (dest->stack_offset > 0) && (dest->stack_base != NULL) ) {
           free(dest->stack_base);
         }
         dest->stack_base = NULL;

@@ -15,14 +15,14 @@ class tracer_t {
     typedef typename stack_t::stack_data_t          stack_data_t;
     static const size_t                             PAGE_SIZE=128;
 
-    typedef struct {
+    typedef struct alignas(32) {
         evm_word_t      address;
         uint32_t        pc;
         uint8_t         opcode;
         stack_data_t    stack;
     } tracer_data_t;
 
-    typedef struct {
+    typedef struct alignas(32) {
         size_t          size;
         size_t          capacity;
         tracer_data_t   *data;
@@ -40,8 +40,9 @@ class tracer_t {
             memcpy(new_data, _content->data, sizeof(tracer_data_t) * _content->size);
             if ( (_content->data != NULL) && (_content->capacity > 0) ) {
                 free(_content->data);
+                _content->data = NULL;
             }
-            _content->capacity += PAGE_SIZE;
+            _content->capacity =  _content->capacity + PAGE_SIZE;
             for (size_t idx=_content->size; idx<_content->capacity; idx++) {
                 new_data[idx].stack.stack_base = NULL;
                 new_data[idx].stack.stack_offset = 0;
@@ -57,8 +58,10 @@ class tracer_t {
         cgbn_store(_arith._env, &(_content->data[_content->size].address), address);
         _content->data[_content->size].pc = pc;
         _content->data[_content->size].opcode = opcode;
-        stack->copy_stack_data(&_content->data[_content->size].stack, 1);
-        _content->size++;
+        ONE_THREAD_PER_INSTANCE(
+            _content->size = _content->size + 1;
+        )
+        stack->copy_stack_data(&_content->data[_content->size-1].stack, 1);   
     }
 
     __host__ __device__ __forceinline__ void modify_last_stack(stack_t *stack) {
@@ -86,8 +89,8 @@ class tracer_t {
             cJSON_AddStringToObject(item, "address", hex_string_ptr);
             cJSON_AddNumberToObject(item, "pc", _content->data[idx].pc);
             cJSON_AddNumberToObject(item, "opcode", _content->data[idx].opcode);
-            //stack_t local_stack(_arith, &_content->data[idx].stack);
-            //cJSON_AddItemToObject(item, "stack", local_stack.to_json());
+            stack_t local_stack(_arith, &_content->data[idx].stack);
+            cJSON_AddItemToObject(item, "stack", local_stack.to_json());
             cJSON_AddItemToArray(tracer_json, item);
         }
         free(hex_string_ptr);
@@ -111,16 +114,20 @@ class tracer_t {
         return gpu_tracers;
     }
 
-    __host__ static void free_tracers(tracer_content_t *cpu_tracers, uint32_t count) {
-        for(uint32_t idx=0; idx<count; idx++) {
-            if ( (cpu_tracers[idx].data != NULL) && (cpu_tracers[idx].size > 0) ) {
-                for (size_t jdx=0; jdx<cpu_tracers[idx].size; jdx++) {
-                    if ( (cpu_tracers[idx].data[jdx].stack.stack_base != NULL) && (cpu_tracers[idx].data[jdx].stack.stack_offset > 0) ) {
-                        free(cpu_tracers[idx].data[jdx].stack.stack_base);
-                    }
+    __host__ __device__ static void free_instance(tracer_content_t *instance) {
+        if ( (instance->data != NULL) && (instance->size > 0) ) {
+            for (size_t idx=0; idx<instance->size; idx++) {
+                if ( (instance->data[idx].stack.stack_base != NULL) && (instance->data[idx].stack.stack_offset > 0) ) {
+                    free(instance->data[idx].stack.stack_base);
                 }
-                free(cpu_tracers[idx].data);
             }
+            free(instance->data);
+        }
+    }
+
+    __host__ __device__ static void free_tracers(tracer_content_t *cpu_tracers, uint32_t count) {
+        for(uint32_t idx=0; idx<count; idx++) {
+            free_instance(&cpu_tracers[idx]);
         }
         free(cpu_tracers);
     }
@@ -132,12 +139,12 @@ class tracer_t {
         tmp_cpu_tracers = (tracer_content_t *)malloc(count*sizeof(tracer_content_t));
         cudaMemcpy(tmp_cpu_tracers, gpu_tracers, count*sizeof(tracer_content_t), cudaMemcpyDeviceToHost);
         for (size_t idx=0; idx<count; idx++) {
-            if (tmp_cpu_tracers[idx].data != NULL) {
+            if ( (tmp_cpu_tracers[idx].data != NULL) && (tmp_cpu_tracers[idx].size > 0) ) {
                 tracer_data_t *tmp_cpu_data;
                 tmp_cpu_data = (tracer_data_t *)malloc(tmp_cpu_tracers[idx].size*sizeof(tracer_data_t));
                 cudaMemcpy(tmp_cpu_data, tmp_cpu_tracers[idx].data, tmp_cpu_tracers[idx].size*sizeof(tracer_data_t), cudaMemcpyDeviceToHost);
                 for (size_t jdx=0; jdx<tmp_cpu_tracers[idx].size; jdx++) {
-                    if (tmp_cpu_data[jdx].stack.stack_base != NULL) {
+                    if ( (tmp_cpu_data[jdx].stack.stack_base != NULL) && (tmp_cpu_data[jdx].stack.stack_offset > 0) ) {
                         cudaFree(tmp_cpu_data[jdx].stack.stack_base);
                     }
                 }
@@ -152,7 +159,7 @@ class tracer_t {
 
     __host__ static tracer_content_t *get_cpu_tracers_from_gpu(tracer_content_t *gpu_tracers, uint32_t count) {
         // STATE 1.1 I can only see the data values and number of data
-        tracer_content_t *cpu_tracers;
+        tracer_content_t *cpu_tracers, *old_gpu_tracers;
         cpu_tracers = (tracer_content_t *)malloc(count*sizeof(tracer_content_t));
         cudaMemcpy(cpu_tracers, gpu_tracers, count*sizeof(tracer_content_t), cudaMemcpyDeviceToHost);
         // STATE 1.2 I can alocate the data array
@@ -161,7 +168,7 @@ class tracer_t {
         memcpy(tmp_cpu_tracers, cpu_tracers, count*sizeof(tracer_content_t));
         for (size_t idx=0; idx<count; idx++) {
             tmp_cpu_tracers[idx].capacity = tmp_cpu_tracers[idx].size;
-            if (tmp_cpu_tracers[idx].data != NULL) {
+            if ( (tmp_cpu_tracers[idx].data != NULL) && (tmp_cpu_tracers[idx].size > 0) ) {
                 cudaMalloc((void **)&(tmp_cpu_tracers[idx].data), tmp_cpu_tracers[idx].size*sizeof(tracer_data_t));
             }
         }
@@ -172,7 +179,8 @@ class tracer_t {
         kernel_get_tracers_S1<params><<<1, count>>>(new_gpu_tracers, gpu_tracers, count);
         CUDA_CHECK(cudaDeviceSynchronize());
         // STATE 1.4 free unnecasry memory
-        cudaFree(gpu_tracers);
+        //cudaFree(gpu_tracers);
+        old_gpu_tracers = gpu_tracers;
         gpu_tracers = new_gpu_tracers;
 
         // STATE 2.1 copy the data array
@@ -181,15 +189,16 @@ class tracer_t {
         tmp_cpu_tracers = (tracer_content_t *)malloc(count*sizeof(tracer_content_t));
         memcpy(tmp_cpu_tracers, cpu_tracers, count*sizeof(tracer_content_t));
         for (size_t idx=0; idx<count; idx++) {
-            if (tmp_cpu_tracers[idx].data != NULL) {
+            if ( (tmp_cpu_tracers[idx].data != NULL) && (tmp_cpu_tracers[idx].size > 0) ) {
                 tracer_data_t *tmp_cpu_data;
                 tmp_cpu_data = (tracer_data_t *)malloc(tmp_cpu_tracers[idx].size*sizeof(tracer_data_t));
                 cudaMemcpy(tmp_cpu_data, tmp_cpu_tracers[idx].data, tmp_cpu_tracers[idx].size*sizeof(tracer_data_t), cudaMemcpyDeviceToHost);
                 for (size_t jdx=0; jdx<tmp_cpu_tracers[idx].size; jdx++) {
-                    if (tmp_cpu_data[jdx].stack.stack_offset > 0) {
+                    if ( (tmp_cpu_data[jdx].stack.stack_offset > 0) && (tmp_cpu_data[jdx].stack.stack_base != NULL) ) {
                         cudaMalloc((void **)&(tmp_cpu_data[jdx].stack.stack_base), tmp_cpu_data[jdx].stack.stack_offset*sizeof(evm_word_t));
                     } else {
                         tmp_cpu_data[jdx].stack.stack_base = NULL;
+                        tmp_cpu_data[jdx].stack.stack_offset = 0;
                     }
                 }
                 cudaMalloc((void **)&(tmp_cpu_tracers[idx].data), tmp_cpu_tracers[idx].size*sizeof(tracer_data_t));
@@ -205,7 +214,7 @@ class tracer_t {
         CUDA_CHECK(cudaDeviceSynchronize());
         // STATE 2.4 free unnecasry memory
         for (size_t idx=0; idx<count; idx++) {
-            if (cpu_tracers[idx].data != NULL) {
+            if ( (cpu_tracers[idx].data != NULL) && (cpu_tracers[idx].size > 0) ) {
                 cudaFree(cpu_tracers[idx].data);
             }
         }
@@ -218,14 +227,14 @@ class tracer_t {
         tmp_cpu_tracers = (tracer_content_t *)malloc(count*sizeof(tracer_content_t));
         memcpy(tmp_cpu_tracers, cpu_tracers, count*sizeof(tracer_content_t));
         for (size_t idx=0; idx<count; idx++) {
-            if (tmp_cpu_tracers[idx].data != NULL) {
+            if ( (tmp_cpu_tracers[idx].data != NULL) && (tmp_cpu_tracers[idx].size > 0) ) {
                 tracer_data_t *tmp_cpu_data, *aux_tmp_cpu_data;
                 tmp_cpu_data = (tracer_data_t *)malloc(tmp_cpu_tracers[idx].size*sizeof(tracer_data_t));
                 aux_tmp_cpu_data = (tracer_data_t *)malloc(tmp_cpu_tracers[idx].size*sizeof(tracer_data_t));
                 cudaMemcpy(tmp_cpu_data, tmp_cpu_tracers[idx].data, tmp_cpu_tracers[idx].size*sizeof(tracer_data_t), cudaMemcpyDeviceToHost);
                 cudaMemcpy(aux_tmp_cpu_data, tmp_cpu_tracers[idx].data, tmp_cpu_tracers[idx].size*sizeof(tracer_data_t), cudaMemcpyDeviceToHost);
                 for (size_t jdx=0; jdx<tmp_cpu_tracers[idx].size; jdx++) {
-                    if (tmp_cpu_data[jdx].stack.stack_offset > 0) {
+                    if ( (tmp_cpu_data[jdx].stack.stack_offset > 0) && (tmp_cpu_data[jdx].stack.stack_base != NULL) ) {
                         tmp_cpu_data[jdx].stack.stack_base = (evm_word_t *)malloc(tmp_cpu_data[jdx].stack.stack_offset*sizeof(evm_word_t));
                         cudaMemcpy(tmp_cpu_data[jdx].stack.stack_base, aux_tmp_cpu_data[jdx].stack.stack_base, tmp_cpu_data[jdx].stack.stack_offset*sizeof(evm_word_t), cudaMemcpyDeviceToHost);
                     } else {
@@ -238,6 +247,9 @@ class tracer_t {
         }
         // STATE 3.3 free gpu local states
         free_gpu_tracers(gpu_tracers, count);
+        tracer_free_kernel<params><<<1, count>>>(old_gpu_tracers, count);
+        CUDA_CHECK(cudaDeviceSynchronize());
+        cudaFree(old_gpu_tracers);
         // STATE 3.4 copy to cpu final
         memcpy(cpu_tracers, tmp_cpu_tracers, count*sizeof(tracer_content_t));
         free(tmp_cpu_tracers);
@@ -255,9 +267,8 @@ __global__ void kernel_get_tracers_S1(typename tracer_t<params>::tracer_content_
     if(instance>=instance_count)
         return;
 
-    if (src_instances[instance].data != NULL) {
+    if ( (src_instances[instance].data != NULL) && (src_instances[instance].size > 0) ) {
         memcpy(dst_instances[instance].data, src_instances[instance].data, src_instances[instance].size*sizeof(tracer_data_t));
-        free(src_instances[instance].data);
     }
 }
 
@@ -271,14 +282,24 @@ __global__ void kernel_get_tracers_S2(typename tracer_t<params>::tracer_content_
     if(instance>=instance_count)
         return;
 
-    if (src_instances[instance].data != NULL) {
+    if ( (src_instances[instance].data != NULL) && (src_instances[instance].size > 0) ) {
         for(size_t idx=0; idx<src_instances[instance].size; idx++) {
-            if (src_instances[instance].data[idx].stack.stack_base != NULL) {
+            if ( (src_instances[instance].data[idx].stack.stack_base != NULL) && (src_instances[instance].data[idx].stack.stack_offset > 0) ) {
                 memcpy(dst_instances[instance].data[idx].stack.stack_base, src_instances[instance].data[idx].stack.stack_base, src_instances[instance].data[idx].stack.stack_offset*sizeof(evm_word_t));
-                free(src_instances[instance].data[idx].stack.stack_base);
             }
         }
     }
+}
+
+template<class params>
+__global__ void tracer_free_kernel(typename tracer_t<params>::tracer_content_t *instances, uint32_t count) {
+    typedef tracer_t<params>                        tracer_t;
+    uint32_t instance=blockIdx.x*blockDim.x + threadIdx.x;
+    if(instance>=count)
+        return;
+        
+    tracer_t::free_instance(&instances[instance]);
+            
 }
 
 
