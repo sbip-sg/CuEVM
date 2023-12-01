@@ -67,6 +67,20 @@ class arith_env_t {
     return dst;
   }
 
+  __host__ __device__ __forceinline__ int32_t size_t_from_cgbn(size_t &dst, bn_t &src) {
+    bn_t MAX_SIZE_T;
+    cgbn_set_ui32(_env, MAX_SIZE_T, 1);
+    cgbn_shift_left(_env, MAX_SIZE_T, MAX_SIZE_T, 64);
+    dst = 0;
+    dst = cgbn_extract_bits_ui32(_env, src, 0, 32);
+    dst |= ((size_t)cgbn_extract_bits_ui32(_env, src, 32, 32)) << 32;
+    if(cgbn_compare(_env, src, MAX_SIZE_T) >= 0) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
   __host__ void from_cgbn_memory_to_hex(evm_word_t &a, char *hex_string, size_t count=params::BITS/32) {
     //char *hex_string = (char *) malloc(sizeof(char) * (count*8+3));
     hex_string[0] = '0';

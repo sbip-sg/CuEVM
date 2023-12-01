@@ -227,6 +227,30 @@ class evm_t {
             msg.get_gas(remaining_gas);
             cgbn_set_ui32(_arith._env, gas_cost, 0);
 
+            // calculate the initial transaction cost
+            // add the cost for call data
+            if (msg.get_depth() == 0) {
+                printf("depth 0\n");
+                printf("msg data size: %lu\n", msg.get_data_size());
+                byte_data=msg.get_data(0, msg.get_data_size(), size_s);
+                for (uint32_t idx=0; idx<size_s; idx++) {
+                    if (byte_data[idx]==0) {
+                        cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 4);
+                    } else {
+                        cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 16);
+                    }
+                }
+                printf("gas cost: %lu\n", _arith.from_cgbn_to_size_t(gas_cost));
+                // add the transaction cost
+                cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 21000);
+                // cgbn_mul_ui32(_arith._env, gas_cost, gas_cost, 2);
+                // add the access list cost
+                // cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 5200);
+                printf("gas cost: %lu\n", _arith.from_cgbn_to_size_t(gas_cost));
+            }
+            cgbn_sub(_arith._env, remaining_gas, remaining_gas, gas_cost);
+            
+
 
             pc=0;
             uint32_t trace_pc;
@@ -580,33 +604,67 @@ class evm_t {
                         case OP_CODECOPY: // CODECOPY
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 3);
-
+                                ONE_THREAD_PER_INSTANCE(                            
+                                    printf("CODECOPY stack:\n");
+                                    stack.print();
+                                )
                                 // get the values from stack
                                 stack.pop(offset, error_code);
                                 stack.pop(index, error_code);
                                 stack.pop(length, error_code);
-                                dst_offset_s=_arith.from_cgbn_to_size_t(offset);
-                                index_s=_arith.from_cgbn_to_size_t(index);
-                                length_s=_arith.from_cgbn_to_size_t(length);
-                                
-                                if (index_s >= contract->code_size) {
-                                    byte_data=expand_memory(NULL, 0, length_s);
-                                } else {
-                                    byte_data=expand_memory(contract->bytecode + index_s, contract->code_size - index_s, length_s);
-                                }
-                                memory.set(
-                                    byte_data,
+
+                                memory.grow_cost(
                                     offset,
                                     length,
                                     gas_cost,
                                     remaining_gas,
                                     error_code
                                 );
-                                ONE_THREAD_PER_INSTANCE(
-                                    if (byte_data!=NULL) {
-                                        free(byte_data);
+
+                                if (error_code == ERR_NONE) {
+                                    // transform and verify for overflow later
+                                    dst_offset_s=_arith.from_cgbn_to_size_t(offset);
+                                    index_s=_arith.from_cgbn_to_size_t(index);
+                                    length_s=_arith.from_cgbn_to_size_t(length);
+
+                                    ONE_THREAD_PER_INSTANCE(                            
+                                        printf("CODECOPY dst_offset_s: %lu\n", dst_offset_s);
+                                        printf("CODECOPY index_s: %lu\n", index_s);
+                                        printf("CODECOPY length_s: %lu\n", length_s);
+                                    )
+                                    
+                                    bn_t MAX_SIZE_T;
+                                    cgbn_set_ui32(_arith._env, MAX_SIZE_T, 1);
+                                    cgbn_shift_left(_arith._env, MAX_SIZE_T, MAX_SIZE_T, 64);
+                                    // veirfy if is a jumpoint dest
+                                    if (cgbn_compare(_arith._env, index, MAX_SIZE_T) >= 0) {
+                                        byte_data=expand_memory(NULL, 0, length_s);
+                                    } else if (index_s >= contract->code_size) {
+                                        byte_data=expand_memory(NULL, 0, length_s);
+                                    } else {
+                                        byte_data=expand_memory(contract->bytecode + index_s, contract->code_size - index_s, length_s);
                                     }
-                                )
+
+                                    ONE_THREAD_PER_INSTANCE(                            
+                                        printf("CODECOPY byte_data:\n");
+                                        print_bytes(byte_data, length_s);
+                                    )
+
+                                    memory.set(
+                                        byte_data,
+                                        offset,
+                                        length,
+                                        dummy_gas,
+                                        remaining_gas,
+                                        error_code
+                                    );
+                                    ONE_THREAD_PER_INSTANCE(
+                                        if (byte_data!=NULL) {
+                                            free(byte_data);
+                                        }
+                                    )
+                                }
+
                             }
                             break;
                         case OP_GASPRICE: // GASPRICE
@@ -649,25 +707,36 @@ class evm_t {
                                     gas_cost,
                                     4 //code
                                 );
+
                                 
-                                if (index_s >= tmp_contract->code_size) {
-                                    byte_data=expand_memory(NULL, 0, length_s);
-                                } else {
-                                    byte_data=expand_memory(tmp_contract->bytecode + index_s, tmp_contract->code_size - index_s, length_s);
-                                }
-                                memory.set(
-                                    byte_data,
+                                memory.grow_cost(
                                     offset,
                                     length,
                                     gas_cost,
                                     remaining_gas,
                                     error_code
                                 );
-                                ONE_THREAD_PER_INSTANCE(
-                                    if (byte_data!=NULL) {
-                                        free(byte_data);
+                                
+                                if (error_code == ERR_NONE) {
+                                    if (index_s >= tmp_contract->code_size) {
+                                        byte_data=expand_memory(NULL, 0, length_s);
+                                    } else {
+                                        byte_data=expand_memory(tmp_contract->bytecode + index_s, tmp_contract->code_size - index_s, length_s);
                                     }
-                                )
+                                    memory.set(
+                                        byte_data,
+                                        offset,
+                                        length,
+                                        gas_cost,
+                                        remaining_gas,
+                                        error_code
+                                    );
+                                    ONE_THREAD_PER_INSTANCE(
+                                        if (byte_data!=NULL) {
+                                            free(byte_data);
+                                        }
+                                    )
+                                }
                             }
                             break;
                         case OP_RETURNDATASIZE: // RETURNDATASIZE
@@ -876,8 +945,13 @@ class evm_t {
                                 cgbn_set_ui32(_arith._env, gas_cost, 8);
                                 stack.pop(index, error_code);
                                 index_s=_arith.from_cgbn_to_size_t(index);
+                                bn_t MAX_SIZE_T;
+                                cgbn_set_ui32(_arith._env, MAX_SIZE_T, 1);
+                                cgbn_shift_left(_arith._env, MAX_SIZE_T, MAX_SIZE_T, 64);
                                 // veirfy if is a jumpoint dest
-                                if (index_s >= contract->code_size) {
+                                if (cgbn_compare(_arith._env, index, MAX_SIZE_T) >= 0) {
+                                    error_code=ERR_INVALID_JUMP_DESTINATION;
+                                } else if (index_s >= contract->code_size) {
                                     error_code=ERR_INVALID_JUMP_DESTINATION;
                                 } else if (contract->bytecode[index_s]!=OP_JUMPDEST) {
                                     error_code=ERR_INVALID_JUMP_DESTINATION;
@@ -899,7 +973,7 @@ class evm_t {
                                     if ( (last_push_idx < index_s) &&
                                             (last_push_idx+push_value > index_s) ) {
                                         // inside a push
-                                        pc=last_push_idx+push_value;
+                                        error_code=ERR_INVALID_JUMP_DESTINATION;
                                     } else {
                                         pc=index_s-1;
                                     }
@@ -911,10 +985,16 @@ class evm_t {
                                 cgbn_set_ui32(_arith._env, gas_cost, 8);
                                 stack.pop(index, error_code);
                                 // TODO: verify versus size_t max value
+                                bn_t MAX_SIZE_T;
+                                cgbn_set_ui32(_arith._env, MAX_SIZE_T, 1);
+                                cgbn_shift_left(_arith._env, MAX_SIZE_T, MAX_SIZE_T, 64);
+                                
                                 index_s=_arith.from_cgbn_to_size_t(index);
                                 stack.pop(value, error_code);
                                 if (cgbn_compare_ui32(_arith._env, value, 0)!=0) {
-                                    if (index_s >= contract->code_size) {
+                                    if (cgbn_compare(_arith._env, index, MAX_SIZE_T) >= 0) {
+                                        error_code=ERR_INVALID_JUMP_DESTINATION;
+                                    } else if (index_s >= contract->code_size) {
                                         error_code=ERR_INVALID_JUMP_DESTINATION;
                                     } else if (contract->bytecode[index_s]!=OP_JUMPDEST) {
                                         error_code=ERR_INVALID_JUMP_DESTINATION;
@@ -939,7 +1019,8 @@ class evm_t {
                                         if ( (last_push_idx < index_s) &&
                                              (last_push_idx+push_value >= index_s) ) {
                                             // inside a push
-                                            pc=last_push_idx+push_value;
+                                            //pc=last_push_idx+push_value;
+                                            error_code=ERR_INVALID_JUMP_DESTINATION;
                                         } else {
                                             pc=index_s-1;
                                         }
@@ -963,6 +1044,7 @@ class evm_t {
                             break;
                         case OP_GAS: // GAS
                             {
+                                //cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 2);
                                 cgbn_set_ui32(_arith._env, gas_cost, 2);
                                 cgbn_set(_arith._env, value, remaining_gas);
                                 cgbn_sub(_arith._env, value, value, gas_cost);
