@@ -877,11 +877,32 @@ class evm_t {
                                 stack.pop(index, error_code);
                                 index_s=_arith.from_cgbn_to_size_t(index);
                                 // veirfy if is a jumpoint dest
-                                if (contract->bytecode[index_s]!=OP_JUMPDEST) {
+                                if (index_s >= contract->code_size) {
                                     error_code=ERR_INVALID_JUMP_DESTINATION;
-                                    break;
+                                } else if (contract->bytecode[index_s]!=OP_JUMPDEST) {
+                                    error_code=ERR_INVALID_JUMP_DESTINATION;
                                 } else {
-                                    pc=index_s-1;
+                                    // VERIFY if is inside a PUSHX
+                                    uint32_t last_push_idx=index_s;
+                                    uint32_t push_value=0;
+                                    if (index_s > 1)
+                                    {
+                                        for (uint32_t idx=index_s-1; idx>0; idx--) {
+                                            if ( ((contract->bytecode[idx]&0xF0)==0x60) || ((contract->bytecode[idx]&0xF0)==0x70) ) {
+                                                // PUSH
+                                                last_push_idx=idx;
+                                                push_value=contract->bytecode[idx]&0x1F;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if ( (last_push_idx < index_s) &&
+                                            (last_push_idx+push_value > index_s) ) {
+                                        // inside a push
+                                        pc=last_push_idx+push_value;
+                                    } else {
+                                        pc=index_s-1;
+                                    }
                                 }
                             }
                             break;
@@ -889,14 +910,39 @@ class evm_t {
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 8);
                                 stack.pop(index, error_code);
+                                // TODO: verify versus size_t max value
                                 index_s=_arith.from_cgbn_to_size_t(index);
                                 stack.pop(value, error_code);
                                 if (cgbn_compare_ui32(_arith._env, value, 0)!=0) {
-                                    if (contract->bytecode[index_s]!=OP_JUMPDEST) {
+                                    if (index_s >= contract->code_size) {
                                         error_code=ERR_INVALID_JUMP_DESTINATION;
-                                        break;
+                                    } else if (contract->bytecode[index_s]!=OP_JUMPDEST) {
+                                        error_code=ERR_INVALID_JUMP_DESTINATION;
                                     } else {
-                                        pc=index_s-1;
+                                        // VERIFY if is inside a PUSHX
+                                        printf("VERIFY INSIDE push index_s: %lu\n", index_s);
+                                        uint32_t last_push_idx=index_s;
+                                        uint32_t push_value=0;
+                                        if (index_s > 0)
+                                        {
+                                            for (uint32_t idx=index_s-1; idx>0; idx--) {
+                                                if ( ((contract->bytecode[idx]&0xF0)==0x60) || ((contract->bytecode[idx]&0xF0)==0x70) ) {
+                                                    // PUSH
+                                                    last_push_idx=idx;
+                                                    push_value=(contract->bytecode[idx]&0x1F) + 1;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        printf("VERIFY INSIDE push last_push_idx: %d\n", last_push_idx);
+                                        printf("VERIFY INSIDE push push_value: %d\n", push_value);
+                                        if ( (last_push_idx < index_s) &&
+                                             (last_push_idx+push_value >= index_s) ) {
+                                            // inside a push
+                                            pc=last_push_idx+push_value;
+                                        } else {
+                                            pc=index_s-1;
+                                        }
                                     }
                                 }
                             }
@@ -1163,6 +1209,22 @@ class evm_t {
             if (msg.get_depth()==0) {
                 stack.copy_stack_data(call_stack, 0);
                 memory.copy_info(call_memory);
+            } else {
+                ONE_THREAD_PER_INSTANCE(
+                    printf("Termina cu %d\n", error);
+                )
+                ONE_THREAD_PER_INSTANCE(
+                    printf("free_memory: alocated_size=%lu, size=%lu\n", memory._content->alocated_size, memory._content->size);
+                )
+                //memory.free_memory();
+                if( (memory._content->alocated_size>0) && (memory._content->data!=NULL)) {
+                    ONE_THREAD_PER_INSTANCE(
+                        free(memory._content->data);
+                    )
+                }
+                ONE_THREAD_PER_INSTANCE(
+                    printf("Termina cu %d\n", error);
+                )
             }
             #ifdef GAS
             cgbn_store(_arith._env, call_gas_left, remaining_gas);
@@ -1370,9 +1432,11 @@ class evm_t {
             #endif
             
             ONE_THREAD_PER_INSTANCE(
+                printf("BEFORE RUN 1\n");
+                external_msg.print();
                 printf("msg data size: %lu\n", external_call_msg->data.size);
                 print_bytes(external_call_msg->data.data, external_call_msg->data.size);
-                printf("BEFORE RUN \n");
+                printf("BEFORE RUN 2\n");
                 external_msg.print();
             )
             // make the call TODO: look on gas

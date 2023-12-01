@@ -72,6 +72,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     printf("Running CPU EVM\n");
     // run the evm
     for(size_t instance = 0; instance < cpu_instances.count; instance++) {
+      printf("Running instance %lu\n", instance);
       evm.run(
         &(cpu_instances.msgs[instance]),
         &(cpu_instances.stacks[instance]),

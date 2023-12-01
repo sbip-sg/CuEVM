@@ -245,12 +245,20 @@ class memory_t {
 
   __device__ __forceinline__ void free_memory() {
     ONE_THREAD_PER_INSTANCE(
-      if(_content->alocated_size>0 && _content->data!=NULL)
-        free(_content->data);
+      printf("free_memory: alocated_size=%lu, size=%lu\n", _content->alocated_size, _content->size);
     )
+    if( (_content->alocated_size>0) && (_content->data!=NULL)) {
+      ONE_THREAD_PER_INSTANCE(
+          free(_content->data);
+      )
+
+    }
     _content->alocated_size = 0;
     _content->size = 0;
     _content->data = NULL;
+    ONE_THREAD_PER_INSTANCE(
+      printf("free_memory: alocated_size=%lu, size=%lu\n", _content->alocated_size, _content->size);
+    )
   }
 
   // generate the memory content structure info on the host
@@ -350,6 +358,7 @@ class memory_t {
   __host__ cJSON *to_json() {
     char hex_string[67]="0x";
     char *bytes_string=NULL;
+    char *tmp_str;
     mpz_t mpz_data_size;
     mpz_init(mpz_data_size);
     cJSON *data_json = cJSON_CreateObject();
@@ -357,8 +366,10 @@ class memory_t {
     mpz_set_ui(mpz_data_size, _content->size >> 32);
     mpz_mul_2exp(mpz_data_size, mpz_data_size, 32);
     mpz_add_ui(mpz_data_size, mpz_data_size, _content->size & 0xffffffff);
-    strcpy(hex_string+2, mpz_get_str(NULL, 16, mpz_data_size));
+    tmp_str = mpz_get_str(NULL, 16, mpz_data_size);
+    strcpy(hex_string+2, tmp_str);
     cJSON_AddStringToObject(data_json, "size", hex_string);
+    free(tmp_str);
 
     if (_content->size > 0) {
       bytes_string = bytes_to_hex(_content->data, _content->size);

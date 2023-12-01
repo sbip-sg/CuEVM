@@ -333,6 +333,7 @@ class block_t {
 
     cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
     free(hex_string_ptr);
+    free(value_hex_string_ptr);
     return block_json;
   }
 };
