@@ -213,7 +213,16 @@ class evm_t {
                 returns.set(NULL, 0);
                 break;
             }
-
+            // get the sroage in the write state so it keeps its code
+            // for delegate call and call code
+            tmp_contract = write_state.get_account(storage_address, _global_state, access_state, parents_state, dummy_gas, 4); //get the code
+            
+            write_state.set_local_account(storage_address, tmp_contract, 1);
+            ONE_THREAD_PER_INSTANCE(
+                printf(" STORAGE CONTRACT\n");
+                printf(" STORAGE code size: %lu\n", tmp_contract->code_size);
+                print_bytes(tmp_contract->bytecode, tmp_contract->code_size);
+            )
             // get the gas from message
             msg.get_gas(remaining_gas);
             cgbn_set_ui32(_arith._env, gas_cost, 0);
@@ -426,7 +435,6 @@ class evm_t {
                                 // get the values from stack
                                 stack.pop(offset, error_code);
                                 stack.pop(length, error_code);
-                                src_offset_s=_arith.from_cgbn_to_size_t(offset);
                                 length_s=_arith.from_cgbn_to_size_t(length);
                                 
                                 // dynamic cost on size
@@ -435,11 +443,25 @@ class evm_t {
                                 cgbn_mul_ui32(_arith._env, aux_gas_cost, aux_gas_cost, 6);
                                 cgbn_add(_arith._env, gas_cost, gas_cost, aux_gas_cost);
 
+                                
+                                ONE_THREAD_PER_INSTANCE(
+                                    printf("error %d\n", error_code);
+                                )
+
                                 // get data from memory and hash
-                                byte_data=memory.get(src_offset_s, length_s, gas_cost, error_code);
-                                _keccak.sha3(byte_data, length_s, &(tmp_memory[0]), HASH_BYTES);
-                                _arith.from_memory_to_cgbn(value, &(tmp_memory[0]));
-                                stack.push(value, error_code);
+                                byte_data=memory.get(
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
+                                
+                                if (error_code == ERR_NONE) {
+                                    _keccak.sha3(byte_data, length_s, &(tmp_memory[0]), HASH_BYTES);
+                                    _arith.from_memory_to_cgbn(value, &(tmp_memory[0]));
+                                    stack.push(value, error_code);
+                                }
                             }
                             break;
                         case OP_ADDRESS: // ADDRESS
@@ -480,7 +502,7 @@ class evm_t {
                         case OP_CALLVALUE: // CALLVALUE
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 2);
-                                msg.get_value(address);
+                                msg.get_value(value);
                                 stack.push(value, error_code);
                             }
                             break;
@@ -489,6 +511,10 @@ class evm_t {
                                 cgbn_set_ui32(_arith._env, gas_cost, 3);
                                 stack.pop(index, error_code);
                                 index_s=_arith.from_cgbn_to_size_t(index);
+                                ONE_THREAD_PER_INSTANCE(
+                                    printf(" CALL DATA COPY index: %lu\n", index_s);
+                                    msg.print();
+                                )
                                 byte_data=msg.get_data(index_s, 32, size_s);
                                 byte_data=expand_memory(byte_data, size_s, 32);
                                 // TODO: reverse the byte_data
@@ -516,7 +542,6 @@ class evm_t {
                                 stack.pop(offset, error_code);
                                 stack.pop(index, error_code);
                                 stack.pop(length, error_code);
-                                dst_offset_s=_arith.from_cgbn_to_size_t(offset);
                                 index_s=_arith.from_cgbn_to_size_t(index);
                                 length_s=_arith.from_cgbn_to_size_t(length);
                                 
@@ -529,7 +554,15 @@ class evm_t {
                                 // get data from msg and set on memory
                                 byte_data=msg.get_data(index_s, length_s, size_s);
                                 byte_data=expand_memory(byte_data, size_s, length_s);
-                                memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
+                                memory.set(
+                                    byte_data,
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
+
                                 ONE_THREAD_PER_INSTANCE(
                                     if (byte_data!=NULL) {
                                         free(byte_data);
@@ -561,7 +594,14 @@ class evm_t {
                                 } else {
                                     byte_data=expand_memory(contract->bytecode + index_s, contract->code_size - index_s, length_s);
                                 }
-                                memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
+                                memory.set(
+                                    byte_data,
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
                                 ONE_THREAD_PER_INSTANCE(
                                     if (byte_data!=NULL) {
                                         free(byte_data);
@@ -615,7 +655,14 @@ class evm_t {
                                 } else {
                                     byte_data=expand_memory(tmp_contract->bytecode + index_s, tmp_contract->code_size - index_s, length_s);
                                 }
-                                memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
+                                memory.set(
+                                    byte_data,
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
                                 ONE_THREAD_PER_INSTANCE(
                                     if (byte_data!=NULL) {
                                         free(byte_data);
@@ -643,7 +690,14 @@ class evm_t {
                                 _arith.from_size_t_to_cgbn(aux_gas_cost, 3*minimum_word_size);
                                 cgbn_add(_arith._env, gas_cost, gas_cost, aux_gas_cost);
                                 byte_data=external_return_data.get(index_s, length_s, error_code);
-                                memory.set(byte_data, dst_offset_s, length_s, gas_cost, error_code);
+                                memory.set(
+                                    byte_data,
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
                             }
                             break;
                         case OP_BLOCKHASH: // BLOCKHASH
@@ -719,11 +773,18 @@ class evm_t {
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 3);
                                 stack.pop(offset, error_code);
-                                offset_s=_arith.from_cgbn_to_size_t(offset);
-                                _arith.from_memory_to_cgbn(value, memory.get(offset_s, 32, gas_cost, error_code));
-                                // print the memory
-
-                                stack.push(value, error_code);
+                                cgbn_set_ui32(_arith._env, length, 32);
+                                byte_data=memory.get(
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
+                                if (error_code == ERR_NONE) {
+                                    _arith.from_memory_to_cgbn(value, byte_data);
+                                    stack.push(value, error_code);
+                                }
                             }
                             break;
                         case OP_MSTORE: // MSTORE
@@ -733,7 +794,15 @@ class evm_t {
                                 offset_s=_arith.from_cgbn_to_size_t(offset);
                                 stack.pop(value, error_code);
                                 _arith.from_cgbn_to_memory(&(tmp_memory[0]), value);
-                                memory.set(&(tmp_memory[0]), offset_s, 32, gas_cost, error_code);
+                                cgbn_set_ui32(_arith._env, length, 32);
+                                memory.set(
+                                    &(tmp_memory[0]),
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
                             }
                             break;
                         case OP_MSTORE8: // MSTORE8
@@ -743,7 +812,26 @@ class evm_t {
                                 offset_s=_arith.from_cgbn_to_size_t(offset);
                                 stack.pop(value, error_code);
                                 _arith.from_cgbn_to_memory(&(tmp_memory[0]), value);
-                                memory.set(&(tmp_memory[0]), offset_s, 1, gas_cost, error_code);
+                                cgbn_set_ui32(_arith._env, length, 1);
+                                ONE_THREAD_PER_INSTANCE(
+                                    printf("memory before set\n");
+                                    memory.print();
+                                    printf("value: %lu\n", _arith.from_cgbn_to_size_t(value));
+                                    printf("tmp_memory:\n");
+                                    print_bytes(&(tmp_memory[WORD_BYTES-1]), 1);
+                                )
+                                memory.set(
+                                    &(tmp_memory[WORD_BYTES-1]),
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
+                                ONE_THREAD_PER_INSTANCE(
+                                    printf("memory after set\n");
+                                    memory.print();
+                                )
                             }
                             break;
                         case OP_SLOAD: // SLOAD
@@ -868,9 +956,7 @@ class evm_t {
                                     access_state,
                                     parents_state,
                                     write_state,
-                                    #ifdef GAS
                                     remaining_gas,
-                                    #endif
                                     #ifdef TRACER
                                     tracer,
                                     trace_pc,
@@ -879,6 +965,7 @@ class evm_t {
                                     OP_CALL,
                                     error_code
                                 );
+                                msg.get_to(to);
                                 contract=write_state.get_account(to, _global_state, access_state, parents_state, dummy_gas, 4);
                             }
                             break;
@@ -894,9 +981,7 @@ class evm_t {
                                     access_state,
                                     parents_state,
                                     write_state,
-                                    #ifdef GAS
                                     remaining_gas,
-                                    #endif
                                     #ifdef TRACER
                                     tracer,
                                     trace_pc,
@@ -905,6 +990,7 @@ class evm_t {
                                     OP_CALLCODE,
                                     error_code
                                 );
+                                msg.get_to(to);
                                 contract=write_state.get_account(to, _global_state, access_state, parents_state, dummy_gas, 4);
                             }
                             break;
@@ -912,16 +998,29 @@ class evm_t {
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 0);
                                 stack.pop(offset, error_code);
-                                offset_s=_arith.from_cgbn_to_size_t(offset);
                                 stack.pop(length, error_code);
                                 length_s=_arith.from_cgbn_to_size_t(length);
-                                byte_data=memory.get(offset_s, length_s, gas_cost, error_code);
-                                returns.set(byte_data, length_s);
-                                error_code=ERR_RETURN;
+                                byte_data=memory.get(
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
+                                if (error_code == ERR_NONE) {
+                                    returns.set(byte_data, length_s);
+                                    error_code=ERR_RETURN;
+                                }
                             }
                             break;
                         case OP_DELEGATECALL: // DELEGATECALL
                             {
+                                ONE_THREAD_PER_INSTANCE(
+                                    printf("DELEGATECALL contract before\n");
+                                    printf("address: %lu\n", _arith.from_cgbn_to_size_t(contract_address));
+                                    printf("code size: %lu\n", contract->code_size);
+                                    print_bytes(contract->bytecode, contract->code_size);
+                                )
                                 call(
                                     contract_address,
                                     storage_address,
@@ -932,9 +1031,7 @@ class evm_t {
                                     access_state,
                                     parents_state,
                                     write_state,
-                                    #ifdef GAS
                                     remaining_gas,
-                                    #endif
                                     #ifdef TRACER
                                     tracer,
                                     trace_pc,
@@ -943,7 +1040,14 @@ class evm_t {
                                     OP_DELEGATECALL,
                                     error_code
                                 );
+                                msg.get_to(to);
                                 contract=write_state.get_account(to, _global_state, access_state, parents_state, dummy_gas, 4);
+                                ONE_THREAD_PER_INSTANCE(
+                                    printf("DELEGATECALL contract after\n");
+                                    printf("address: %lu\n", _arith.from_cgbn_to_size_t(contract_address));
+                                    printf("code size: %lu\n", contract->code_size);
+                                    print_bytes(contract->bytecode, contract->code_size);
+                                )
                             }
                             break;
                         case OP_CREATE2: // CREATE2
@@ -964,9 +1068,7 @@ class evm_t {
                                     access_state,
                                     parents_state,
                                     write_state,
-                                    #ifdef GAS
                                     remaining_gas,
-                                    #endif
                                     #ifdef TRACER
                                     tracer,
                                     trace_pc,
@@ -975,6 +1077,7 @@ class evm_t {
                                     OP_STATICCALL,
                                     error_code
                                 );
+                                msg.get_to(to);
                                 contract=write_state.get_account(to, _global_state, access_state, parents_state, dummy_gas, 4);
                             }
                             break;
@@ -982,10 +1085,15 @@ class evm_t {
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 0);
                                 stack.pop(offset, error_code);
-                                offset_s=_arith.from_cgbn_to_size_t(offset);
                                 stack.pop(length, error_code);
                                 length_s=_arith.from_cgbn_to_size_t(length);
-                                byte_data=memory.get(offset_s, length_s, gas_cost, error_code);
+                                byte_data=memory.get(
+                                    offset,
+                                    length,
+                                    gas_cost,
+                                    remaining_gas,
+                                    error_code
+                                );
                                 returns.set(byte_data, length_s);
                                 error_code=ERR_REVERT;
                             }
@@ -1015,16 +1123,36 @@ class evm_t {
                 #ifdef GAS
                 if (cgbn_compare(_arith._env, remaining_gas, gas_cost)==-1) {
                     error_code=ERR_OUT_OF_GAS;
-                    break;
                 }
                 cgbn_sub(_arith._env, remaining_gas, remaining_gas, gas_cost);
                 #else
                 execution_step=execution_step+1;
                 #endif
+                ONE_THREAD_PER_INSTANCE(
+                    printf("AI error %d\n", error_code);
+                )
                 error=error_code;
-                if (error!=ERR_NONE)
+
+                if ( (error==ERR_RETURN) || (error==ERR_REVERT)) {
+                    ONE_THREAD_PER_INSTANCE(
+                        printf("OUT R error %d\n", error);
+                    )
                     break;
-                pc=pc+1;
+                } else if (error!=ERR_NONE) {
+                    returns.set(NULL, 0);
+                    ONE_THREAD_PER_INSTANCE(
+                        printf(" OUT P error %d\n", error);
+                    )
+                    if (msg.get_depth() > 0) {
+                        error=ERR_REVERT;
+                    }
+                    ONE_THREAD_PER_INSTANCE(
+                        printf("OUT F error %d\n", error);
+                    )
+                    break;
+                } else {
+                    pc=pc+1;
+                }
             }
             if (pc >= contract->code_size) {
                 returns.set(NULL, 0);
@@ -1051,9 +1179,7 @@ class evm_t {
             state_t &access_state,
             state_t &parents_state,
             state_t &write_state,
-            #ifdef GAS
             bn_t &remaining_gas,
-            #endif
             #ifdef TRACER
             tracer_t &tracer,
             uint32_t trace_pc,
@@ -1159,6 +1285,10 @@ class evm_t {
                 cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 9000);
                 // TODO: something with fallback function refund 2300
             }
+            
+            ONE_THREAD_PER_INSTANCE(
+                printf(" DIFF CALL TYPES error %d\n", error_code);
+            )
 
             
             write_state.get_account_nonce(
@@ -1187,11 +1317,25 @@ class evm_t {
             bn_t offset, length;
             size_t offset_s, length_s;
             uint8_t *byte_data;
+            
+            ONE_THREAD_PER_INSTANCE(
+                printf(" BF M error %d\n", error_code);
+            )
             stack.pop(offset, error_code);
             stack.pop(length, error_code);
-            offset_s=_arith.from_cgbn_to_size_t(offset);
             length_s=_arith.from_cgbn_to_size_t(length);
-            byte_data=memory.get(offset_s, length_s, gas_cost, error_code);
+            byte_data=memory.get(
+                offset,
+                length,
+                gas_cost,
+                remaining_gas,
+                error_code
+            );
+            
+            ONE_THREAD_PER_INSTANCE(
+                printf(" AF M error %d\n", error_code);
+            )
+
             byte_data=expand_memory(byte_data, length_s, length_s);
             external_call_msg->data.size=length_s;
             external_call_msg->data.data=byte_data;
@@ -1228,6 +1372,8 @@ class evm_t {
             ONE_THREAD_PER_INSTANCE(
                 printf("msg data size: %lu\n", external_call_msg->data.size);
                 print_bytes(external_call_msg->data.data, external_call_msg->data.size);
+                printf("BEFORE RUN \n");
+                external_msg.print();
             )
             // make the call TODO: look on gas
             run(
@@ -1259,7 +1405,14 @@ class evm_t {
             byte_data=returns.get(0, returns.size(), tmp_error_code);
             byte_data=expand_memory(byte_data, returns.size(), length_s);
             uint8_t *tmp_memory=byte_data;
-            memory.set(byte_data, offset_s, length_s, gas_cost, error_code);
+            memory.set(
+                byte_data,
+                offset,
+                length,
+                gas_cost,
+                remaining_gas,
+                error_code
+            );
             
             #ifdef GAS
             cgbn_load(_arith._env, gas, &call_gas_left);
@@ -1268,7 +1421,7 @@ class evm_t {
                 external_error_code=ERR_OUT_OF_GAS;
             }
             #endif
-            if (external_error_code==ERR_NONE || external_error_code==ERR_RETURN) {
+            if ( (external_error_code==ERR_NONE) || (external_error_code==ERR_RETURN)) {
                 // save the state
                 write_state.copy_from_state_t(external_write_state);
                 cgbn_set_ui32(_arith._env, return_value, 1);

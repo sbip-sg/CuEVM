@@ -24,9 +24,11 @@ class memory_t {
   //content of the memory
   memory_data_t *_content;
   arith_t       _arith;
+  bn_t          _memory_cost;
 
   //constructor
   __host__ __device__ __forceinline__ memory_t(arith_t arith, memory_data_t *content) : _arith(arith), _content(content) {
+    cgbn_set_ui32(_arith._env, _memory_cost, 0);
   }
 
   //get the size of the memory
@@ -48,6 +50,7 @@ class memory_t {
     size_t no_pages = (new_size / PAGE_SIZE) + 1;
     SHARED_MEMORY uint8_t *new_data;
     ONE_THREAD_PER_INSTANCE(
+      printf("allocate_pages: %lx\n", no_pages);
       new_data = (uint8_t *)malloc(no_pages * PAGE_SIZE);
       if (new_data == NULL) {
         error_code = ERR_MEMORY_INVALID_ALLOCATION;
@@ -66,7 +69,7 @@ class memory_t {
     )
   }
 
-  __host__ __device__ __forceinline__ void grow_cost(size_t &new_size, bn_t &gas_cost) {
+  __host__ __device__ __forceinline__ void grow_cost_s(size_t &new_size, bn_t &gas_cost) {
       size_t memory_size_word = (_content->size + 31) / 32;
       size_t new_memory_size_word = (new_size + 31) / 32;
       size_t memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word;
@@ -79,7 +82,84 @@ class memory_t {
       new_size = new_memory_size_word * 32;
   }
 
-  __host__ __device__ __forceinline__ void grow(size_t offset, bn_t &gas_cost, uint32_t &error_code) {
+  __host__ __device__ __forceinline__ size_t grow_cost(bn_t &index, bn_t &length, bn_t &gas_cost, bn_t &remaining_gas, uint32_t &error_code) {
+      ONE_THREAD_PER_INSTANCE(
+        printf("grow_cost: index=%lu, length=%lu\n", _arith.from_cgbn_to_size_t(index), _arith.from_cgbn_to_size_t(length));
+      )
+      bn_t offset;
+      int32_t overflow = cgbn_add(_arith._env, offset, index, length);
+      // verify if is larger than size_t
+      bn_t MAX_SIZE_T;
+      cgbn_set_ui32(_arith._env, MAX_SIZE_T, 1);
+      cgbn_shift_left(_arith._env, MAX_SIZE_T, MAX_SIZE_T, 64);
+      if (cgbn_compare(_arith._env, offset, MAX_SIZE_T) >= 0) {
+        overflow = 1;
+      }
+      // memort_size_word = (last_offset + 31) / 32
+      bn_t memory_size_word;
+      cgbn_add_ui32(_arith._env, memory_size_word, offset, 31);
+      cgbn_div_ui32(_arith._env, memory_size_word, memory_size_word, 32);
+      // memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word
+      bn_t memory_cost;
+      cgbn_mul(_arith._env, memory_cost, memory_size_word, memory_size_word);
+      cgbn_div_ui32(_arith._env, memory_cost, memory_cost, 512);
+      bn_t tmp;
+      cgbn_mul_ui32(_arith._env, tmp, memory_size_word, 3);
+      cgbn_add(_arith._env, memory_cost, memory_cost, tmp);
+      //  gas_cost = gas_cost + memory_cost - old_memory_cost
+      bn_t memory_expansion_cost;
+      if (cgbn_compare(_arith._env, memory_cost, _memory_cost) == 1) {
+        cgbn_sub(_arith._env, memory_expansion_cost, memory_cost, _memory_cost);
+        // set the new memory cost
+        cgbn_set(_arith._env, _memory_cost, memory_cost);
+      } else {
+        cgbn_set_ui32(_arith._env, memory_expansion_cost, 0);
+      }
+      // size is always a multiple of 32
+      cgbn_mul_ui32(_arith._env, offset, memory_size_word, 32);
+      // get the new size
+      size_t new_size;
+      if ( (cgbn_compare(_arith._env, memory_expansion_cost, remaining_gas) == 1) || (overflow != 0) ) {
+        error_code = ERR_OUT_OF_GAS;
+        new_size = 0;
+        if (overflow != 0) {
+          cgbn_add_ui32(_arith._env, memory_expansion_cost, remaining_gas, 1);
+        }
+      } else {
+        new_size = _arith.from_cgbn_to_size_t(offset);
+      }
+      cgbn_add(_arith._env, gas_cost, gas_cost, memory_expansion_cost);
+      ONE_THREAD_PER_INSTANCE(
+        printf("new_size=%lu, gas_cost=%lu, error_code=%d\n", new_size, _arith.from_cgbn_to_size_t(gas_cost), error_code);
+        printf("memory_size_word=%lu, memory_cost=%lu, memory_expansion_cost=%lu\n", _arith.from_cgbn_to_size_t(memory_size_word), _arith.from_cgbn_to_size_t(memory_cost), _arith.from_cgbn_to_size_t(memory_expansion_cost));
+      )
+      return new_size;
+  }
+
+  __host__ __device__ __forceinline__ void grow(bn_t &index, bn_t &length, bn_t &gas_cost, bn_t &remaining_gas, uint32_t &error_code) {
+    size_t offset = grow_cost(index, length, gas_cost, remaining_gas, error_code);
+    ONE_THREAD_PER_INSTANCE(
+      printf("grow_cost: offset=%lu, error_code=%d\n", offset, error_code);
+    )
+    if ( (error_code == ERR_NONE) && (offset > _content->size) ) {
+      _content->size = offset;
+      if (offset > _content->alocated_size) {
+        allocate_pages(offset, error_code);
+      }
+    }
+    ONE_THREAD_PER_INSTANCE(
+      printf("grow: alocated_size=%lu, size=%lu, error_code=%d\n", _content->alocated_size, _content->size, error_code);
+    )
+  }
+  
+  __host__ __device__ __forceinline__ void grow_s(size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
+    size_t offset = index + length;
+    // overflow verification
+    if ( (offset < index) || (offset < length) ) {
+      // maybe set someway of out of gas
+      error_code = ERR_MEMORY_INVALID_ALLOCATION;
+      return;
+    }
     if (offset > _content->size) {
       grow_cost(offset, gas_cost);
       _content->size = offset;
@@ -90,18 +170,48 @@ class memory_t {
   }
 
   //get the data of the memory at a specific index and length
-  __host__ __device__ __forceinline__ uint8_t *get(size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
-    grow(index + length, gas_cost, error_code);
+  __host__ __device__ __forceinline__ uint8_t *get_s(size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
+    grow(index, length, gas_cost, error_code);
     return _content->data + index;
   }
 
-  //set the data of the memory at a specific index and length
-  __host__ __device__ __forceinline__ void set(uint8_t *data, size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
-    grow(index + length, gas_cost, error_code);
+   __host__ __device__ __forceinline__ uint8_t *get(bn_t &index, bn_t &length, bn_t &gas_cost, bn_t &remaining_gas, uint32_t &error_code) {
     ONE_THREAD_PER_INSTANCE(
-      if (data != NULL && length > 0)
+      printf("get: index=%lu, length=%lu, error_code=%d\n", _arith.from_cgbn_to_size_t(index), _arith.from_cgbn_to_size_t(length), error_code);
+    )
+    grow(index, length, gas_cost, remaining_gas, error_code);
+    ONE_THREAD_PER_INSTANCE(
+      printf("get grow\n");
+    )
+    size_t index_s = _arith.from_cgbn_to_size_t(index);
+    ONE_THREAD_PER_INSTANCE(
+      printf("get: index=%lu, length=%lu, error_code=%d\n", index_s, _arith.from_cgbn_to_size_t(length), error_code);
+    )
+    if (error_code == ERR_NONE) {
+      return _content->data + index_s;
+    } else {
+      return NULL;
+    }
+  }
+
+  //set the data of the memory at a specific index and length
+  __host__ __device__ __forceinline__ void set_s(uint8_t *data, size_t index, size_t length, bn_t &gas_cost, uint32_t &error_code) {
+    grow(index, length, gas_cost, error_code);
+    ONE_THREAD_PER_INSTANCE(
+      if ( (data != NULL) && (length > 0) && (error_code == ERR_NONE) )
         memcpy(_content->data + index, data, length);
     )
+  }
+
+  __host__ __device__ __forceinline__ void set(uint8_t *data, bn_t &index, bn_t &length, bn_t &gas_cost, bn_t &remaining_gas, uint32_t &error_code) {
+    grow(index, length, gas_cost, remaining_gas, error_code);
+    size_t index_s = _arith.from_cgbn_to_size_t(index);
+    size_t length_s = _arith.from_cgbn_to_size_t(length);
+    if ( (data != NULL) && (length_s > 0) && (error_code == ERR_NONE) ) {
+      ONE_THREAD_PER_INSTANCE(
+        memcpy(_content->data + index_s, data, length_s);
+      )
+    }
   }
 
 
