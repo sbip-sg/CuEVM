@@ -263,15 +263,6 @@ namespace keccak {
                 tmp_cpu_instances[idx].piln = piln;
                 cudaMalloc((void **)&(state), sizeof(sha3_ctx_t));
                 tmp_cpu_instances[idx].state = state;
-                printf("allocating %d pointer:%p\n", idx, tmp_cpu_instances[idx].state);
-            }
-            // print the instances
-            for (uint32_t idx = 0; idx < count; idx++) {
-                printf("allocating %d pointer:%p\n", idx, tmp_cpu_instances[idx].state);
-                printf("sha3_parameters->piln: %p\n", tmp_cpu_instances[idx].piln);
-                printf("sha3_parameters->rotc: %p\n", tmp_cpu_instances[idx].rotc);
-                printf("sha3_parameters->rndc: %p\n", tmp_cpu_instances[idx].rndc);
-
             }
             cudaMemcpy(gpu_instances, tmp_cpu_instances, sizeof(sha3_parameters_t) * count, cudaMemcpyHostToDevice);
             free(tmp_cpu_instances);
@@ -286,7 +277,6 @@ namespace keccak {
             cudaFree(tmp_cpu_instances[0].rotc);
             cudaFree(tmp_cpu_instances[0].piln);
             for (uint32_t idx = 0; idx < count; idx++) {
-                printf("freeing %d pointer:%p\n", idx, tmp_cpu_instances[idx].state);
                 cudaFree(tmp_cpu_instances[idx].state);
             }
             cudaFree(gpu_instance);

@@ -26,6 +26,9 @@ test_cgbn: src/test/test_cgbn.cu
 interpreter: src/interpreter.cu
 	$(NVCC) -D TRACER $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ $<
 
+debug_interpreter: src/interpreter.cu
+	$(NVCC) -D TRACER $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
+
 cpu_interpreter: src/interpreter.cu
 	$(NVCC) -D TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
 

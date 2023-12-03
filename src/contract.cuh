@@ -321,6 +321,7 @@ class state_t {
         uint32_t tmp_error_code = ERR_SUCCESS;
         contract_t *account = get_local_account(address, tmp_error_code);
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
+            printf("set_local_value: ERR_STATE_INVALID_ADDRESS NOT SUPPOSED TO HAPPEN\n");
             set_local_account(address, account, 1, 1); //without storage // empy account
         }
         account = get_local_account(address, tmp_error_code);
@@ -335,7 +336,7 @@ class state_t {
                     free(account->storage);
                 }
                 account->storage = tmp_storage;
-                account->storage_size++;
+                account->storage_size = account->storage_size+1;
             )
             cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);
             tmp_error_code = ERR_SUCCESS;
@@ -1094,6 +1095,10 @@ __global__ void kernel_get_local_states_S2(typename state_t<params>::state_data_
                 free(src_instances[instance].contracts[idx].bytecode);
             }
             if ( (src_instances[instance].contracts[idx].storage != NULL) && (src_instances[instance].contracts[idx].storage_size > 0) ) {
+                printf("dst storage_size: %lu\n", dst_instances[instance].contracts[idx].storage_size);
+                printf("dst storage: %p\n", dst_instances[instance].contracts[idx].storage);
+                printf("src storage_size: %lu\n", src_instances[instance].contracts[idx].storage_size);
+                printf("src storage: %p\n", src_instances[instance].contracts[idx].storage);
                 memcpy(dst_instances[instance].contracts[idx].storage, src_instances[instance].contracts[idx].storage, src_instances[instance].contracts[idx].storage_size*sizeof(contract_storage_t));
                 free(src_instances[instance].contracts[idx].storage);
             }

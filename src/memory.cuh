@@ -83,9 +83,6 @@ class memory_t {
   }
 
   __host__ __device__ __forceinline__ size_t grow_cost(bn_t &index, bn_t &length, bn_t &gas_cost, bn_t &remaining_gas, uint32_t &error_code) {
-      ONE_THREAD_PER_INSTANCE(
-        printf("grow_cost: index=%lu, length=%lu\n", _arith.from_cgbn_to_size_t(index), _arith.from_cgbn_to_size_t(length));
-      )
       bn_t offset;
       int32_t overflow = cgbn_add(_arith._env, offset, index, length);
       // verify if is larger than size_t
@@ -95,6 +92,11 @@ class memory_t {
       if (cgbn_compare(_arith._env, offset, MAX_SIZE_T) >= 0) {
         overflow = 1;
       }
+      /*
+      ONE_THREAD_PER_INSTANCE(
+        printf("grow_cost: index=%lu, length=%lu\n", _arith.from_cgbn_to_size_t(index), _arith.from_cgbn_to_size_t(length));
+      )
+      */
       // memort_size_word = (last_offset + 31) / 32
       bn_t memory_size_word;
       cgbn_add_ui32(_arith._env, memory_size_word, offset, 31);
@@ -129,10 +131,12 @@ class memory_t {
         new_size = _arith.from_cgbn_to_size_t(offset);
       }
       cgbn_add(_arith._env, gas_cost, gas_cost, memory_expansion_cost);
+      /*
       ONE_THREAD_PER_INSTANCE(
         printf("new_size=%lu, gas_cost=%lu, error_code=%d\n", new_size, _arith.from_cgbn_to_size_t(gas_cost), error_code);
         printf("memory_size_word=%lu, memory_cost=%lu, memory_expansion_cost=%lu\n", _arith.from_cgbn_to_size_t(memory_size_word), _arith.from_cgbn_to_size_t(memory_cost), _arith.from_cgbn_to_size_t(memory_expansion_cost));
       )
+      */
       return new_size;
   }
 
@@ -176,17 +180,22 @@ class memory_t {
   }
 
    __host__ __device__ __forceinline__ uint8_t *get(bn_t &index, bn_t &length, bn_t &gas_cost, bn_t &remaining_gas, uint32_t &error_code) {
+    printf("MEMORY GET\n");
+    grow(index, length, gas_cost, remaining_gas, error_code);
+    /*
     ONE_THREAD_PER_INSTANCE(
       printf("get: index=%lu, length=%lu, error_code=%d\n", _arith.from_cgbn_to_size_t(index), _arith.from_cgbn_to_size_t(length), error_code);
     )
-    grow(index, length, gas_cost, remaining_gas, error_code);
+    */
     ONE_THREAD_PER_INSTANCE(
       printf("get grow\n");
     )
     size_t index_s = _arith.from_cgbn_to_size_t(index);
+    /*
     ONE_THREAD_PER_INSTANCE(
       printf("get: index=%lu, length=%lu, error_code=%d\n", index_s, _arith.from_cgbn_to_size_t(length), error_code);
     )
+    */
     if (error_code == ERR_NONE) {
       return _content->data + index_s;
     } else {
@@ -234,7 +243,11 @@ class memory_t {
     */
       dest->alocated_size = _content->size;
       dest->size = _content->size;
-      memcpy(dest->data, _content->data, _content->size);
+      if (_content->size > 0) {
+        memcpy(dest->data, _content->data, _content->size);
+      } else {
+        dest->data = NULL;
+      }
     /*
     #ifdef __CUDA_ARCH__
     }

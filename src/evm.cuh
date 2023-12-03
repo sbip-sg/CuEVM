@@ -1283,6 +1283,10 @@ class evm_t {
             if (msg.get_depth()==0) {
                 stack.copy_stack_data(call_stack, 0);
                 memory.copy_info(call_memory);
+                ONE_THREAD_PER_INSTANCE(
+                    printf("Final write state:\n");
+                    write_state.print();
+                )
             } else {
                 
                 //memory.free_memory();
@@ -1534,14 +1538,6 @@ class evm_t {
             tracer.push(contract_address, trace_pc, opcode, &stack);
             #endif
             
-            ONE_THREAD_PER_INSTANCE(
-                //printf("BEFORE RUN 1\n");
-                //external_msg.print();
-                //printf("msg data size: %lu\n", external_call_msg->data.size);
-                //print_bytes(external_call_msg->data.data, external_call_msg->data.size);
-                //printf("BEFORE RUN 2\n");
-                //external_msg.print();
-            )
             // if no code size special case
             if (contract->code_size > 0) {
                 
