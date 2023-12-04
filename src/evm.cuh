@@ -11,6 +11,7 @@
 #include "tracer.cuh"
 #include "contract.cuh"
 #include "keccak.cuh"
+#include "jump_destinations.cuh"
 
 template<class params>
 class evm_t {
@@ -246,6 +247,9 @@ class evm_t {
             }
             cgbn_sub(_arith._env, remaining_gas, remaining_gas, gas_cost);
             
+
+            // find the jump destinations for the current code
+            jump_destinations_t D_jumps(contract->bytecode, contract->code_size);
 
 
             pc=0;
@@ -952,38 +956,14 @@ class evm_t {
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 8);
                                 stack.pop(index, error_code);
-                                index_s=_arith.from_cgbn_to_size_t(index);
-                                bn_t MAX_SIZE_T;
-                                cgbn_set_ui32(_arith._env, MAX_SIZE_T, 1);
-                                cgbn_shift_left(_arith._env, MAX_SIZE_T, MAX_SIZE_T, 64);
+                                int32_t overflow = _arith.size_t_from_cgbn(index_s, index);
                                 // veirfy if is a jumpoint dest
-                                if (cgbn_compare(_arith._env, index, MAX_SIZE_T) >= 0) {
-                                    error_code=ERR_INVALID_JUMP_DESTINATION;
-                                } else if (index_s >= contract->code_size) {
-                                    error_code=ERR_INVALID_JUMP_DESTINATION;
-                                } else if (contract->bytecode[index_s]!=OP_JUMPDEST) {
-                                    error_code=ERR_INVALID_JUMP_DESTINATION;
-                                } else {
-                                    // VERIFY if is inside a PUSHX
-                                    //printf("VERIFY INSIDE push index_s: %lu\n", index_s);
-                                    uint32_t last_push_idx=index_s;
-                                    uint32_t push_value=0;
-                                    if (index_s > 1)
-                                    {
-                                        for (uint32_t idx=index_s-1; idx>0; idx--) {
-                                            if ( ((contract->bytecode[idx]&0xF0)==0x60) || ((contract->bytecode[idx]&0xF0)==0x70) ) {
-                                                // PUSH
-                                                last_push_idx=idx;
-                                                push_value=(contract->bytecode[idx]&0x1F) + 1;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    //printf("VERIFY INSIDE push last_push_idx: %d\n", last_push_idx);
-                                    //printf("VERIFY INSIDE push push_value: %d\n", push_value);
-                                    if ( (last_push_idx < index_s) &&
-                                            ((last_push_idx+push_value) >= index_s) ) {
-                                        // inside a push
+                                if (error_code==ERR_NONE) {
+                                    if (overflow) {
+                                        error_code=ERR_INVALID_JUMP_DESTINATION;
+                                    } else if (index_s >= contract->code_size) {
+                                        error_code=ERR_INVALID_JUMP_DESTINATION;
+                                    } else if (D_jumps.has(index_s)==0) {
                                         error_code=ERR_INVALID_JUMP_DESTINATION;
                                     } else {
                                         pc=index_s-1;
@@ -995,46 +975,18 @@ class evm_t {
                             {
                                 cgbn_set_ui32(_arith._env, gas_cost, 10);
                                 stack.pop(index, error_code);
-                                // TODO: verify versus size_t max value
-                                bn_t MAX_SIZE_T;
-                                cgbn_set_ui32(_arith._env, MAX_SIZE_T, 1);
-                                cgbn_shift_left(_arith._env, MAX_SIZE_T, MAX_SIZE_T, 64);
-                                
-                                index_s=_arith.from_cgbn_to_size_t(index);
                                 stack.pop(value, error_code);
-                                if (cgbn_compare_ui32(_arith._env, value, 0)!=0) {
-                                    if (cgbn_compare(_arith._env, index, MAX_SIZE_T) >= 0) {
+                                int32_t overflow = _arith.size_t_from_cgbn(index_s, index);
+                                if ( (cgbn_compare_ui32(_arith._env, value, 0)!=0) &&
+                                     (error_code==ERR_NONE) ) {
+                                    if (overflow) {
                                         error_code=ERR_INVALID_JUMP_DESTINATION;
                                     } else if (index_s >= contract->code_size) {
                                         error_code=ERR_INVALID_JUMP_DESTINATION;
-                                    } else if (contract->bytecode[index_s]!=OP_JUMPDEST) {
+                                    } else if (D_jumps.has(index_s)==0) {
                                         error_code=ERR_INVALID_JUMP_DESTINATION;
                                     } else {
-                                        // VERIFY if is inside a PUSHX
-                                        //printf("VERIFY INSIDE push index_s: %lu\n", index_s);
-                                        uint32_t last_push_idx=index_s;
-                                        uint32_t push_value=0;
-                                        if (index_s > 0)
-                                        {
-                                            for (uint32_t idx=index_s-1; idx>0; idx--) {
-                                                if ( ((contract->bytecode[idx]&0xF0)==0x60) || ((contract->bytecode[idx]&0xF0)==0x70) ) {
-                                                    // PUSH
-                                                    last_push_idx=idx;
-                                                    push_value=(contract->bytecode[idx]&0x1F) + 1;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        //printf("VERIFY INSIDE push last_push_idx: %d\n", last_push_idx);
-                                        //printf("VERIFY INSIDE push push_value: %d\n", push_value);
-                                        if ( (last_push_idx < index_s) &&
-                                             ((last_push_idx+push_value) >= index_s) ) {
-                                            // inside a push
-                                            //pc=last_push_idx+push_value;
-                                            error_code=ERR_INVALID_JUMP_DESTINATION;
-                                        } else {
-                                            pc=index_s-1;
-                                        }
+                                        pc=index_s-1;
                                     }
                                 }
                             }
