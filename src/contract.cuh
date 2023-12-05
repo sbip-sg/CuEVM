@@ -234,32 +234,25 @@ class state_t {
     __host__ __device__ __forceinline__ void set_local_account(bn_t &address, contract_t *account, uint32_t type=0, uint32_t empty=0) {
         uint32_t tmp_error_code = ERR_SUCCESS;
         uint32_t account_idx = get_account_idx_basic(address, tmp_error_code);
-        //printf("set_local_account: %d\n", tmp_error_code);
-        //printf("set_local_account: type: %d empty: %d\n", type, empty);
-        //evm_word_t tmp_address;
-        //cgbn_store(_arith._env, &tmp_address, address);
-        //print_bn<params>(tmp_address);
+        
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
             account_idx = (uint32_t)_content->no_contracts;
         }
-        //printf("set_local_account: account_idx: %d\n", account_idx);
-        //printf("set_local_account: no_contracts: %lu\n", _content->no_contracts);
+        
         SHARED_MEMORY contract_t dup_account;
 
 
         ONE_THREAD_PER_INSTANCE(
-            //contract_t *dup_account;
+            
             if (empty == 1) {
                 // we have to add an empty account
-                //dup_account = get_empty_account();
-                printf("set_local_account: empty\n");
+                
                 dup_account.code_size = 0;
                 dup_account.bytecode = NULL;
                 dup_account.storage_size = 0;
                 dup_account.storage = NULL;
             } else {
-                //dup_account = duplicate_contract(account, type);
-                //dup_account = (contract_t *) malloc(sizeof(contract_t));
+                
                 memcpy(&dup_account, account, sizeof(contract_t));
                 if ( (account->code_size > 0) && (account->bytecode != NULL)) {
                     dup_account.bytecode = (uint8_t *) malloc(account->code_size*sizeof(uint8_t));
@@ -285,7 +278,7 @@ class state_t {
             }
             if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
                 // contract does not exist needs to be added
-                //account_idx = _content->no_contracts;
+                
                 contract_t *tmp_contracts = (contract_t *) malloc((_content->no_contracts+1)*sizeof(contract_t));
                 memcpy(tmp_contracts, _content->contracts, _content->no_contracts*sizeof(contract_t));
                 if (_content->no_contracts > 0) {
@@ -305,14 +298,9 @@ class state_t {
             //free(dup_account);
         )
         if (empty == 1) {
-            //printf("set_local_account: empty\n");
-            //printf("set_local_account: account_idx: %d\n", account_idx);
-            //cgbn_store(_arith._env, &tmp_address, address);
-            //print_bn<params>(tmp_address);
+            
             cgbn_store(_arith._env, &(_content->contracts[account_idx].address), address);
-            //print_bn<params>(_content->contracts[account_idx].address);
-            //printf("set_local_account: contract size: %lu\n", _content->contracts[account_idx].code_size);
-            //printf("set_local_account: storage size: %lu\n", _content->contracts[account_idx].storage_size);
+            
         }
     }
 
@@ -354,36 +342,21 @@ class state_t {
     ) {
         uint32_t tmp_error_code = ERR_SUCCESS;
         evm_word_t tmp_address;
-            //printf("get_account: %d\n", tmp_error_code);
-            //cgbn_store(_arith._env, &tmp_address, address);
-            //print_bn<params>(tmp_address);
         size_t  warm_address=1; // we consider that it is a warm address
         contract_t *account = get_local_account(address, tmp_error_code);
-            //printf("local get_account: %d\n", tmp_error_code);
-            //cgbn_store(_arith._env, &tmp_address, address);
-            //print_bn<params>(tmp_address);
 
         if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
             // account does not exist in the current environment
             // we have too look up
             tmp_error_code = ERR_SUCCESS;
             account = parents.get_local_account(address, tmp_error_code);
-                //printf("parents get_account: %d\n", tmp_error_code);
-                //cgbn_store(_arith._env, &tmp_address, address);
-                //print_bn<params>(tmp_address);
             if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
                 tmp_error_code = ERR_SUCCESS;
                 account = access_list.get_local_account(address, tmp_error_code);
-                    //printf("access get_account: %d\n", tmp_error_code);
-                    //cgbn_store(_arith._env, &tmp_address, address);
-                    //print_bn<params>(tmp_address);
                 if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) { // we have to go to global state
                     warm_address=0;
                     tmp_error_code = ERR_SUCCESS;
                     account = global.get_local_account(address, tmp_error_code);
-                        //printf("global get_account: %d\n", tmp_error_code);
-                        //cgbn_store(_arith._env, &tmp_address, address);
-                        //print_bn<params>(tmp_address);
                     if (tmp_error_code == ERR_STATE_INVALID_ADDRESS) {
                         // account does not exist in the global state
                         // we have to create it
@@ -587,37 +560,22 @@ class state_t {
         bn_t dummy_gas_cost;
         //evm_word_t tmp_value;
         access_list.get_local_value(address, key, original_value, tmp_error_code);
-        //printf("SSTORE original_value error_code: %d\n", tmp_error_code);
         get_value(address, key, current_value, global, access_list, parents, dummy_gas_cost);
-        //printf("SSTORE current_value: \n");
-        //cgbn_store(_arith._env, &tmp_value, current_value);
-        //print_bn<params>(tmp_value);
         if (tmp_error_code != ERR_SUCCESS) {
             warm_key=0;
             tmp_error_code = ERR_SUCCESS;
             access_list.get_local_value(address, key, original_value, tmp_error_code);
         }
-        //printf("SSTORE original_value: \n");
-        //cgbn_store(_arith._env, &tmp_value, original_value);
-        //print_bn<params>(tmp_value);
 
         set_local_value(address, key, value);
 
-        //printf("SSTORE value: \n");
-        //cgbn_store(_arith._env, &tmp_value, value);
-        //print_bn<params>(tmp_value);
-
         if (cgbn_compare(_arith._env, value, current_value) == 0) {
-            //printf("SSTORE current_value == value\n");
             cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 100);
         } else {
             if(cgbn_compare(_arith._env, current_value, original_value) == 0) {
-                //printf("SSTORE current_value == original_value\n");
                 if(cgbn_compare_ui32(_arith._env, original_value, 0) == 0) {
-                    //printf("SSTORE original_value == 0\n");
                     cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 20000);
                 } else {
-                    //printf("SSTORE original_value != 0\n");
                     cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 2900);
                 }
             } else {
@@ -658,7 +616,6 @@ class state_t {
                 }
             }
         }
-        //printf("SSTORE warm_key: %lu\n", warm_key);
         if (warm_key == 1) {
             cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 0);
         } else {
@@ -1095,10 +1052,6 @@ __global__ void kernel_get_local_states_S2(typename state_t<params>::state_data_
                 free(src_instances[instance].contracts[idx].bytecode);
             }
             if ( (src_instances[instance].contracts[idx].storage != NULL) && (src_instances[instance].contracts[idx].storage_size > 0) ) {
-                printf("dst storage_size: %lu\n", dst_instances[instance].contracts[idx].storage_size);
-                printf("dst storage: %p\n", dst_instances[instance].contracts[idx].storage);
-                printf("src storage_size: %lu\n", src_instances[instance].contracts[idx].storage_size);
-                printf("src storage: %p\n", src_instances[instance].contracts[idx].storage);
                 memcpy(dst_instances[instance].contracts[idx].storage, src_instances[instance].contracts[idx].storage, src_instances[instance].contracts[idx].storage_size*sizeof(contract_storage_t));
                 free(src_instances[instance].contracts[idx].storage);
             }

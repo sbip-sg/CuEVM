@@ -215,11 +215,6 @@ class evm_t {
             tmp_contract = write_state.get_account(storage_address, _global_state, access_state, parents_state, dummy_gas, 4); //get the code
             
             write_state.set_local_account(storage_address, tmp_contract, 1);
-            ONE_THREAD_PER_INSTANCE(
-                printf(" STORAGE CONTRACT\n");
-                printf(" STORAGE code size: %lu\n", tmp_contract->code_size);
-                print_bytes(tmp_contract->bytecode, tmp_contract->code_size);
-            )
             // get the gas from message
             msg.get_gas(remaining_gas);
             cgbn_set_ui32(_arith._env, gas_cost, 0);
@@ -227,8 +222,6 @@ class evm_t {
             // calculate the initial transaction cost
             // add the cost for call data
             if (msg.get_depth() == 0) {
-                //printf("depth 0\n");
-                //printf("msg data size: %lu\n", msg.get_data_size());
                 byte_data=msg.get_data(0, msg.get_data_size(), size_s);
                 for (uint32_t idx=0; idx<size_s; idx++) {
                     if (byte_data[idx]==0) {
@@ -237,13 +230,10 @@ class evm_t {
                         cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 16);
                     }
                 }
-                //printf("gas cost: %lu\n", _arith.from_cgbn_to_size_t(gas_cost));
                 // add the transaction cost
                 cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 21000);
-                // cgbn_mul_ui32(_arith._env, gas_cost, gas_cost, 2);
                 // add the access list cost
                 // cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 5200);
-                //printf("gas cost: %lu\n", _arith.from_cgbn_to_size_t(gas_cost));
             }
             cgbn_sub(_arith._env, remaining_gas, remaining_gas, gas_cost);
             
@@ -903,28 +893,6 @@ class evm_t {
                                 cgbn_set_ui32(_arith._env, gas_refund, 0);
                                 stack.pop(key, error_code);
                                 stack.pop(value, error_code);
-                                /*
-                                evm_word_t tmp_print_value;
-                                printf("SSTORE key: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), key);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE value: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), value);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE storage_address: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), storage_address);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE gas_cost: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), gas_cost);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE remaining_gas: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), remaining_gas);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE gas_refund: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), gas_refund);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE error_code: %d\n", error_code);
-                                */
                                 write_state.set_value(
                                     storage_address,
                                     key,
@@ -935,19 +903,6 @@ class evm_t {
                                     gas_cost,
                                     gas_refund
                                 );
-                                /*
-                                printf("SSTORE gas_cost: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), gas_cost);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE remaining_gas: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), remaining_gas);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE gas_refund: \n");
-                                cgbn_store(_arith._env, &(tmp_print_value), gas_refund);
-                                print_bn<params>(tmp_print_value);
-                                printf("SSTORE error_code: %d\n", error_code);
-                                cgbn_add(_arith._env, remaining_gas, remaining_gas, gas_refund);
-                                */
                             }
                             break;
                         // TODO: for jump verify is PUSHX the jump destination
@@ -1235,10 +1190,6 @@ class evm_t {
             if (msg.get_depth()==0) {
                 stack.copy_stack_data(call_stack, 0);
                 memory.copy_info(call_memory);
-                ONE_THREAD_PER_INSTANCE(
-                    printf("Final write state:\n");
-                    write_state.print();
-                )
             } else {
                 
                 //memory.free_memory();
@@ -1296,11 +1247,7 @@ class evm_t {
             bn_t return_value;
             //evm_word_t tmp_evm_word;;
             cgbn_set_ui32(_arith._env, gas_cost, 0);
-            //stack.print();
             stack.pop(gas, error_code);
-            //printf("gas to send from stack:\n");
-            //cgbn_store(_arith._env, &tmp_evm_word, gas);
-            //print_bn<params>(tmp_evm_word);
 
             stack.pop(to, error_code);
             // make the cost for accesing the state
@@ -1312,15 +1259,7 @@ class evm_t {
                 gas_cost,
                 4 //code
             );
-            // gas cost for address access
-            //printf("gas cost for address access:\n");
-            //cgbn_store(_arith._env, &tmp_evm_word, gas_cost);
-            //print_bn<params>(tmp_evm_word);
 
-
-
-
-            //printf("call_type: %d\n", call_type);
             if (call_type==OP_CALL) {
                 stack.pop(value, error_code);
                 cgbn_set(_arith._env, caller, contract_address);
@@ -1361,9 +1300,6 @@ class evm_t {
             // positive value cost
             if ((call_type == OP_CALL) || (call_type == OP_CALLCODE)) {
                 if (cgbn_compare_ui32(_arith._env, value, 0)==1) {
-                    //printf("value cost:\n");
-                    //cgbn_store(_arith._env, &tmp_evm_word, value);
-                    //print_bn<params>(tmp_evm_word);
                     if (msg.get_call_type() == OP_STATICCALL) {
                         error_code=ERR_STATIC_CALL_CONTEXT;
                     }
@@ -1371,11 +1307,6 @@ class evm_t {
                     // TODO: something with fallback function refund 2300
                 }
             }
-            
-
-            //printf("gas cost for special casese:\n");
-            //cgbn_store(_arith._env, &tmp_evm_word, gas_cost);
-            //print_bn<params>(tmp_evm_word);
             
             write_state.get_account_nonce(
                 caller,
@@ -1413,11 +1344,6 @@ class evm_t {
                 remaining_gas,
                 error_code
             );
-
-            
-            //printf("gas cost for gettting call data:\n");
-            //cgbn_store(_arith._env, &tmp_evm_word, gas_cost);
-            //print_bn<params>(tmp_evm_word);
             
             
             byte_data=expand_memory(byte_data, length_s, length_s);
@@ -1447,16 +1373,6 @@ class evm_t {
                 remaining_gas,
                 error_code
             );
-
-            
-            //printf("gas cost for setting return data:\n");
-            //cgbn_store(_arith._env, &tmp_evm_word, gas_cost);
-            //print_bn<params>(tmp_evm_word);
-
-            //cgbn_store(_arith._env, &tmp_evm_word, gas);
-            // make the capped gas
-            //printf("gas to send:\n");
-            //print_bn<params>(tmp_evm_word);
             if (cgbn_compare(_arith._env, remaining_gas, gas_cost)==-1) {
                 error_code=ERR_OUT_OF_GAS;
                 return;
@@ -1468,10 +1384,6 @@ class evm_t {
                 cgbn_set(_arith._env, gas, capped_gas);
             }
             cgbn_sub(_arith._env, remaining_gas, remaining_gas, gas);
-            
-            //cgbn_store(_arith._env, &tmp_evm_word, gas);
-            //printf("capped gas to send:\n");
-            //print_bn<params>(tmp_evm_word);
 
             cgbn_store(_arith._env, &(external_call_msg->gas), gas);
 
