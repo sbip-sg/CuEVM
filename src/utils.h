@@ -17,6 +17,7 @@
 #include "opcodes.h"
 #include "error_codes.h"
 #include "arith.cuh"
+#include "gas_cost.h"
 
 #ifdef __CUDA_ARCH__
 #ifndef MULTIPLE_THREADS_PER_INSTANCE

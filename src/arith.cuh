@@ -21,6 +21,9 @@ class arith_env_t {
   typedef typename env_t::cgbn_t                 bn_t;
   typedef typename env_t::cgbn_wide_t            bn_wide_t;
   typedef cgbn_mem_t<params::BITS>               evm_word_t;
+  static const uint32_t                          BITS = params::BITS;
+  static const uint32_t                          BYTES = params::BITS/8;
+  static const uint32_t                          LIMBS = params::BITS/32;
   
   context_t _context;
   env_t     _env;
@@ -89,6 +92,27 @@ class arith_env_t {
       sprintf(hex_string+2+idx*8, "%08x", a._limbs[count-1-idx]);
     }
     hex_string[count*8+2] = '\0';
+  }
+
+  __host__ int32_t cgbn_memory_from_hex_string(evm_word_t &a, char *hex_string) {
+    mpz_t value;
+    size_t written;
+    mpz_init(value);
+    if ((hex_string[0] == '0') &&
+    ((hex_string[1] == 'x') || (hex_string[1] == 'X'))) {
+      mpz_set_str(value, hex_string+2, 16);
+    } else {
+      mpz_set_str(value, hex_string, 16);
+    }
+    if(mpz_sizeinbase(value, 2) > BITS) {
+      return 1;
+    }
+    mpz_export(a._limbs, &written, -1, sizeof(uint32_t), 0, 0, value);
+    while(written < LIMBS) {
+      a._limbs[written++] = 0;
+    }
+    mpz_clear(value);
+    return 0;
   }
 
 };
