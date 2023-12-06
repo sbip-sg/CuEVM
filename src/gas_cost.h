@@ -2,9 +2,9 @@
 #define __GAS_COST_H__
 
 #define GAS_ZERO 0
-#define GAS_JUMPDEST 1
+#define GAS_JUMP_DEST 1
 #define GAS_BASE 2
-#define GAS_VERYLOW 3
+#define GAS_VERY_LOW 3
 #define GAS_LOW 5
 #define GAS_MID 8
 #define GAS_HIGH 10
@@ -15,9 +15,9 @@
 #define GAS_ACCESS_LIST_STORAGE 1900
 #define GAS_COLD_ACCOUNT_ACCESS 2600
 #define GAS_COLD_SLOAD 2100
-#define GAS_SSET 20000
-#define GAS_SRESET 2900
-#define REFUND_SCLEAR 4800 //can be defined as GAS_SRESET + GAS_ACCESS_LIST_STORAGE
+#define GAS_STORAGE_SET 20000
+#define GAS_STORAGE_RESET 2900
+#define GAS_STORAGE_CLEAR_REFUND 4800 //can be defined as GAS_SRESET + GAS_ACCESS_LIST_STORAGE
 #define GAS_SELFDESTRUCT 5000
 #define GAS_CREATE 32000
 #define GAS_CODE_DEPOSIT 200
@@ -38,6 +38,7 @@
 #define GAS_KECCAK256_WORD 6
 #define GAS_COPY 3
 #define GAS_BLOCKHASH 20
+#define GAS_STIPEND 2300
 
 
 #endif  // __GAS_COST_H__
