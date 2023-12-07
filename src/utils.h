@@ -25,7 +25,7 @@
 #endif
 #endif
 #ifdef MULTIPLE_THREADS_PER_INSTANCE
-#define ONE_THREAD_PER_INSTANCE(X) if (threadIdx.x == 0) { X } __syncthreads();
+#define ONE_THREAD_PER_INSTANCE(X) __syncthreads(); if (threadIdx.x == 0) { X } __syncthreads();
 #define SHARED_MEMORY __shared__
 #else
 #define ONE_THREAD_PER_INSTANCE(X) X

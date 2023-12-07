@@ -14,7 +14,7 @@ Or for running with cpu
 
 ## Usage 
 
-* `compute-sanitizer ./out/interpreter --input [inpot_json_file] --output [output_json_file]`
+* `compute-sanitizer --tool memcheck --leak-check=full ./out/interpreter --input [inpot_json_file] --output [output_json_file]`
 Or for running with cpu
 * `./out/cpu_interpreter --input [inpot_json_file] --output [output_json_file]`
 Easy test:
