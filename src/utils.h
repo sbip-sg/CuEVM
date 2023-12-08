@@ -115,12 +115,6 @@ class mr_params_t {
 typedef mr_params_t<8, 256, 1, 1024, 4096, 50> utils_params;
 
 
-typedef struct
-{
-  size_t size;
-  uint8_t *data;
-} data_content_t;
-
 
 __host__ void from_mpz(uint32_t *words, uint32_t count, mpz_t value) {
   size_t written;
@@ -139,32 +133,6 @@ __host__ void to_mpz(mpz_t r, uint32_t *x, uint32_t count) {
   mpz_import(r, count, -1, sizeof(uint32_t), 0, 0, x);
 }
 
-template<class params>
-__host__ __device__ void print_bn(cgbn_mem_t<params::BITS> bn) {
-  for(size_t idx=0; idx<params::BITS/32; idx++)
-    printf("%08x ", bn._limbs[params::BITS/32 - 1 - idx]);
-  printf("\n");
-}
-
-__host__ __device__ void print_bytes(uint8_t *bytes, size_t count) {
-  for(size_t idx=0; idx<count; idx++)
-    printf("%02x", bytes[idx]);
-  printf("\n");
-}
-
-char *bytes_to_hex(uint8_t *bytes, size_t count) {
-  char *hex_string = (char *)malloc(count*2+1);
-  char *return_string = (char *)malloc(count*2+1+2);
-  for(size_t idx=0; idx<count; idx++)
-    sprintf(&hex_string[idx*2], "%02x", bytes[idx]);
-  hex_string[count*2]=0;
-  strcpy(return_string + 2, hex_string);
-  free(hex_string);
-  return_string[0]='0';
-  return_string[1]='x';
-  return return_string;
-}
-
 __host__ cJSON *get_json_from_file(const char *filepath) {
     FILE *fp = fopen(filepath, "r");
     fseek(fp, 0, SEEK_END);
@@ -180,13 +148,73 @@ __host__ cJSON *get_json_from_file(const char *filepath) {
     return root;
 }
 
-__host__ __device__ uint8_t *expand_memory(uint8_t *memory, size_t current_size, size_t new_size) {
+
+// data content ==BEGIN==
+
+typedef struct
+{
+  size_t size;
+  uint8_t *data;
+} data_content_t;
+
+
+__host__ char *bytes_to_hex(uint8_t *bytes, size_t count) {
+  char *hex_string = new char[count*2+1];
+  char *return_string = new char[count*2+1+2];
+  for(size_t idx=0; idx<count; idx++)
+    sprintf(&hex_string[idx*2], "%02x", bytes[idx]);
+  hex_string[count*2]=0;
+  strcpy(return_string + 2, hex_string);
+  delete[] hex_string;
+  hex_string = NULL;
+  return_string[0]='0';
+  return_string[1]='x';
+  return return_string;
+}
+
+__host__ __device__ __forceinline__ void print_bytes(uint8_t *bytes, size_t count) {
+  printf("data: ");
+  for(size_t idx=0; idx<count; idx++)
+    printf("%02x", bytes[idx]);
+  printf("\n");
+}
+
+__host__ __device__ __forceinline__ void print_data_content(data_content_t &data_content) {
+  printf("size: %lu\n", data_content.size);
+  print_bytes(data_content.data, data_content.size);
+}
+
+__host__ __forceinline__ cJSON *json_from_data_content(data_content_t &data_content) {
+  cJSON *data_json = cJSON_CreateObject();
+  char *hex_string;
+  //cJSON_AddNumberToObject(json, "size", data_content.size);
+  if (data_content.size > 0)
+  {
+    hex_string = bytes_to_hex(data_content.data, data_content.size);
+    cJSON_AddStringToObject(data_json, "data", hex_string);
+    free(hex_string);
+  } else {
+    cJSON_AddStringToObject(data_json, "data", "0x");
+  }
+  return data_json;
+}
+
+
+template<class params>
+__host__ __device__ __forceinline__ void print_bn(cgbn_mem_t<params::BITS> bn) {
+  for(size_t idx=0; idx<params::BITS/32; idx++)
+    printf("%08x ", bn._limbs[params::BITS/32 - 1 - idx]);
+  printf("\n");
+}
+
+
+__host__ __device__ __forceinline__ uint8_t *expand_memory(uint8_t *memory, size_t current_size, size_t new_size) {
   SHARED_MEMORY uint8_t *new_memory;
 
   ONE_THREAD_PER_INSTANCE(
     new_memory = NULL;
     if (new_size != 0) {
-      new_memory = (uint8_t *)malloc(new_size);
+      new_memory = new uint8_t[new_size];
       memset(new_memory, 0, new_size);
       if ((memory != NULL) && (current_size > 0))
         if (current_size > new_size)
@@ -198,4 +226,8 @@ __host__ __device__ uint8_t *expand_memory(uint8_t *memory, size_t current_size,
   )
   return new_memory;
 }
+
+// data content ==END==
+
+
 #endif

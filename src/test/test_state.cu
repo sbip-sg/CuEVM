@@ -29,18 +29,7 @@ __host__ __device__ __forceinline__ void test_storage(
   touch_state_t *parent_1_touch_state;
   touch_state_t *parent_2_touch_state;
 
-  /*
-  SHARED_MEMORY accessed_state_data_t *shared_access_state_data;
-  ONE_THREAD_PER_INSTANCE(
-    shared_access_state_data=new accessed_state_data_t;
-    shared_access_state_data->accessed_accounts.no_accounts = 0;
-    shared_access_state_data->accessed_accounts.accounts = NULL;
-    shared_access_state_data->reads = NULL;
-
-  )
-  */
   world_state=new world_state_t(arith, world_state_data);
-  //access_state=new accessed_state_t(shared_access_state_data, world_state);
   access_state=new accessed_state_t(world_state);
   parent_2_touch_state=new touch_state_t(access_state, NULL);
   parent_1_touch_state=new touch_state_t(access_state, parent_2_touch_state);
@@ -268,7 +257,7 @@ void run_test(uint32_t instance_count) {
     access_state=NULL;
   }
   cJSON_AddItemToObject(root, "post", post);
-  cpu_world_state->free_world_state_data();
+  cpu_world_state->free_content();
   delete cpu_world_state;
   cpu_world_state=NULL;
   delete[] cpu_access_states_data;

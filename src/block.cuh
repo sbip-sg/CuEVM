@@ -1,339 +1,421 @@
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2023-11-30
+// SPDX-License-Identifier: MIT
+
 #ifndef _BLOCK_H_
 #define _BLOCK_H_
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <cuda.h>
-#include <gmp.h>
-#ifndef __CGBN_H__
-#define __CGBN_H__
-#include <cgbn/cgbn.h>
-#endif
 #include "utils.h"
 
+/**
+ * The block class is used to store the block information
+ * before the transaction are done. YP: H
+ */
+template <class params>
+class block_t
+{
+public:
+  /**
+   * The arithmetical environment used by the arbitrary length
+   * integer library.
+   */
+  typedef arith_env_t<params> arith_t;
+  /**
+   * The arbitrary length integer type.
+   */
+  typedef typename arith_t::bn_t bn_t;
+  /**
+   * The arbitrary length integer type used for the storage.
+   * It is defined as the EVM word type.
+   */
+  typedef cgbn_mem_t<params::BITS> evm_word_t;
 
-
-template<class params>
-class block_t {
-  public:
-  typedef typename arith_env_t<params>::bn_t      bn_t;
-  typedef cgbn_mem_t<params::BITS>                evm_word_t;
-  typedef arith_env_t<params>                     arith_t;
-
-  
-  typedef struct {
-    evm_word_t number;
-    evm_word_t hash;
+  /**
+   * The previous block hash information.
+   *  (YP: \f$P(h, n, a)\f$)
+  */
+  typedef struct
+  {
+    evm_word_t number; /**< The number of the block 0 if none */
+    evm_word_t hash;  /**< The hash of the block */
   } block_hash_t;
 
-  typedef struct {
-    evm_word_t    coin_base;
-    evm_word_t    time_stamp;
-    evm_word_t    number;
-    evm_word_t    difficulty;
-    evm_word_t    gas_limit;
-    evm_word_t    chain_id;
-    evm_word_t    base_fee;
-    block_hash_t  previous_blocks[256];
+  /**
+   * The block information.
+   *  (YP: \f$H\f$)
+   * It does NOT contains:
+   *  the ommers or their hases (YP: \f$U, H_{o}\f$)
+   *  the state root (YP: \f$S, H_{r}\f$)
+   *  the transactions root (YP: \f$T, H_{t}\f$)
+   *  the receipts root (YP: \f$R, H_{e}\f$)
+   *  the logs bloom (YP: \f$H_{b}\f$)
+   *  the gas used (YP: \f$H_{g}\f$)
+   *  the extra data (YP: \f$H_{x}\f$)
+   *  the mix hash (YP: \f$H_{m}\f$)
+   *  the nonce (YP: \f$H_{n}\f$)
+  */
+  typedef struct
+  {
+    evm_word_t coin_base; /**< The address of the block miner (YP: \f$H_{c}\f$) */
+    evm_word_t difficulty; /**< The difficulty of the block (YP: \f$H_{d}\f$) */
+    evm_word_t number; /**< The number of the block (YP: \f$H_{i}\f$) */
+    evm_word_t gas_limit; /**< The gas limit of the block (YP: \f$H_{l}\f$) */
+    evm_word_t time_stamp; /**< The timestamp of the block (YP: \f$H_{s}\f$) */
+    evm_word_t base_fee; /**< The base fee of the block (YP: \f$H_{f}\f$)*/
+    evm_word_t chain_id; /**< The chain id of the block */
+    block_hash_t previous_blocks[256]; /**< The previous block hashes (YP: \f$H_{p}\f$) */
   } block_data_t;
 
-  block_data_t          *_content;
-  arith_t   _arith;
+  block_data_t *_content; /**< The block information content */
+  arith_t _arith; /**< The arithmetical environment */
 
-  __device__ block_t(arith_t arith, block_data_t *content)  : _arith(arith), _content(content) {
+  /**
+   * The constructor of the block class.
+   * @param arith The arithmetical environment
+   * @param content The block information content
+   */
+  __device__ __forceinline__ block_t(
+      arith_t arith,
+      block_data_t *content
+  ) : _arith(arith),
+      _content(content)
+  {
   }
 
-  __host__ static block_data_t *get_instance(const cJSON * test) {
-    block_data_t *cpu_block=(block_data_t *)malloc(sizeof(block_data_t));
-    // block related info
-    mpz_t coin_base, time_stamp, number, difficulty, gas_limit, chain_id, base_fee;
-    // previous blocks info
-    mpz_t number_prev, hash_prev;
-    mpz_init(coin_base);
-    mpz_init(time_stamp);
-    mpz_init(number);
-    mpz_init(difficulty);
-    mpz_init(gas_limit);
-    mpz_init(chain_id);
-    mpz_init(base_fee);
-    mpz_init(number_prev);
-    mpz_init(hash_prev);
-    char *hex_string=NULL;
-    cJSON *block_json=NULL;
-    cJSON *coin_base_json=NULL;
-    cJSON *time_stamp_json=NULL;
-    cJSON *number_json=NULL;
-    cJSON *difficulty_json=NULL;
-    cJSON *gas_limit_json=NULL;
-    cJSON *chain_id_json=NULL;
-    cJSON *base_fee_json=NULL;
-    cJSON *previous_blocks_json=NULL;
-    cJSON *previous_block_json=NULL;
-    cJSON *number_prev_json=NULL;
-    cJSON *hash_prev_json=NULL;
-    size_t idx=0, jdx=0;
+  /**
+   * The constructor of the block class.
+   * @param arith The arithmetical environment
+   * @param test The block information in JSON format
+   */
+  __host__ block_t(
+      arith_t arith,
+      const cJSON *test
+  ) : _arith(arith)
+  {
+    cJSON *block_json = NULL;
+    cJSON *element_json = NULL;
+    cJSON *previous_blocks_json = NULL;
+    size_t idx = 0;
+    _content = NULL;
+#ifndef ONLY_CPU
+    CUDA_CHECK(cudaMallocManaged(
+        (void **)&(_content),
+        sizeof(block_data_t)));
+#else
+    _content = new block_data_t;
+#endif
 
-    block_json=cJSON_GetObjectItemCaseSensitive(test, "env");
+    block_json = cJSON_GetObjectItemCaseSensitive(test, "env");
 
-    coin_base_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentCoinbase");
-    hex_string = coin_base_json->valuestring;
-    adjusted_length(&hex_string);
-    mpz_set_str(coin_base, hex_string, 16);
-    from_mpz(cpu_block->coin_base._limbs, params::BITS/32, coin_base);
+    element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentCoinbase");
+    _arith.cgbn_memory_from_hex_string(
+      _content->coin_base,
+      element_json->valuestring
+    );
 
-    time_stamp_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentTimestamp");
-    hex_string = time_stamp_json->valuestring;
-    adjusted_length(&hex_string);
-    mpz_set_str(time_stamp, hex_string, 16);
-    from_mpz(cpu_block->time_stamp._limbs, params::BITS/32, time_stamp);
+    element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentTimestamp");
+    _arith.cgbn_memory_from_hex_string(
+      _content->time_stamp,
+      element_json->valuestring
+    );
 
-    number_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentNumber");
-    hex_string = number_json->valuestring;
-    adjusted_length(&hex_string);
-    mpz_set_str(number, hex_string, 16);
-    from_mpz(cpu_block->number._limbs, params::BITS/32, number);
+    element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentNumber");
+    _arith.cgbn_memory_from_hex_string(
+      _content->number,
+      element_json->valuestring
+    );
 
-    difficulty_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentDifficulty");
-    hex_string = difficulty_json->valuestring;
-    adjusted_length(&hex_string);
-    mpz_set_str(difficulty, hex_string, 16);
-    from_mpz(cpu_block->difficulty._limbs, params::BITS/32, difficulty);
+    element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentDifficulty");
+    _arith.cgbn_memory_from_hex_string(
+      _content->difficulty,
+      element_json->valuestring
+    );
 
-    gas_limit_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentGasLimit");
-    hex_string = gas_limit_json->valuestring;
-    adjusted_length(&hex_string);
-    mpz_set_str(gas_limit, hex_string, 16);
-    from_mpz(cpu_block->gas_limit._limbs, params::BITS/32, gas_limit);
+    element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentGasLimit");
+    _arith.cgbn_memory_from_hex_string(
+      _content->gas_limit,
+      element_json->valuestring
+    );
 
-    //chain_id_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentChainId");
-    //hex_string = chain_id_json->valuestring;
-    //adjusted_length(&hex_string);
-    //mpz_set_str(chain_id, hex_string, 16);
-    //from_mpz(cpu_block->chain_id._limbs, params::BITS/32, chain_id);
-    mpz_set_ui(chain_id, 1); //mainnet
-    from_mpz(cpu_block->chain_id._limbs, params::BITS/32, chain_id);
+    // element_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentChainId");
+    //_arith.cgbn_memory_from_hex_string(_content->chain_id, element_json->valuestring);
+    _arith.cgbn_memory_from_size_t(_content->chain_id, 1);
 
-    base_fee_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentBaseFee");
-    hex_string = base_fee_json->valuestring;
-    adjusted_length(&hex_string);
-    mpz_set_str(base_fee, hex_string, 16);
-    from_mpz(cpu_block->base_fee._limbs, params::BITS/32, base_fee);
+    element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentBaseFee");
+    _arith.cgbn_memory_from_hex_string(
+      _content->base_fee,
+      element_json->valuestring
+    );
 
-    
-    previous_blocks_json=cJSON_GetObjectItemCaseSensitive(block_json, "previousHashes");
-    if (previous_blocks_json != NULL and cJSON_IsArray(previous_blocks_json)) {
-      jdx=0;
-      cJSON_ArrayForEach(previous_block_json, previous_blocks_json) {
-        number_prev_json=cJSON_GetObjectItemCaseSensitive(previous_block_json, "number");
-        hex_string = number_prev_json->valuestring;
-        adjusted_length(&hex_string);
-        mpz_set_str(number_prev, hex_string, 16);
-        from_mpz(cpu_block->previous_blocks[jdx].number._limbs, params::BITS/32, number_prev);
+    previous_blocks_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHashes");
+    if (previous_blocks_json != NULL and cJSON_IsArray(previous_blocks_json))
+    {
+      idx = 0;
+      cJSON_ArrayForEach(element_json, previous_blocks_json)
+      {
+        element_json = cJSON_GetObjectItemCaseSensitive(element_json, "number");
+        _arith.cgbn_memory_from_hex_string(
+          _content->previous_blocks[idx].number,
+          element_json->valuestring
+        );
 
-        hash_prev_json=cJSON_GetObjectItemCaseSensitive(previous_block_json, "hash");
-        hex_string = hash_prev_json->valuestring;
-        adjusted_length(&hex_string);
-        mpz_set_str(hash_prev, hex_string, 16);
-        from_mpz(cpu_block->previous_blocks[jdx].hash._limbs, params::BITS/32, hash_prev);
-        jdx++;
+        element_json = cJSON_GetObjectItemCaseSensitive(element_json, "hash");
+        _arith.cgbn_memory_from_hex_string(
+          _content->previous_blocks[idx].hash,
+          element_json->valuestring
+        );
+        idx++;
       }
-    } else {
-      jdx=0;
-      previous_block_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");
-      mpz_sub_ui(number_prev, number, 1);
-      from_mpz(cpu_block->previous_blocks[0].number._limbs, params::BITS/32, number_prev);
+    }
+    else
+    {
+      idx = 0;
+      _arith.cgbn_memory_from_size_t(_content->previous_blocks[0].number, 1);
 
-      hex_string = previous_block_json->valuestring;
-      adjusted_length(&hex_string);
-      mpz_set_str(hash_prev, hex_string, 16);
-      from_mpz(cpu_block->previous_blocks[0].hash._limbs, params::BITS/32, hash_prev);
-      jdx++;
+      element_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");
+      _arith.cgbn_memory_from_hex_string(
+        _content->previous_blocks[0].hash,
+        element_json->valuestring
+      );
+      idx++;
     }
 
-    for(idx=jdx; idx<256; idx++) {
-      mpz_set_ui(number_prev, 0);
-      from_mpz(cpu_block->previous_blocks[idx].number._limbs, params::BITS/32, number_prev);
-      mpz_set_ui(hash_prev, 0);
-      from_mpz(cpu_block->previous_blocks[idx].hash._limbs, params::BITS/32, hash_prev);
+    // fill the remaing parents with 0
+    for (size_t jdx = idx; jdx < 256; jdx++)
+    {
+      _arith.cgbn_memory_from_size_t(_content->previous_blocks[jdx].number, 0);
+      _arith.cgbn_memory_from_size_t(_content->previous_blocks[jdx].hash, 0);
     }
-
-    mpz_clear(coin_base);
-    mpz_clear(time_stamp);
-    mpz_clear(number);
-    mpz_clear(difficulty);
-    mpz_clear(gas_limit);
-    mpz_clear(chain_id);
-    mpz_clear(base_fee);
-    mpz_clear(number_prev);
-    mpz_clear(hash_prev);
-    return cpu_block;
   }
 
-  __host__ block_t(arith_t arith, const cJSON * test)  : _arith(arith) {
-    _content=get_instance(test);
+  /**
+   * The destructor of the block class.
+  */
+  __host__ __device__ __forceinline__ ~block_t()
+  {
+    _content = NULL;
   }
 
-  __host__ static void free_instance(block_data_t *cpu_block) {
-    free(cpu_block);
+  /**
+   * deallocates the block information content
+  */
+  __host__ void free_content()
+  {
+#ifndef ONLY_CPU
+    CUDA_CHECK(cudaFree(_content));
+#else
+    delete _content;
+#endif
+    _content = NULL;
   }
 
-  __host__ void free_memory() {
-    free_instance(_content);
-  }
-
-  __host__ static block_data_t *from_cpu_to_gpu(block_data_t *cpu_block) {
-    block_data_t *gpu_block=NULL;
-    cudaMalloc((void **)&gpu_block, sizeof(block_data_t));
-    cudaMemcpy(gpu_block, cpu_block, sizeof(block_data_t), cudaMemcpyHostToDevice);
-    return gpu_block;
-  }
-
-  __host__ block_data_t *to_gpu() {
-    block_data_t *gpu_block=from_cpu_to_gpu(_content);
-    return gpu_block;
-  }
-
-  __host__ void from_gpu(block_data_t *gpu_block) {
-    cudaMemcpy(_content, gpu_block, sizeof(block_data_t), cudaMemcpyDeviceToHost);
-  }
-
-  __host__ static void free_gpu(block_data_t *gpu_block) {
-    cudaFree(gpu_block);
-  }
-
-  __host__ __device__ __forceinline__ void get_coin_base(bn_t &coin_base) {
+  /**
+   * Get the coin base of the block.
+   * @param[out] coin_base The coin base of the block
+  */
+  __host__ __device__ __forceinline__ void get_coin_base(
+      bn_t &coin_base)
+  {
     cgbn_load(_arith._env, coin_base, &(_content->coin_base));
   }
 
-  __host__ __device__ __forceinline__ void get_time_stamp(bn_t &time_stamp) {
+  /**
+   * Get the time stamp of the block.
+   * @param[out] time_stamp The time stamp of the block
+  */
+  __host__ __device__ __forceinline__ void get_time_stamp(
+      bn_t &time_stamp)
+  {
     cgbn_load(_arith._env, time_stamp, &(_content->time_stamp));
   }
 
-  __host__ __device__ __forceinline__ void get_number(bn_t &number) {
+  /**
+   * Get the number of the block.
+   * @param[out] number The number of the block
+  */
+  __host__ __device__ __forceinline__ void get_number(
+    bn_t &number)
+  {
     cgbn_load(_arith._env, number, &(_content->number));
   }
 
-  __host__ __device__ __forceinline__ void get_difficulty(bn_t &difficulty) {
+  /**
+   * Get the difficulty of the block.
+   * @param[out] difficulty The difficulty of the block
+  */
+  __host__ __device__ __forceinline__ void get_difficulty(
+    bn_t &difficulty)
+  {
     cgbn_load(_arith._env, difficulty, &(_content->difficulty));
   }
 
-  __host__ __device__ __forceinline__ void get_gas_limit(bn_t &gas_limit) {
+  /**
+   * Get the gas limit of the block.
+   * @param[out] gas_limit The gas limit of the block
+  */
+  __host__ __device__ __forceinline__ void get_gas_limit(
+    bn_t &gas_limit)
+  {
     cgbn_load(_arith._env, gas_limit, &(_content->gas_limit));
   }
 
-  __host__ __device__ __forceinline__ void get_chain_id(bn_t &chain_id) {
+  /**
+   * Get the chain id of the block.
+  */
+  __host__ __device__ __forceinline__ void get_chain_id(
+    bn_t &chain_id)
+  {
     cgbn_load(_arith._env, chain_id, &(_content->chain_id));
   }
 
-  __host__ __device__ __forceinline__ void get_base_fee(bn_t &base_fee) {
+  /**
+   * Get the base fee of the block.
+   * @param[out] base_fee The base fee of the block
+  */
+  __host__ __device__ __forceinline__ void get_base_fee(
+    bn_t &base_fee)
+  {
     cgbn_load(_arith._env, base_fee, &(_content->base_fee));
   }
 
-  __host__ __device__ __forceinline__ void get_previous_hash(bn_t &previous_number, bn_t &previous_hash, uint32_t &error_code) {
-    uint32_t idx=0;
+  /**
+   * Get the has of a previous block given by the number
+   * @param[in] previous_number The number of the previous block
+   * @param[out] previous_hash The hash of the previous block
+   * @param[out] error_code The error code
+  */
+  __host__ __device__ __forceinline__ void get_previous_hash(
+      bn_t &previous_number,
+      bn_t &previous_hash,
+      uint32_t &error_code)
+  {
+    uint32_t idx = 0;
     bn_t number;
+    // ge tthe current number
     get_number(number);
-    if(cgbn_compare(_arith._env, number, previous_number) < 1) {
-      error_code=ERR_BLOCK_INVALID_NUMBER;
+    // if the rquest number is greater than the current block number
+    if (cgbn_compare(_arith._env, number, previous_number) < 1)
+    {
+      error_code = ERR_BLOCK_INVALID_NUMBER;
       return;
     }
+    // get the distance from the current block number to the requested block number
     cgbn_sub(_arith._env, number, number, previous_number);
-    idx=cgbn_get_ui32(_arith._env, number) - 1;
-    if (idx > 255) {
-      error_code=ERR_BLOCK_INVALID_NUMBER;
+    idx = cgbn_get_ui32(_arith._env, number) - 1;
+    // only the last 256 blocks are stored
+    if (idx > 255)
+    {
+      error_code = ERR_BLOCK_INVALID_NUMBER;
       return;
     }
     cgbn_load(_arith._env, previous_hash, &(_content->previous_blocks[idx].hash));
   }
 
-    
-  __host__ __device__ void print() {
-    uint32_t idx=0;
+  /**
+   * Print the block information.
+  */
+  __host__ __device__ void print()
+  {
+    uint32_t idx = 0;
     bn_t number;
     printf("BLOCK: \n");
     printf("COINBASE: ");
-    print_bn<params>(_content->coin_base);
+    _arith.print_cgbn_memory(_content->coin_base);
     printf(", TIMESTAMP: ");
-    print_bn<params>(_content->time_stamp);
+    _arith.print_cgbn_memory(_content->time_stamp);
     printf(", NUMBER: ");
-    print_bn<params>(_content->number);
+    _arith.print_cgbn_memory(_content->number);
     printf(", DIFICULTY: ");
-    print_bn<params>(_content->difficulty);
+    _arith.print_cgbn_memory(_content->difficulty);
     printf(", GASLIMIT: ");
-    print_bn<params>(_content->gas_limit);
+    _arith.print_cgbn_memory(_content->gas_limit);
     printf(", CHAINID: ");
-    print_bn<params>(_content->chain_id);
+    _arith.print_cgbn_memory(_content->chain_id);
     printf(", BASE_FEE: ");
-    print_bn<params>(_content->base_fee);
+    _arith.print_cgbn_memory(_content->base_fee);
     printf("PREVIOUS_BLOCKS: \n");
-    for(idx=0; idx<256; idx++) {
+    for (idx = 0; idx < 256; idx++)
+    {
       printf("NUMBER: ");
-      print_bn<params>(_content->previous_blocks[idx].number);
+      _arith.print_cgbn_memory(_content->previous_blocks[idx].number);
       printf(", HASH: ");
-      print_bn<params>(_content->previous_blocks[idx].hash);
+      _arith.print_cgbn_memory(_content->previous_blocks[idx].hash);
       printf("\n");
       cgbn_load(_arith._env, number, &(_content->previous_blocks[idx].number));
-      if (cgbn_compare_ui32(_arith._env, number, 0) == 0) {
+      if (cgbn_compare_ui32(_arith._env, number, 0) == 0)
+      {
         break;
       }
     }
   }
 
+  /**
+   * Get the block information in JSON format.
+   * @return The block information in JSON format
+  */
+  __host__ cJSON *json()
+  {
+    uint32_t idx = 0;
+    char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+    cJSON *block_json = NULL;
+    cJSON *previous_blocks_json = NULL;
+    cJSON *previous_block_json = NULL;
 
-  __host__ cJSON *to_json() {
-    uint32_t idx=0;
-    char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
-    char *value_hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
-    cJSON *block_json=NULL;
-    cJSON *previous_blocks_json=NULL;
-    cJSON *previous_block_json=NULL;
+    block_json = cJSON_CreateObject();
 
-    block_json=cJSON_CreateObject();
-
-    _arith.from_cgbn_memory_to_hex(_content->coin_base, hex_string_ptr, 5); //address
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->coin_base, 5);
     cJSON_AddStringToObject(block_json, "currentCoinbase", hex_string_ptr);
-    
-    _arith.from_cgbn_memory_to_hex(_content->time_stamp, hex_string_ptr);
+
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->time_stamp);
     cJSON_AddStringToObject(block_json, "currentTimestamp", hex_string_ptr);
-    
-    _arith.from_cgbn_memory_to_hex(_content->number, hex_string_ptr);
+
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->number);
     cJSON_AddStringToObject(block_json, "currentNumber", hex_string_ptr);
-    
-    _arith.from_cgbn_memory_to_hex(_content->difficulty, hex_string_ptr);
+
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->difficulty);
     cJSON_AddStringToObject(block_json, "currentDifficulty", hex_string_ptr);
-    
-    _arith.from_cgbn_memory_to_hex(_content->gas_limit, hex_string_ptr);
+
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->gas_limit);
     cJSON_AddStringToObject(block_json, "currentGasLimit", hex_string_ptr);
 
-    _arith.from_cgbn_memory_to_hex(_content->chain_id, hex_string_ptr);
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->chain_id);
     cJSON_AddStringToObject(block_json, "currentChainId", hex_string_ptr);
 
-    _arith.from_cgbn_memory_to_hex(_content->base_fee, hex_string_ptr);
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->base_fee);
     cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string_ptr);
 
-    previous_blocks_json=cJSON_CreateArray();
+    previous_blocks_json = cJSON_CreateArray();
     bn_t number;
-    for(idx=0; idx<256; idx++) {
-      previous_block_json=cJSON_CreateObject();
-      
-      _arith.from_cgbn_memory_to_hex(_content->previous_blocks[idx].number, hex_string_ptr);
+    for (idx = 0; idx < 256; idx++)
+    {
+      previous_block_json = cJSON_CreateObject();
+
+      _arith.hex_string_from_cgbn_memory(
+        hex_string_ptr,
+        _content->previous_blocks[idx].number
+      );
       cJSON_AddStringToObject(previous_block_json, "number", hex_string_ptr);
 
-      _arith.from_cgbn_memory_to_hex(_content->previous_blocks[idx].hash, hex_string_ptr);
+      _arith.hex_string_from_cgbn_memory(
+        hex_string_ptr,
+        _content->previous_blocks[idx].hash
+      );
       cJSON_AddStringToObject(previous_block_json, "hash", hex_string_ptr);
 
       cJSON_AddItemToArray(previous_blocks_json, previous_block_json);
 
       cgbn_load(_arith._env, number, &(_content->previous_blocks[idx].number));
-      if (cgbn_compare_ui32(_arith._env, number, 0) == 0) {
+      if (cgbn_compare_ui32(_arith._env, number, 0) == 0)
+      {
         break;
       }
     }
 
     cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
-    free(hex_string_ptr);
-    free(value_hex_string_ptr);
+    delete[] hex_string_ptr;
+    hex_string_ptr = NULL;
     return block_json;
   }
 };

@@ -25,6 +25,29 @@ class return_data_t {
 
   __host__ __device__ __forceinline__ return_data_t(data_content_t *content) : _content(content) {}
   
+  __host__ __device__ __forceinline__ return_data_t()
+  {
+    SHARED_MEMORY data_content_t *tmp_content;
+    ONE_THREAD_PER_INSTANCE(
+      tmp_content= new data_content_t;
+      tmp_content->size=0;
+      tmp_content->data=NULL;
+    )
+    _content=tmp_content;
+  }
+
+  __host__ __device__ __forceinline__ ~return_data_t() {
+    ONE_THREAD_PER_INSTANCE(
+      if ( (_content->size > 0) && (_content->data != NULL) ) {
+        delete _content->data;
+        _content->size=0;
+        _content->data=NULL;
+      }
+      delete _content;
+    )
+    _content=NULL;
+  }
+
   __host__ __device__ __forceinline__ size_t size() {
     return _content->size;
   }

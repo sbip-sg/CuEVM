@@ -57,13 +57,13 @@ public:
     */
     typedef struct alignas(32)
     {
-        evm_word_t address; /**< The address of the account */
-        evm_word_t balance; /**< The balance of the account */
-        evm_word_t nonce; /**< The nonce of the account */
-        size_t code_size; /**< The size of the bytecode */
-        size_t storage_size; /**< The number of storage entries */
-        uint8_t *bytecode; /**< The bytecode of the account */
-        contract_storage_t *storage; /**< The storage of the account */
+        evm_word_t address; /**< The address of the account (YP: \f$a\f$) */
+        evm_word_t balance; /**< The balance of the account (YP: \f$\sigma[a]_{b}\f$) */
+        evm_word_t nonce; /**< The nonce of the account (YP: \f$\sigma[a]_{n}\f$) */
+        size_t code_size; /**< The size of the bytecode (YP: \f$|b|\f$) */
+        size_t storage_size; /**< The number of storage entries (YP: \f$|\sigma[a]_{s}|\f$) */
+        uint8_t *bytecode; /**< The bytecode of the account (YP: \f$b\f$) */
+        contract_storage_t *storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
     } account_t;
 
     /**
@@ -71,8 +71,8 @@ public:
     */
     typedef struct
     {
-        account_t *accounts; /**< The accounts in the state */
-        size_t no_accounts; /**< The number of accounts in the state */
+        account_t *accounts; /**< The accounts in the state (YP: \f$\sigma\f$)*/
+        size_t no_accounts; /**< The number of accounts in the state (YP: \f$|\sigma|\f$)*/
     } state_data_t;
 
     state_data_t *_content; /**< The content of the state */
@@ -102,7 +102,7 @@ public:
      * It use cudaFree to free the memory, because the
      * state is allocated with cudaMallocManaged.
     */
-    __host__ void free_world_state_data()
+    __host__ void free_content()
     {
         #ifndef ONLY_CPU
         if (_content != NULL)
@@ -333,27 +333,25 @@ public:
         cJSON *account_json = NULL;
         cJSON *storage_json = NULL;
         char *bytes_string = NULL;
-        char *hex_string_ptr = (char *)malloc(sizeof(char) * ((params::BITS / 32) * 8 + 3));
-        char *value_hex_string_ptr = (char *)malloc(sizeof(char) * ((params::BITS / 32) * 8 + 3));
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        char *value_hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
         size_t jdx = 0;
         account_json = cJSON_CreateObject();
         // set the address
-        // TODO: see how to modify as before
-        _arith.from_cgbn_memory_to_hex(account->address, hex_string_ptr, 5);
-        // cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
-        cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->address, 5);
+        cJSON_SetValuestring(account_json, hex_string_ptr);
         // set the balance
-        _arith.from_cgbn_memory_to_hex(account->balance, hex_string_ptr);
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->balance);
         cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
         // set the nonce
-        _arith.from_cgbn_memory_to_hex(account->nonce, hex_string_ptr);
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->nonce);
         cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
         // set the code
         if (account->code_size > 0)
         {
             bytes_string = bytes_to_hex(account->bytecode, account->code_size);
             cJSON_AddStringToObject(account_json, "code", bytes_string);
-            free(bytes_string);
+            delete[] bytes_string;
         }
         else
         {
@@ -366,13 +364,15 @@ public:
         {
             for (jdx = 0; jdx < account->storage_size; jdx++)
             {
-                _arith.from_cgbn_memory_to_hex(account->storage[jdx].key, hex_string_ptr);
-                _arith.from_cgbn_memory_to_hex(account->storage[jdx].value, value_hex_string_ptr);
+                _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->storage[jdx].key);
+                _arith.hex_string_from_cgbn_memory(value_hex_string_ptr, account->storage[jdx].value);
                 cJSON_AddStringToObject(storage_json, hex_string_ptr, value_hex_string_ptr);
             }
         }
-        free(hex_string_ptr);
-        free(value_hex_string_ptr);
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
+        delete[] value_hex_string_ptr;
+        value_hex_string_ptr = NULL;
         return account_json;
     }
 
@@ -500,13 +500,17 @@ public:
     {
         cJSON *state_json = NULL;
         cJSON *account_json = NULL;
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
         size_t idx = 0;
-        state_json = cJSON_CreateArray();
+        state_json = cJSON_CreateObject();
         for (idx = 0; idx < _content->no_accounts; idx++)
         {
             account_json = json_from_account(&(_content->accounts[idx]));
-            cJSON_AddItemToArray(state_json, account_json);
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->accounts[idx].address, 5);
+            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
         }
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
         return state_json;
     }
 };
@@ -1519,14 +1523,19 @@ public:
     {
         cJSON *state_json = NULL;
         cJSON *account_json = NULL;
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
         size_t idx = 0;
-        state_json = cJSON_CreateArray();
+        state_json = cJSON_CreateObject();
         for (idx = 0; idx < _content->accessed_accounts.no_accounts; idx++)
         {
-            account_json =  _world_state->json_from_account(&(_content->accessed_accounts.accounts[idx]));
+            account_t *account = &(_content->accessed_accounts.accounts[idx]);
+            account_json = _world_state->json_from_account(account);
             cJSON_AddItemToObject(account_json, "read", cJSON_CreateNumber(_content->reads[idx]));
-            cJSON_AddItemToArray(state_json, account_json);
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->address, 5);
+            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
         }
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
         return state_json;
     }
 };
@@ -2983,14 +2992,18 @@ public:
     {
         cJSON *state_json = NULL;
         cJSON *account_json = NULL;
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
         size_t idx = 0;
-        state_json = cJSON_CreateArray();
+        state_json = cJSON_CreateObject();
         for (idx = 0; idx < _content->touch_accounts.no_accounts; idx++)
         {
-            account_json = _access_state->_world_state->json_from_account(&(_content->touch_accounts.accounts[idx]));
-            cJSON_AddItemToObject(account_json, "touch", cJSON_CreateNumber(_content->touch[idx]));
-            cJSON_AddItemToArray(state_json, account_json);
+            account_t *account = &(_content->touch_accounts.accounts[idx]);
+            account_json = _access_state->_world_state->json_from_account(account);
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->address, 5);
+            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
         }
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
         return state_json;
     }
 
