@@ -56,7 +56,7 @@ public:
    *  the mix hash (YP: \f$H_{m}\f$)
    *  the nonce (YP: \f$H_{n}\f$)
   */
-  typedef struct
+  typedef struct alignas(32)
   {
     evm_word_t coin_base; /**< The address of the block miner (YP: \f$H_{c}\f$) */
     evm_word_t difficulty; /**< The difficulty of the block (YP: \f$H_{d}\f$) */
@@ -172,7 +172,8 @@ public:
     else
     {
       idx = 0;
-      _arith.cgbn_memory_from_size_t(_content->previous_blocks[0].number, 1);
+      // TODO: maybe fill with something else
+      _arith.cgbn_memory_from_size_t(_content->previous_blocks[0].number, 0);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");
       _arith.cgbn_memory_from_hex_string(
@@ -323,24 +324,24 @@ public:
     printf("BLOCK: \n");
     printf("COINBASE: ");
     _arith.print_cgbn_memory(_content->coin_base);
-    printf(", TIMESTAMP: ");
+    printf("TIMESTAMP: ");
     _arith.print_cgbn_memory(_content->time_stamp);
-    printf(", NUMBER: ");
+    printf("NUMBER: ");
     _arith.print_cgbn_memory(_content->number);
-    printf(", DIFICULTY: ");
+    printf("DIFICULTY: ");
     _arith.print_cgbn_memory(_content->difficulty);
-    printf(", GASLIMIT: ");
+    printf("GASLIMIT: ");
     _arith.print_cgbn_memory(_content->gas_limit);
-    printf(", CHAINID: ");
+    printf("CHAINID: ");
     _arith.print_cgbn_memory(_content->chain_id);
-    printf(", BASE_FEE: ");
+    printf("BASE_FEE: ");
     _arith.print_cgbn_memory(_content->base_fee);
     printf("PREVIOUS_BLOCKS: \n");
     for (idx = 0; idx < 256; idx++)
     {
       printf("NUMBER: ");
       _arith.print_cgbn_memory(_content->previous_blocks[idx].number);
-      printf(", HASH: ");
+      printf("HASH: ");
       _arith.print_cgbn_memory(_content->previous_blocks[idx].hash);
       printf("\n");
       cgbn_load(_arith._env, number, &(_content->previous_blocks[idx].number));

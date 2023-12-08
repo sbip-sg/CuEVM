@@ -53,6 +53,7 @@ __host__ __device__ __forceinline__ void test_block(
   // block->print();
   delete block;
   block = NULL;
+  printf("Block deleted\n");
 }
 
 template <class params>
@@ -65,18 +66,27 @@ __global__ void kernel_block(
   typedef arith_env_t<params> arith_t;
 
   arith_t arith(cgbn_report_monitor, report, instance);
+  
+  printf("kernel %p\n", current_block_data);
 
   test_block(arith, current_block_data, instance);
 }
 
 void run_test()
 {
+  #ifndef ONLY_CPU
+  CUDA_CHECK(cudaDeviceReset());
+  CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024*1024*1024));
+  CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
+  #endif
+
   typedef block_t<utils_params> block_t;
   typedef typename block_t::block_data_t block_data_t;
   typedef arith_env_t<utils_params> arith_t;
   block_data_t *block_data = NULL;
   block_t *cpu_block = NULL;
   arith_t arith(cgbn_report_monitor, 0);
+
 
   // read the json file with the global state
   cJSON *root = get_json_from_file("input/evm_test.json");
@@ -92,6 +102,7 @@ void run_test()
   cpu_block = new block_t(arith, test);
   block_data = cpu_block->_content;
   printf("Global block generated\n");
+  cpu_block->print();
 
 // create a cgbn_error_report for CGBN to report back errors
 #ifndef ONLY_CPU
@@ -138,6 +149,9 @@ void run_test()
   cpu_block->free_content();
   delete cpu_block;
   cpu_block = NULL;
+  #ifndef ONLY_CPU
+  CUDA_CHECK(cudaDeviceReset());
+  #endif
 }
 
 int main()

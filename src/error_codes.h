@@ -38,6 +38,7 @@
 // memory error codes
 #define ERR_MEMEORY_INVALID_INDEX 0x0F
 #define ERR_MEMORY_INVALID_ALLOCATION 0x10
+#define ERR_MEMORY_INVALID_OFFSET 0x16
 
 // execution codes
 #define ERR_INVALID_JUMP_DESTINATION 0x11
