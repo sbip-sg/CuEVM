@@ -495,6 +495,7 @@ public:
 
     /**
      * Get json of the state
+     * @return The json of the state
     */
     __host__ __forceinline__ cJSON *json()
     {
@@ -1518,6 +1519,7 @@ public:
 
     /**
      * Get json of the state
+     * @return The json of the state
     */
     __host__ __forceinline__ cJSON *json()
     {
@@ -2987,6 +2989,7 @@ public:
 
     /**
      * Get json of the state
+     * @return The json of the state
     */
     __host__ __forceinline__ cJSON *json()
     {

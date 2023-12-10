@@ -209,8 +209,10 @@ void run_test(uint32_t instance_count) {
   printf("GPU kernel finished\n");
 
   printf("Copying the results back to the CPU ...\n");
+  accessed_state_t::free_cpu_instances(cpu_access_states_data, instance_count);
   cpu_access_states_data=accessed_state_t::get_cpu_instances_from_gpu_instances(gpu_access_states_data, instance_count);
   printf("Copying the results back to the CPU ...\n");
+  touch_state_t::free_cpu_instances(cpu_touch_states_data, instance_count);
   cpu_touch_states_data=touch_state_t::get_cpu_instances_from_gpu_instances(gpu_touch_states_data, instance_count);
   printf("Results copied\n");
   CUDA_CHECK(cgbn_error_report_free(report));
@@ -230,6 +232,10 @@ void run_test(uint32_t instance_count) {
   root = cJSON_CreateObject();
   accessed_state_t *access_state;
   touch_state_t *touch_state;
+  accessed_state_data_t *access_state_data = new accessed_state_data_t;
+  touch_state_data_t *touch_state_data = new touch_state_data_t;
+  access_state = new accessed_state_t(access_state_data, cpu_world_state);
+  touch_state = new touch_state_t(touch_state_data, access_state, NULL);
   printf("World state:\n");
   cpu_world_state->print();
   cJSON_AddItemToObject(root, "pre", cpu_world_state->json());
@@ -239,24 +245,22 @@ void run_test(uint32_t instance_count) {
     cJSON *instance_json = cJSON_CreateObject();
     cJSON_AddItemToArray(post, instance_json);
     cJSON_AddNumberToObject(instance_json, "instance", instance);
-    accessed_state_data_t *access_state_data = new accessed_state_data_t;
     memcpy(access_state_data, &(cpu_access_states_data[instance]), sizeof(accessed_state_data_t));
-    access_state = new accessed_state_t(access_state_data, cpu_world_state);
-    touch_state_data_t *touch_state_data = new touch_state_data_t;
     memcpy(touch_state_data, &(cpu_touch_states_data[instance]), sizeof(touch_state_data_t));
-    touch_state = new touch_state_t(touch_state_data, access_state, NULL);
     printf("Access state %d:\n", instance);
     access_state->print();
     cJSON_AddItemToObject(instance_json, "access", access_state->json());
     printf("Touch state %d:\n", instance);
     touch_state->print();
     cJSON_AddItemToObject(instance_json, "touch", touch_state->json());
-    delete touch_state;
-    touch_state=NULL;
-    delete access_state;
-    access_state=NULL;
   }
   cJSON_AddItemToObject(root, "post", post);
+  delete touch_state;
+  touch_state=NULL;
+  delete access_state;
+  access_state=NULL;
+  access_state_data=NULL;
+  touch_state_data=NULL;
   cpu_world_state->free_content();
   delete cpu_world_state;
   cpu_world_state=NULL;
