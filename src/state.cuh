@@ -79,11 +79,11 @@ public:
     arith_t _arith; /**< The arithmetical environment */
 
     /**
-     * The constructor of the state in device memory.
+     * The constructor of the state given the content.
      * @param arith The arithmetical environment
      * @param content The content of the state
     */
-    __device__ __forceinline__ world_state_t(
+    __host__ __device__ __forceinline__ world_state_t(
         arith_t arith,
         state_data_t *content
     ) : _arith(arith), _content(content)
@@ -91,7 +91,7 @@ public:
     }
 
     /**
-     * The destructor of the state in device memory.
+     * The destructor of the state.
     */
     __host__ __device__ __forceinline__ ~world_state_t()
     {
@@ -194,7 +194,12 @@ public:
         #endif
 
         // get the world state json
-        world_state_json = cJSON_GetObjectItemCaseSensitive(test, "pre");
+        if (cJSON_IsObject(test))
+            world_state_json = cJSON_GetObjectItemCaseSensitive(test, "pre");
+        else if (cJSON_IsArray(test))
+            world_state_json = test;
+        else
+            printf("[ERROR] world_state_t: invalid test json\n");
 
         // get the number of accounts
         _content->no_accounts = cJSON_GetArraySize(world_state_json);

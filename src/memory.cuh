@@ -1,3 +1,9 @@
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2023-11-30
+// SPDX-License-Identifier: MIT
+
 #ifndef _MEMORY_H_
 #define _MEMORY_H_
 
@@ -144,7 +150,7 @@ public:
   }
 
   /**
-   * The memory cost of the memory. (YP: \f$M(\mu_{i}, index, length)\f$)
+   * The memory cost of the memory. (YP: \f$C_{mem}-M(\mu_{i}, index, length)\f$)
    * @param[in] index The index of the memory access.
    * @param[in] length The length of the memory access.
    * @param[out] gas_cost The gas cost after.
@@ -157,47 +163,51 @@ public:
     uint32_t &error_code
   )
   {
-    bn_t offset;
-    int32_t overflow;
-    size_t last_offset;
-    // first overflow check
-    overflow = cgbn_add(_arith._env, offset, index, length);
-    overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
+    //
+    if (cgbn_compare_ui32(_arith._env, length, 0) > 0)
+    {
+      bn_t offset;
+      int32_t overflow;
+      size_t last_offset;
+      // first overflow check
+      overflow = cgbn_add(_arith._env, offset, index, length);
+      overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
 
-    bn_t old_memory_cost;
-    cgbn_load(_arith._env, old_memory_cost, &(_content->memory_cost));
-    // memort_size_word = (offset + 31) / 32
-    bn_t memory_size_word;
-    cgbn_add_ui32(_arith._env, memory_size_word, offset, 31);
-    cgbn_div_ui32(_arith._env, memory_size_word, memory_size_word, 32);
-    // memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word
-    bn_t memory_cost;
-    cgbn_mul(_arith._env, memory_cost, memory_size_word, memory_size_word);
-    cgbn_div_ui32(_arith._env, memory_cost, memory_cost, 512);
-    bn_t tmp;
-    cgbn_mul_ui32(_arith._env, tmp, memory_size_word, GAS_MEMORY);
-    cgbn_add(_arith._env, memory_cost, memory_cost, tmp);
-    //  gas_cost = gas_cost + memory_cost - old_memory_cost
-    bn_t memory_expansion_cost;
-    if (cgbn_compare(_arith._env, memory_cost, old_memory_cost) == 1)
-    {
-      cgbn_sub(_arith._env, memory_expansion_cost, memory_cost, old_memory_cost);
-      // set the new memory cost
-      cgbn_store(_arith._env, &(_content->memory_cost), memory_cost);
-    }
-    else
-    {
-      cgbn_set_ui32(_arith._env, memory_expansion_cost, 0);
-    }
-    cgbn_add(_arith._env, gas_cost, gas_cost, memory_expansion_cost);
+      bn_t old_memory_cost;
+      cgbn_load(_arith._env, old_memory_cost, &(_content->memory_cost));
+      // memort_size_word = (offset + 31) / 32
+      bn_t memory_size_word;
+      cgbn_add_ui32(_arith._env, memory_size_word, offset, 31);
+      cgbn_div_ui32(_arith._env, memory_size_word, memory_size_word, 32);
+      // memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word
+      bn_t memory_cost;
+      cgbn_mul(_arith._env, memory_cost, memory_size_word, memory_size_word);
+      cgbn_div_ui32(_arith._env, memory_cost, memory_cost, 512);
+      bn_t tmp;
+      cgbn_mul_ui32(_arith._env, tmp, memory_size_word, GAS_MEMORY);
+      cgbn_add(_arith._env, memory_cost, memory_cost, tmp);
+      //  gas_cost = gas_cost + memory_cost - old_memory_cost
+      bn_t memory_expansion_cost;
+      if (cgbn_compare(_arith._env, memory_cost, old_memory_cost) == 1)
+      {
+        cgbn_sub(_arith._env, memory_expansion_cost, memory_cost, old_memory_cost);
+        // set the new memory cost
+        cgbn_store(_arith._env, &(_content->memory_cost), memory_cost);
+      }
+      else
+      {
+        cgbn_set_ui32(_arith._env, memory_expansion_cost, 0);
+      }
+      cgbn_add(_arith._env, gas_cost, gas_cost, memory_expansion_cost);
 
-    // size is always a multiple of 32
-    cgbn_mul_ui32(_arith._env, offset, memory_size_word, 32);
-    // get the new size
-    overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
-    if (overflow != 0)
-    {
-      error_code = ERR_MEMORY_INVALID_OFFSET;
+      // size is always a multiple of 32
+      cgbn_mul_ui32(_arith._env, offset, memory_size_word, 32);
+      // get the new size
+      overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
+      if (overflow != 0)
+      {
+        error_code = ERR_MEMORY_INVALID_OFFSET;
+      }
     }
   }
 
@@ -271,17 +281,17 @@ public:
     uint32_t &error_code
   )
   {
-    grow(index, length, error_code);
-    size_t index_s;
-    if (error_code == ERR_NONE)
+    if (cgbn_compare_ui32(_arith._env, length, 0) > 0)
     {
-      _arith.size_t_from_cgbn(index_s, index);
-      return _content->data + index_s;
+      grow(index, length, error_code);
+      size_t index_s;
+      if (error_code == ERR_NONE)
+      {
+        _arith.size_t_from_cgbn(index_s, index);
+        return _content->data + index_s;
+      }
     }
-    else
-    {
-      return NULL;
-    }
+    return NULL;
   }
 
 
@@ -299,20 +309,23 @@ public:
     uint32_t &error_code
   )
   {
-    size_t index_s;
-    size_t length_s;
-    grow(index, length, error_code);
-    _arith.size_t_from_cgbn(index_s, index);
-    _arith.size_t_from_cgbn(length_s, length);
-    if (
-      (data != NULL) &&
-      (length_s > 0) &&
-      (error_code == ERR_NONE)
-    )
+    if (cgbn_compare_ui32(_arith._env, length, 0) > 0)
     {
-      ONE_THREAD_PER_INSTANCE(
-        memcpy(_content->data + index_s, data, length_s);
+      size_t index_s;
+      size_t length_s;
+      grow(index, length, error_code);
+      _arith.size_t_from_cgbn(index_s, index);
+      _arith.size_t_from_cgbn(length_s, length);
+      if (
+        (data != NULL) &&
+        (length_s > 0) &&
+        (error_code == ERR_NONE)
       )
+      {
+        ONE_THREAD_PER_INSTANCE(
+          memcpy(_content->data + index_s, data, length_s);
+        )
+      }
     }
   }
 

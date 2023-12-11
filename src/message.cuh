@@ -1,381 +1,848 @@
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2023-11-30
+// SPDX-License-Identifier: MIT
+
 #ifndef _MESSAGE_H_
 #define _MESSAGE_H_
 
 #include "utils.h"
+#include "state.cuh"
 
-template<class params>
-class message_t {
-  public:
-    typedef arith_env_t<params>                     arith_t;
-    typedef typename arith_t::bn_t                  bn_t;
-    typedef cgbn_mem_t<params::BITS>                evm_word_t;
-  
-    typedef struct {
-      evm_word_t origin;
-      evm_word_t gasprice;
-    } tx_t;
+/**
+ * The message call class.
+ * YP: \f$M\f$
+ */
+template <class params>
+class message_t
+{
+public:
+  /**
+   * The arithmetical environment used by the arbitrary length
+   * integer library.
+   */
+  typedef arith_env_t<params> arith_t;
+  /**
+   * The arbitrary length integer type.
+   */
+  typedef typename arith_t::bn_t bn_t;
+  /**
+   * The arbitrary length integer type used for the storage.
+   * It is defined as the EVM word type.
+   */
+  typedef cgbn_mem_t<params::BITS> evm_word_t;
 
-    typedef struct  {
-      evm_word_t      caller;
-      evm_word_t      value;
-      evm_word_t      to;
-      evm_word_t      nonce;
-      tx_t            tx;
-      evm_word_t      gas;
-      uint32_t        depth;
-      uint32_t        call_type; // OP_CALL - call, OP_CALLCODE - callcode, OP_STATICCALL - static call, OP_DELEGATECALL - delegate call, OP_CREATE - create, OP_CREATE2 - create2
-      evm_word_t      storage;
-      data_content_t  data;
-    } message_content_t;
+  /**
+   * The message data.
+   */
+  typedef struct
+  {
+    evm_word_t sender;           /**< The sender address YP: \f$s\f$ */
+    evm_word_t recipient;        /**< The recipient address YP: \f$r\f$ */
+    evm_word_t contract_address; /**< The contract address YP: \f$c\f$ */
+    evm_word_t gas_limit;        /**< The gas limit YP: \f$g\f$ */
+    evm_word_t value;            /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
+    uint32_t depth;              /**< The depth YP: \f$e\f$ */
+    uint8_t call_type;           /**< The call type internal has the opcode YP: \f$w\f$ */
+    evm_word_t storage_address;  /**< The storage address YP: \f$a\f$ */
+    data_content_t data;         /**< The data YP: \f$d\f$ */
+  } message_data_t;
 
-    message_content_t *_content;
-    arith_t           _arith;
+  message_data_t *_content; /**< The message content */
+  arith_t _arith;           /**< The arithmetical environment */
 
-    __host__ __device__ message_t(arith_t arith, message_content_t *content) : _arith(arith), _content(content) {
-    }
+  /**
+   * The constructor. Takes the message parameters.
+   * @param[in] arith The arithmetical environment.
+   * @param[in] sender The sender address YP: \f$s\f$.
+   * @param[in] recipient The recipient address YP: \f$r\f$.
+   * @param[in] contract_address The contract address YP: \f$c\f$.
+   * @param[in] gas_limit The gas limit YP: \f$g\f$.
+   * @param[in] value The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL.
+   * @param[in] depth The depth YP: \f$e\f$.
+   * @param[in] call_type The call type internal has the opcode YP: \f$w\f$.
+   * @param[in] storage_address The storage address YP: \f$a\f$.
+   * @param[in] data The data YP: \f$d\f$.
+   * @param[in] data_size The data size YP: \f$|d|\f$.
+  */
+  __host__ __device__ __forceinline__ message_t(
+      arith_t &arith,
+      bn_t &sender,
+      bn_t &recipient,
+      bn_t &contract_address,
+      bn_t &gas_limit,
+      bn_t &value,
+      uint32_t &depth,
+      uint8_t &call_type,
+      bn_t &storage_address,
+      uint8_t *data,
+      size_t &data_size) : _arith(arith)
+  {
+    SHARED_MEMORY message_data_t *content;
+    ONE_THREAD_PER_INSTANCE(
+      content = new message_data_t;)
+    _content = content;
+    cgbn_store(_arith._env, &(_content->sender), sender);
+    cgbn_store(_arith._env, &(_content->recipient), recipient);
+    cgbn_store(_arith._env, &(_content->contract_address), contract_address);
+    cgbn_store(_arith._env, &(_content->gas_limit), gas_limit);
+    cgbn_store(_arith._env, &(_content->value), value);
+    _content->depth = depth;
+    _content->call_type = call_type;
+    cgbn_store(_arith._env, &(_content->storage_address), storage_address);
+    _content->data.size = data_size;
+    ONE_THREAD_PER_INSTANCE(
+      if (data_size > 0) {
+        _content->data.data = new uint8_t[data_size];
+        memcpy(_content->data.data, data, sizeof(uint8_t) * data_size);
+      } else {
+        _content->data.data = NULL;
+      })
+  }
 
-    __host__ message_t(arith_t arith, const cJSON *test) : _arith(arith) {
-        size_t count;
-        _content = (message_content_t *)malloc(sizeof(message_content_t));
-        message_content_t *cpu_messages = get_messages(test, count);
-        memcpy(_content, &(cpu_messages[0]), sizeof(message_content_t));
+  /**
+   * The destructor.
+   */
+  __host__ __device__ __forceinline__ ~message_t()
+  {
+    ONE_THREAD_PER_INSTANCE(
         if (_content->data.size > 0) {
-          _content->data.data = (uint8_t *)malloc(sizeof(uint8_t)*_content->data.size);
-          memcpy(_content->data.data, cpu_messages[0].data.data, sizeof(uint8_t)*_content->data.size);
-        } else {
+          delete[] _content->data.data;
+          _content->data.size = 0;
           _content->data.data = NULL;
-        }
-        free_messages(cpu_messages, count);
-    }
+        } delete _content;)
+    _content = NULL;
+  }
 
-    __host__ __device__ void free_memory() {
-      ONE_THREAD_PER_INSTANCE(
-        if (_content->data.size > 0) {
-          free(_content->data.data);
-        }
-        free(_content);
-      )
-    }
+  /**
+   * Get the sender address.
+   * @param[out] sender The sender address YP: \f$s\f$.
+  */
+  __host__ __device__ __forceinline__ void get_sender(
+      bn_t &sender)
+  {
+    cgbn_load(_arith._env, sender, &(_content->sender));
+  }
 
-    __host__ __device__ __forceinline__ void get_caller(bn_t &caller) {
-      cgbn_load(_arith._env, caller, &(_content->caller));
-    }
+  /**
+   * Get the recipient address.
+   * @param[out] recipient The recipient address YP: \f$r\f$.
+  */
+  __host__ __device__ __forceinline__ void get_recipient(
+      bn_t &recipient)
+  {
+    cgbn_load(_arith._env, recipient, &(_content->recipient));
+  }
 
-    __host__ __device__ __forceinline__ void get_value(bn_t &value) {
-      cgbn_load(_arith._env, value, &(_content->value));
-    }
+  /**
+   * Get the contract address.
+   * @param[out] contract_address The contract address YP: \f$c\f$.
+  */
+  __host__ __device__ __forceinline__ void get_contract_address(
+      bn_t &contract_address)
+  {
+    cgbn_load(_arith._env, contract_address, &(_content->contract_address));
+  }
 
-    __host__ __device__ __forceinline__ void get_to(bn_t &to) {
-      cgbn_load(_arith._env, to, &(_content->to));
-    }
+  /**
+   * Get the gas limit.
+   * @param[out] gas_limit The gas limit YP: \f$g\f$.
+  */
+  __host__ __device__ __forceinline__ void get_gas_limit(
+      bn_t &gas_limit)
+  {
+    cgbn_load(_arith._env, gas_limit, &(_content->gas_limit));
+  }
 
-    __host__ __device__ __forceinline__ void get_nonce(bn_t &nonce) {
-      cgbn_load(_arith._env, nonce, &(_content->nonce));
-    }
+  /**
+   * Get the value.
+   * @param[out] value The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL.
+  */
+  __host__ __device__ __forceinline__ void get_value(
+      bn_t &value)
+  {
+    cgbn_load(_arith._env, value, &(_content->value));
+  }
 
-    __host__ __device__ __forceinline__ void get_tx_origin(bn_t &tx_origin) {
-      cgbn_load(_arith._env, tx_origin, &(_content->tx.origin));
-    }
+  /**
+   * Get the depth.
+   * @return The depth YP: \f$e\f$.
+  */
+  __host__ __device__ __forceinline__ uint32_t get_depth()
+  {
+    return _content->depth;
+  }
 
-    __host__ __device__ __forceinline__ void get_tx_gasprice(bn_t &tx_gasprice) {
-      cgbn_load(_arith._env, tx_gasprice, &(_content->tx.gasprice));
-    }
+  /**
+   * Get the call type.
+   * @return The call type internal has the opcode YP: \f$w\f$.
+  */
+  __host__ __device__ __forceinline__ uint8_t get_call_type()
+  {
+    return _content->call_type;
+  }
 
-    __host__ __device__ __forceinline__ void get_gas(bn_t &gas) {
-      cgbn_load(_arith._env, gas, &(_content->gas));
-    }
+  /**
+   * Get the storage address.
+   * @param[out] storage_address The storage address YP: \f$a\f$.
+  */
+  __host__ __device__ __forceinline__ void get_storage_address(
+      bn_t &storage_address)
+  {
+    cgbn_load(_arith._env, storage_address, &(_content->storage_address));
+  }
 
-    __host__ __device__ __forceinline__ uint32_t get_depth() {
-      return _content->depth;
-    }
+  /**
+   * Get the call/init data size.
+   * @return The data size YP: \f$|d|\f$.
+  */
+  __host__ __device__ __forceinline__ size_t get_data_size()
+  {
+    return _content->data.size;
+  }
 
-    __host__ __device__ __forceinline__ uint32_t get_call_type() {
-      return _content->call_type;
+  /**
+   * Get the call/init data.
+   * @param[in] index The index of the first byte to be returned.
+   * @param[in] length The number of bytes to be returned.
+   * @param[out] available_size The number of bytes available starting from index.
+   * @return The pointer to the data.
+  */
+  __host__ __device__ __forceinline__ uint8_t *get_data(
+      bn_t index,
+      bn_t length,
+      size_t &available_size)
+  {
+    available_size = 0;
+    size_t index_s;
+    int32_t overflow = _arith.size_t_from_cgbn(index_s, index);
+    if (
+        (overflow != 0) ||
+        (index_s >= _content.data.size))
+    {
+      return NULL;
     }
-
-    __host__ __device__ __forceinline__ void get_storage(bn_t &storage) {
-      cgbn_load(_arith._env, storage, &(_content->storage));
-    }
-
-    __host__ __device__ __forceinline__ size_t get_data_size() {
-      return _content->data.size;
-    }
-
-    __host__ __device__ __forceinline__ uint8_t *get_data(size_t index, size_t length, size_t &available_size) {
-      available_size = length;
-      size_t last_offset = index + length;
-      // verify for overflow
-      // TODO: verify also in evm in opcode if the value is larger than size_t
-      if ( (last_offset < index) || (last_offset < length)) {
-        if (index < _content->data.size) {
-          available_size = _content->data.size - index;
-          return _content->data.data + index;
-        } else {
-          available_size = 0;
-          return _content->data.data;
-        }
-      } else if (index >= _content->data.size) {
-        available_size = 0;
-        return _content->data.data;
-      } else if (index + length <= _content->data.size) {
-        return _content->data.data + index;
-      } else if (index < _content->data.size) {
-        available_size = _content->data.size - index;
-        return _content->data.data + index;
-      } else {
-        available_size = 0;
-        return _content->data.data;
+    else
+    {
+      size_t length_s;
+      overflow = _arith.size_t_from_cgbn(length_s, length);
+      if (
+          (overflow != 0) ||
+          (length_s > _content.data.size - index_s))
+      {
+        available_size = _content.data.size - index_s;
+        return _content.data.data + index_s;
+      }
+      else
+      {
+        available_size = length_s;
+        return _content.data.data + index_s;
       }
     }
+  }
 
-    __host__ message_content_t *to_gpu() {
-      message_content_t *gpu_content, *tmp_cpu_content;
-      tmp_cpu_content = (message_content_t *)malloc(sizeof(message_content_t));
-      memcpy(tmp_cpu_content, _content, sizeof(message_content_t));
-      if (tmp_cpu_content->data.size > 0) {
-        cudaMalloc((void **)&(tmp_cpu_content->data.data), sizeof(uint8_t)*tmp_cpu_content->data.size);
-        cudaMemcpy(tmp_cpu_content->data.data, _content->data.data, sizeof(uint8_t)*tmp_cpu_content->data.size, cudaMemcpyHostToDevice);
-      } else {
-        tmp_cpu_content->data.data = NULL;
-      }
-      cudaMalloc((void **)&gpu_content, sizeof(message_content_t));
-      cudaMemcpy(gpu_content, tmp_cpu_content, sizeof(message_content_t), cudaMemcpyHostToDevice);
-      free(tmp_cpu_content);
-      return gpu_content;
-    }
-
-    __host__ void free_gpu() {
-      message_content_t *tmp_cpu_content;
-      tmp_cpu_content = (message_content_t *)malloc(sizeof(message_content_t));
-      cudaMemcpy(tmp_cpu_content, _content, sizeof(message_content_t), cudaMemcpyDeviceToHost);
-      if (tmp_cpu_content->data.size > 0) {
-        cudaFree(tmp_cpu_content->data.data);
-      }
-      free(tmp_cpu_content);
-      cudaFree(_content);
-    }
-
-    __host__ __device__ void print() {
-      printf("CALLER: ");
-      print_bn<params>(_content->caller);
-      printf(", VALUE: ");
-      print_bn<params>(_content->value);
-      printf(", TO: ");
-      print_bn<params>(_content->to);
-      printf(", NONCE: ");
-      print_bn<params>(_content->nonce);
-      printf(", TX_ORIGIN: ");
-      print_bn<params>(_content->tx.origin);
-      printf(", TX_GASPRICE: ");
-      print_bn<params>(_content->tx.gasprice);
-      printf(", DEPTH: %d", _content->depth);
-      printf(", CALL_TYPE: %d", _content->call_type);
-      printf(", DATA_SIZE: ");
-      printf("%lx ", _content->data.size);
+  /**
+   * Print the message.
+  */
+  __host__ __device__ __forceinline__ void print()
+  {
+    printf("SENDER: ");
+    print_bn<params>(_content->sender);
+    printf("RECIPIENT: ");
+    print_bn<params>(_content->recipient);
+    printf("CONTRACT_ADDRESS: ");
+    print_bn<params>(_content->contract_address);
+    printf("GAS_LIMIT: ");
+    print_bn<params>(_content->gas_limit);
+    printf("VALUE: ");
+    print_bn<params>(_content->value);
+    printf("DEPTH: %d\n", _content->depth);
+    printf("CALL_TYPE: %d\n", _content->call_type);
+    printf("STORAGE_ADDRESS: ");
+    print_bn<params>(_content->storage_address);
+    printf("DATA_SIZE: %lu\n", _content->data.size);
+    if (_content->data.size > 0)
+    {
+      printf("DATA: ");
+      print_bytes(_content->data.data, _content->data.size);
       printf("\n");
-      if (_content->data.size > 0) {
-        printf("DATA: ");
-        print_bytes(_content->data.data, _content->data.size);
-        printf("\n");
-      }
     }
-
-    __host__ cJSON *to_json() {
-      cJSON *transaction_json = cJSON_CreateObject();
-      char *hex_string_ptr=(char *) malloc(sizeof(char) * ((params::BITS/32)*8+3));
-      char *bytes_string=NULL;
-      
-      // set the caller
-      _arith.from_cgbn_memory_to_hex(_content->caller, hex_string_ptr, 5); //address
-      cJSON_AddStringToObject(transaction_json, "sender", hex_string_ptr);
-      
-      // set the value
-      _arith.from_cgbn_memory_to_hex(_content->value, hex_string_ptr);
-      cJSON_AddStringToObject(transaction_json, "value", hex_string_ptr);
-
-      // set the to
-      _arith.from_cgbn_memory_to_hex(_content->to, hex_string_ptr, 5); //address
-      cJSON_AddStringToObject(transaction_json, "to", hex_string_ptr);
-
-      // set the nonce
-      _arith.from_cgbn_memory_to_hex(_content->nonce, hex_string_ptr);
-      cJSON_AddStringToObject(transaction_json, "nonce", hex_string_ptr);
-
-      // set the tx.origin
-      _arith.from_cgbn_memory_to_hex(_content->tx.origin, hex_string_ptr, 5); //address
-      cJSON_AddStringToObject(transaction_json, "origin", hex_string_ptr);
-
-      // set the tx.gasprice
-      _arith.from_cgbn_memory_to_hex(_content->tx.gasprice, hex_string_ptr);
-      cJSON_AddStringToObject(transaction_json, "gasPrice", hex_string_ptr);
-
-      // set the gas
-      _arith.from_cgbn_memory_to_hex(_content->gas, hex_string_ptr);
-      cJSON_AddStringToObject(transaction_json, "gasLimit", hex_string_ptr);
-
-      // set the data
-      if (_content->data.size > 0) {
-        bytes_string = bytes_to_hex(_content->data.data, _content->data.size);
-        cJSON_AddStringToObject(transaction_json, "data", bytes_string);
-        free(bytes_string);
-      } else {
-        cJSON_AddStringToObject(transaction_json, "data", "0x");
-      }
-
-      free(hex_string_ptr);
-      return transaction_json;
-    }
-
-    __host__ static message_content_t *get_messages(const cJSON *test, size_t &count) {
-      const cJSON *messages_json = cJSON_GetObjectItemCaseSensitive(test, "transaction");
-      message_content_t *cpu_messages = NULL;
-      mpz_t caller, value, nonce, to, tx_origin, tx_gasprice, gas;
-      char *hex_string=NULL;
-      mpz_init(caller);
-      mpz_init(value);
-      mpz_init(to);
-      mpz_init(nonce);
-      mpz_init(tx_origin);
-      mpz_init(tx_gasprice);
-      mpz_init(gas);
-      const cJSON *data_json = cJSON_GetObjectItemCaseSensitive(messages_json, "data");
-      size_t data_counts = cJSON_GetArraySize(data_json);
-
-      const cJSON *gas_limit_json = cJSON_GetObjectItemCaseSensitive(messages_json, "gasLimit");
-      size_t gas_limit_counts = cJSON_GetArraySize(gas_limit_json);
-
-      const cJSON *gas_price_json = cJSON_GetObjectItemCaseSensitive(messages_json, "gasPrice");
-      hex_string = gas_price_json->valuestring;
-      adjusted_length(&hex_string);
-      mpz_set_str(tx_gasprice, hex_string, 16);
-
-      const cJSON *nonce_json = cJSON_GetObjectItemCaseSensitive(messages_json, "nonce");
-      hex_string = nonce_json->valuestring;
-      adjusted_length(&hex_string);
-      mpz_set_str(nonce, hex_string, 16);
-
-      const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(messages_json, "to");
-      uint32_t call_type = OP_CALL;
-      hex_string = to_json->valuestring;
-      if (strlen(hex_string) == 0) {
-        mpz_set_ui(to, 0);
-        call_type=OP_CREATE; //to see if it is not create2
-      } else {
-        adjusted_length(&hex_string);
-        mpz_set_str(to, hex_string, 16);
-      }
-
-
-      const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(messages_json, "value");
-      size_t value_counts = cJSON_GetArraySize(value_json);
-
-      const cJSON *caller_json = cJSON_GetObjectItemCaseSensitive(messages_json, "sender");
-      hex_string = caller_json->valuestring;
-      adjusted_length(&hex_string);
-      mpz_set_str(caller, hex_string, 16);
-      mpz_set_str(tx_origin, hex_string, 16);
-
-      count = data_counts * gas_limit_counts * value_counts;
-      cpu_messages = (message_content_t *)malloc(sizeof(message_content_t)*count);
-      size_t idx=0, jdx=0, kdx=0, instance_idx=0;
-      size_t data_size;
-      uint8_t *data_content;
-
-      for(idx=0; idx<data_counts; idx++) {
-        hex_string = cJSON_GetArrayItem(data_json, idx)->valuestring;
-        data_size = adjusted_length(&hex_string);
-        if (data_size > 0) {
-          data_content = (uint8_t *) malloc (data_size);
-          hex_to_bytes(hex_string, data_content, 2 * data_size);
-        } else {
-          data_content = NULL;
-        }
-
-        for(jdx=0; jdx<gas_limit_counts; jdx++) {
-          hex_string = cJSON_GetArrayItem(gas_limit_json, jdx)->valuestring;
-          adjusted_length(&hex_string);
-          mpz_set_str(gas, hex_string, 16);
-
-          for(kdx=0; kdx<value_counts; kdx++) {
-            hex_string = cJSON_GetArrayItem(value_json, kdx)->valuestring;
-            adjusted_length(&hex_string);
-            mpz_set_str(value, hex_string, 16);
-
-            cpu_messages[instance_idx].data.size = data_size;
-            if (data_size > 0) {
-              cpu_messages[instance_idx].data.data = (uint8_t *) malloc (data_size);
-              memcpy(cpu_messages[instance_idx].data.data, data_content, data_size);
-            } else {
-              cpu_messages[instance_idx].data.data = NULL;
-            }
-
-            from_mpz(cpu_messages[instance_idx].caller._limbs, params::BITS/32, caller);
-            from_mpz(cpu_messages[instance_idx].value._limbs, params::BITS/32, value);
-            from_mpz(cpu_messages[instance_idx].to._limbs, params::BITS/32, to);
-            from_mpz(cpu_messages[instance_idx].nonce._limbs, params::BITS/32, nonce);
-            from_mpz(cpu_messages[instance_idx].tx.origin._limbs, params::BITS/32, tx_origin);
-            from_mpz(cpu_messages[instance_idx].tx.gasprice._limbs, params::BITS/32, tx_gasprice);
-            from_mpz(cpu_messages[instance_idx].gas._limbs, params::BITS/32, gas);
-            cpu_messages[instance_idx].depth=0;
-            cpu_messages[instance_idx].call_type=call_type;
-            instance_idx++;
-          }
-        }
-        free(data_content);
-      }
-      mpz_clear(caller);
-      mpz_clear(value);
-      mpz_clear(to);
-      mpz_clear(nonce);
-      mpz_clear(tx_origin);
-      mpz_clear(tx_gasprice);
-      mpz_clear(gas);
-      return cpu_messages;
-    }
-
-    
-    __host__ static void free_messages(message_content_t *cpu_messages, size_t count) {
-      for(size_t idx=0; idx<count; idx++) {
-        // data
-        free(cpu_messages[idx].data.data);
-      }
-      free(cpu_messages);
-    }
-
-    __host__ static message_content_t *get_gpu_messages(message_content_t *cpu_messages, size_t count) {
-      message_content_t *gpu_messages, *tmp_cpu_messages;
-      tmp_cpu_messages = (message_content_t *)malloc(count*sizeof(message_content_t));
-      memcpy(tmp_cpu_messages, cpu_messages, count*sizeof(message_content_t));
-      for(size_t idx=0; idx<count; idx++) {
-        // data
-        if (tmp_cpu_messages[idx].data.size > 0) {
-          cudaMalloc((void **)&(tmp_cpu_messages[idx].data.data), sizeof(uint8_t)*tmp_cpu_messages[idx].data.size);
-          cudaMemcpy(tmp_cpu_messages[idx].data.data, cpu_messages[idx].data.data, sizeof(uint8_t)*tmp_cpu_messages[idx].data.size, cudaMemcpyHostToDevice);
-        } else {
-          tmp_cpu_messages[idx].data.data = NULL;
-        }
-      }
-      //write_messages<params>(stdout, tmp_cpu_instaces, count);
-      cudaMalloc((void **)&gpu_messages, sizeof(message_content_t)*count);
-      cudaMemcpy(gpu_messages, tmp_cpu_messages, sizeof(message_content_t)*count, cudaMemcpyHostToDevice);
-      free(tmp_cpu_messages);
-      return gpu_messages;
-    }
-  
-    __host__ static void free_gpu_messages(message_content_t *gpu_messages, size_t count) {
-      message_content_t *tmp_cpu_messages;
-      tmp_cpu_messages = (message_content_t *)malloc(count*sizeof(message_content_t));
-      cudaMemcpy(tmp_cpu_messages, gpu_messages, count*sizeof(message_content_t), cudaMemcpyDeviceToHost);
-
-      for(size_t idx=0; idx<count; idx++) {
-        if ( (tmp_cpu_messages[idx].data.size > 0) && (tmp_cpu_messages[idx].data.data != NULL) ) {
-          cudaFree(tmp_cpu_messages[idx].data.data);
-        }
-      }
-      free(tmp_cpu_messages);
-      cudaFree(gpu_messages);
-    }
+  }
 };
 
+/**
+ * The transaction type
+ * YP: \f$T\f$
+ */
+template <class params>
+class transaction_t
+{
+public:
+  /**
+   * The arithmetical environment used by the arbitrary length
+   * integer library.
+   */
+  typedef arith_env_t<params> arith_t;
+  /**
+   * The arbitrary length integer type.
+   */
+  typedef typename arith_t::bn_t bn_t;
+  /**
+   * The arbitrary length integer type used for the storage.
+   * It is defined as the EVM word type.
+   */
+  typedef cgbn_mem_t<params::BITS> evm_word_t;
+  /**
+   * The message type.
+   */
+  typedef message_t<params> message_t;
+  /**
+   * The maximum number of transactions per test.
+   */
+  static const size_t MAX_TRANSACTION_COUNT = 2000;
+
+  /**
+   * The access list account.
+   * YP: \f$E_{a}\f$
+   */
+  typedef struct
+  {
+    evm_word_t address;       /**< The address YP: \f$a\f$ */
+    uint32_t no_storage_keys; /**< The number of storage keys YP: \f$|E_{s}|\f$ */
+    evm_word_t *storage_keys; /**< The storage keys YP: \f$E_{s}\f$ */
+  } access_list_account_t;
+
+  /**
+   * The access list.
+   * YP: \f$T_{A}\f$
+   */
+  typedef struct
+  {
+    uint32_t no_accounts;            /**< The number of accounts YP: \f$|T_{A}|\f$ */
+    access_list_account_t *accounts; /**< The accounts YP: \f$T_{A}\f$ */
+  } access_list_t;
+
+  /**
+   * The transaction data.
+   * It does not contains:
+   * - chain id (YP: \f$T_{c}\f$)
+   * - yParity (YP: \f$T_{y}\f$)
+   * - w (YP: \f$T_{w}\f$)
+   */
+  typedef struct alignas(32)
+  {
+    uint8_t type;                        /**< The transaction type EIP-2718 (YP: YP: \f$\T_{x}\f$) */
+    evm_word_t nonce;                    /**< The nonce YP: \f$T_{n}\f$ */
+    evm_word_t gas_limit;                /**< The gas limit YP: \f$T_{g}\f$ */
+    evm_word_t to;                       /**< The recipient address YP: \f$T_{t}\f$ */
+    evm_word_t value;                    /**< The value YP: \f$T_{v}\f$ */
+    evm_word_t sender;                   /**< The sender address YP: \f$T_{s}\f$ or \f$T_{r}\f$*/
+    access_list_t access_list;           /**< The state YP: \f$T_{A}\f$ entry are \f$E=(E_{a}, E_{s})\f$*/
+    evm_word_t max_fee_per_gas;          /**< The max fee per gas YP: \f$T_{m}\f$ */
+    evm_word_t max_priority_fee_per_gas; /**< The max priority fee per gas YP: \f$T_{f}\f$ */
+    evm_word_t gas_price;                /**< The gas proce YP: \f$T_{p}\f$ */
+    data_content_t data_init;            /**< The init or data YP:\f$T_{i}\f$ or \f$T_{d}\f$ */
+  } transaction_data_t;
+
+  transaction_data_t *_content; /**< The transaction content */
+  arith_t _arith; /**< The arithmetic  */
+
+  /**
+   * The constructor. Takes the transaction content.
+   * @param[in] arith The arithmetical environment.
+   * @param[in] content The transaction content.
+  */
+  __host__ __device__ __forceinline__ transaction_t(
+      arith_t arith,
+      transaction_data_t *content) : _arith(arith),
+                                     _content(content)
+  {
+  }
+
+  /**
+   * The destructor.
+  */
+  __host__ __device__ __forceinline__ ~transaction_t()
+  {
+    _content = NULL;
+  }
+
+  /**
+   * Get the transation nonce.
+   * @param[out] nonce The nonce YP: \f$T_{n}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_nonce(
+      bn_t &nonce)
+  {
+    cgbn_load(_arith._env, nonce, &(_content->nonce));
+  }
+
+  /**
+   * Get the transation gas limit.
+   * @param[out] gas_limit The gas limit YP: \f$T_{g}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_gas_limit(
+      bn_t &gas_limit)
+  {
+    cgbn_load(_arith._env, gas_limit, &(_content->gas_limit));
+  }
+
+  /**
+   * Get the transaction receiver.
+   * @param[out] to The receiver address YP: \f$T_{t}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_to(
+      bn_t &to)
+  {
+    cgbn_load(_arith._env, to, &(_content->to));
+  }
+
+  /**
+   * Get the transaction value.
+   * @param[out] value The value YP: \f$T_{v}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_value(
+      bn_t &value)
+  {
+    cgbn_load(_arith._env, value, &(_content->value));
+  }
+
+  /**
+   * Get the transaction sender.
+   * @param[out] sender The sender address YP: \f$T_{s}\f$ or \f$T_{r}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_sender(
+      bn_t &sender)
+  {
+    cgbn_load(_arith._env, sender, &(_content->sender));
+  }
+
+  /**
+   * Get the transaction gas price.
+   * @param[out] gas_price The gas price YP: \f$T_{p}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_gas_price(
+      bn_t &gas_price)
+  {
+    cgbn_load(_arith._env, gas_price, &(_content->gas_price));
+  }
+
+  /**
+   * Print the transaction information.
+  */
+  __host__ __device__ void print()
+  {
+    printf("TYPE: %hhu\n, NONCE: ", _content->type);
+    _arith.print_cgbn_memory(_content->nonce);
+    printf("GAS_LIMIT: ");
+    _arith.print_cgbn_memory(_content->gas_limit);
+    printf("TO: ");
+    _arith.print_cgbn_memory(_content->to);
+    printf("VALUE: ");
+    _arith.print_cgbn_memory(_content->value);
+    printf("SENDER: ");
+    _arith.print_cgbn_memory(_content->sender);
+    if (_content->type >= 1)
+    {
+      printf("ACCESS_LIST: ");
+      for (size_t idx = 0; idx < _content->access_list.no_accounts; idx++)
+      {
+        printf("ADDRESS: ");
+        _arith.print_cgbn_memory(_content->access_list.accounts[idx].address);
+        printf("NO_STORAGE_KEYS: %d", _content->access_list.accounts[idx].no_storage_keys);
+        for (size_t jdx = 0; jdx < _content->access_list.accounts[idx].no_storage_keys; jdx++)
+        {
+          printf("STORAGE_KEY[%d]: ", jdx);
+          _arith.print_cgbn_memory(_content->access_list.accounts[idx].storage_keys[jdx]);
+        }
+      }
+    }
+    if (_content->type == 2)
+    {
+      printf("MAX_FEE_PER_GAS: ");
+      _arith.print_cgbn_memory(_content->max_fee_per_gas);
+      printf("MAX_PRIORITY_FEE_PER_GAS: ");
+      _arith.print_cgbn_memory(_content->max_priority_fee_per_gas);
+    }
+    else
+    {
+      printf("GAS_PRICE: ");
+      _arith.print_cgbn_memory(_content->gas_price);
+    }
+    printf("DATA_INIT: ");
+    print_bytes(_content->data_init.data, _content->data_init.size);
+  }
+
+  /**
+   * Get the transaction in json format.
+   * @return The transaction in json format.
+  */
+  __host__ cJSON *json()
+  {
+    cJSON *transaction_json = cJSON_CreateObject();
+    char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+    char *bytes_string = NULL;
+
+    // set the type
+    cJSON_AddNumberToObject(transaction_json, "type", _content->type);
+
+    // set the nonce
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->nonce);
+    cJSON_AddStringToObject(transaction_json, "nonce", hex_string_ptr);
+
+    // set the gas limit
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->gas_limit);
+    cJSON_AddStringToObject(transaction_json, "gasLimit", hex_string_ptr);
+
+    // set the to
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->to, 5);
+    cJSON_AddStringToObject(transaction_json, "to", hex_string_ptr);
+
+    // set the value
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->value);
+    cJSON_AddStringToObject(transaction_json, "value", hex_string_ptr);
+
+    // set the sender
+    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->sender, 5);
+    cJSON_AddStringToObject(transaction_json, "sender", hex_string_ptr);
+
+    // set the access list
+    if (_content->type >= 1)
+    {
+      cJSON *access_list_json = cJSON_CreateArray();
+      cJSON_AddItemToObject(transaction_json, "accessList", access_list_json);
+      for (size_t idx = 0; idx < _content->access_list.no_accounts; idx++)
+      {
+        cJSON *account_json = cJSON_CreateObject();
+        cJSON_AddItemToArray(access_list_json, account_json);
+        _arith.hex_string_from_cgbn_memory(
+            hex_string_ptr,
+            _content->access_list.accounts[idx].address,
+            5);
+        cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
+        cJSON *storage_keys_json = cJSON_CreateArray();
+        cJSON_AddItemToObject(account_json, "storageKeys", storage_keys_json);
+        for (size_t jdx = 0; jdx < _content->access_list.accounts[idx].no_storage_keys; jdx++)
+        {
+          _arith.hex_string_from_cgbn_memory(
+              hex_string_ptr,
+              _content->access_list.accounts[idx].storage_keys[jdx]);
+          cJSON_AddStringToObject(storage_keys_json, hex_string_ptr);
+        }
+      }
+    }
+
+    // set the gas price
+    if (_content->type == 2)
+    {
+      _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->max_fee_per_gas);
+      cJSON_AddStringToObject(transaction_json, "maxFeePerGas", hex_string_ptr);
+
+      // set the max priority fee per gas
+      _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->max_priority_fee_per_gas);
+      cJSON_AddStringToObject(transaction_json, "maxPriorityFeePerGas", hex_string_ptr);
+    }
+    else
+    {
+      // set the gas price
+      _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->gas_price);
+      cJSON_AddStringToObject(transaction_json, "gasPrice", hex_string_ptr);
+    }
+
+    // set the data init
+    if (_content->data_init.size > 0)
+    {
+      bytes_string = bytes_to_hex(_content->data_init.data, _content->data_init.size);
+      cJSON_AddStringToObject(transaction_json, "data", bytes_string);
+      delete[] bytes_string;
+      bytes_string = NULL;
+    }
+    else
+    {
+      cJSON_AddStringToObject(transaction_json, "data", "0x");
+    }
+
+    delete[] hex_string_ptr;
+    hex_string_ptr = NULL;
+    return transaction_json;
+  }
+
+  /**
+   * Get the number of transactions from a test in json format.
+   * @param[in] test The json format of the test.
+   * @return The number of transactions.
+  */
+  __host__ static size_t get_no_transaction(
+      const cJSON *test)
+  {
+    const cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(test, "transaction");
+    const cJSON *data_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
+    size_t data_counts = cJSON_GetArraySize(data_json);
+    const cJSON *gas_limit_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
+    size_t gas_limit_counts = cJSON_GetArraySize(gas_limit_json);
+    const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
+    size_t value_counts = cJSON_GetArraySize(value_json);
+    return data_counts * gas_limit_counts * value_counts;
+  }
+
+  /**
+   * Get the transactions from a test in json format.
+   * The number of transaction is limited by MAX_TRANSACTION_COUNT.
+   * @param[in] test The json format of the test.
+   * @param[out] count The number of transactions.
+   * @param[in] start_index The index of the first transaction to be returned.
+  */
+  __host__ static transaction_data_t *get_transactions(
+      const cJSON *test,
+      size_t &count,
+      size_t start_index = 0)
+  {
+    const cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(test, "transaction");
+    arith_t arith(cgbn_report_monitor, 0);
+    transaction_data_t *transactions = NULL;
+    size_t available_no_transactions = get_no_transaction(test);
+    if (start_index >= available_no_transactions)
+    {
+      count = 0;
+      return NULL;
+    }
+    // set the number of transactions
+    count = available_no_transactions - start_index;
+    count = (count > MAX_TRANSACTION_COUNT) ? MAX_TRANSACTION_COUNT : count;
+#ifndef ONLY_CPU
+    CUDA_CHECK(cudaMallocManaged(
+        (void **)&(transactions),
+        count * sizeof(transaction_data_t)));
+#else
+    transactions = new transaction_data_t[count];
+#endif
+    transaction_data_t *template_transaction = new transaction_data_t;
+    memset(template_transaction, 0, sizeof(transaction_data_t));
+
+    uint8_t type;
+    size_t data_index, gas_limit_index, value_index;
+    size_t idx = 0, jdx = 0, kdx = 0, instance_idx = 0;
+
+    type = 0;
+    const cJSON *nonce_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "nonce");
+    arith.cgbn_memory_from_hex_string(template_transaction->nonce, nonce_json->valuestring);
+
+    const cJSON *gas_limit_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
+    size_t gas_limit_counts = cJSON_GetArraySize(gas_limit_json);
+
+    const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
+    if (strlen(to_json->valuestring) == 0)
+    {
+      arith.cgbn_memory_from_size_t(template_transaction->to, 0);
+    }
+    else
+    {
+      arith.cgbn_memory_from_hex_string(template_transaction->to, to_json->valuestring);
+    }
+
+    const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
+    size_t value_counts = cJSON_GetArraySize(value_json);
+
+    const cJSON *sender_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "sender");
+    arith.cgbn_memory_from_hex_string(template_transaction->sender, sender_json->valuestring);
+
+    const cJSON *access_list_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "accessList");
+    if (access_list_json != NULL)
+    {
+      size_t accounts_counts = cJSON_GetArraySize(access_list_json);
+      template_transaction->access_list.no_accounts = accounts_counts;
+#ifndef ONLY_CPU
+      CUDA_CHECK(cudaMallocManaged(
+          (void **)&(template_transaction->access_list.accounts),
+          accounts_counts * sizeof(access_list_account_t)));
+#else
+      template_transaction->access_list.accounts = new access_list_account_t[accounts_counts];
+#endif
+      for (idx = 0; idx < accounts_counts; idx++)
+      {
+        const cJSON *account_json = cJSON_GetArrayItem(access_list_json, idx);
+        const cJSON *address_json = cJSON_GetObjectItemCaseSensitive(account_json, "address");
+        arith.cgbn_memory_from_hex_string(
+            template_transaction->access_list.accounts[idx].address,
+            address_json->valuestring);
+        const cJSON *storage_keys_json = cJSON_GetObjectItemCaseSensitive(account_json, "storageKeys");
+        size_t storage_keys_counts = cJSON_GetArraySize(storage_keys_json);
+        template_transaction->access_list.accounts[idx].no_storage_keys = storage_keys_counts;
+#ifndef ONLY_CPU
+        CUDA_CHECK(cudaMallocManaged(
+            (void **)&(template_transaction->access_list.accounts[idx].storage_keys),
+            storage_keys_counts * sizeof(evm_word_t)));
+#else
+        template_transaction->access_list.accounts[idx].storage_keys = new evm_word_t[storage_keys_counts];
+#endif
+        for (jdx = 0; jdx < storage_keys_counts; jdx++)
+        {
+          const cJSON *storage_key_json = cJSON_GetArrayItem(storage_keys_json, jdx);
+          arith.cgbn_memory_from_hex_string(
+              template_transaction->access_list.accounts[idx].storage_keys[jdx],
+              storage_key_json->valuestring);
+        }
+      }
+    }
+
+    const cJSON *max_fee_per_gas_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "maxFeePerGas");
+
+    const cJSON *max_priority_fee_per_gas_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "maxPriorityFeePerGas");
+
+    const cJSON *gas_price_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasPrice");
+    if (
+        (max_fee_per_gas_json != NULL) &&
+        (max_priority_fee_per_gas_json != NULL) &&
+        (gas_price_json == NULL))
+    {
+      type = 2;
+      arith.cgbn_memory_from_hex_string(
+          template_transaction->max_fee_per_gas,
+          max_fee_per_gas_json->valuestring);
+      arith.cgbn_memory_from_hex_string(
+          template_transaction->max_priority_fee_per_gas,
+          max_priority_fee_per_gas_json->valuestring);
+      arith.cgbn_memory_from_size_t(template_transaction->gas_price, 0);
+    }
+    else if (
+        (max_fee_per_gas_json == NULL) &&
+        (max_priority_fee_per_gas_json == NULL) &&
+        (gas_price_json != NULL))
+    {
+      if (access_list_json == NULL)
+      {
+        type = 0;
+      }
+      else
+      {
+        type = 1;
+      }
+      arith.cgbn_memory_from_size_t(template_transaction->max_fee_per_gas, 0);
+      arith.cgbn_memory_from_size_t(template_transaction->max_priority_fee_per_gas, 0);
+      arith.cgbn_memory_from_hex_string(
+          template_transaction->gas_price,
+          gas_price_json->valuestring);
+    }
+    else
+    {
+      printf("ERROR: invalid transaction type\n");
+      exit(1);
+    }
+
+    const cJSON *data_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
+    size_t data_counts = cJSON_GetArraySize(data_json);
+
+    template_transaction->type = type;
+
+    size_t index;
+    char *bytes_string = NULL;
+    for (idx = 0; idx < count; idx++)
+    {
+      index = start_index + idx;
+      data_index = index % data_counts;
+      gas_limit_index = (index / data_counts) % gas_limit_counts;
+      value_index = (index / (data_counts * gas_limit_counts)) % value_counts;
+      memcpy(&(transactions[idx]), template_transaction, sizeof(transaction_data_t));
+      arith.cgbn_memory_from_hex_string(
+          transactions[idx].gas_limit,
+          cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
+      arith.cgbn_memory_from_hex_string(
+          transactions[idx].value,
+          cJSON_GetArrayItem(value_json, value_index)->valuestring);
+      bytes_string = cJSON_GetArrayItem(data_json, data_index)->valuestring;
+      transactions[idx].data_init.size = adjusted_length(&bytes_string);
+      if (transactions[idx].data_init.size > 0)
+      {
+#ifndef ONLY_CPU
+        CUDA_CHECK(cudaMallocManaged(
+            (void **)&(transactions[idx].data_init.data),
+            transactions[idx].data_init.size * sizeof(uint8_t)));
+#else
+        transactions[idx].data_init.data = new uint8_t[transactions[idx].data_init.size];
+#endif
+        hex_to_bytes(
+            bytes_string,
+            transactions[idx].data_init.data,
+            2 * transactions[idx].data_init.size);
+      }
+      else
+      {
+        transactions[idx].data_init.data = NULL;
+      }
+    }
+    delete template_transaction;
+    template_transaction = NULL;
+    return transactions;
+  }
+
+  /**
+   * Free the memory allocated for transactions.
+   * @param[in] transactions The transactions.
+   * @param[in] count The number of transactions.
+  */
+  __host__ static void free_instances(
+      transaction_data_t *transactions,
+      size_t count)
+  {
+#ifndef ONLY_CPU
+    if (transactions[0].access_list.no_accounts > 0)
+    {
+      for (size_t jdx = 0; jdx < transactions[0].access_list.no_accounts; jdx++)
+      {
+        if (transactions[0].access_list.accounts[jdx].no_storage_keys > 0)
+        {
+          CUDA_CHECK(cudaFree(transactions[0].access_list.accounts[jdx].storage_keys));
+          transactions[0].access_list.accounts[jdx].no_storage_keys = 0;
+          transactions[0].access_list.accounts[jdx].storage_keys = NULL;
+        }
+      }
+      CUDA_CHECK(cudaFree(transactions[0].access_list.accounts));
+    }
+    for (size_t idx = 0; idx < count; idx++)
+    {
+      if (transactions[idx].data_init.size > 0)
+      {
+        CUDA_CHECK(cudaFree(transactions[idx].data_init.data));
+        transactions[idx].data_init.size = 0;
+      }
+      if (transactions[idx].access_list.no_accounts > 0)
+      {
+        transactions[idx].access_list.accounts = NULL;
+        transactions[idx].access_list.no_accounts = 0;
+      }
+    }
+    CUDA_CHECK(cudaFree(transactions));
+#else
+    if (transactions[0].access_list.no_accounts > 0)
+    {
+      for (size_t jdx = 0; jdx < transactions[0].access_list.no_accounts; jdx++)
+      {
+        if (transactions[0].access_list.accounts[jdx].no_storage_keys > 0)
+        {
+          delete[] transactions[0].access_list.accounts[jdx].storage_keys;
+          transactions[0].access_list.accounts[jdx].no_storage_keys = 0;
+          transactions[0].access_list.accounts[jdx].storage_keys = NULL;
+        }
+      }
+      delete[] transactions[0].access_list.accounts;
+    }
+    for (size_t idx = 0; idx < count; idx++)
+    {
+      if (transactions[idx].data_init.size > 0)
+      {
+        delete[] transactions[idx].data_init.data;
+        transactions[idx].data_init.size = 0;
+      }
+      if (transactions[idx].access_list.no_accounts > 0)
+      {
+        transactions[idx].access_list.accounts = NULL;
+        transactions[idx].access_list.no_accounts = 0;
+      }
+    }
+    delete[] transactions;
+#endif
+  }
+};
 
 #endif
