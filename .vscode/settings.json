@@ -20,6 +20,7 @@
         "memory": "cpp",
         "stdlib.h": "c",
         "typeinfo": "cpp",
-        "cstdint": "cpp"
+        "cstdint": "cpp",
+        "vector": "cpp"
     }
 }

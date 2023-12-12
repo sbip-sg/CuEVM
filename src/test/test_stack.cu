@@ -1,107 +1,88 @@
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2023-11-30
+// SPDX-License-Identifier: MIT
 
-
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <cuda.h>
-#include <gmp.h>
-#ifndef __CGBN_H__
-#define __CGBN_H__
-#include <cgbn/cgbn.h>
-#endif
 #include "../stack.cuh"
-#include "../utils.h"
 
- 
-template<class params>
-__global__ void kernel_stack(cgbn_error_report_t *report, typename stack_t<params>::stack_data_t *stacks, uint32_t instance_count) {
-  typedef arith_env_t<params>                     arith_t;
-  typedef typename arith_t::bn_t                  bn_t;
-  typedef cgbn_mem_t<params::BITS>                evm_word_t;
-  typedef stack_t<params>                         stack_t;
-  typedef typename stack_t::stack_data_t          stack_data_t;
-  typedef typename stack_t::stack_content_data_t  stack_content_data_t;
+template <class params>
+__host__ __device__ __forceinline__ void test_stack(
+    arith_env_t<params> &arith,
+    typename stack_t<params>::stack_data_t *stack_data,
+    uint32_t &instance)
+{
+  typedef arith_env_t<params> arith_t;
+  typedef typename arith_t::bn_t bn_t;
+  typedef cgbn_mem_t<params::BITS> evm_word_t;
+  typedef stack_t<params> stack_t;
+  typedef typename stack_t::stack_data_t stack_data_t;
 
-  uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
-  __shared__ stack_content_data_t                 stack_content_data;
-  
-  if(instance>=instance_count)
-    return;
-
-
-  __syncthreads();
-  if (threadIdx.x == 0)
-    memcpy(&(stack_content_data.values[0]), stacks[instance].stack_base, sizeof(stack_content_data_t));
-  __syncthreads();
-
-  // setup arithmetic
-  arith_t arith(cgbn_report_monitor, report, instance);
- 
-  //local_stack_t  stack(arith, &(instances[instance].values[0]), 0);
-  stack_data_t   stack_data;
-  stack_data.stack_offset = 0;
-  stack_data.stack_base = &(stack_content_data.values[0]);
-
-  stack_t  stack(arith, &(stack_data));
-  
-  // some test operations
-  //stack.negate();
-  //stack.add();
-  //stack.sub();
-  //stack.mul();
-  //stack.div();
-  //stack.sdiv();
-
-  //push pop some values
+  stack_t *stack;
+  stack = new stack_t(arith);
   bn_t a, b, c, gas_cost;
   uint32_t error_code;
   cgbn_set_ui32(arith._env, gas_cost, 0);
   cgbn_set_ui32(arith._env, a, instance);
   cgbn_set_ui32(arith._env, b, 0xFF);
-  stack.push(b, error_code);
-  stack.push(a, error_code);
-  //stack.exp(error_code, gas_cost);
-  stack.signextend(error_code);
+  stack->push(b, error_code);
+  stack->push(a, error_code);
+  stack->signextend(error_code);
   printf("gas cost: %d\n", cgbn_get_ui32(arith._env, gas_cost));
-  //stack.push(a);
-
-  //cgbn_set_ui32(arith._env, a, 1);
-  //stack.push(a);
-  //cgbn_set_ui32(arith._env, a, 0xff);
-  //stack.push(a);
-  //stack.signextend();
-
-  //copy the stack to the instance
-  //stack.copy(&(instances[instance].values[0]));
-  stack.copy_stack_data(&(stacks[instance]), 0);
-  //memcpy(&(instances[instance].values[0]), &stack_data[0], sizeof(cgbn_mem_t<params::BITS>)*params::STACK_SIZE);
-  
+  stack->to_stack_data_t(*stack_data);
+  delete stack;
+  stack = NULL;
 }
 
-template<class params>
-void run_test(uint32_t instance_count) {
-  typedef arith_env_t<params>                     arith_t;
-  typedef typename arith_t::bn_t                  bn_t;
-  typedef cgbn_mem_t<params::BITS>                evm_word_t;
-  typedef stack_t<params>                         stack_t;
-  typedef typename stack_t::stack_data_t          stack_data_t;
-  typedef typename stack_t::stack_content_data_t  stack_content_data_t;
-  
-  stack_data_t          *cpu_stacks, *gpu_stacks;
-  cgbn_error_report_t *report;
+template <class params>
+__global__ void kernel_stack(
+    cgbn_error_report_t *report,
+    typename stack_t<params>::stack_data_t *stacks_data,
+    uint32_t count)
+{
+  typedef arith_env_t<params> arith_t;
+
+  uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
+
+  if (instance >= count)
+    return;
+
+  // setup arithmetic
+  arith_t arith(cgbn_report_monitor, report, instance);
+
+  test_stack(arith, &(stacks_data[instance]), instance);
+}
+
+template <class params>
+void run_test(uint32_t instance_count)
+{
+  typedef arith_env_t<params> arith_t;
+  typedef stack_t<params> stack_t;
+  typedef typename stack_t::stack_data_t stack_data_t;
+  typedef cgbn_mem_t<params::BITS> evm_word_t;
+
+  stack_data_t *cpu_stacks;
   arith_t arith(cgbn_report_monitor, 0);
-  
+
+#ifndef ONLY_CPU
+  CUDA_CHECK(cudaDeviceReset());
+  CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024 * 1024 * 1024));
+  CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64 * 1024));
+  cgbn_error_report_t *report;
+  stack_data_t *gpu_stacks;
+#endif
 
   printf("Geenerating stack data ...\n");
-  cpu_stacks=stack_t::get_stacks(instance_count);
+  cpu_stacks = stack_t::get_cpu_instances(instance_count);
+  printf("Stack data generated\n");
+
+#ifndef ONLY_CPU
   printf("Copying stack data to the GPU ...\n");
-  gpu_stacks=stack_t::get_gpu_stacks(cpu_stacks, instance_count);
-  printf("Freeing stack data on CPU ...\n");
-  stack_t::free_stacks(cpu_stacks, instance_count);
+  gpu_stacks = stack_t::get_gpu_instances_from_cpu_instances(cpu_stacks, instance_count);
 
   // create a cgbn_error_report for CGBN to report back errors
-  CUDA_CHECK(cgbn_error_report_alloc(&report)); 
-  
+  CUDA_CHECK(cgbn_error_report_alloc(&report));
+
   printf("Running GPU kernel ...\n");
 
   kernel_stack<params><<<instance_count, params::TPI>>>(report, gpu_stacks, instance_count);
@@ -109,41 +90,55 @@ void run_test(uint32_t instance_count) {
   // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
   CUDA_CHECK(cudaDeviceSynchronize());
   CGBN_CHECK(report);
-    
+  CUDA_CHECK(cgbn_error_report_free(report));
+  printf("GPU kernel finished\n");
+
   // copy the instances back from gpuMemory
   printf("Copying results back to CPU ...\n");
-  cpu_stacks=stack_t::get_cpu_stacks_from_gpu(gpu_stacks, instance_count);
-  stack_t::free_gpu_stacks(gpu_stacks, instance_count);
-  
+  stack_t::free_cpu_instances(cpu_stacks, instance_count);
+  cpu_stacks = stack_t::get_cpu_instances_from_gpu_instances(gpu_stacks, instance_count);
+#else
+  printf("Running CPU kernel ...\n");
+  for (uint32_t instance = 0; instance < instance_count; instance++)
+  {
+    test_stack(arith, &(cpu_stacks[instance]), instance);
+  }
+  printf("CPU kernel finished\n");
+#endif
+
   // print the results
-  printf("Printing results and create jsons\n");
+  printf("Printing the results stdout/json...\n");
   cJSON *root = cJSON_CreateObject();
   cJSON *post = cJSON_CreateArray();
-  for(uint32_t instance=0; instance<instance_count; instance++) {
-    stack_t local_stack(arith, &(cpu_stacks[instance]));
-    printf("Instance %d:  ", instance);
-    local_stack.print();
-    printf("\n");
-    cJSON_AddItemToArray(post, local_stack.to_json());
+  cJSON *stack_json = NULL;
+  for (uint32_t instance = 0; instance < instance_count; instance++)
+  {
+    
+    printf("Instance %d:  \n", instance);
+    stack_t::print_stack_data_t(arith, cpu_stacks[instance]);
+    stack_json = stack_t::json_from_stack_data_t(arith, cpu_stacks[instance]);
+    cJSON_AddItemToArray(post, stack_json);
   }
-  printf("Results printed\n");
+  stack_t::free_cpu_instances(cpu_stacks, instance_count);
   cJSON_AddItemToObject(root, "post", post);
-  char *json_str=cJSON_Print(root);
-  FILE *fp=fopen("output/evm_stack.json", "w");
+  char *json_str = cJSON_Print(root);
+  FILE *fp = fopen("output/evm_stack.json", "w");
   fprintf(fp, "%s", json_str);
   fclose(fp);
   free(json_str);
+  json_str = NULL;
   cJSON_Delete(root);
-  printf("Json files printed\n");
-  
-  
+  root = NULL;
+  printf("Results printed\n");
+
   // clean up
   printf("Freeing stack data on CPU ...\n");
-  stack_t::free_stacks(cpu_stacks, instance_count);
-  printf("Freeing error report ...\n");
-  CUDA_CHECK(cgbn_error_report_free(report));
+#ifndef ONLY_CPU
+  CUDA_CHECK(cudaDeviceReset());
+#endif
 }
 
-int main() {
+int main()
+{
   run_test<utils_params>(2);
 }

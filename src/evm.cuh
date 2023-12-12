@@ -46,8 +46,6 @@ class evm_t {
 
         // constants
         static const uint32_t                           MAX_DEPTH=1024;
-        static const uint32_t                           WORD_BITS = params::BITS;
-        static const uint32_t                           WORD_BYTES = params::BITS/8;
         static const uint32_t                           MAX_EXECUTION_STEPS = 30000;
         static const uint32_t                           HASH_BYTES = 32;
 
@@ -1188,7 +1186,7 @@ class evm_t {
                 #endif
             }
             if (msg.get_depth()==0) {
-                stack.copy_stack_data(call_stack, 0);
+                stack.to_stack_data_t(call_stack, 0);
                 memory.copy_info(call_memory);
             } else {
                 

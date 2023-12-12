@@ -333,38 +333,38 @@ public:
    * Copy the current memory data to the given memory data structure.
    * @param[out] dst The destination memory data structure.
   */
-  __host__ __device__ __forceinline__ void to_memory_data_t(memory_data_t *dst)
+  __host__ __device__ __forceinline__ void to_memory_data_t(memory_data_t &dst)
   {
       // free if any memory is allocated
       if (
-        (dst->allocated_size > 0) &&
-        (dst->data != NULL)
+        (dst.allocated_size > 0) &&
+        (dst.data != NULL)
       )
       {
         ONE_THREAD_PER_INSTANCE(
-            delete[] dst->data;
+            delete[] dst.data;
         )
-        dst->data = NULL;
-        dst->allocated_size = 0;
-        dst->size = 0;
-        _arith.cgbn_memory_from_size_t(dst->memory_cost, 0);
+        dst.data = NULL;
+        dst.allocated_size = 0;
+        dst.size = 0;
+        _arith.cgbn_memory_from_size_t(dst.memory_cost, 0);
       }
 
-      dst->size = _content->size;
-      dst->allocated_size = _content->size;
+      dst.size = _content->size;
+      dst.allocated_size = _content->size;
       bn_t memory_cost;
       cgbn_load(_arith._env, memory_cost, &(_content->memory_cost));
-      cgbn_store(_arith._env, &(dst->memory_cost), memory_cost);
+      cgbn_store(_arith._env, &(dst.memory_cost), memory_cost);
       if (_content->size > 0)
       {
         ONE_THREAD_PER_INSTANCE(
-            dst->data = new uint8_t[_content->size];
-            memcpy(dst->data, _content->data, _content->size);
+            dst.data = new uint8_t[_content->size];
+            memcpy(dst.data, _content->data, _content->size);
         )
       }
       else
       {
-        dst->data = NULL;
+        dst.data = NULL;
       }
   }
   
@@ -597,17 +597,56 @@ public:
 
   /**
    * Print the memory data structure.
+   * @param[in] arith The arithmetical environment.
+   * @param[in] memory_data The memory data structure.
+  */
+  __host__ __device__ __forceinline__ static void print_memory_data_t(
+    arith_t &arith,
+    memory_data_t &memory_data
+  )
+  {
+    printf("size=%lu\n", memory_data.size);
+    printf("allocated_size=%lu\n", memory_data.allocated_size);
+    printf("memory_cost=");
+    arith.print_cgbn_memory(memory_data.memory_cost);
+    printf("data: ");
+    if (memory_data.size > 0)
+      print_bytes(memory_data.data, memory_data.size);
+    printf("\n");
+  }
+
+  /**
+   * Print the memory data structure.
   */
   __host__ __device__ void print()
   {
-    printf("size=%lu\n", _content->size);
-    printf("allocated_size=%lu\n", _content->allocated_size);
-    printf("memory_cost=");
-    _arith.print_cgbn_memory(_content->memory_cost);
-    printf("data: ");
-    if (_content->size > 0)
-      print_bytes(_content->data, _content->size);
-    printf("\n");
+    print_memory_data_t(_arith, *_content);
+  }
+
+  __host__ static cJSON *json_from_memory_data_t(
+    arith_t &arith,
+    memory_data_t &memory_data
+  )
+  {
+    cJSON *memory_json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(memory_json, "size", memory_data.size);
+    cJSON_AddNumberToObject(memory_json, "allocated_size", memory_data.allocated_size);
+    char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+    arith.hex_string_from_cgbn_memory(hex_string_ptr, memory_data.memory_cost);
+    cJSON_AddStringToObject(memory_json, "memory_cost", hex_string_ptr);
+    if (memory_data.size > 0)
+    {
+      char *bytes_string = bytes_to_hex(memory_data.data, memory_data.size);
+      cJSON_AddStringToObject(memory_json, "data", bytes_string);
+      delete[] bytes_string;
+    }
+    else
+    {
+      cJSON_AddStringToObject(memory_json, "data", "0x");
+    }
+    delete[] hex_string_ptr;
+    hex_string_ptr = NULL;
+    return memory_json;
   }
 
   /**
@@ -616,18 +655,7 @@ public:
   */
   __host__ cJSON *json()
   {
-    char *bytes_string=NULL;
-    cJSON *data_json = cJSON_CreateObject();
-
-    if (_content->size > 0) {
-      bytes_string = bytes_to_hex(_content->data, _content->size);
-      cJSON_AddStringToObject(data_json, "data", bytes_string);
-      delete[] bytes_string;
-    } else {
-      cJSON_AddStringToObject(data_json, "data", "0x");
-    }
-    
-    return data_json;
+    return json_from_memory_data_t(_arith, *_content);
   }
 };
 

@@ -54,7 +54,7 @@ __host__ __device__ __forceinline__ void test_memory(
   memory->set(&(tmp[0]), index, length, error_code);
   printf("error_code=%d\n", error_code);
 
-  memory->to_memory_data_t(memory_data);
+  memory->to_memory_data_t(*memory_data);
 
   delete memory;
   memory = NULL;
@@ -143,23 +143,17 @@ void run_test(uint32_t instance_count)
   printf("Printing the results stdout/json...\n");
   cJSON *root = cJSON_CreateObject();
   cJSON *post = cJSON_CreateArray();
-  memory_t *memory;
-  memory_data_t *memory_data;
-  memory_data = new memory_data_t;
-  memory = new memory_t(arith, memory_data);
+  cJSON *memory_json = NULL;
   for (uint32_t instance = 0; instance < instance_count; instance++)
   {
     cJSON *instance_json = cJSON_CreateObject();
     cJSON_AddItemToArray(post, instance_json);
     cJSON_AddNumberToObject(instance_json, "instance", instance);
-    memcpy(memory_data, &(cpu_memories[instance]), sizeof(memory_data_t));
-    cJSON_AddItemToObject(instance_json, "memory", memory->json());
+    memory_json = memory_t::json_from_memory_data_t(arith, cpu_memories[instance]);
+    cJSON_AddItemToObject(instance_json, "memory", memory_json);
     printf("Instance %d:  ", instance);
-    memory->print();
+    memory_t::print_memory_data_t(arith, cpu_memories[instance]);
   }
-  delete memory;
-  memory = NULL;
-  memory_data = NULL;
   cJSON_AddItemToObject(root, "post", post);
   delete[] cpu_memories;
   cpu_memories = NULL;

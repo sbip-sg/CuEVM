@@ -295,44 +295,43 @@ public:
 
     /**
      * Print the account.
+     * @param[in] arith The arithmetical environment
      * @param[in] account The account
     */
-    __host__ __device__ __forceinline__ static void print_account(
-        account_t *account
+    __host__ __device__ __forceinline__ static void print_account_t(
+        arith_t &arith,
+        account_t &account
     )
     {
         printf("address: ");
-        print_bn<params>(account->address);
-        printf("\n");
+        arith.print_cgbn_memory(account.address);
         printf("balance: ");
-        print_bn<params>(account->balance);
-        printf("\n");
+        arith.print_cgbn_memory(account.balance);
         printf("nonce: ");
-        print_bn<params>(account->nonce);
-        printf("\n");
-        printf("code_size: %lu\n", account->code_size);
+        arith.print_cgbn_memory(account.nonce);
+        printf("code_size: %lu\n", account.code_size);
         printf("code: ");
-        print_bytes(account->bytecode, account->code_size);
+        print_bytes(account.bytecode, account.code_size);
         printf("\n");
-        printf("storage_size: %lu\n", account->storage_size);
-        for (size_t idx = 0; idx < account->storage_size; idx++)
+        printf("storage_size: %lu\n", account.storage_size);
+        for (size_t idx = 0; idx < account.storage_size; idx++)
         {
             printf("storage[%lu].key: ", idx);
-            print_bn<params>(account->storage[idx].key);
-            printf("\n");
+            arith.print_cgbn_memory(account.storage[idx].key);
             printf("storage[%lu].value: ", idx);
-            print_bn<params>(account->storage[idx].value);
-            printf("\n");
+            arith.print_cgbn_memory(account.storage[idx].value);
         }
     }
 
     /**
      * Get json of the account
+     * @param[in] arith The arithmetical environment
      * @param[in] account The account
      * @return The json of the account
     */
-    __host__ cJSON *json_from_account(
-        account_t *account
+    __host__ static cJSON *json_from_account_t(
+        arith_t &arith,
+        account_t &account
     )
     {
         cJSON *account_json = NULL;
@@ -343,18 +342,18 @@ public:
         size_t jdx = 0;
         account_json = cJSON_CreateObject();
         // set the address
-        _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->address, 5);
+        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.address, 5);
         cJSON_SetValuestring(account_json, hex_string_ptr);
         // set the balance
-        _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->balance);
+        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.balance);
         cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
         // set the nonce
-        _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->nonce);
+        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.nonce);
         cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
         // set the code
-        if (account->code_size > 0)
+        if (account.code_size > 0)
         {
-            bytes_string = bytes_to_hex(account->bytecode, account->code_size);
+            bytes_string = bytes_to_hex(account.bytecode, account.code_size);
             cJSON_AddStringToObject(account_json, "code", bytes_string);
             delete[] bytes_string;
         }
@@ -365,12 +364,12 @@ public:
         // set the storage
         storage_json = cJSON_CreateObject();
         cJSON_AddItemToObject(account_json, "storage", storage_json);
-        if (account->storage_size > 0)
+        if (account.storage_size > 0)
         {
-            for (jdx = 0; jdx < account->storage_size; jdx++)
+            for (jdx = 0; jdx < account.storage_size; jdx++)
             {
-                _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->storage[jdx].key);
-                _arith.hex_string_from_cgbn_memory(value_hex_string_ptr, account->storage[jdx].value);
+                arith.hex_string_from_cgbn_memory(hex_string_ptr, account.storage[jdx].key);
+                arith.hex_string_from_cgbn_memory(value_hex_string_ptr, account.storage[jdx].value);
                 cJSON_AddStringToObject(storage_json, hex_string_ptr, value_hex_string_ptr);
             }
         }
@@ -486,16 +485,53 @@ public:
     }
 
     /**
+     * Print the state data structure.
+     * @param[in] arith The arithmetical environment
+     * @param[in] state_data The state data
+    */
+    __host__ __device__ __forceinline__ static void print_state_data_t(
+        arith_t &arith,
+        state_data_t &state_data
+    )
+    {
+        printf("no_accounts: %lu\n", state_data.no_accounts);
+        for (size_t idx = 0; idx < state_data.no_accounts; idx++)
+        {
+            printf("accounts[%lu]:\n", idx);
+            print_account_t(arith, state_data.accounts[idx]);
+        }
+    }
+
+    /**
      * Print the state.
     */
     __host__ __device__ __forceinline__ void print()
     {
-        printf("no_accounts: %lu\n", _content->no_accounts);
-        for (size_t idx = 0; idx < _content->no_accounts; idx++)
+        print_state_data_t(_arith, *_content);
+    }
+
+    /**
+     * Get json from the state data structure.
+    */
+    __host__ __forceinline__ static cJSON *json_from_state_data_t(
+        arith_t &arith,
+        state_data_t &state_data
+    )
+    {
+        cJSON *state_json = NULL;
+        cJSON *account_json = NULL;
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        size_t idx = 0;
+        state_json = cJSON_CreateObject();
+        for (idx = 0; idx < state_data.no_accounts; idx++)
         {
-            printf("accounts[%lu]:\n", idx);
-            print_account(&(_content->accounts[idx]));
+            account_json = json_from_account_t(arith, state_data.accounts[idx]);
+            arith.hex_string_from_cgbn_memory(hex_string_ptr, state_data.accounts[idx].address, 5);
+            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
         }
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
+        return state_json;
     }
 
     /**
@@ -504,20 +540,7 @@ public:
     */
     __host__ __forceinline__ cJSON *json()
     {
-        cJSON *state_json = NULL;
-        cJSON *account_json = NULL;
-        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-        size_t idx = 0;
-        state_json = cJSON_CreateObject();
-        for (idx = 0; idx < _content->no_accounts; idx++)
-        {
-            account_json = json_from_account(&(_content->accounts[idx]));
-            _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->accounts[idx].address, 5);
-            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
-        }
-        delete[] hex_string_ptr;
-        hex_string_ptr = NULL;
-        return state_json;
+        return json_from_state_data_t(_arith, *_content);
     }
 };
 
@@ -921,6 +944,7 @@ public:
         accessed_state_data_t &accessed_state_data
     )
     {
+        ONE_THREAD_PER_INSTANCE(
         // free the memory of the destination if needed
         if (accessed_state_data.accessed_accounts.no_accounts > 0)
         {
@@ -992,6 +1016,7 @@ public:
             }
 
         }
+        )
     }
 
     /**
@@ -1509,41 +1534,72 @@ public:
     }
 
     /**
+     * Print the accessed state data structure.
+     * @param[in] arith The arithemtic instance
+     * @param[in] accessed_state_data The accessed state data
+    */
+    __host__ __device__ __forceinline__ static void print_accessed_state_data_t(
+        arith_t &arith,
+        accessed_state_data_t &accessed_state_data
+    )
+    {
+        printf("no_accounts: %lu\n", accessed_state_data.accessed_accounts.no_accounts);
+        for (size_t idx = 0; idx < accessed_state_data.accessed_accounts.no_accounts; idx++)
+        {
+            printf("accounts[%lu]:\n", idx);
+            world_state_t::print_account_t(arith, accessed_state_data.accessed_accounts.accounts[idx]);
+            printf("read: %hhu\n", accessed_state_data.reads[idx]);
+        }
+    }
+
+    /**
      * Print the state.
     */
     __host__ __device__ __forceinline__ void print()
     {
-        printf("no_accounts: %lu\n", _content->accessed_accounts.no_accounts);
-        for (size_t idx = 0; idx < _content->accessed_accounts.no_accounts; idx++)
-        {
-            printf("accounts[%lu]:\n", idx);
-            world_state_t::print_account(&(_content->accessed_accounts.accounts[idx]));
-            printf("read: %hhu\n", _content->reads[idx]);
-        }
+        print_accessed_state_data_t(_arith, *_content);
     }
 
+    /**
+     * Get json from the accessed state data structure.
+     * @param[in] arith The arithemtic instance
+     * @param[in] accessed_state_data The accessed state data
+     * @return The json of the accessed state data
+    */
+    __host__ static cJSON *json_from_accessed_state_data_t(
+        arith_t &arith,
+        accessed_state_data_t &accessed_state_data
+    )
+    {
+        cJSON *accessed_state_json = NULL;
+        cJSON *account_json = NULL;
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        size_t idx = 0;
+        accessed_state_json = cJSON_CreateObject();
+        for (idx = 0; idx < accessed_state_data.accessed_accounts.no_accounts; idx++)
+        {
+            account_json = world_state_t::json_from_account_t(
+                arith,
+                accessed_state_data.accessed_accounts.accounts[idx]);
+            cJSON_AddItemToObject(account_json, "read", cJSON_CreateNumber(accessed_state_data.reads[idx]));
+            arith.hex_string_from_cgbn_memory(
+                hex_string_ptr,
+                accessed_state_data.accessed_accounts.accounts[idx].address,
+                5
+            );
+            cJSON_AddItemToObject(accessed_state_json, hex_string_ptr, account_json);
+        }
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
+        return accessed_state_json;
+    }
     /**
      * Get json of the state
      * @return The json of the state
     */
     __host__ __forceinline__ cJSON *json()
     {
-        cJSON *state_json = NULL;
-        cJSON *account_json = NULL;
-        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-        size_t idx = 0;
-        state_json = cJSON_CreateObject();
-        for (idx = 0; idx < _content->accessed_accounts.no_accounts; idx++)
-        {
-            account_t *account = &(_content->accessed_accounts.accounts[idx]);
-            account_json = _world_state->json_from_account(account);
-            cJSON_AddItemToObject(account_json, "read", cJSON_CreateNumber(_content->reads[idx]));
-            _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->address, 5);
-            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
-        }
-        delete[] hex_string_ptr;
-        hex_string_ptr = NULL;
-        return state_json;
+        return json_from_accessed_state_data_t(_arith, *_content);
     }
 };
 
@@ -2397,6 +2453,7 @@ public:
         touch_state_data_t &touch_state_data
     )
     {
+        ONE_THREAD_PER_INSTANCE(
         // free the memory if it is already allocated
         if (touch_state_data.touch_accounts.no_accounts > 0)
         {
@@ -2468,6 +2525,7 @@ public:
             }
 
         }
+        )
     }
 
     /**
@@ -2769,7 +2827,7 @@ public:
         // run the first kernel which copy the accoutns details and read operations
         kernel_touch_state_S1<params><<<1, count>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
-        cudaFree(gpu_instances);
+        CUDA_CHECK(cudaFree(gpu_instances));
 
         
         // STEP 2: get the accounts storage and bytecode from GPU
@@ -2979,17 +3037,64 @@ public:
     }
 
     /**
+     * Print the touch state data structure
+     * @param[in] arith The arithemtic instance
+     * @param[in] touch_state_data The touch state data
+    */
+    __host__ __device__ __forceinline__ static void print_touch_state_data_t(
+        arith_t &arith,
+        touch_state_data_t &touch_state_data
+    )
+    {
+        printf("no_accounts: %lu\n", touch_state_data.touch_accounts.no_accounts);
+        for (size_t idx = 0; idx < touch_state_data.touch_accounts.no_accounts; idx++)
+        {
+            printf("accounts[%lu]:\n", idx);
+            world_state_t::print_account_t(arith, touch_state_data.touch_accounts.accounts[idx]);
+            printf("touch: %hhu\n", touch_state_data.touch[idx]);
+        }
+    }
+
+    /**
      * Print the state.
     */
     __host__ __device__ __forceinline__ void print()
     {
-        printf("no_accounts: %lu\n", _content->touch_accounts.no_accounts);
-        for (size_t idx = 0; idx < _content->touch_accounts.no_accounts; idx++)
+        print_touch_state_data_t(_arith, *_content);
+    }
+
+    /**
+     * Get json of the touch state data structure.
+     * @param[in] arith The arithemtic instance
+     * @param[in] touch_state_data The touch state data
+     * @return The json of the touch state data
+    */
+    __host__ static cJSON *json_from_touch_state_data_t(
+        arith_t &arith,
+        touch_state_data_t &touch_state_data
+    )
+    {
+        cJSON *state_json = NULL;
+        cJSON *account_json = NULL;
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        size_t idx = 0;
+        state_json = cJSON_CreateObject();
+        for (idx = 0; idx < touch_state_data.touch_accounts.no_accounts; idx++)
         {
-            printf("accounts[%lu]:\n", idx);
-            world_state_t::print_account(&(_content->touch_accounts.accounts[idx]));
-            printf("touch: %hhu\n", _content->touch[idx]);
+            account_json = world_state_t::json_from_account_t(
+                arith,
+                touch_state_data.touch_accounts.accounts[idx]);
+            cJSON_AddNumberToObject(account_json, "touch", touch_state_data.touch[idx]);
+            arith.hex_string_from_cgbn_memory(
+                hex_string_ptr,
+                touch_state_data.touch_accounts.accounts[idx].address,
+                5
+            );
+            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
         }
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
+        return state_json;
     }
 
     /**
@@ -2998,21 +3103,7 @@ public:
     */
     __host__ __forceinline__ cJSON *json()
     {
-        cJSON *state_json = NULL;
-        cJSON *account_json = NULL;
-        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-        size_t idx = 0;
-        state_json = cJSON_CreateObject();
-        for (idx = 0; idx < _content->touch_accounts.no_accounts; idx++)
-        {
-            account_t *account = &(_content->touch_accounts.accounts[idx]);
-            account_json = _access_state->_world_state->json_from_account(account);
-            _arith.hex_string_from_cgbn_memory(hex_string_ptr, account->address, 5);
-            cJSON_AddItemToObject(state_json, hex_string_ptr, account_json);
-        }
-        delete[] hex_string_ptr;
-        hex_string_ptr = NULL;
-        return state_json;
+        return json_from_touch_state_data_t(_arith, *_content);
     }
 
 

@@ -73,11 +73,11 @@ public:
       bn_t &contract_address,
       bn_t &gas_limit,
       bn_t &value,
-      uint32_t &depth,
-      uint8_t &call_type,
+      uint32_t depth,
+      uint8_t call_type,
       bn_t &storage_address,
       uint8_t *data,
-      size_t &data_size) : _arith(arith)
+      size_t data_size) : _arith(arith)
   {
     SHARED_MEMORY message_data_t *content;
     ONE_THREAD_PER_INSTANCE(
@@ -219,7 +219,7 @@ public:
     int32_t overflow = _arith.size_t_from_cgbn(index_s, index);
     if (
         (overflow != 0) ||
-        (index_s >= _content.data.size))
+        (index_s >= _content->data.size))
     {
       return NULL;
     }
@@ -229,15 +229,15 @@ public:
       overflow = _arith.size_t_from_cgbn(length_s, length);
       if (
           (overflow != 0) ||
-          (length_s > _content.data.size - index_s))
+          (length_s > _content->data.size - index_s))
       {
-        available_size = _content.data.size - index_s;
-        return _content.data.data + index_s;
+        available_size = _content->data.size - index_s;
+        return _content->data.data + index_s;
       }
       else
       {
         available_size = length_s;
-        return _content.data.data + index_s;
+        return _content->data.data + index_s;
       }
     }
   }
@@ -419,6 +419,26 @@ public:
   }
 
   /**
+   * Get the maximum fee per gas.
+   * @param[out] max_fee_per_gas The maximum fee per gas YP: \f$T_{m}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_max_fee_per_gas(
+      bn_t &max_fee_per_gas)
+  {
+    cgbn_load(_arith._env, max_fee_per_gas, &(_content->max_fee_per_gas));
+  }
+
+  /**
+   * Get the maximum priority fee per gas.
+   * @param[out] max_priority_fee_per_gas The maximum priority fee per gas YP: \f$T_{f}\f$.
+  */
+  __host__ __device__ __forceinline__ void get_max_priority_fee_per_gas(
+      bn_t &max_priority_fee_per_gas)
+  {
+    cgbn_load(_arith._env, max_priority_fee_per_gas, &(_content->max_priority_fee_per_gas));
+  }
+
+  /**
    * Get the transaction gas price.
    * @param[out] gas_price The gas price YP: \f$T_{p}\f$.
   */
@@ -433,7 +453,7 @@ public:
   */
   __host__ __device__ void print()
   {
-    printf("TYPE: %hhu\n, NONCE: ", _content->type);
+    printf("TYPE: %hhu\nNONCE: ", _content->type);
     _arith.print_cgbn_memory(_content->nonce);
     printf("GAS_LIMIT: ");
     _arith.print_cgbn_memory(_content->gas_limit);
@@ -453,7 +473,7 @@ public:
         printf("NO_STORAGE_KEYS: %d", _content->access_list.accounts[idx].no_storage_keys);
         for (size_t jdx = 0; jdx < _content->access_list.accounts[idx].no_storage_keys; jdx++)
         {
-          printf("STORAGE_KEY[%d]: ", jdx);
+          printf("STORAGE_KEY[%lu]: ", jdx);
           _arith.print_cgbn_memory(_content->access_list.accounts[idx].storage_keys[jdx]);
         }
       }
@@ -528,7 +548,7 @@ public:
           _arith.hex_string_from_cgbn_memory(
               hex_string_ptr,
               _content->access_list.accounts[idx].storage_keys[jdx]);
-          cJSON_AddStringToObject(storage_keys_json, hex_string_ptr);
+          cJSON_AddItemToArray(storage_keys_json, cJSON_CreateString(hex_string_ptr));
         }
       }
     }
@@ -622,7 +642,7 @@ public:
 
     uint8_t type;
     size_t data_index, gas_limit_index, value_index;
-    size_t idx = 0, jdx = 0, kdx = 0, instance_idx = 0;
+    size_t idx = 0, jdx = 0;
 
     type = 0;
     const cJSON *nonce_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "nonce");
