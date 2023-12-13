@@ -706,7 +706,7 @@ public:
         uint32_t tmp_error_code = ERR_SUCCESS;
         // get the account index
         size_t account_idx = get_account_index(address, tmp_error_code);
-        // if account was accesed before, it is warm
+        // if account was accessed before, it is warm
         // otherwise it is cold
         if (tmp_error_code == ERR_SUCCESS)
         {

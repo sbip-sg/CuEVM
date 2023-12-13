@@ -298,6 +298,22 @@ public:
    */
   typedef message_t<params> message_t;
   /**
+   * The world state class.
+   */
+  typedef world_state_t<params> world_state_t;
+  /**
+   * The accessed state class.
+  */
+  typedef accessed_state_t<params> accessed_state_t;
+  /**
+   * The touch state class.
+  */
+  typedef touch_state_t<params> touch_state_t;
+  /**
+   * The account class.
+  */
+  typedef world_state_t::account_t account_t;
+  /**
    * The maximum number of transactions per test.
    */
   static const size_t MAX_TRANSACTION_COUNT = 2000;
@@ -448,6 +464,299 @@ public:
     cgbn_load(_arith._env, gas_price, &(_content->gas_price));
   }
 
+  /**
+   * Get the intrisinc gas value for the transacation.
+   * Add the accounts and storage keys from access list
+   * to the warm accessed accounts and storage keys.
+   * @param[out] intrisinc_gas The intrisinc gas value YP: \f$g_{0}\f$.
+   * @param[out] accessed_state The accessed state.
+  */
+  __host__ __device__ __forceinline__ void get_intrisinc_gas(
+      bn_t &intrisinc_gas,
+      accessed_state_t &accessed_state)
+  {
+    // set the initial cost to the transaction cost
+    cgbn_set_ui32(_arith._env, intrisinc_gas, GAS_TRANSACTION);
+    // see if a contract is being created
+    bn_t to;
+    get_to(to);
+    if (cgbn_compare_ui32(_arith._env, to, 0) == 0)
+    {
+        // contract creation
+        cgbn_add_ui32(_arith._env, intrisinc_gas, intrisinc_gas, GAS_TX_CREATE);
+    }
+    // go through call data cost
+    for (size_t idx=0; idx < _content->data_init.size; idx++)
+    {
+        if (_content->data_init.data[idx] == 0)
+        {
+            cgbn_add_ui32(_arith._env, intrisinc_gas, intrisinc_gas, GAS_TX_DATA_ZERO);
+        }
+        else
+        {
+            cgbn_add_ui32(_arith._env, intrisinc_gas, intrisinc_gas, GAS_TX_DATA_NONZERO);
+        }
+    }
+    // if has the access list add the cost and
+    // add the accounts and storage keys to the warm accessed accounts and storage keys
+    bn_t address;
+    bn_t key;
+    bn_t value;
+    if (_content->type > 0)
+    {
+        for (size_t idx=0; idx < _content->access_list.no_accounts; idx++)
+        {
+          cgbn_add_ui32(
+              _arith._env,
+              intrisinc_gas,
+              intrisinc_gas,
+              GAS_ACCESS_LIST_ADDRESS);
+          cgbn_load(
+              _arith._env,
+              address,
+              &(_content->access_list.accounts[idx].address));
+          // get the account in warm accessed accounts
+          accessed_state.get_account(address, READ_NONE);
+          for (
+              size_t jdx=0;
+              jdx < _content->access_list.accounts[idx].no_storage_keys;
+              jdx++)
+          {
+            cgbn_add_ui32(
+                _arith._env,
+                intrisinc_gas,
+                intrisinc_gas,
+                GAS_ACCESS_LIST_STORAGE);
+            cgbn_load(
+                _arith._env,
+                key,
+                &(_content->access_list.accounts[idx].storage_keys[jdx]));
+            // get the storage in warm accessed storage keys
+            accessed_state.get_storage(address, key, value);
+          }
+        }
+    }
+  }
+
+  /**
+   * Get the transaction fees. The fees are computed
+   * based on the transaction information and block
+   * base fee.
+   * @param[out] gas_value The WEI gas value YP: \f$p \dot T_{g}\f$
+   * @param[out] gas_limit The gas limit YP: \f$T_{g}\f$
+   * @param[out] gas_price The gas price YP: \f$p\f$
+   * @param[out] gas_priority_fee The gas priority fee YP: \f$f\f$
+   * @param[out] up_front_cost The up front cost YP: \f$v_{0}\f$
+   * @param[out] m The max gas fee YP: \f$m\f$
+   * @param[in] block_base_fee The block base fee YP: \f$H_{f}\f$
+   * @return The error code.
+  */
+  __host__ __device__ __forceinline__ uint32_t get_transaction_fees(
+    bn_t &gas_value,
+    bn_t &gas_limit,
+    bn_t &gas_price,
+    bn_t &gas_priority_fee,
+    bn_t &up_front_cost,
+    bn_t &m,
+    bn_t &block_base_fee
+  )
+  {
+    bn_t max_priority_fee_per_gas; // YP: \f$T_{f}\f$
+    bn_t max_fee_per_gas; // YP: \f$T_{m}\f$
+    bn_t value; // YP: \f$T_{v}\f$
+    get_max_priority_fee_per_gas(max_priority_fee_per_gas);
+    get_max_fee_per_gas(max_fee_per_gas);
+    get_value(value);
+    get_gas_limit(gas_limit); // YP: \f$T_{g}\f$
+    if (
+        (_content->type == 0) ||
+        (_content->type == 1)
+    )
+    {
+        // \f$p = T_{p}\f$
+        get_gas_price(gas_price);
+        // \f$f = T_{p} - H_{f}\f$
+        cgbn_sub(_arith._env, gas_priority_fee, gas_price, block_base_fee);
+        // \f$v_{0} = T_{p} * T_{g} + T_{v}\f$
+        cgbn_mul(_arith._env, up_front_cost, gas_price, gas_limit);
+        cgbn_add(_arith._env, up_front_cost, up_front_cost, value);
+        // \f$m = T_{p}\f$
+        cgbn_set(_arith._env, m, gas_price);
+    } else if (_content->type == 2)
+    {
+        // \f$T_{m} - H_{f}\f$
+        cgbn_sub(_arith._env, gas_priority_fee, max_fee_per_gas, block_base_fee);
+        // \f$f=min(T_{f}, T_{m} - H_{f})\f$
+        if (cgbn_compare(_arith.env, gas_priority_fee, max_priority_fee_per_gas) > 0)
+        {
+            cgbn_set(_arith._env, gas_priority_fee, max_priority_fee_per_gas);
+        }
+        // \f$p = f + H_{f}\f$
+        cgbn_add(_arith._env, gas_price, gas_priority_fee, block_base_fee);
+        // \f$v_{0} = T_{m} * T_{g} + T_{v}\f$
+        cgbn_mul(_arith._env, up_front_cost, max_fee_per_gas, gas_limit);
+        cgbn_add(_arith._env, up_front_cost, up_front_cost, value);
+        // \f$m = T_{m}\f$
+        cgbn_set(_arith._env, m, max_fee_per_gas);
+    } else {
+        return ERROR_TRANSACTION_TYPE;
+    }
+    // gas value \f$= T_{g} \dot p\f$
+    cgbn_mul(_arith._env, gas_value, gas_limit, gas_price);
+    return ERR_NONE;
+  }
+
+  /**
+   * Validate the transaction. The validation is done
+   * based on the transaction information and block
+   * base fee. It gives the gas price, the gas used for
+   * the transaction, the gas priority fee, the error code
+   * (if the transaction is invalid). If the transaction is
+   * valid it updates the touch state by subtracting the
+   * gas value from the sender balance and incrementing
+   * the sender nonce.
+   * @param[out] touch_state The touch state.
+   * @param[out] gas_used The gas used YP: \f$g_{0}\f$
+   * @param[out] gas_price The gas price YP: \f$p\f$
+   * @param[out] gas_priority_fee The gas priority fee YP: \f$f\f$
+   * @param[out] error_code The error code.
+   * @param[in] block_base_fee The block base fee YP: \f$H_{f}\f$
+   * @param[in] block_gas_limit The block gas limit YP: \f$H_{l}\f$
+  */
+  __host__ __device__ void validate_transaction(
+    touched_state_t &touch_state,
+    bn_t &gas_used,
+    bn_t &gas_price,
+    bn_t &gas_priority_fee,
+    uint32_t &error_code,
+    bn_t &block_base_fee,
+    bn_t &block_gas_limit
+  )
+  {
+    bn_t intrisinc_gas; /**< YP: \f$g_{0}\f$*/
+    // get the intrisinc gas and update the accessed state
+    // with the access list if present
+    get_intrisinc_gas(intrisinc_gas, *touch_state.accessed_state);
+    bn_t up_front_cost; // YP: \f$v_{0}\f$
+    bn_t m; // YP: \f$m\f$
+    bn_t gas_value; // YP: \f$p \dot T_{g}\f$
+    bn_t gas_limit; // YP: \f$T_{g}\f$
+    error_code = get_transaction_fees(
+        gas_value,
+        gas_limit,
+        gas_price,
+        gas_priority_fee,
+        up_front_cost,
+        m,
+        block_base_fee,
+    )
+    
+    bn_t sender_address;
+    account_t *sender_account;
+    get_sender(sender_address);
+    error_code = ERR_NONE;
+    // get the world state account
+    sender_account = touch_state.accessed_state->_world_state->get_account(
+      sender_address,
+      error_code
+    );
+    bn_t sender_balance;
+    cgbn_load(_arith._env, sender_balance, &(sender_account->balance));
+    bn_t sender_nonce;
+    cgbn_load(_arith._env, sender_nonce, &(sender_account->nonce));
+    bn_t transaction_nonce;
+    get_nonce(transaction_nonce);
+
+    // sender is an empty account YP: \f$\sigma(T_{s}) \neq \varnothing\f$
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      ((error_code == ERR_STATE_INVALID_ADDRESS) ?
+      ERROR_TRANSACTION_SENDER_EMPTY : ERR_NONE);
+    // sender is a contract YP: \f$\sigma(T_{s})_{c} \eq KEC(())\f$
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      ( (sender_account->code_size > 0) ?
+        ERROR_TRANSACTION_SENDER_CODE : ERR_NONE);
+    // nonce are different YP: \f$T_{n} \eq \sigma(T_{s})_{n}\f$
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      ((cgbn_compare(_arith.env, transaction_nonce, sender_nonce) != 0) ?
+        ERROR_TRANSACTION_NONCE : ERR_NONE);
+    // sent gas is less than intrinisec gas YP: \f$T_{g} \geq g_{0}\f$
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      ((cgbn_compare(_arith.env, gas_limit, intrisinc_gas) < 0) ?
+        ERROR_TRANSACTION_GAS_LIMIT : ERR_NONE);
+    // balance is less than up front cost YP: \f$\sigma(T_{s})_{b} \geq v_{0}\f$
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      ((cgbn_compare(_arith.env, sender_balance, up_front_cost) < 0) ?
+        ERROR_TRANSACTION_BALANCE : ERR_NONE);
+    // gas fee is less than than block base fee YP: \f$m \geq H_{f}\f$
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      ((cgbn_compare(_arith.env, m, block_base_fee) < 0) ?
+        ERROR_TRANSACTION_GAS_FEE : ERR_NONE);
+    // Max priority fee per gas is higher than max fee per gas YP: \f$T_{m} \geq T_{f}\f$
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      (((_content->type == 2) &&
+      (cgbn_compare(_arith.env, max_fee_per_gas, max_priority_fee_per_gas) < 0)) ?
+        ERROR_TRANSACTION_MAX_FEE : ERR_NONE);
+    
+    // the other verification is about the block gas limit
+    // YP: \f$T_{g} \leq H_{l}\f$ ... different because it takes in account
+    // previous transactions
+    error_code = (error_code != ERR_NONE) ?
+      error_code :
+      ((cgbn_compare(_arith.env, gas_limit, block_gas_limit) > 0) ?
+        ERROR_TRANSACTION_BLOCK_GAS_LIMIT : ERR_NONE);
+    
+    // if transaction is valid update the touch state
+    if (error_code == ERR_NONE)
+    {
+      // \f$\simga(T_{s})_{b} = \simga(T_{s})_{b} - (p \dot T_{g})\f$
+      cgbn_sub(_arith._env, sender_balance, sender_balance, gas_value);
+      touch_state.set_account_balance(sender_address, sender_balance);
+      // \f$\simga(T_{s})_{n} = \simga(T_{s})_{n} + 1\f$
+      cgbn_add_ui32(_arith._env, sender_nonce, sender_nonce, 1);
+      touch_state.set_account_nonce(sender_address, sender_nonce);
+      // set the gas used to the intrisinc gas
+      cgbn_set(_arith._env, gas_used, intrisinc_gas);
+    }
+  }
+
+  /**
+   * Get the message call from the transaction.
+   * @return The message call.
+  */
+  __host__ __device__ message_t *get_message_call()
+  {
+    bn_t sender, to, gas_limit, value;
+    get_sender(sender);
+    get_to(to);
+    get_gas_limit(gas_limit);
+    get_value(value);
+    uint32_t depth = 0;
+    uint8_t call_type = OP_CALL;
+    if (cgbn_compare_ui32(_arith._env, to, 0) == 0)
+    {
+      // TODO: to see which type of create CREATE or CREATE2
+      call_type = OP_CREATE;
+    }
+    return new message_t(
+        _arith,
+        sender,
+        to,
+        to,
+        gas_limit,
+        value,
+        depth,
+        call_type,
+        to,
+        _content->data_init.data,
+        _content->data_init.size);
+  }
   /**
    * Print the transaction information.
   */
