@@ -606,6 +606,40 @@ public:
     return ERR_NONE;
   }
 
+  __host__ __device__ __forceinline__ static void get_computed_gas_price(
+    bn_t &gas_price,
+    bn_t &block_base_fee,
+    uint32_t &error_code
+  )
+  {
+    bn_t max_priority_fee_per_gas; // YP: \f$T_{f}\f$
+    bn_t max_fee_per_gas; // YP: \f$T_{m}\f$
+    bn_t gas_priority_fee; // YP: \f$f\f$
+    get_max_priority_fee_per_gas(max_priority_fee_per_gas);
+    get_max_fee_per_gas(max_fee_per_gas);
+    if (
+        (_content->type == 0) ||
+        (_content->type == 1)
+    )
+    {
+        // \f$p = T_{p}\f$
+        get_gas_price(gas_price);
+    } else if (_content->type == 2)
+    {
+        // \f$T_{m} - H_{f}\f$
+        cgbn_sub(_arith._env, gas_priority_fee, max_fee_per_gas, block_base_fee);
+        // \f$f=min(T_{f}, T_{m} - H_{f})\f$
+        if (cgbn_compare(_arith.env, gas_priority_fee, max_priority_fee_per_gas) > 0)
+        {
+            cgbn_set(_arith._env, gas_priority_fee, max_priority_fee_per_gas);
+        }
+        // \f$p = f + H_{f}\f$
+        cgbn_add(_arith._env, gas_price, gas_priority_fee, block_base_fee);
+    } else {
+        error_code = ERROR_TRANSACTION_TYPE;
+    }
+  }
+
   /**
    * Validate the transaction. The validation is done
    * based on the transaction information and block

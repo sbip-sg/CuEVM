@@ -1874,6 +1874,27 @@ public:
         return 0;
     }
 
+    __host__ __device__ __forceinline__ void charge_gas_access_account(
+        bn_t &address,
+        bn_t &gas_used
+    )
+    {
+        bn_t gas_cost;
+        _access_state->get_access_account_gas_cost(address, gas_cost);
+        cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
+    }
+
+    __host__ __device__ __forceinline__ void charge_gas_access_storage(
+        bn_t &address,
+        bn_t &key,
+        bn_t &gas_used
+    )
+    {
+        bn_t gas_cost;
+        _access_state->get_access_storage_gas_cost(address, key, gas_cost);
+        cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
+    }
+
     /**
      * Get the account with the given address.
      * If the account does not exist in the touch state,
@@ -1982,6 +2003,42 @@ public:
     {
         account_t *account = get_account(address, READ_CODE);
         return account->bytecode;
+    }
+
+    __host__ __device__ __forceinline__ uint8_t *get_account_code_data(
+        bn_t &address,
+        bn_t index,
+        bn_t length,
+        size_t &available_size
+    )
+    {
+        account_t *account = get_account(address, READ_CODE);
+        available_size = 0;
+        size_t index_s;
+        int32_t overflow = _arith.size_t_from_cgbn(index_s, index);
+        if (
+            (overflow != 0) ||
+            (index_s >= _content->data.size))
+        {
+            return NULL;
+        }
+        else
+        {
+            size_t length_s;
+            overflow = _arith.size_t_from_cgbn(length_s, length);
+            if (
+                (overflow != 0) ||
+                (length_s > _content->data.size - index_s))
+            {
+                available_size = _content->data.size - index_s;
+                return _content->data.data + index_s;
+            }
+            else
+            {
+                available_size = length_s;
+                return _content->data.data + index_s;
+            }
+        }
     }
 
     /**
@@ -2300,8 +2357,8 @@ public:
                 {
                     if (cgbn_compare_ui32(_arith._env, current_value, 0) == 0)
                     {
-                        // cgbn_sub_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
-                        cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_STORAGE_CLEAR_REFUND);
+                        /cgbn_sub_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
+                        //cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_STORAGE_CLEAR_REFUND);
                     }
                     if (cgbn_compare_ui32(_arith._env, value, 0) == 0)
                     {
@@ -2322,6 +2379,20 @@ public:
             }
         }
     }
+
+    __host__ __device__ __forceinline__ void charge_gas_set_storage(
+        bn_t &address,
+        bn_t &key,
+        bn_t &value,
+        bn_t &gas_used,
+        bn_t &gas_refund
+    )
+    {
+        bn_t gas_cost, set_gas_refund;
+        get_storage_set_gas_cost_gas_refund(address, key, value, gas_cost, set_gas_refund);
+        cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
+        cgbn_add(_arith._env, gas_refund, gas_refund, set_gas_refund);
+    } 
 
     /**
      * Set the storage value for the given key in the storage

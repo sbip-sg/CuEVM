@@ -118,7 +118,6 @@ public:
     // constants
     static const uint32_t MAX_DEPTH = 1024;
     static const uint32_t MAX_EXECUTION_STEPS = 30000;
-    static const uint32_t HASH_BYTES = 32;
     static const uint32_t DEPTH_PAGE_SIZE = 32;
 
     typedef struct
@@ -164,7 +163,11 @@ public:
     bn_t _gas_priority_fee; /**< YP: \f$f\f$*/
     bn_t _storage_address;
     bn_t _contract_address;
-    account_t *_contract;
+    uint8_t *_bytecode;
+    uint32_t _code_size;
+    uint8_t _opcode;
+    jump_destinations_t *_jump_destinations;
+    uint32_t _error_code;
 
 
     // constructor
@@ -204,6 +207,8 @@ public:
         #ifdef TRACER
         _tracer = new tracer_t(arith, tracer_data);
         #endif
+        _jump_destinations = NULL;
+        _error_code = ERR_NONE;
     }
     
     __host__ __device__ __forceinline__ ~evm_t()
@@ -314,7 +319,25 @@ public:
         _message_ptrs[_depth]->get_gas(_gas_limit);
         _message_ptrs[_depth]->get_storage_address(_storage_address);
         _message_ptrs[_depth]->get_contract_address(_contract_address);
-        _contract = _touch_state_ptrs[_depth]->get_account(_contract_address, READ_CODE | READ_BALANCE | READ_NONCE);
+        if (
+            (_message_ptrs[_depth]->get_call_type() == OP_CREATE) ||
+            (_message_ptrs[_depth]->get_call_type() == OP_CREATE2)
+        )
+        {
+            _bytecode = _message_ptrs[_depth]->_content->data.data;
+            _code_size = _message_ptrs[_depth]->_content->data.size;
+        } else {
+            account_t *contract;
+            contract = _touch_state_ptrs[_depth]->get_account(_contract_address, READ_CODE);
+            _bytecode = contract->bytecode;
+            _code_size = contract->code_size;
+        }
+        if (_jump_destinations != NULL)
+        {
+            delete _jump_destinations;
+            _jump_destinations = NULL;
+        }
+        _jump_destinations = new jump_destinations_t(_bytecode, _code_size);
     }
 
     __host__ __device__ void init_message_call(
@@ -347,206 +370,103 @@ public:
             _touch_state_ptrs[_depth]->get_account_balance(sender, sender_balance);
             _touch_state_ptrs[_depth]->get_account_balance(receiver, receiver_balance);
             // verify the balance before transfer
+            if (cgbn_compare(_arith._env, sender_balance, value) < 0)
+            {
+                error_code = ERROR_MESSAGE_CALL_SENDER_BALANCE;
+                return;
+            }
             cgbn_sub(_arith._env, sender_balance, sender_balance, value);
             cgbn_add(_arith._env, receiver_balance, receiver_balance, value);
             _touch_state_ptrs[_depth]->set_account_balance(sender, sender_balance);
             _touch_state_ptrs[_depth]->set_account_balance(receiver, receiver_balance);
         }
+        // warm up the accounts
+        account_t *account;
+        account = _touch_state_ptrs[_depth]->get_account(sender, READ_NONE);
+        account = _touch_state_ptrs[_depth]->get_account(receiver, READ_NONE);
+        account = _touch_state_ptrs[_depth]->get_account(_contract_address, READ_NONE);
+        account = _touch_state_ptrs[_depth]->get_account(_storage_address, READ_NONE);
+        account = NULL;
     }
+
+   
+
+    __host__ __device__ __forceinline__ static void operation_logx(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        uint32_t &pc,
+        stack_t &stack,
+        uint8_t &opcode
+    )
+    {
+        uint8_t log_index = opcode & 0x0F;
+        error_code = ERR_NOT_IMPLEMENTED;
+    }
+
+    __host__ __device__ __forceinline__ static void operation_stop(
+        return_data_t &return_data,
+        uint32_t &error_code
+    )
+    {
+        return_data.set(
+            NULL,
+            0);
+        error_code = ERR_RETURN;
+    }
+
 
     __host__ __device__ void run(
         uint32_t error_code
     )
     {
-        //
-
-        // return data
-        return_data_t returns(call_return_data);
-        if (call_msg->depth > MAX_DEPTH)
+        // get the first message call from transaction
+        _message_ptrs[_depth] = _transaction->get_message_call();
+        // process the transaction
+        bn_t intrsinc_gas_used;
+        process_transaction(intrsinc_gas_used, error_code);
+        if (error_code != ERR_NONE)
         {
-            error = ERR_MAX_DEPTH_EXCEEDED;
-            returns.set(NULL, 0);
-            // probabily revert the state
+            // TODO: do stuff for fail transaction
             return;
         }
-
-        // stack initiliasation
-        SHARED_MEMORY stack_content_data_t stack_content;
-        stack_data_t stack_data;
-        stack_data.stack_offset = 0;
-        stack_data.stack_base = &(stack_content.values[0]);
-        stack_t stack(_arith, &stack_data);
-
-        // (heap) memory initiliasation
-        SHARED_MEMORY memory_data_t memory_data;
-        SHARED_MEMORY uint8_t tmp_memory[WORD_BYTES];
-        memory_data.size = 0;
-        memory_data.alocated_size = 0;
-        memory_data.data = NULL;
-        memory_t memory(_arith, &memory_data);
-
-        // local state initiliasation
-        state_t write_state(_arith, call_write_state);
-        state_t parents_state(_arith, call_parents_write_state);
-        state_t access_state(_arith, call_access_state);
-
-        // msg initiliasation
-        message_t msg(_arith, call_msg);
-
-// tracer initiliasation
-#ifdef TRACER
-        tracer_t tracer(_arith, call_tracer);
-#endif
-
-        // evm run internal information
-        uint32_t pc;
-        uint8_t opcode;
-        uint32_t error_code;
-        error_code = ERR_NONE;
-
-        // last return data
-        SHARED_MEMORY data_content_t last_return_data;
-        last_return_data.data = NULL;
-        last_return_data.size = 0;
-        return_data_t external_return_data(&last_return_data);
-
-        // auxiliary variables
-        contract_t *contract, *tmp_contract;
-        bn_t contract_address, contract_balance, storage_address;
-        bn_t caller, value, nonce, to, tx_origin, tx_gasprice;
-        bn_t address, key, offset, length, index, src_offset, dst_offset;
-        size_t dst_offset_s, src_offset_s, length_s, index_s, offset_s, size_s;
-        bn_t remaining_gas;
-        bn_t gas_cost, aux_gas_cost, gas_refund;
-        uint8_t *byte_data;
-        uint32_t minimum_word_size;
-
-        msg.get_to(to);
-        msg.get_caller(caller);
-        bn_t dummy_gas;
-
-        // add to access list the caller and the contract called
-        contract = write_state.get_account(to, _global_state, access_state, parents_state, dummy_gas, 4); // get the code
-        // TODO: maybe see a way of making the contract local
-        cgbn_load(_arith._env, contract_address, &(contract->address));
-        cgbn_load(_arith._env, contract_balance, &(contract->balance));
-        write_state.get_account(caller, _global_state, access_state, parents_state, dummy_gas, 1); // get the balance
-        // TODO: for gas maybe verify if the balance is enough
-
-        // depending on the call type take action
-        switch (msg.get_call_type())
-        {
-        case OP_CALL:
-            cgbn_set(_arith._env, storage_address, to);
-            /* code */
-            break;
-        case OP_CALLCODE:
-            msg.get_storage(storage_address);
-            /* code */
-            break;
-        case OP_DELEGATECALL:
-            msg.get_storage(storage_address);
-            /* code */
-            break;
-        case OP_STATICCALL:
-            cgbn_set(_arith._env, storage_address, to);
-            /* code */
-            break;
-
-        default:
-            error = ERR_NOT_IMPLEMENTED;
-            returns.set(NULL, 0);
-            break;
-        }
-        // get the sroage in the write state so it keeps its code
-        // for delegate call and call code
-        tmp_contract = write_state.get_account(storage_address, _global_state, access_state, parents_state, dummy_gas, 4); // get the code
-
-        write_state.set_local_account(storage_address, tmp_contract, 1);
-        // get the gas from message
-        msg.get_gas(remaining_gas);
-        cgbn_set_ui32(_arith._env, gas_cost, 0);
-
-        // calculate the initial transaction cost
-        // add the cost for call data
-        if (msg.get_depth() == 0)
-        {
-            byte_data = msg.get_data(0, msg.get_data_size(), size_s);
-            for (uint32_t idx = 0; idx < size_s; idx++)
-            {
-                if (byte_data[idx] == 0)
-                {
-                    cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 4);
-                }
-                else
-                {
-                    cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 16);
-                }
-            }
-            // add the transaction cost
-            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 21000);
-            // add the access list cost
-            // cgbn_add_ui32(_arith._env, gas_cost, gas_cost, 5200);
-        }
-        cgbn_sub(_arith._env, remaining_gas, remaining_gas, gas_cost);
-
-        // find the jump destinations for the current code
-        jump_destinations_t D_jumps(contract->bytecode, contract->code_size);
-
-        pc = 0;
+        // init the first message call
+        init_message_call(error_code);
+        // add the transaction cost
+        cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], intrsinc_gas_used);
+        // run the message call
         uint32_t trace_pc;
         uint32_t execution_step = 0;
-        // while(pc < contract->code_size)
-        while (pc < contract->code_size && execution_step < MAX_EXECUTION_STEPS)
+        while (
+            ((_pcs[_depth] < _code_size) ||
+            (_depth > 0)) &&
+            (execution_step < MAX_EXECUTION_STEPS)
+        )
         {
 
-            opcode = contract->bytecode[pc];
+            _opcode = _bytecode[_pcs[_depth]];
             ONE_THREAD_PER_INSTANCE(
                 printf("pc: %d opcode: %d\n", pc, opcode);)
 #ifdef TRACER
             trace_pc = pc;
 #endif
-            if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70))
+            // PUSHX
+            if (((_opcode & 0xF0) == 0x60) || ((_opcode & 0xF0) == 0x70))
             {
-                // PUSH
-                cgbn_set_ui32(_arith._env, gas_cost, 3);
-                uint8_t push_size = (opcode & 0x1F) + 1;
-                byte_data = &(contract->bytecode[pc + 1]);
-                // verify if the push is inside the code
-                // TOD: verify if pc+1 exists
-                if (pc + push_size >= contract->code_size)
-                {
-                    byte_data = expand_memory(byte_data, contract->code_size - 1 - pc, push_size);
-                    stack.pushx(byte_data, push_size, error_code);
-                    ONE_THREAD_PER_INSTANCE(
-                        free(byte_data);)
-                }
-                else
-                {
-                    stack.pushx(byte_data, push_size, error_code);
-                }
-                pc = pc + push_size;
+                operation_pushx();
             }
-            else if ((opcode & 0xF0) == 0x80)
+            else if ((_opcode & 0xF0) == 0x80) // DUPX
             {
-                // DUP
-                cgbn_set_ui32(_arith._env, gas_cost, 3);
-                uint8_t dup_index = (opcode & 0x0F) + 1;
-                stack.dupx(dup_index, error_code);
+                operation_dupx();
             }
-            else if ((opcode & 0xF0) == 0x90)
+            else if ((opcode & 0xF0) == 0x90) // SWAPX
             {
-                // SWAP
-                cgbn_set_ui32(_arith._env, gas_cost, 3);
-                uint8_t swap_index = (opcode & 0x0F) + 1;
-                stack.swapx(swap_index, error_code);
+                operation_swapx();
             }
-            else if ((opcode & 0xF0) == 0xA0)
+            else if ((opcode & 0xF0) == 0xA0) // LOGX
             {
-                // LOG
-                // more complex gas cost
-                uint8_t log_index = opcode & 0x0F;
-                error_code = ERR_NOT_IMPLEMENTED;
+                operation_logx();
             }
             else
             {
@@ -554,11 +474,7 @@ public:
                 {
                 case OP_STOP: // STOP
                 {
-                    // only for contracts without code
-                    returns.set(NULL, 0);
-                    pc = pc;
-                    // TODO: maybe modify later
-                    error_code = ERR_RETURN;
+                    operation_stop();
                 }
                 break;
                 case OP_ADD: // ADD

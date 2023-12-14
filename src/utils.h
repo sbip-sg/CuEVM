@@ -229,5 +229,20 @@ __host__ __device__ __forceinline__ uint8_t *expand_memory(uint8_t *memory, size
 
 // data content ==END==
 
+// evm gas verification
+
+template <class params>
+__host__ __device__ __forceinline__ int32_t has_gas(
+  arith_env_t<params> &arith,
+  typename arith_env_t<params>::bn_t &gas_limit,
+  typename arith_env_t<params>::bn_t &gas_used,
+  uint32_t &error_code
+)
+{
+  int32_t gas_sign = cgbn_compare(arith._env, gas_limit, gas_used);
+  error_code = (gas_sign < 0) ? ERROR_GAS_LIMIT_EXCEEDED : error_code;
+  return (gas_sign >= 0);
+}
+
 
 #endif

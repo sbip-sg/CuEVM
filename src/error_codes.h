@@ -43,9 +43,6 @@
 // execution codes
 #define ERR_INVALID_JUMP_DESTINATION 0x11
 
-// return data errors
-#define ERR_RETURN_DATA_INVALID_SIZE 0x12
-#define ERR_RETURN_DATA_OVERFLOW 0x13
 
 // static call error
 #define ERR_STATIC_CALL_CONTEXT 0x14
@@ -64,5 +61,19 @@
 #define ERROR_TRANSACTION_GAS_PRIORITY 0x1E
 #define ERROR_TRANSACTION_BLOCK_GAS_LIMIT 0x1F
 
+// message calls
+#define ERROR_MESSAGE_CALL_SENDER_BALANCE 0x20
+
+// gas
+#define ERROR_GAS_LIMIT_EXCEEDED 0x21
+
+// stack
+#define ERROR_STACK_INVALID_PUSHX_X 0x22
+#define ERROR_STACK_INVALID_DUPX_X 0x23
+
+
+// return data errors
+#define ERROR_RETURN_DATA_INVALID_SIZE 0x12
+#define ERROR_RETURN_DATA_OVERFLOW 0x13
 
 #endif

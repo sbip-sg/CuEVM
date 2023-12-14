@@ -283,13 +283,13 @@ public:
 
   /**
    * Get the has of a previous block given by the number
-   * @param[in] previous_number The number of the previous block
    * @param[out] previous_hash The hash of the previous block
+   * @param[in] previous_number The number of the previous block
    * @param[out] error_code The error code
   */
   __host__ __device__ __forceinline__ void get_previous_hash(
-      bn_t &previous_number,
       bn_t &previous_hash,
+      bn_t &previous_number,
       uint32_t &error_code)
   {
     uint32_t idx = 0;

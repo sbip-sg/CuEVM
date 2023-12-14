@@ -573,18 +573,28 @@ public:
     push(r, error_code);
   }
 
-  __host__ __device__ __forceinline__ void pushx(uint8_t *value, uint32_t size, uint32_t &error_code)
+  __host__ __device__ __forceinline__ void pushx(
+    uint8_t x,
+    uint32_t &error_code,
+    uint8_t *src_byte_data,
+    uint8_t src_byte_size)
   {
-    if (size > 32)
+    if (x > 32)
     {
-      error_code = ERR_STACK_INVALID_SIZE;
+      error_code = ERROR_STACK_INVALID_PUSHX_X;
       return;
     }
     bn_t r;
     cgbn_set_ui32(_arith._env, r, 0);
-    for (uint32_t i = 0; i < size; i++)
+    for (uint8_t idx = (x - src_byte_size); idx < x; idx++)
     {
-      cgbn_insert_bits_ui32(_arith._env, r, r, i * 8, 8, value[size - 1 - i]);
+      cgbn_insert_bits_ui32(
+        _arith._env,
+        r,
+        r,
+        idx * 8,
+        8,
+        src_byte_data[x - 1 - idx]);
     }
     push(r, error_code);
   }
@@ -599,15 +609,18 @@ public:
     return _content->stack_base + (size() - index);
   }
 
-  __host__ __device__ __forceinline__ void dupx(uint32_t index, uint32_t &error_code)
+  __host__ __device__ __forceinline__ void dupx(
+    uint8_t x,
+    uint32_t &error_code
+  )
   {
-    if ((index < 1) || (index > 16))
+    if ((x < 1) || (x > 16))
     {
-      error_code = ERR_STACK_INVALID_SIZE;
+      error_code = ERROR_STACK_INVALID_DUPX_X;
       return;
     }
     bn_t r;
-    evm_word_t *value = get_index(index, error_code);
+    evm_word_t *value = get_index(x, error_code);
     if (value == NULL)
     {
       return;

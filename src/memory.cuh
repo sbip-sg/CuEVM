@@ -153,13 +153,13 @@ public:
    * The memory cost of the memory. (YP: \f$C_{mem}-M(\mu_{i}, index, length)\f$)
    * @param[in] index The index of the memory access.
    * @param[in] length The length of the memory access.
-   * @param[out] gas_cost The gas cost after.
+   * @param[out] gas_used The gas cost after.
    * @param[out] error_code The error code.
   */
   __host__ __device__ __forceinline__ void grow_cost(
     bn_t &index,
     bn_t &length,
-    bn_t &gas_cost,
+    bn_t &gas_used,
     uint32_t &error_code
   )
   {
@@ -186,7 +186,7 @@ public:
       bn_t tmp;
       cgbn_mul_ui32(_arith._env, tmp, memory_size_word, GAS_MEMORY);
       cgbn_add(_arith._env, memory_cost, memory_cost, tmp);
-      //  gas_cost = gas_cost + memory_cost - old_memory_cost
+      //  gas_used = gas_used + memory_cost - old_memory_cost
       bn_t memory_expansion_cost;
       if (cgbn_compare(_arith._env, memory_cost, old_memory_cost) == 1)
       {
@@ -198,7 +198,7 @@ public:
       {
         cgbn_set_ui32(_arith._env, memory_expansion_cost, 0);
       }
-      cgbn_add(_arith._env, gas_cost, gas_cost, memory_expansion_cost);
+      cgbn_add(_arith._env, gas_used, gas_used, memory_expansion_cost);
 
       // size is always a multiple of 32
       cgbn_mul_ui32(_arith._env, offset, memory_size_word, 32);
@@ -306,24 +306,23 @@ public:
     uint8_t *data,
     bn_t &index,
     bn_t &length,
+    size_t &available_size,
     uint32_t &error_code
   )
   {
     if (cgbn_compare_ui32(_arith._env, length, 0) > 0)
     {
       size_t index_s;
-      size_t length_s;
       grow(index, length, error_code);
       _arith.size_t_from_cgbn(index_s, index);
-      _arith.size_t_from_cgbn(length_s, length);
       if (
         (data != NULL) &&
-        (length_s > 0) &&
+        (available_size > 0) &&
         (error_code == ERR_NONE)
       )
       {
         ONE_THREAD_PER_INSTANCE(
-          memcpy(_content->data + index_s, data, length_s);
+          memcpy(_content->data + index_s, data, available_size);
         )
       }
     }

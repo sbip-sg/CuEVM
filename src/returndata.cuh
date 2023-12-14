@@ -109,12 +109,12 @@ public:
     size_t request_size = index + size;
     if ((request_size > index) || (request_size > size))
     {
-      error_code = ERR_RETURN_DATA_OVERFLOW;
+      error_code = ERROR_RETURN_DATA_OVERFLOW;
       return _content->data;
     }
     else if (request_size > _content->size)
     {
-      error_code = ERR_RETURN_DATA_INVALID_SIZE;
+      error_code = ERROR_RETURN_DATA_INVALID_SIZE;
       return _content->data;
     }
     else
@@ -270,7 +270,7 @@ public:
 
     // 1. alocate the memory for gpu memory as memory which can be addressed by the cpu
     data_content_t *tmp_cpu_instances, *new_gpu_instances;
-    new_gpu_instances = get_gpu_returns(cpu_instances, count);
+    new_gpu_instances = get_gpu_instances_from_cpu_instances(cpu_instances, count);
 
     // 2. call the kernel to copy the memory between the gpu memories
     kernel_get_returns<<<1, count>>>(new_gpu_instances, gpu_instances, count);
