@@ -313,7 +313,6 @@ public:
     }
 
     __host__ __device__ void update_env(
-        uint32_t &error_code
     )
     {
         _message_ptrs[_depth]->get_gas(_gas_limit);
@@ -405,7 +404,7 @@ public:
         error_code = ERR_NOT_IMPLEMENTED;
     }
 
-    __host__ __device__ __forceinline__ static void operation_stop(
+    __host__ __device__ __forceinline__ static void operation_STOP(
         return_data_t &return_data,
         uint32_t &error_code
     )
@@ -1390,6 +1389,220 @@ public:
         }
         cgbn_store(_arith._env, call_gas_left, remaining_gas);
     }
+
+    __host__ __device__ __forceinline__ void child_call
+    (
+        uint32_t &error_code,
+        message_t &new_message
+    )
+    {
+        if ((_depth + 1) < MAX_DEPTH)
+        {
+            if (_depth == _allocated_depth)
+            {
+                grow();
+            }
+            _pcs[_depth + 1] = 0;
+            _depth = _depth + 1;
+            _message_ptrs[_depth] = &new_message;
+            init_message_call(error_code);
+            update_env();
+        }
+        else
+        {
+            error_code = ERROR_MAX_DEPTH_EXCEEDED;
+        }
+    }
+
+    __host__ __device__ __forceinline__ static void generic_call(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        uint32_t &pc,
+        stack_t &stack,
+        message_t &message,
+        memory_t &memory,
+        touch_state_t &touch_state,
+        uint8_t &opcode,
+        evm_t &evm,
+        message_t &new_message,
+        bn_t &args_offset,
+        bn_t &args_size
+    )
+    {
+        // try to send value in static call
+        bn_t value;
+        new_message.get_value(value);
+        if (message.get_static_env()) {
+            if (cgbn_compare_ui32(_arith._env, value, 0) != 0) {
+                error_code = ERROR_STATIC_CALL_CONTEXT_CALL_VALUE;
+            }
+        }
+
+        // charge the gas for the call
+
+        // memory call data
+        memory.grow_cost(
+            args_offset,
+            args_size,
+            gas_used,
+            error_code);
+        
+        // memory return data
+        bn_t ret_offset, ret_size;
+        new_message.get_return_data_offset(ret_offset);
+        new_message.get_return_data_size(ret_size);
+        memory.grow_cost(
+            ret_offset,
+            ret_size,
+            gas_used,
+            error_code);
+        
+        // adress warm call
+        bn_t contract_address;
+        new_message.get_contract_address(contract_address);
+        touch_state.charge_gas_access_account(
+            contract_address,
+            gas_used);
+
+        // positive value call cost (except delegate call)
+        // empty account call cost
+        bn_t gas_stippend;
+        cgbn_set_ui32(_arith._env, gas_stippend, 0);
+        if (new_message.get_call_type() != OP_DELEGATECALL) {
+            if (cgbn_compare_ui32(_arith._env, value, 0) > 0) {
+                cgbn_add_ui32(_arith._env, gas_used, gas_used, GAS_CALL_VALUE);
+                cgbn_set_ui32(_arith._env, gas_stippend, GAS_CALL_STIPEND);
+                // If the empty account is called
+                if (touch_state.is_empty_account(contract_address)) {
+                    cgbn_add_ui32(_arith._env, gas_used, gas_used, GAS_NEW_ACCOUNT);
+                };
+            }
+        }
+
+        if (has_gas(arith, gas_limit, gas_used, error_code))
+        {
+            bn_t gas;
+            new_message.get_gas(gas);
+
+            bn_t gas_left;
+            cgbn_sub(_arith._env, gas_left, gas_limit, gas_used);
+
+            // gas capped = (63/64) * gas_left
+            bn_t gas_left_capped;
+            cgbn_set(_arith._env, gas_left_capped, gas_left);
+            cgbn_div_ui32(_arith._env, gas_left_capped, gas_left_capped, 64);
+            cgbn_sub(_arith._env, gas_left_capped, gas_left, gas_left_capped);
+
+            if (cgbn_compare(_arith._env, gas, gas_left_capped) > 0)
+            {
+                cgbn_set(_arith._env, gas, gas_left_capped);
+            }
+
+            // add the call stippend
+            cgbn_add(_arith._env, gas, gas, gas_stippend);
+
+            // set the new gas limit
+            new_message.set_gas_limit(gas);
+            
+            uint8_t *call_data;
+            size_t call_data_size;
+            call_data = memory.get(
+                args_offset,
+                args_size,
+                error_code);
+            arith.size_t_from_cgbn(call_data_size, args_size);
+
+            new_message.set_data(call_data, call_data_size);
+
+            // new message done
+            // call the child
+            evm.child_call(
+                error_code,
+                new_message
+            );
+        }
+    }
+
+
+    __host__ __device__ ___forceinline__ static void operation_CALL(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code, 
+        uint32_t &pc,
+        stack_t &stack,
+        message_t &message,
+        memory_t &memory,
+        touch_state_t &touch_state,
+        uint8_t &opcode,
+        evm_t &evm
+    )
+    {
+        bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
+        stack.pop(gas, error_code);
+        stack.pop(address, error_code);
+        stack.pop(value, error_code);
+        stack.pop(args_offset, error_code);
+        stack.pop(args_size, error_code);
+        stack.pop(ret_offset, error_code);
+        stack.pop(ret_size, error_code);
+
+        if (error_code == ERR_NONE)
+        {   
+            bn_t sender;
+            message.get_contract_address(sender);
+            bn_t recipient;
+            cgbn_set(_arith._env, recipient, address);
+            bn_t contract_address;
+            cgbn_set(_arith._env, contract_address, address);
+            bn_t storage_address;
+            cgbn_set(_arith._env, storage_address, address);
+
+            message_t *new_message = new message_t(
+                arith,
+                sender,
+                recipient,
+                contract_address,
+                gas,
+                value,
+                message.get_depth() + 1,
+                opcode,
+                storage_address,
+                NULL,
+                0,
+                ret_offset,
+                ret_size,
+                message.get_static_env()
+            );
+
+            generic_call(
+                arith,
+                gas_limit,
+                gas_used,
+                error_code,
+                pc,
+                stack,
+                message,
+                memory,
+                touch_state,
+                opcode,
+                evm,
+                *new_message,
+                args_offset,
+                args_size
+            );
+
+            pc = pc + 1;
+        }
+
+    }
+
+
+
+
+
 
     __host__ __device__ void call(
         bn_t &contract_address,

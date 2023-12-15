@@ -44,9 +44,12 @@ public:
     evm_word_t gas_limit;        /**< The gas limit YP: \f$g\f$ */
     evm_word_t value;            /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
     uint32_t depth;              /**< The depth YP: \f$e\f$ */
-    uint8_t call_type;           /**< The call type internal has the opcode YP: \f$w\f$ */
+    uint8_t call_type;           /**< The call type internal has the opcode */
     evm_word_t storage_address;  /**< The storage address YP: \f$a\f$ */
     data_content_t data;         /**< The data YP: \f$d\f$ */
+    evm_word_t return_data_offset; /**< The return data offset in memory */
+    evm_word_t return_data_size;   /**< The return data size in memory */
+    uint32_t static_env;         /**< The static flag (STATICCALL) YP: \f$w\f$ */
   } message_data_t;
 
   message_data_t *_content; /**< The message content */
@@ -65,6 +68,9 @@ public:
    * @param[in] storage_address The storage address YP: \f$a\f$.
    * @param[in] data The data YP: \f$d\f$.
    * @param[in] data_size The data size YP: \f$|d|\f$.
+   * @param[in] return_data_offset The return data offset in memory.
+   * @param[in] return_data_size The return data size in memory.
+   * @param[in] static_env The static flag (STATICCALL) YP: \f$w\f$.
   */
   __host__ __device__ __forceinline__ message_t(
       arith_t &arith,
@@ -77,7 +83,11 @@ public:
       uint8_t call_type,
       bn_t &storage_address,
       uint8_t *data,
-      size_t data_size) : _arith(arith)
+      size_t data_size,
+      bn_t &return_data_offset,
+      bn_t &return_data_size,
+      uint32_t static_env = 0
+      ) : _arith(arith)
   {
     SHARED_MEMORY message_data_t *content;
     ONE_THREAD_PER_INSTANCE(
@@ -99,6 +109,9 @@ public:
       } else {
         _content->data.data = NULL;
       })
+    cgbn_store(_arith._env, &(_content->return_data_offset), return_data_offset);
+    cgbn_store(_arith._env, &(_content->return_data_size), return_data_size);
+    _content->static_env = static_env;
   }
 
   /**
@@ -240,6 +253,70 @@ public:
         return _content->data.data + index_s;
       }
     }
+  }
+
+
+  /**
+   * Get the return data offset.
+   * @param[out] return_data_offset The return data offset in memory.
+  */
+  __host__ __device__ __forceinline__ void get_return_data_offset(
+      bn_t &return_data_offset)
+  {
+    cgbn_load(_arith._env, return_data_offset, &(_content->return_data_offset));
+  }
+
+  /**
+   * Get the return data size.
+   * @param[out] return_data_size The return data size in memory.
+  */
+  __host__ __device__ __forceinline__ void get_return_data_size(
+      bn_t &return_data_size)
+  {
+    cgbn_load(_arith._env, return_data_size, &(_content->return_data_size));
+  }
+
+  /**
+   * Get the static flag.
+   * @return The static flag (STATICCALL) YP: \f$w\f$.
+  */
+  __host__ __device__ __forceinline__ uint32_t get_static_env()
+  {
+    return _content->static_env;
+  }
+
+  /**
+   * Set the gas limit.
+   * @param[in] gas_limit The gas limit YP: \f$g\f$.
+  */
+  __host__ __device__ __forceinline__ void set_gas_limit(
+      bn_t &gas_limit)
+  {
+    cgbn_store(_arith._env, &(_content->gas_limit), gas_limit);
+  }
+
+  /**
+   * Set the call data.
+   * @param[in] data The data YP: \f$d\f$.
+   * @param[in] data_size The data size YP: \f$|d|\f$.
+  */
+  __host__ __device__ __forceinline__ void set_data(
+      uint8_t *data,
+      size_t data_size)
+  {
+    ONE_THREAD_PER_INSTANCE(
+      if (_content->data.size > 0) {
+        delete[] _content->data.data;
+        _content->data.size = 0;
+        _content->data.data = NULL;
+      }
+      if (data_size > 0) {
+        _content->data.data = new uint8_t[data_size];
+        memcpy(_content->data.data, data, sizeof(uint8_t) * data_size);
+      } else {
+        _content->data.data = NULL;
+      }
+      _content->data.size = data_size;)
   }
 
   /**
@@ -778,6 +855,11 @@ public:
       // TODO: to see which type of create CREATE or CREATE2
       call_type = OP_CREATE;
     }
+    uint32_t static_env = 0;
+    bn_t return_data_offset;
+    cgbn_set_ui32(_arith._env, return_data_offset, 0);
+    bn_t return_data_size;
+    cgbn_set_ui32(_arith._env, return_data_size, 0);
     return new message_t(
         _arith,
         sender,
@@ -789,7 +871,10 @@ public:
         call_type,
         to,
         _content->data_init.data,
-        _content->data_init.size);
+        _content->data_init.size,
+        return_data_offset,
+        return_data_size,
+        static_env);
   }
   /**
    * Print the transaction information.

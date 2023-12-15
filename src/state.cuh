@@ -1874,6 +1874,11 @@ public:
         return 0;
     }
 
+    /**
+     * Get the gas for accessing the account with the given address.
+     * @param[in] address The address of the account
+     * @param[inout] gas_used The gas used after the access
+    */
     __host__ __device__ __forceinline__ void charge_gas_access_account(
         bn_t &address,
         bn_t &gas_used
@@ -1884,6 +1889,13 @@ public:
         cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
     }
 
+    /**
+     * Get the gas for accessing the given storage key
+     * of the account with the given address.
+     * @param[in] address The address of the account
+     * @param[in] key The key of the storage
+     * @param[inout] gas_used The gas used after the access
+    */
     __host__ __device__ __forceinline__ void charge_gas_access_storage(
         bn_t &address,
         bn_t &key,
@@ -2005,6 +2017,20 @@ public:
         return account->bytecode;
     }
 
+    /**
+     * Get the account code data at the given index for the given length
+     * of the account with the given address.
+     * If the index is greater than the code size, it returns NULL.
+     * If the length is greater than the code size - index, it returns
+     * the code data from index to the end of the code and sets the
+     * available size to the code size - index. Otherwise, it returns
+     * the code data from index to index + length and sets the available
+     * size to length.
+     * @param[in] address The address of the account
+     * @param[in] index The index of the code data
+     * @param[in] length The length of the code data
+     * @param[out] available_size The available size of the code data
+    */
     __host__ __device__ __forceinline__ uint8_t *get_account_code_data(
         bn_t &address,
         bn_t index,
@@ -2380,6 +2406,16 @@ public:
         }
     }
 
+    /**
+     * Get the gas cost and gas refund for the storage set operation
+     * with the given value at the given storage key in the storage
+     * of the account with the given address.
+     * @param[in] address The address of the account
+     * @param[in] key The key of the storage
+     * @param[in] value The new value for the storage
+     * @param[inout] gas_used The gas cost
+     * @param[inout] gas_refund The gas refund
+    */
     __host__ __device__ __forceinline__ void charge_gas_set_storage(
         bn_t &address,
         bn_t &key,
@@ -2441,6 +2477,29 @@ public:
         // set the value
         cgbn_store(_arith._env, &(account->storage[storage_idx].value), value);
         _content->touch[account_idx] |= WRITE_STORAGE;
+    }
+
+    /**
+     * Get if the account with the given address is empty.
+     * An account is empty if it has zero balance, zero nonce
+     * and zero code size.
+     * @param[in] address The address of the account
+     * @return 1 if the account is empty, 0 otherwise
+    */
+    __host__ __device__ __forceinline__ int32_t is_empty_account(
+        bn_t &address
+    )
+    {
+        account_t *account = get_account(address, READ_NONE);
+        bn_t balance, nonce;
+        cgbn_load(_arith._env, balance, &(account->balance));
+        cgbn_load(_arith._env, nonce, &(account->nonce));
+        return (
+            (cgbn_compare_ui32(_arith._env, balance, 0) == 0) &&
+            (cgbn_compare_ui32(_arith._env, nonce, 0) == 0) &&
+            (account->code_size == 0)
+        );
+
     }
 
     /**
