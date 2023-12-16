@@ -47,7 +47,7 @@ __host__ __device__ __forceinline__ void test_block(
   // block hash
   cgbn_set_ui32(arith._env, b, 0);
   uint32_t error_code = 0;
-  block->get_previous_hash(b, a, error_code);
+  block->get_previous_hash(a, b, error_code);
   printf("previous hash %08x for number %08x, with error %d\n", cgbn_get_ui32(arith._env, a), cgbn_get_ui32(arith._env, b), error_code);
 
   // block->print();

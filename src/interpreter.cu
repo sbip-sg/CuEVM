@@ -29,7 +29,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
   cJSON_ArrayForEach(test, read_root) {
     // get instaces to run
     printf("Generating instances\n");
-    evm_t::get_instances(cpu_instances, test);
+    evm_t::get_cpu_instances(cpu_instances, test);
     #ifndef ONLY_CPU
     CUDA_CHECK(cudaDeviceReset());
     evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
@@ -50,10 +50,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     printf("Heap size: %zu\n", heap_size);
     #endif
 
-    // evm
-    evm_t evm(cgbn_report_monitor, 0, &(cpu_instances.sha3_parameters[0]), cpu_instances.block, cpu_instances.world_state);
-
-
     #ifndef ONLY_CPU
     printf("Running GPU kernel ...\n");
     kernel_evm<params><<<cpu_instances.count, params::TPI>>>(report, gpu_instances);
@@ -71,24 +67,26 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     #else
     printf("Running CPU EVM\n");
     // run the evm
-    for(size_t instance = 0; instance < cpu_instances.count; instance++) {
+    evm_t *evm = NULL;
+    uint32_t tmp_error;
+    for(uint32_t instance = 0; instance < cpu_instances.count; instance++) {
       printf("Running instance %lu\n", instance);
-      evm.run(
-        &(cpu_instances.msgs[instance]),
-        &(cpu_instances.stacks[instance]),
-        &(cpu_instances.return_datas[instance]),
-        &(cpu_instances.memories[instance]),
-        &(cpu_instances.access_states[instance]),
-        &(cpu_instances.parents_write_states[instance]),
-        &(cpu_instances.write_states[instance]),
-        #ifdef GAS
-        &(cpu_instances.gas_left_a[instance]),
-        #endif
-        #ifdef TRACER
-        &(cpu_instances.tracers[instance]),
-        #endif
-        cpu_instances.errors[instance]
-      );
+      evm = new evm_t(
+          arith,
+          cpu_instances.world_state_data,
+          cpu_instances.block_data,
+          cpu_instances.sha3_parameters,
+          &(cpu_instances.transactions_data[instance]),
+          &(cpu_instances.accessed_states_data[instance]),
+          &(cpu_instances.touch_states_data[instance]),
+          #ifdef TRACER
+          &(cpu_instances.tracers_data[instance]),
+          #endif
+          instance,
+          &(cpu_instances.errors[instance]));
+      evm->run(tmp_error);
+      delete evm;
+      evm = NULL;
     }
     printf("CPU EVM finished\n");
     #endif
@@ -96,12 +94,15 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
 
     // print the results
     printf("Printing the results ...\n");
-    evm.print_instances(cpu_instances);
+    evm_t::print_instances(arith, cpu_instances);
     printf("Results printed\n");
 
     // print to json files
     printf("Printing to json files ...\n");
-    cJSON_AddItemToObject(write_root, test->string, evm.instances_to_json(cpu_instances));
+    cJSON_AddItemToObject(
+      write_root,
+      test->string,
+      evm_t::json_from_evm_instances_t(arith, cpu_instances));
     printf("Json files printed\n");
 
     // free the memory

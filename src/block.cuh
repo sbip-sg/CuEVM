@@ -300,7 +300,6 @@ public:
     if (cgbn_compare(_arith._env, number, previous_number) < 1)
     {
       error_code = ERR_BLOCK_INVALID_NUMBER;
-      return;
     }
     // get the distance from the current block number to the requested block number
     cgbn_sub(_arith._env, number, number, previous_number);
@@ -309,9 +308,11 @@ public:
     if (idx > 255)
     {
       error_code = ERR_BLOCK_INVALID_NUMBER;
-      return;
     }
-    cgbn_load(_arith._env, previous_hash, &(_content->previous_blocks[idx].hash));
+    if (error_code == ERR_NONE)
+      cgbn_load(_arith._env, previous_hash, &(_content->previous_blocks[idx].hash));
+    else
+      cgbn_set_ui32(_arith._env, previous_hash, 0);
   }
 
   /**

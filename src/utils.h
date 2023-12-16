@@ -5,19 +5,18 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#ifdef __CUDA_ARCH__
 #include <cuda.h>
-#endif
 #include <gmp.h>
 #ifndef __CGBN_H__
 #define __CGBN_H__
 #include <cgbn/cgbn.h>
 #endif
 #include <cjson/cJSON.h>
+#include "data_content.h"
 #include "opcodes.h"
 #include "error_codes.h"
-#include "arith.cuh"
 #include "gas_cost.h"
+#include "arith.cuh"
 
 #ifdef __CUDA_ARCH__
 #ifndef MULTIPLE_THREADS_PER_INSTANCE
@@ -147,102 +146,5 @@ __host__ cJSON *get_json_from_file(const char *filepath) {
     free(buffer);
     return root;
 }
-
-
-// data content ==BEGIN==
-
-typedef struct
-{
-  size_t size;
-  uint8_t *data;
-} data_content_t;
-
-
-__host__ char *bytes_to_hex(uint8_t *bytes, size_t count) {
-  char *hex_string = new char[count*2+1];
-  char *return_string = new char[count*2+1+2];
-  for(size_t idx=0; idx<count; idx++)
-    sprintf(&hex_string[idx*2], "%02x", bytes[idx]);
-  hex_string[count*2]=0;
-  strcpy(return_string + 2, hex_string);
-  delete[] hex_string;
-  hex_string = NULL;
-  return_string[0]='0';
-  return_string[1]='x';
-  return return_string;
-}
-
-__host__ __device__ __forceinline__ void print_bytes(uint8_t *bytes, size_t count) {
-  printf("data: ");
-  for(size_t idx=0; idx<count; idx++)
-    printf("%02x", bytes[idx]);
-  printf("\n");
-}
-
-__host__ __device__ __forceinline__ void print_data_content(data_content_t &data_content) {
-  printf("size: %lu\n", data_content.size);
-  print_bytes(data_content.data, data_content.size);
-}
-
-__host__ __forceinline__ cJSON *json_from_data_content(data_content_t &data_content) {
-  cJSON *data_json = cJSON_CreateObject();
-  char *hex_string;
-  //cJSON_AddNumberToObject(json, "size", data_content.size);
-  if (data_content.size > 0)
-  {
-    hex_string = bytes_to_hex(data_content.data, data_content.size);
-    cJSON_AddStringToObject(data_json, "data", hex_string);
-    free(hex_string);
-  } else {
-    cJSON_AddStringToObject(data_json, "data", "0x");
-  }
-  return data_json;
-}
-
-
-template<class params>
-__host__ __device__ __forceinline__ void print_bn(cgbn_mem_t<params::BITS> bn) {
-  for(size_t idx=0; idx<params::BITS/32; idx++)
-    printf("%08x ", bn._limbs[params::BITS/32 - 1 - idx]);
-  printf("\n");
-}
-
-
-__host__ __device__ __forceinline__ uint8_t *expand_memory(uint8_t *memory, size_t current_size, size_t new_size) {
-  SHARED_MEMORY uint8_t *new_memory;
-
-  ONE_THREAD_PER_INSTANCE(
-    new_memory = NULL;
-    if (new_size != 0) {
-      new_memory = new uint8_t[new_size];
-      memset(new_memory, 0, new_size);
-      if ((memory != NULL) && (current_size > 0))
-        if (current_size > new_size)
-          memcpy(new_memory, memory, new_size);
-        else
-          memcpy(new_memory, memory, current_size);
-
-    }
-  )
-  return new_memory;
-}
-
-// data content ==END==
-
-// evm gas verification
-
-template <class params>
-__host__ __device__ __forceinline__ int32_t has_gas(
-  arith_env_t<params> &arith,
-  typename arith_env_t<params>::bn_t &gas_limit,
-  typename arith_env_t<params>::bn_t &gas_used,
-  uint32_t &error_code
-)
-{
-  int32_t gas_sign = cgbn_compare(arith._env, gas_limit, gas_used);
-  error_code = (gas_sign < 0) ? ERROR_GAS_LIMIT_EXCEEDED : error_code;
-  return (gas_sign >= 0);
-}
-
 
 #endif

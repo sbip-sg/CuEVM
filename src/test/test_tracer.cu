@@ -94,10 +94,13 @@ __host__ __device__ __forceinline__ void test_tracer(
   bn_t length;
   cgbn_set_ui32(arith._env, index, 10+instance);
   cgbn_set_ui32(arith._env, length, 32);
+  size_t available_size;
+  available_size = arith_t::BYTES;
   memory->set(
     &(tmp[0]),
     index,
     length,
+    available_size,
     error
   );
   tracer->push(

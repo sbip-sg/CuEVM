@@ -10,7 +10,7 @@
 #include "utils.h"
 
 /**
- * The momory class (YP: \f$\mu_{m}\f$)
+ * The memory class (YP: \f$\mu_{m}\f$).
 */
 template <class params>
 class memory_t
@@ -608,10 +608,8 @@ public:
     printf("allocated_size=%lu\n", memory_data.allocated_size);
     printf("memory_cost=");
     arith.print_cgbn_memory(memory_data.memory_cost);
-    printf("data: ");
     if (memory_data.size > 0)
       print_bytes(memory_data.data, memory_data.size);
-    printf("\n");
   }
 
   /**
@@ -635,7 +633,7 @@ public:
     cJSON_AddStringToObject(memory_json, "memory_cost", hex_string_ptr);
     if (memory_data.size > 0)
     {
-      char *bytes_string = bytes_to_hex(memory_data.data, memory_data.size);
+      char *bytes_string = hex_from_bytes(memory_data.data, memory_data.size);
       cJSON_AddStringToObject(memory_json, "data", bytes_string);
       delete[] bytes_string;
     }

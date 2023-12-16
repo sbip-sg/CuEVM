@@ -33,11 +33,12 @@ __host__ __device__ __forceinline__ void test_memory(
   cgbn_set_ui32(arith._env, c, 100);
   cgbn_set_ui32(arith._env, index, 30);
   cgbn_set_ui32(arith._env, length, 20);
+  size_t available_size = arith_t::BYTES;
 
   arith.memory_from_cgbn(&(tmp[0]), a);
   memory->grow_cost(index, length, gas, error_code);
   printf("error_code=%d gas=%08x\n", error_code, cgbn_get_ui32(arith._env, gas));
-  memory->set(&(tmp[0]), index, length, error_code);
+  memory->set(&(tmp[0]), index, length, available_size, error_code);
   printf("error_code=%d\n", error_code);
   printf("Memory set:\n");
   print_bytes(&(tmp[0]), 32);
@@ -51,7 +52,7 @@ __host__ __device__ __forceinline__ void test_memory(
   cgbn_set_ui32(arith._env, length, 32);
   memory->grow_cost(index, length, gas, error_code);
   printf("error_code=%d gas=%08x\n", error_code, cgbn_get_ui32(arith._env, gas));
-  memory->set(&(tmp[0]), index, length, error_code);
+  memory->set(&(tmp[0]), index, length, available_size, error_code);
   printf("error_code=%d\n", error_code);
 
   memory->to_memory_data_t(*memory_data);
@@ -155,7 +156,7 @@ void run_test(uint32_t instance_count)
     memory_t::print_memory_data_t(arith, cpu_memories[instance]);
   }
   cJSON_AddItemToObject(root, "post", post);
-  delete[] cpu_memories;
+  memory_t::free_cpu_instances(cpu_memories, instance_count);
   cpu_memories = NULL;
   char *json_str = cJSON_Print(root);
   FILE *fp = fopen("output/evm_memory.json", "w");

@@ -89,9 +89,10 @@ void run_test()
 
     printf("Generating hash data\n");
     size_t hash_data_count = HASH_DATA_COUNT;
-    uint8_t *cpu_hash_data, *gpu_hash_data;
+    uint8_t *cpu_hash_data;
     cpu_hash_data = (uint8_t *)malloc(instance_count * hash_data_count * sizeof(uint8_t));
 #ifndef ONLY_CPU
+    uint8_t *gpu_hash_data;
     CUDA_CHECK(cudaMalloc(
         (void **)&gpu_hash_data,
         instance_count * hash_data_count * sizeof(uint8_t)));
@@ -149,10 +150,10 @@ void run_test()
     delete keccak_obj;
     keccak_obj = NULL;
     free(cpu_input_data);
-    cudaFree(gpu_input_data);
     free(cpu_hash_data);
-    cudaFree(gpu_hash_data);
 #ifndef ONLY_CPU
+    cudaFree(gpu_input_data);
+    cudaFree(gpu_hash_data);
     CUDA_CHECK(cgbn_error_report_free(report));
 #endif
     printf("Memory freed\n");

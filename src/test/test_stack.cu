@@ -20,15 +20,42 @@ __host__ __device__ __forceinline__ void test_stack(
 
   stack_t *stack;
   stack = new stack_t(arith);
-  bn_t a, b, c, gas_cost;
+  bn_t a, b, c;
   uint32_t error_code;
-  cgbn_set_ui32(arith._env, gas_cost, 0);
+
   cgbn_set_ui32(arith._env, a, instance);
   cgbn_set_ui32(arith._env, b, 0xFF);
   stack->push(b, error_code);
   stack->push(a, error_code);
-  stack->signextend(error_code);
-  printf("gas cost: %d\n", cgbn_get_ui32(arith._env, gas_cost));
+  printf("Stack before pop: \n");
+  stack->print();
+  stack->pop(c, error_code);
+  printf("Stack after pop: \n");
+  stack->print();
+  stack->push(c, error_code);
+  printf("Stack after push: \n");
+  stack->print();
+  printf("stack->size(): %d\n", stack->size());
+
+  stack->dupx(1, error_code);
+  printf("Stack after dupx: \n");
+  stack->print();
+  printf("stack->size(): %d\n", stack->size());
+
+  stack->swapx(2, error_code);
+  printf("Stack after swapx: \n");
+  stack->print();
+  printf("stack->size(): %d\n", stack->size());
+
+  SHARED_MEMORY uint8_t tmp[32];
+  arith.memory_from_cgbn(&(tmp[0]), a);
+
+  stack->pushx(32, error_code, &(tmp[0]), 32);
+  printf("Stack after pushx: \n");
+  stack->print();
+  printf("stack->size(): %d\n", stack->size());
+
+
   stack->to_stack_data_t(*stack_data);
   delete stack;
   stack = NULL;

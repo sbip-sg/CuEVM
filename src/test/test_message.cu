@@ -52,6 +52,9 @@ __host__ __device__ __forceinline__ void test_message(
   size_t size=transaction->_content->data_init.size;
   uint8_t *data=transaction->_content->data_init.data;
   uint32_t depth=0;
+  bn_t ret_offset, ret_size;
+  cgbn_set_ui32(arith._env, ret_offset, 0);
+  cgbn_set_ui32(arith._env, ret_size, 0);
 
   message = new message_t(
     arith,
@@ -64,7 +67,12 @@ __host__ __device__ __forceinline__ void test_message(
     opcode,
     to,
     data,
-    size);
+    size,
+    data,
+    size,
+    ret_offset,
+    ret_size,
+    0);
   
   ONE_THREAD_PER_INSTANCE(
     message->print();

@@ -7,7 +7,7 @@
 #ifndef _ENVIRONMENTAL_OP_H_
 #define _ENVIRONMENTAL_OP_H_
 
-#include "uitls.h"
+#include "utils.h"
 #include "stack.cuh"
 #include "block.cuh"
 #include "state.cuh"
@@ -44,15 +44,6 @@ public:
      */
     typedef typename arith_t::bn_t bn_t;
     /**
-     * The CGBN wide type with double the given number of bits in environment.
-     */
-    typedef typename env_t::cgbn_wide_t bn_wide_t;
-    /**
-     * The arbitrary length integer type used for the storage.
-     * It is defined as the EVM word type.
-     */
-    typedef cgbn_mem_t<params::BITS> evm_word_t;
-    /**
      * The stackk class.
      */
     typedef stack_t<params> stack_t;
@@ -84,7 +75,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BLOCKHASH);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t number;
             stack.pop(number, error_code);
@@ -119,7 +110,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t coinbase;
             block.get_coin_base(coinbase);
@@ -151,7 +142,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t timestamp;
             block.get_time_stamp(timestamp);
@@ -183,7 +174,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t number;
             block.get_number(number);
@@ -215,7 +206,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t prev_randao;
             // TODO: to change depending on the evm version
@@ -249,7 +240,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t gas_limit;
             block.get_gas_limit(gas_limit);
@@ -281,7 +272,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t chain_id;
             block.get_chain_id(chain_id);
@@ -313,7 +304,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t base_fee;
             block.get_base_fee(base_fee);
@@ -362,15 +353,6 @@ public:
      */
     typedef typename arith_t::bn_t bn_t;
     /**
-     * The CGBN wide type with double the given number of bits in environment.
-     */
-    typedef typename env_t::cgbn_wide_t bn_wide_t;
-    /**
-     * The arbitrary length integer type used for the storage.
-     * It is defined as the EVM word type.
-     */
-    typedef cgbn_mem_t<params::BITS> evm_word_t;
-    /**
      * The stackk class.
      */
     typedef stack_t<params> stack_t;
@@ -398,10 +380,6 @@ public:
      * The keccak class.
      */
     typedef keccak::keccak_t keccak_t;
-    /**
-     * The return data class.
-     */
-    typedef return_data_t<params> return_data_t;
     /**
      * The numver of bytes in a hash.
      */
@@ -461,7 +439,7 @@ public:
 
         if (error_code == ERR_NONE)
         {
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
                 uint8_t *data;
                 data = memory.get(
@@ -493,9 +471,9 @@ public:
 
     /**
      * The ADDRESS operation implementation.
-     * Pushes on the stack the address of the current contract.
-     * The current contract is consider the contract that owns the
-     * execution code.
+     * Pushes on the stack the address of currently executing account.
+     * The executing account is consider the current context, so it can be
+     * different than the owner of the code.
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -514,12 +492,12 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
-            bn_t contract_address;
-            message.get_contract_address(contract_address);
+            bn_t recipient_address;
+            message.get_recipient(recipient_address);
 
-            stack.push(contract_address, error_code);
+            stack.push(recipient_address, error_code);
 
             pc = pc + 1;
         }
@@ -557,7 +535,7 @@ public:
             touch_state.charge_gas_access_account(
                 address,
                 gas_used);
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
 
                 bn_t balance;
@@ -594,7 +572,7 @@ public:
         transaction_t &transaction)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t origin;
             transaction.get_sender(origin);
@@ -627,7 +605,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t caller;
             message.get_sender(caller);
@@ -659,7 +637,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t call_value;
             message.get_value(call_value);
@@ -695,12 +673,12 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t index;
             stack.pop(index, error_code);
             bn_t length;
-            cgbn_set_ui32(arith._env, length, arith::BYTES);
+            cgbn_set_ui32(arith._env, length, arith_t::BYTES);
 
             size_t available_data;
             uint8_t *data;
@@ -709,7 +687,7 @@ public:
                 length,
                 available_data);
 
-            stack.pushx(arith::BYTES, error_code, data, available_data);
+            stack.pushx(arith_t::BYTES, error_code, data, available_data);
 
             pc = pc + 1;
         }
@@ -736,7 +714,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t length;
             size_t length_s;
@@ -806,7 +784,7 @@ public:
 
         if (error_code == ERR_NONE)
         {
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
                 size_t available_data;
                 uint8_t *data;
@@ -829,9 +807,7 @@ public:
 
     /**
      * The CODESIZE operation implementation.
-     * Pushes on the stack the size of the code of the current contract.
-     * The current contract is consider the contract that owns the
-     * execution code.
+     * Pushes on the stack the size of code running in current environment.
      * 
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
@@ -840,7 +816,6 @@ public:
      * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] message The message.
-     * @param[in] touch_state The touch state object. The executing world state.
     */
     __host__ __device__ __forceinline__ static void operation_CODESIZE(
         arith_t &arith,
@@ -848,18 +823,15 @@ public:
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        message_t &message,
-        touch_state_t &touch_state)
+        stack_t &stack,
+        message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
-            bn_t contract_address;
-            message.get_contract_address(contract_address);
-
             size_t code_size;
-            code_size = touch_state.get_account_code_size(
-                contract_address);
+            code_size = message.get_code_size();
+
             bn_t code_size_bn;
             arith.cgbn_from_size_t(code_size_bn, code_size);
 
@@ -872,7 +844,7 @@ public:
     /**
      * The CODECOPY operation implementation.
      * Takes the memory offset, code offset and length from the stack and
-     * copies the code from the current contract at the given code offset for
+     * copies code running in current environment at the given code offset for
      * the given length to the memory at the given memory offset.
      * If the code has less bytes than neccessay to fill the memory,
      * the remaining bytes are filled with zeros.
@@ -899,7 +871,6 @@ public:
         uint32_t &pc,
         stack_t &stack,
         message_t &message,
-        touch_state_t &touch_state,
         memory_t &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
@@ -930,15 +901,12 @@ public:
 
             if (error_code == ERR_NONE)
             {
-                if (has_gas(arith, gas_limit, gas_used, error_code))
+                if (arith.has_gas(arith, gas_limit, gas_used, error_code))
                 {
-                    bn_t contract_address;
-                    message.get_contract_address(contract_address);
 
                     size_t available_data;
                     uint8_t *data;
-                    data = touch_state.get_account_code_data(
-                        contract_address,
+                    data = message.get_byte_code_data(
                         code_offset,
                         length,
                         available_data);
@@ -981,7 +949,7 @@ public:
         transaction_t &transaction)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t block_base_fee;
             block.get_base_fee(block_base_fee);
@@ -1027,12 +995,12 @@ public:
         stack.pop(address, error_code);
         if (error_code == ERR_NONE)
         {
-            touch.state.charge_gas_access_account(
+            touch_state.charge_gas_access_account(
                 address,
                 gas_used);
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
-                code_size = touch_state.get_account_code_size(
+                size_t code_size = touch_state.get_account_code_size(
                     address);
                 bn_t code_size_bn;
                 arith.cgbn_from_size_t(code_size_bn, code_size);
@@ -1104,13 +1072,13 @@ public:
                 gas_used,
                 error_code);
 
-            touch.state.charge_gas_access_account(
+            touch_state.charge_gas_access_account(
                 address,
                 gas_used);
 
             if (error_code == ERR_NONE)
             {
-                if (has_gas(arith, gas_limit, gas_used, error_code))
+                if (arith.has_gas(arith, gas_limit, gas_used, error_code))
                 {
                     size_t available_data;
                     uint8_t *data;
@@ -1155,7 +1123,7 @@ public:
         return_data_t &return_data)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t length;
             size_t length_s;
@@ -1227,7 +1195,7 @@ public:
 
             if (error_code == ERR_NONE)
             {
-                if (has_gas(arith, gas_limit, gas_used, error_code))
+                if (arith.has_gas(arith, gas_limit, gas_used, error_code))
                 {
                     size_t available_data;
                     uint8_t *data;
@@ -1241,7 +1209,7 @@ public:
                     }
                     else
                     {
-                        data = return_data.get(
+                        return_data.get(
                             data_offset_s,
                             length_s,
                             error_code);
@@ -1293,10 +1261,10 @@ public:
         stack.pop(address, error_code);
         if (error_code == ERR_NONE)
         {
-            touch.state.charge_gas_access_account(
+            touch_state.charge_gas_access_account(
                 address,
                 gas_used);
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
                 bn_t hash_bn;
                 // TODO: look on the difference between destroyed and empty
@@ -1360,9 +1328,9 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
         bn_t address;
-        transaction.get_contract_address(address);
+        transaction.get_recipient(address);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
 
             bn_t balance;

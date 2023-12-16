@@ -14,7 +14,8 @@ Or for running with cpu
 
 ## Usage 
 
-* `compute-sanitizer --tool memcheck --leak-check=full ./out/interpreter --input [inpot_json_file] --output [output_json_file]`
+* `clear && compute-sanitizer --tool memcheck --leak-check=full ./out/interpreter --input [inpot_json_file] --output [output_json_file]`
+* `clear && valgrind --leak-check=full --show-leak-kinds=all ./out/*`
 Or for running with cpu
 * `./out/cpu_interpreter --input [inpot_json_file] --output [output_json_file]`
 Easy test:

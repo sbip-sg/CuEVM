@@ -353,7 +353,7 @@ public:
         // set the code
         if (account.code_size > 0)
         {
-            bytes_string = bytes_to_hex(account.bytecode, account.code_size);
+            bytes_string = hex_from_bytes(account.bytecode, account.code_size);
             cJSON_AddStringToObject(account_json, "code", bytes_string);
             delete[] bytes_string;
         }
@@ -2039,32 +2039,15 @@ public:
     )
     {
         account_t *account = get_account(address, READ_CODE);
-        available_size = 0;
-        size_t index_s;
-        int32_t overflow = _arith.size_t_from_cgbn(index_s, index);
-        if (
-            (overflow != 0) ||
-            (index_s >= _content->data.size))
-        {
-            return NULL;
-        }
-        else
-        {
-            size_t length_s;
-            overflow = _arith.size_t_from_cgbn(length_s, length);
-            if (
-                (overflow != 0) ||
-                (length_s > _content->data.size - index_s))
-            {
-                available_size = _content->data.size - index_s;
-                return _content->data.data + index_s;
-            }
-            else
-            {
-                available_size = length_s;
-                return _content->data.data + index_s;
-            }
-        }
+        data_content_t code_data;
+        code_data.data = account->bytecode;
+        code_data.size = account->code_size;
+        return _arith.get_data(
+            code_data,
+            index,
+            length,
+            available_size
+        );
     }
 
     /**
@@ -2383,7 +2366,7 @@ public:
                 {
                     if (cgbn_compare_ui32(_arith._env, current_value, 0) == 0)
                     {
-                        /cgbn_sub_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
+                        cgbn_sub_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
                         //cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_STORAGE_CLEAR_REFUND);
                     }
                     if (cgbn_compare_ui32(_arith._env, value, 0) == 0)

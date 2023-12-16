@@ -39,7 +39,7 @@ public:
   typedef struct
   {
     evm_word_t sender;           /**< The sender address YP: \f$s\f$ */
-    evm_word_t recipient;        /**< The recipient address YP: \f$r\f$ */
+    evm_word_t recipient;        /**< The recipient address YP: \f$r\f$ also \f$I_{a}\f$ */
     evm_word_t contract_address; /**< The contract address YP: \f$c\f$ */
     evm_word_t gas_limit;        /**< The gas limit YP: \f$g\f$ */
     evm_word_t value;            /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
@@ -47,6 +47,7 @@ public:
     uint8_t call_type;           /**< The call type internal has the opcode */
     evm_word_t storage_address;  /**< The storage address YP: \f$a\f$ */
     data_content_t data;         /**< The data YP: \f$d\f$ */
+    data_content_t byte_code;    /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
     evm_word_t return_data_offset; /**< The return data offset in memory */
     evm_word_t return_data_size;   /**< The return data size in memory */
     uint32_t static_env;         /**< The static flag (STATICCALL) YP: \f$w\f$ */
@@ -68,6 +69,8 @@ public:
    * @param[in] storage_address The storage address YP: \f$a\f$.
    * @param[in] data The data YP: \f$d\f$.
    * @param[in] data_size The data size YP: \f$|d|\f$.
+   * @param[in] byte_code The byte code YP: \f$b\f$.
+   * @param[in] byte_code_size The byte code size YP: \f$|b|\f$.
    * @param[in] return_data_offset The return data offset in memory.
    * @param[in] return_data_size The return data size in memory.
    * @param[in] static_env The static flag (STATICCALL) YP: \f$w\f$.
@@ -84,6 +87,8 @@ public:
       bn_t &storage_address,
       uint8_t *data,
       size_t data_size,
+      uint8_t *byte_code,
+      size_t byte_code_size,
       bn_t &return_data_offset,
       bn_t &return_data_size,
       uint32_t static_env = 0
@@ -102,12 +107,19 @@ public:
     _content->call_type = call_type;
     cgbn_store(_arith._env, &(_content->storage_address), storage_address);
     _content->data.size = data_size;
+    _content->byte_code.size = byte_code_size;
     ONE_THREAD_PER_INSTANCE(
       if (data_size > 0) {
         _content->data.data = new uint8_t[data_size];
         memcpy(_content->data.data, data, sizeof(uint8_t) * data_size);
       } else {
         _content->data.data = NULL;
+      }
+      if (byte_code_size > 0) {
+        _content->byte_code.data = new uint8_t[byte_code_size];
+        memcpy(_content->byte_code.data, byte_code, sizeof(uint8_t) * byte_code_size);
+      } else {
+        _content->byte_code.data = NULL;
       })
     cgbn_store(_arith._env, &(_content->return_data_offset), return_data_offset);
     cgbn_store(_arith._env, &(_content->return_data_size), return_data_size);
@@ -124,7 +136,13 @@ public:
           delete[] _content->data.data;
           _content->data.size = 0;
           _content->data.data = NULL;
-        } delete _content;)
+        }
+        if (_content->byte_code.size > 0) {
+          delete[] _content->byte_code.data;
+          _content->byte_code.size = 0;
+          _content->byte_code.data = NULL;
+        }
+        delete _content;)
     _content = NULL;
   }
 
@@ -255,6 +273,48 @@ public:
     }
   }
 
+  /**
+   * Get the byte code size.
+   * @return The byte code size YP: \f$|b|\f$.
+  */
+  __host__ __device__ __forceinline__ size_t get_code_size()
+  {
+    return _content->byte_code.size;
+  }
+
+  /**
+   * Get the byte code.
+   * @return The pointer to the byte code YP: \f$b\f$.
+  */
+  __host__ __device__ __forceinline__ uint8_t *get_byte_code()
+  {
+    return _content->byte_code.data;
+  }
+
+  /**
+   * Get the code at the given index for the given length.
+   * If the index is greater than the code size, it returns NULL.
+   * If the length is greater than the code size - index, it returns
+   * the code data from index to the end of the code and sets the
+   * available size to the code size - index. Otherwise, it returns
+   * the code data from index to index + length and sets the available
+   * size to length.
+   * @param[in] index The index of the code data
+   * @param[in] length The length of the code data
+   * @param[out] available_size The available size of the code data
+  */
+  __host__ __device__ __forceinline__ uint8_t *get_byte_code_data(
+    bn_t index,
+    bn_t length,
+    size_t &available_size
+  )
+  {
+    return _arith.get_data(
+      _content->byte_code,
+      index,
+      length,
+      available_size);
+  }
 
   /**
    * Get the return data offset.
@@ -325,19 +385,19 @@ public:
   __host__ __device__ __forceinline__ void print()
   {
     printf("SENDER: ");
-    print_bn<params>(_content->sender);
+    _arith.print_cgbn_memory(_content->sender);
     printf("RECIPIENT: ");
-    print_bn<params>(_content->recipient);
+    _arith.print_cgbn_memory(_content->recipient);
     printf("CONTRACT_ADDRESS: ");
-    print_bn<params>(_content->contract_address);
+    _arith.print_cgbn_memory(_content->contract_address);
     printf("GAS_LIMIT: ");
-    print_bn<params>(_content->gas_limit);
+    _arith.print_cgbn_memory(_content->gas_limit);
     printf("VALUE: ");
-    print_bn<params>(_content->value);
+    _arith.print_cgbn_memory(_content->value);
     printf("DEPTH: %d\n", _content->depth);
     printf("CALL_TYPE: %d\n", _content->call_type);
     printf("STORAGE_ADDRESS: ");
-    print_bn<params>(_content->storage_address);
+    _arith.print_cgbn_memory(_content->storage_address);
     printf("DATA_SIZE: %lu\n", _content->data.size);
     if (_content->data.size > 0)
     {
@@ -345,6 +405,18 @@ public:
       print_bytes(_content->data.data, _content->data.size);
       printf("\n");
     }
+    printf("BYTE_CODE_SIZE: %lu\n", _content->byte_code.size);
+    if (_content->byte_code.size > 0)
+    {
+      printf("BYTE_CODE: ");
+      print_bytes(_content->byte_code.data, _content->byte_code.size);
+      printf("\n");
+    }
+    printf("RETURN_DATA_OFFSET: ");
+    _arith.print_cgbn_memory(_content->return_data_offset);
+    printf("RETURN_DATA_SIZE: ");
+    _arith.print_cgbn_memory(_content->return_data_size);
+    printf("STATIC_ENV: %d\n", _content->static_env);
   }
 };
 
@@ -683,7 +755,7 @@ public:
     return ERR_NONE;
   }
 
-  __host__ __device__ __forceinline__ static void get_computed_gas_price(
+  __host__ __device__ __forceinline__ void get_computed_gas_price(
     bn_t &gas_price,
     bn_t &block_base_fee,
     uint32_t &error_code
@@ -735,7 +807,7 @@ public:
    * @param[in] block_gas_limit The block gas limit YP: \f$H_{l}\f$
   */
   __host__ __device__ void validate_transaction(
-    touched_state_t &touch_state,
+    touch_state_t &touch_state,
     bn_t &gas_used,
     bn_t &gas_price,
     bn_t &gas_priority_fee,
@@ -759,8 +831,8 @@ public:
         gas_priority_fee,
         up_front_cost,
         m,
-        block_base_fee,
-    )
+        block_base_fee
+    );
     
     bn_t sender_address;
     account_t *sender_account;
@@ -777,6 +849,10 @@ public:
     cgbn_load(_arith._env, sender_nonce, &(sender_account->nonce));
     bn_t transaction_nonce;
     get_nonce(transaction_nonce);
+    bn_t max_fee_per_gas;
+    get_max_fee_per_gas(max_fee_per_gas);
+    bn_t max_priority_fee_per_gas;
+    get_max_priority_fee_per_gas(max_priority_fee_per_gas);
 
     // sender is an empty account YP: \f$\sigma(T_{s}) \neq \varnothing\f$
     error_code = (error_code != ERR_NONE) ?
@@ -797,23 +873,23 @@ public:
     error_code = (error_code != ERR_NONE) ?
       error_code :
       ((cgbn_compare(_arith.env, gas_limit, intrisinc_gas) < 0) ?
-        ERROR_TRANSACTION_GAS_LIMIT : ERR_NONE);
+        ERROR_TRANSACTION_GAS : ERR_NONE);
     // balance is less than up front cost YP: \f$\sigma(T_{s})_{b} \geq v_{0}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
       ((cgbn_compare(_arith.env, sender_balance, up_front_cost) < 0) ?
-        ERROR_TRANSACTION_BALANCE : ERR_NONE);
+        ERROR_TRANSACTION_SENDER_BALANCE : ERR_NONE);
     // gas fee is less than than block base fee YP: \f$m \geq H_{f}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
       ((cgbn_compare(_arith.env, m, block_base_fee) < 0) ?
-        ERROR_TRANSACTION_GAS_FEE : ERR_NONE);
+        ERROR_TRANSACTION_GAS_PRICE : ERR_NONE);
     // Max priority fee per gas is higher than max fee per gas YP: \f$T_{m} \geq T_{f}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
       (((_content->type == 2) &&
       (cgbn_compare(_arith.env, max_fee_per_gas, max_priority_fee_per_gas) < 0)) ?
-        ERROR_TRANSACTION_MAX_FEE : ERR_NONE);
+        ERROR_TRANSACTION_GAS_PRIORITY : ERR_NONE);
     
     // the other verification is about the block gas limit
     // YP: \f$T_{g} \leq H_{l}\f$ ... different because it takes in account
@@ -841,7 +917,9 @@ public:
    * Get the message call from the transaction.
    * @return The message call.
   */
-  __host__ __device__ message_t *get_message_call()
+  __host__ __device__ message_t *get_message_call(
+      accessed_state_t &accessed_state
+  )
   {
     bn_t sender, to, gas_limit, value;
     get_sender(sender);
@@ -850,10 +928,20 @@ public:
     get_value(value);
     uint32_t depth = 0;
     uint8_t call_type = OP_CALL;
+    uint8_t *byte_code = NULL;
+    size_t byte_code_size = 0;
     if (cgbn_compare_ui32(_arith._env, to, 0) == 0)
     {
       // TODO: to see which type of create CREATE or CREATE2
       call_type = OP_CREATE;
+      byte_code = _content->data_init.data;
+      byte_code_size = _content->data_init.size;
+    }
+    else
+    {
+      account_t *account = accessed_state->get_account(to, READ_CODE);
+      byte_code = account->bytecode;
+      byte_code_size = account->code_size;
     }
     uint32_t static_env = 0;
     bn_t return_data_offset;
@@ -872,6 +960,8 @@ public:
         to,
         _content->data_init.data,
         _content->data_init.size,
+        byte_code,
+        byte_code_size,
         return_data_offset,
         return_data_size,
         static_env);
@@ -1001,7 +1091,7 @@ public:
     // set the data init
     if (_content->data_init.size > 0)
     {
-      bytes_string = bytes_to_hex(_content->data_init.data, _content->data_init.size);
+      bytes_string = hex_from_data_content(_content->data_init);
       cJSON_AddStringToObject(transaction_json, "data", bytes_string);
       delete[] bytes_string;
       bytes_string = NULL;

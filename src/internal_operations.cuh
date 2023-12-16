@@ -7,7 +7,7 @@
 #ifndef _INTERNAL_OP_H_
 #define _INTERNAL_OP_H_
 
-#include "uitls.h"
+#include "utils.h"
 #include "stack.cuh"
 #include "block.cuh"
 #include "state.cuh"
@@ -17,7 +17,6 @@
  * The internal operations class.
  * It contains the implementation of the internal operations.
  * 50s: Stack, Memory, Storage and Flow Operations:
- * - POP
  * - MLOAD
  * - MSTORE
  * - MSTORE8
@@ -29,6 +28,9 @@
  * - MSIZE
  * - GAS
  * - JUMPDEST
+ * POP moved to stack_operations
+ * a0s: Logging Operations:
+ * - LOGX
  */
 template <class params>
 class internal_operations
@@ -43,15 +45,6 @@ public:
      * The arbitrary length integer type.
      */
     typedef typename arith_t::bn_t bn_t;
-    /**
-     * The CGBN wide type with double the given number of bits in environment.
-     */
-    typedef typename env_t::cgbn_wide_t bn_wide_t;
-    /**
-     * The arbitrary length integer type used for the storage.
-     * It is defined as the EVM word type.
-     */
-    typedef cgbn_mem_t<params::BITS> evm_word_t;
     /**
      * The stackk class.
      */
@@ -77,43 +70,9 @@ public:
      */
     typedef message_t<params> message_t;
     /**
-     * The return data class.
-     */
-    typedef return_data_t<params> return_data_t;
-    /**
-     * The numver of bytes in a hash.
+     * The number of bytes in a hash.
      */
     static const uint32_t HASH_BYTES = 32;
-
-    /**
-     * The POP operation implementation.
-     * It pops the top element from the stack.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[out] error_code The error code.
-     * @param[inout] pc The program counter.
-     * @param[out] stack The stack.
-     */
-    __host__ __device__ __forceinline__ static void operation_POP(
-        arith_t &arith,
-        bn_t &gas_limit,
-        bn_t &gas_used,
-        uint32_t &error_code,
-        uint32_t &pc,
-        stack_t &stack)
-    {
-        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-
-        if (has_gas(arith, gas_limit, gas_used, error_code))
-        {
-            bn_t y;
-
-            stack.pop(y, error_code);
-
-            pc = pc + 1;
-        }
-    }
 
     /**
      * The MLOAD operation implementation.
@@ -137,12 +96,12 @@ public:
         stack_t &stack,
         memory_t &memory)
     {
-        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERYLOW);
+        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
 
         bn_t memory_offset;
         stack.pop(memory_offset, error_code);
         bn_t length;
-        cgbn_set_ui32(arith._env, length, arith::BYTES);
+        cgbn_set_ui32(arith._env, length, arith_t::BYTES);
 
         memory.grow_cost(
             memory_offset,
@@ -150,7 +109,7 @@ public:
             gas_used,
             error_code);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             uint8_t *data;
             data = memory.get(
@@ -198,7 +157,7 @@ public:
         bn_t value;
         stack.pop(value, error_code);
         bn_t length;
-        cgbn_set_ui32(arith._env, length, arith::BYTES);
+        cgbn_set_ui32(arith._env, length, arith_t::BYTES);
 
         if (error_code == ERR_NONE)
         {
@@ -208,9 +167,9 @@ public:
                 gas_used,
                 error_code);
 
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
-                uint8_t data[arith::BYTES];
+                uint8_t data[arith_t::BYTES];
                 arith.memory_from_cgbn(
                     &(data[0]),
                     value);
@@ -265,9 +224,9 @@ public:
                 gas_used,
                 error_code);
 
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
-                uint8_t data[arith::BYTES];
+                uint8_t data[arith_t::BYTES];
                 arith.memory_from_cgbn(
                     &(data[0]),
                     value);
@@ -275,7 +234,7 @@ public:
                 memory.set(
                     memory_offset,
                     length,
-                    &(data[arith::BYTES - 1]),
+                    &(data[arith_t::BYTES - 1]),
                     error_code);
 
                 pc = pc + 1;
@@ -307,7 +266,7 @@ public:
         uint32_t &pc,
         stack_t &stack,
         touch_state_t &touch_state,
-        message_t &message, )
+        message_t &message)
     {
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
 
@@ -324,7 +283,7 @@ public:
                 key,
                 gas_used);
 
-            if (has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
             {
                 bn_t value;
                 touch_state.get_value(
@@ -366,7 +325,7 @@ public:
         uint32_t &pc,
         stack_t &stack,
         touch_state_t &touch_state,
-        message_t &message, )
+        message_t &message)
     {
         // only if is not a static call
         if (message.get_static_env() == 0)
@@ -397,7 +356,7 @@ public:
                         gas_used,
                         gas_refund);
 
-                    if (has_gas(arith, gas_limit, gas_used, error_code))
+                    if (arith.has_gas(arith, gas_limit, gas_used, error_code))
                     {
                         touch_state.set_value(
                             storage_address,
@@ -438,7 +397,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t destination;
             stack.pop(destination, error_code);
@@ -487,7 +446,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_HIGH);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t destination;
             stack.pop(destination, error_code);
@@ -541,7 +500,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t pc_bn;
             cgbn_set_ui32(arith._env, pc_bn, pc);
@@ -574,7 +533,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t size;
             size_t size_s;
@@ -610,7 +569,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             bn_t gas_left;
             cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
@@ -640,11 +599,25 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_JUMP_DEST);
 
-        if (has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
         {
             pc = pc + 1;
         }
     }
+
+    __host__ __device__ __forceinline__ static void operation_LOGX(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        uint32_t &pc,
+        stack_t &stack,
+        uint8_t &opcode)
+    {
+        uint8_t log_index = opcode & 0x0F;
+        error_code = ERR_NOT_IMPLEMENTED;
+    }
+    
 };
 
 #endif

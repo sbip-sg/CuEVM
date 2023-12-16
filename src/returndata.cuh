@@ -4,8 +4,8 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _RETURNDATA_H_
-#define _RETURNDATA_H_
+#ifndef _RETURN_DATA_H_
+#define _RETURN_DATA_H_
 
 #include "utils.h"
 
@@ -124,6 +124,15 @@ public:
   }
 
   /**
+   * Get the content of the return data
+   * @return the pointer in the return data
+  */
+  __host__ __device__ __forceinline__ data_content_t *get_data()
+  {
+    return _content;
+  }
+
+  /**
    * Set the content of the return data
    * @param[in] data the data to be set
    * @param[in] size the size of the data
@@ -140,6 +149,24 @@ public:
           memcpy(_content->data, data, size);
         })
     _content->size = size;
+  }
+
+  __host__ __device__ __forceinline__ void to_data_content_t(
+      data_content_t &data_content)
+  {
+    ONE_THREAD_PER_INSTANCE(
+        if (data_content.size > 0) {
+          delete[] data_content.data;
+          data_content.data = NULL;
+          data_content.size = 0;
+        }
+        if (_content->size > 0) {
+          data_content.data = new uint8_t[_content->size];
+          memcpy(data_content.data, _content->data, _content->size);
+        } else {
+          data_content.data = NULL;
+        })
+    data_content.size = _content->size;
   }
 
   /**
@@ -269,15 +296,42 @@ public:
         cudaMemcpyDeviceToHost));
 
     // 1. alocate the memory for gpu memory as memory which can be addressed by the cpu
-    data_content_t *tmp_cpu_instances, *new_gpu_instances;
-    new_gpu_instances = get_gpu_instances_from_cpu_instances(cpu_instances, count);
+    data_content_t *tmp_cpu_instances, *tmp_gpu_instances;
+    tmp_cpu_instances = new data_content_t[count];
+    memcpy(
+        tmp_cpu_instances,
+        cpu_instances,
+        sizeof(data_content_t) * count);
+    for (uint32_t idx = 0; idx < count; idx++)
+    {
+      if (tmp_cpu_instances[idx].size > 0)
+      {
+        CUDA_CHECK(cudaMalloc(
+            (void **)&tmp_cpu_instances[idx].data,
+            sizeof(uint8_t) * tmp_cpu_instances[idx].size));
+      }
+      else
+      {
+        tmp_cpu_instances[idx].data = NULL;
+      }
+    }
+    CUDA_CHECK(cudaMalloc(
+        (void **)&tmp_gpu_instances,
+        sizeof(data_content_t) * count));
+    CUDA_CHECK(cudaMemcpy(
+        tmp_gpu_instances,
+        tmp_cpu_instances,
+        sizeof(data_content_t) * count,
+        cudaMemcpyHostToDevice));
+    delete[] tmp_cpu_instances;
+    tmp_cpu_instances = NULL;
 
     // 2. call the kernel to copy the memory between the gpu memories
-    kernel_get_returns<<<1, count>>>(new_gpu_instances, gpu_instances, count);
+    kernel_get_returns<<<1, count>>>(tmp_gpu_instances, gpu_instances, count);
     CUDA_CHECK(cudaDeviceSynchronize());
     cudaFree(gpu_instances);
-    gpu_instances = new_gpu_instances;
-    new_gpu_instances = NULL;
+    gpu_instances = tmp_gpu_instances;
+    tmp_gpu_instances = NULL;
 
     // 3. copy the gpu memories back in the cpu memories
     CUDA_CHECK(cudaMemcpy(
@@ -321,11 +375,7 @@ public:
   */
   __host__ __device__ void print()
   {
-    printf("size=%lx\n", _content->size);
-    printf("data: ");
-    if (_content->size > 0)
-      print_bytes(_content->data, _content->size);
-    printf("\n");
+    print_data_content(*_content);
   }
 
   /**
@@ -334,19 +384,7 @@ public:
   */
   __host__ cJSON *json()
   {
-    char *bytes_string = NULL;
-    cJSON *data_json = cJSON_CreateObject();
-    if (_content->size > 0)
-    {
-      bytes_string = bytes_to_hex(_content->data, _content->size);
-      cJSON_AddStringToObject(data_json, "data", bytes_string);
-      free(bytes_string);
-    }
-    else
-    {
-      cJSON_AddStringToObject(data_json, "data", "0x");
-    }
-    return data_json;
+    return json_from_data_content(*_content);
   }
 };
 #endif

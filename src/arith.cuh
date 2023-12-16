@@ -1,3 +1,9 @@
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2023-11-30
+// SPDX-License-Identifier: MIT
+
 #ifndef _ARITH_H_
 #define _ARITH_H_
 
@@ -10,6 +16,7 @@
 #define __CGBN_H__
 #include <cgbn/cgbn.h>
 #endif
+#include "data_content.h"
 
 /**
  * The arithmetic environment class is a wrapper around the CGBN library.
@@ -293,6 +300,72 @@ public:
       printf("%08x ", src_cgbn_memory._limbs[LIMBS - 1 - idx]);
     printf("\n");
   }
+
+  /**
+   * Verify if is enough gas for the operation.
+   * @param[in] gas_limit The gas limit
+   * @param[in] gas_used The gas used
+   * @param[inout] error_code The error code
+  */
+  __host__ __device__ __forceinline__ int32_t has_gas(
+    bn_t &gas_limit,
+    bn_t &gas_used,
+    uint32_t &error_code
+  )
+  {
+    int32_t gas_sign = cgbn_compare(_env, gas_limit, gas_used);
+    error_code = (gas_sign < 0) ? ERROR_GAS_LIMIT_EXCEEDED : error_code;
+    return (gas_sign >= 0);
+  }
+  
+  /**
+   * Get the data at the given index for the given length.
+   * If the index is greater than the data size, it returns NULL.
+   * If the length is greater than the data size - index, it returns
+   * the data from index to the end of the data and sets the
+   * available size to the data size - index. Otherwise, it returns
+   * the data from index to index + length and sets the available
+   * size to length.
+   * @param[in] data_content The data content
+   * @param[in] index The index of the code data
+   * @param[in] length The length of the code data
+   * @param[out] available_size The available size of the code data
+  */
+  __host__ __device__ __forceinline__ uint8_t *get_data(
+    data_content_t &data_content,
+    bn_t index,
+    bn_t length,
+    size_t &available_size
+  )
+  {
+    available_size = 0;
+    size_t index_s;
+    int32_t overflow = size_t_from_cgbn(index_s, index);
+    if (
+        (overflow != 0) ||
+        (index_s >= data_content.size))
+    {
+        return NULL;
+    }
+    else
+    {
+        size_t length_s;
+        overflow = size_t_from_cgbn(length_s, length);
+        if (
+            (overflow != 0) ||
+            (length_s > data_content.size - index_s))
+        {
+            available_size = data_content.size - index_s;
+            return data_content.data + index_s;
+        }
+        else
+        {
+            available_size = length_s;
+            return data_content.data + index_s;
+        }
+    }
+  }
+
 };
 
 #endif

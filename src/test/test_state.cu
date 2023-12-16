@@ -252,9 +252,9 @@ void run_test(uint32_t instance_count) {
   cpu_world_state->free_content();
   delete cpu_world_state;
   cpu_world_state=NULL;
-  delete[] cpu_access_states_data;
+  accessed_state_t::free_cpu_instances(cpu_access_states_data, instance_count);
   cpu_access_states_data=NULL;
-  delete[] cpu_touch_states_data;
+  touch_state_t::free_cpu_instances(cpu_touch_states_data, instance_count);
   cpu_touch_states_data=NULL;
   char *json_str=cJSON_Print(root);
   FILE *fp=fopen("output/evm_state.json", "w");

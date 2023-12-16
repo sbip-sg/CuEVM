@@ -53,7 +53,7 @@ public:
                 _size = _size + 1;
             }
         }
-        SHARED_MEMORY uint8_t *tmp_destinations;
+        SHARED_MEMORY size_t *tmp_destinations;
         ONE_THREAD_PER_INSTANCE(
             if (_size > 0) {
                 tmp_destinations = new size_t[_size];
