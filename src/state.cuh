@@ -740,6 +740,7 @@ public:
         if (tmp_error_code != ERR_SUCCESS)
         {
             // get the account from the world state
+            tmp_error_code = ERR_SUCCESS;
             account_t *account = _world_state->get_account(address, tmp_error_code);
             // the duplicate account
             SHARED_MEMORY account_t *dup_account;
@@ -1766,7 +1767,7 @@ public:
 
     touch_state_data_t *_content; /**< The content of the touch state */
     arith_t _arith;              /**< The arithmetical environment */
-    accessed_state_t *_access_state; /**< The accessed state */
+    accessed_state_t *_accessed_state; /**< The accessed state */
     touch_state_t *_parent_state;  /**< The parent touch state */
 
 
@@ -1782,7 +1783,7 @@ public:
         touch_state_t *parent_state
     ) : _arith(access_state->_arith),
         _content(content),
-        _access_state(access_state),
+        _accessed_state(access_state),
         _parent_state(parent_state)
     {
     }
@@ -1796,7 +1797,7 @@ public:
         accessed_state_t *access_state,
         touch_state_t *parent_state
     ) : _arith(access_state->_arith),
-        _access_state(access_state),
+        _accessed_state(access_state),
         _parent_state(parent_state)
     {
         // aloocate the memory for the touch state
@@ -1885,7 +1886,7 @@ public:
     )
     {
         bn_t gas_cost;
-        _access_state->get_access_account_gas_cost(address, gas_cost);
+        _accessed_state->get_access_account_gas_cost(address, gas_cost);
         cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
     }
 
@@ -1903,7 +1904,7 @@ public:
     )
     {
         bn_t gas_cost;
-        _access_state->get_access_storage_gas_cost(address, key, gas_cost);
+        _accessed_state->get_access_storage_gas_cost(address, key, gas_cost);
         cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
     }
 
@@ -1949,7 +1950,7 @@ public:
             // search it in the accessed state
             if (tmp_error_code != ERR_SUCCESS)
             {
-                account = _access_state->get_account(address, read_type);
+                account = _accessed_state->get_account(address, read_type);
             }
         }
         else
@@ -1958,7 +1959,7 @@ public:
         }
 
         // read the account in access state
-        _access_state->get_account(address, read_type);
+        _accessed_state->get_account(address, read_type);
 
         return account;
     }
@@ -2033,8 +2034,8 @@ public:
     */
     __host__ __device__ __forceinline__ uint8_t *get_account_code_data(
         bn_t &address,
-        bn_t index,
-        bn_t length,
+        bn_t &index,
+        bn_t &length,
         size_t &available_size
     )
     {
@@ -2095,7 +2096,7 @@ public:
             // search it in the accessed state/global state
             if (tmp_error_code != ERR_SUCCESS)
             {
-                account = _access_state->get_account(address, READ_NONE);
+                account = _accessed_state->get_account(address, READ_NONE);
                 // there is no previous touch, so the account is not touched
                 touch = WRITE_NONE;
             }
@@ -2304,7 +2305,7 @@ public:
             // search it in the accessed state/global state
             if (tmp_error_code != ERR_SUCCESS)
             {
-                _access_state->get_value(address, key, value);
+                _accessed_state->get_value(address, key, value);
             }
         }
     }
@@ -2326,14 +2327,14 @@ public:
         bn_t &gas_refund)
     {
         // find out if it is a warm or cold storage access
-        _access_state->get_access_storage_gas_cost(address, key, gas_cost);
+        _accessed_state->get_access_storage_gas_cost(address, key, gas_cost);
         if (cgbn_compare_ui32(_arith._env, gas_cost, GAS_WARM_ACCESS) == 0)
         {
             cgbn_set_ui32(_arith._env, gas_cost, 0); // 100 is not add here
         }
         // get the original value from accessed state/global state
         bn_t original_value;
-        _access_state->get_value(address, key, original_value);
+        _accessed_state->get_value(address, key, original_value);
         // get the current value from the touch state
         bn_t current_value;
         get_value(address, key, current_value);

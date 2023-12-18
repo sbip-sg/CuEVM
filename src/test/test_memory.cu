@@ -23,7 +23,7 @@ __host__ __device__ __forceinline__ void test_memory(
   // printf("Instance %d:  memory size=%d\n", instance, memory.size());
 
   bn_t a, b, c, gas;
-  bn_t index, length;
+  bn_t &index, length;
   uint32_t error_code;
   uint8_t *data;
   error_code = ERR_NONE;

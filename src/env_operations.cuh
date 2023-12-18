@@ -75,7 +75,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BLOCKHASH);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t number;
             stack.pop(number, error_code);
@@ -110,7 +110,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t coinbase;
             block.get_coin_base(coinbase);
@@ -142,7 +142,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t timestamp;
             block.get_time_stamp(timestamp);
@@ -174,7 +174,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t number;
             block.get_number(number);
@@ -206,7 +206,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t prev_randao;
             // TODO: to change depending on the evm version
@@ -240,7 +240,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t gas_limit;
             block.get_gas_limit(gas_limit);
@@ -272,7 +272,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t chain_id;
             block.get_chain_id(chain_id);
@@ -304,7 +304,7 @@ public:
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t base_fee;
             block.get_base_fee(base_fee);
@@ -439,7 +439,7 @@ public:
 
         if (error_code == ERR_NONE)
         {
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 uint8_t *data;
                 data = memory.get(
@@ -492,7 +492,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t recipient_address;
             message.get_recipient(recipient_address);
@@ -535,7 +535,7 @@ public:
             touch_state.charge_gas_access_account(
                 address,
                 gas_used);
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
 
                 bn_t balance;
@@ -543,7 +543,7 @@ public:
                     address,
                     balance);
 
-                stack.push(balance);
+                stack.push(balance, error_code);
 
                 pc = pc + 1;
             }
@@ -572,7 +572,7 @@ public:
         transaction_t &transaction)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t origin;
             transaction.get_sender(origin);
@@ -605,7 +605,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t caller;
             message.get_sender(caller);
@@ -637,7 +637,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t call_value;
             message.get_value(call_value);
@@ -673,7 +673,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t index;
             stack.pop(index, error_code);
@@ -714,7 +714,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t length;
             size_t length_s;
@@ -784,7 +784,7 @@ public:
 
         if (error_code == ERR_NONE)
         {
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 size_t available_data;
                 uint8_t *data;
@@ -827,7 +827,7 @@ public:
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             size_t code_size;
             code_size = message.get_code_size();
@@ -901,7 +901,7 @@ public:
 
             if (error_code == ERR_NONE)
             {
-                if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+                if (arith.has_gas(gas_limit, gas_used, error_code))
                 {
 
                     size_t available_data;
@@ -949,7 +949,7 @@ public:
         transaction_t &transaction)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t block_base_fee;
             block.get_base_fee(block_base_fee);
@@ -998,7 +998,7 @@ public:
             touch_state.charge_gas_access_account(
                 address,
                 gas_used);
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 size_t code_size = touch_state.get_account_code_size(
                     address);
@@ -1078,7 +1078,7 @@ public:
 
             if (error_code == ERR_NONE)
             {
-                if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+                if (arith.has_gas(gas_limit, gas_used, error_code))
                 {
                     size_t available_data;
                     uint8_t *data;
@@ -1123,7 +1123,7 @@ public:
         return_data_t &return_data)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t length;
             size_t length_s;
@@ -1195,9 +1195,8 @@ public:
 
             if (error_code == ERR_NONE)
             {
-                if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+                if (arith.has_gas(gas_limit, gas_used, error_code))
                 {
-                    size_t available_data;
                     uint8_t *data;
                     size_t data_offset_s, length_s;
                     int32_t overflow;
@@ -1209,7 +1208,7 @@ public:
                     }
                     else
                     {
-                        return_data.get(
+                        data = return_data.get(
                             data_offset_s,
                             length_s,
                             error_code);
@@ -1264,7 +1263,7 @@ public:
             touch_state.charge_gas_access_account(
                 address,
                 gas_used);
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 bn_t hash_bn;
                 // TODO: look on the difference between destroyed and empty
@@ -1324,13 +1323,13 @@ public:
         uint32_t &pc,
         stack_t &stack,
         touch_state_t &touch_state,
-        transaction_t &transaction)
+        message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
         bn_t address;
-        transaction.get_recipient(address);
+        message.get_recipient(address);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
 
             bn_t balance;
@@ -1338,7 +1337,7 @@ public:
                 address,
                 balance);
 
-            stack.push(balance);
+            stack.push(balance, error_code);
 
             pc = pc + 1;
         }

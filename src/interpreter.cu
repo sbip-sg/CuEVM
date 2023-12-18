@@ -70,7 +70,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     evm_t *evm = NULL;
     uint32_t tmp_error;
     for(uint32_t instance = 0; instance < cpu_instances.count; instance++) {
-      printf("Running instance %lu\n", instance);
+      printf("Running instance %d\n", instance);
       evm = new evm_t(
           arith,
           cpu_instances.world_state_data,
@@ -94,7 +94,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
 
     // print the results
     printf("Printing the results ...\n");
-    evm_t::print_instances(arith, cpu_instances);
+    evm_t::print_evm_instances_t(arith, cpu_instances);
     printf("Results printed\n");
 
     // print to json files

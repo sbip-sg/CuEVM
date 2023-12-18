@@ -82,12 +82,14 @@ public:
         uint32_t *pcs; /**< The program counters*/
         uint8_t *opcodes; /**< The opcodes*/
         stack_data_t *stacks; /**< The stacks*/
+        #ifdef COMPLEX_TRACER
         memory_data_t *memories; /**< The memories*/
         touch_state_data_t *touch_states; /**< The touch states*/
         evm_word_t *gas_useds; /**< The gas used*/
         evm_word_t *gas_limits; /**< The gas limits*/
         evm_word_t *gas_refunds; /**< The gas refunds*/
         uint32_t *error_codes; /**< The error codes*/
+        #endif
     } tracer_data_t;
 
     tracer_data_t *_content; /**< The content of the tracer*/
@@ -121,12 +123,14 @@ public:
             uint32_t *new_pcs = new uint32_t[_content->capacity + PAGE_SIZE];
             uint8_t *new_opcodes = new uint8_t[_content->capacity + PAGE_SIZE];
             stack_data_t *new_stacks = new stack_data_t[_content->capacity + PAGE_SIZE];
+            #ifdef COMPLEX_TRACER
             memory_data_t *new_memories = new memory_data_t[_content->capacity + PAGE_SIZE];
             touch_state_data_t *new_touch_states = new touch_state_data_t[_content->capacity + PAGE_SIZE];
             evm_word_t *new_gas_useds = new evm_word_t[_content->capacity + PAGE_SIZE];
             evm_word_t *new_gas_limits = new evm_word_t[_content->capacity + PAGE_SIZE];
             evm_word_t *new_gas_refunds = new evm_word_t[_content->capacity + PAGE_SIZE];
             uint32_t *new_error_codes = new uint32_t[_content->capacity + PAGE_SIZE];
+            #endif
             if (_content->capacity > 0) {
                 memcpy(
                     new_addresses,
@@ -145,6 +149,7 @@ public:
                     new_stacks,
                     _content->stacks,
                     sizeof(stack_data_t) * _content->capacity);
+                #ifdef COMPLEX_TRACER
                 memcpy(
                     new_memories,
                     _content->memories,
@@ -169,37 +174,44 @@ public:
                     new_error_codes,
                     _content->error_codes,
                     sizeof(uint32_t) * _content->capacity);
+                #endif
                 delete[] _content->addresses;
                 delete[] _content->pcs;
                 delete[] _content->opcodes;
                 delete[] _content->stacks;
+                #ifdef COMPLEX_TRACER
                 delete[] _content->memories;
                 delete[] _content->touch_states;
                 delete[] _content->gas_useds;
                 delete[] _content->gas_limits;
                 delete[] _content->gas_refunds;
                 delete[] _content->error_codes;
+                #endif
             }
             _content->capacity = _content->capacity + PAGE_SIZE;
             _content->addresses = new_addresses;
             _content->pcs = new_pcs;
             _content->opcodes = new_opcodes;
             _content->stacks = new_stacks;
+            #ifdef COMPLEX_TRACER
             _content->memories = new_memories;
             _content->touch_states = new_touch_states;
             _content->gas_useds = new_gas_useds;
             _content->gas_limits = new_gas_limits;
             _content->gas_refunds = new_gas_refunds;
             _content->error_codes = new_error_codes;
+            #endif
             for (size_t idx = _content->size; idx < _content->capacity; idx++) {
                 _content->stacks[idx].stack_base = NULL;
                 _content->stacks[idx].stack_offset = 0;
+                #ifdef COMPLEX_TRACER
                 _content->memories[idx].size = 0;
                 _content->memories[idx].allocated_size = 0;
                 _content->memories[idx].data = NULL;
                 _content->touch_states[idx].touch_accounts.no_accounts = 0;
                 _content->touch_states[idx].touch_accounts.accounts = NULL;
                 _content->touch_states[idx].touch = NULL;
+                #endif
             }
         )
     }
@@ -239,6 +251,9 @@ public:
             address);
         _content->pcs[_content->size] = pc;
         _content->opcodes[_content->size] = opcode;
+        stack.to_stack_data_t(
+            _content->stacks[_content->size]);
+        #ifdef COMPLEX_TRACER
         cgbn_store(
             _arith._env,
             &(_content->gas_useds[_content->size]),
@@ -252,12 +267,11 @@ public:
             &(_content->gas_refunds[_content->size]),
             gas_refund);
         _content->error_codes[_content->size] = error_code;
-        stack.to_stack_data_t(
-            _content->stacks[_content->size]);
         memory.to_memory_data_t(
             _content->memories[_content->size]);
         touch_state.to_touch_state_data_t(
             _content->touch_states[_content->size]);
+        #endif
         ONE_THREAD_PER_INSTANCE(
             _content->size = _content->size + 1;)
     }
@@ -290,6 +304,7 @@ public:
             printf("Opcode: %d\n", tracer_data.opcodes[idx]);
             printf("Stack:\n");
             stack_t::print_stack_data_t(arith, tracer_data.stacks[idx]);
+            #ifdef COMPLEX_TRACER
             printf("Memory:\n");
             memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
             printf("Touch state:\n");
@@ -301,6 +316,7 @@ public:
             printf("Gas refund: ");
             arith.print_cgbn_memory(tracer_data.gas_refunds[idx]);
             printf("Error code: %d\n", tracer_data.error_codes[idx]);
+            #endif
         }
     }
 
@@ -342,6 +358,7 @@ public:
                 arith,
                 tracer_data.stacks[idx]);
             cJSON_AddItemToObject(item, "stack", stack_json);
+            #ifdef COMPLEX_TRACER
             memory_json = memory_t::json_from_memory_data_t(
                 arith,
                 tracer_data.memories[idx]);
@@ -363,6 +380,7 @@ public:
                 tracer_data.gas_refunds[idx]);
             cJSON_AddStringToObject(item, "gas_refund", hex_string_ptr);
             cJSON_AddNumberToObject(item, "error_code", tracer_data.error_codes[idx]);
+            #endif
             cJSON_AddItemToArray(tracer_json, item);
         }
         delete[] hex_string_ptr;
@@ -410,6 +428,7 @@ public:
                 delete[] cpu_instances[idx].opcodes;
                 stack_t::free_cpu_instances(cpu_instances[idx].stacks, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].stacks;
+                #ifdef COMPLEX_TRACER
                 memory_t::free_cpu_instances(cpu_instances[idx].memories, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].memories;
                 touch_state_t::free_cpu_instances(cpu_instances[idx].touch_states, cpu_instances[idx].capacity);
@@ -418,18 +437,21 @@ public:
                 delete[] cpu_instances[idx].gas_limits;
                 delete[] cpu_instances[idx].gas_refunds;
                 delete[] cpu_instances[idx].error_codes;
+                #endif
                 cpu_instances[idx].capacity = 0;
                 cpu_instances[idx].size = 0;
                 cpu_instances[idx].addresses = NULL;
                 cpu_instances[idx].pcs = NULL;
                 cpu_instances[idx].opcodes = NULL;
                 cpu_instances[idx].stacks = NULL;
+                #ifdef COMPLEX_TRACER
                 cpu_instances[idx].memories = NULL;
                 cpu_instances[idx].touch_states = NULL;
                 cpu_instances[idx].gas_useds = NULL;
                 cpu_instances[idx].gas_limits = NULL;
                 cpu_instances[idx].gas_refunds = NULL;
                 cpu_instances[idx].error_codes = NULL;
+                #endif
             }
         }
         delete[] cpu_instances;
@@ -481,6 +503,7 @@ public:
                 tmp_cpu_instances[idx].stacks = stack_t::get_gpu_instances_from_cpu_instances(
                     cpu_instances[idx].stacks,
                     cpu_instances[idx].size);
+                #ifdef COMPLEX_TRACER
                 tmp_cpu_instances[idx].memories = memory_t::get_gpu_instances_from_cpu_instances(
                     cpu_instances[idx].memories,
                     cpu_instances[idx].size);
@@ -519,6 +542,7 @@ public:
                     cpu_instances[idx].error_codes,
                     sizeof(uint32_t) * tmp_cpu_instances[idx].size,
                     cudaMemcpyHostToDevice));
+                #endif
             }
             else
             {
@@ -528,12 +552,14 @@ public:
                 tmp_cpu_instances[idx].pcs = NULL;
                 tmp_cpu_instances[idx].opcodes = NULL;
                 tmp_cpu_instances[idx].stacks = NULL;
+                #ifdef COMPLEX_TRACER
                 tmp_cpu_instances[idx].memories = NULL;
                 tmp_cpu_instances[idx].touch_states = NULL;
                 tmp_cpu_instances[idx].gas_useds = NULL;
                 tmp_cpu_instances[idx].gas_limits = NULL;
                 tmp_cpu_instances[idx].gas_refunds = NULL;
                 tmp_cpu_instances[idx].error_codes = NULL;
+                #endif
             }
         }
         CUDA_CHECK(cudaMemcpy(
@@ -568,12 +594,14 @@ public:
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].pcs));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].opcodes));
                 stack_data_t::free_gpu_instances(tmp_cpu_instances[idx].stacks, tmp_cpu_instances[idx].size);
+                #ifdef COMPLEX_TRACER
                 memory_data_t::free_gpu_instances(tmp_cpu_instances[idx].memories, tmp_cpu_instances[idx].size);
                 touch_state_data_t::free_gpu_instances(tmp_cpu_instances[idx].touch_states, tmp_cpu_instances[idx].size);
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_useds));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_limits));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_refunds));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].error_codes));
+                #endif
             }
         }
         delete[] tmp_cpu_instances;
@@ -631,7 +659,7 @@ public:
                     cpu_instances[idx].size);
                 delete[] cpu_instances[idx].stacks;
                 cpu_instances[idx].stacks = NULL;
-
+                #ifdef COMPLEX_TRACER
                 // reset the memory data structures
                 cpu_instances[idx].memories = memory_t::get_cpu_instances(
                     cpu_instances[idx].size);
@@ -662,6 +690,7 @@ public:
                 CUDA_CHECK(cudaMalloc(
                     (void **)&(tmp_cpu_instances[idx].error_codes),
                     sizeof(uint32_t) * cpu_instances[idx].size));
+                #endif
             }
             else
             {
@@ -671,12 +700,14 @@ public:
                 tmp_cpu_instances[idx].pcs = NULL;
                 tmp_cpu_instances[idx].opcodes = NULL;
                 tmp_cpu_instances[idx].stacks = NULL;
+                #ifdef COMPLEX_TRACER
                 tmp_cpu_instances[idx].memories = NULL;
                 tmp_cpu_instances[idx].touch_states = NULL;
                 tmp_cpu_instances[idx].gas_useds = NULL;
                 tmp_cpu_instances[idx].gas_limits = NULL;
                 tmp_cpu_instances[idx].gas_refunds = NULL;
                 tmp_cpu_instances[idx].error_codes = NULL;
+                #endif
             }
         }
         printf("Copying the tracer data structures...\n");
@@ -741,6 +772,7 @@ public:
                 tmp_cpu_instances[idx].stacks = stack_t::get_cpu_instances_from_gpu_instances(
                     cpu_instances[idx].stacks,
                     cpu_instances[idx].size);
+                #ifdef COMPLEX_TRACER
                 tmp_cpu_instances[idx].memories = memory_t::get_cpu_instances_from_gpu_instances(
                     cpu_instances[idx].memories,
                     cpu_instances[idx].size);
@@ -775,6 +807,7 @@ public:
                     sizeof(uint32_t) * cpu_instances[idx].size,
                     cudaMemcpyDeviceToHost));
                 CUDA_CHECK(cudaFree(cpu_instances[idx].error_codes));
+                #endif
             }
             else
             {
@@ -784,12 +817,14 @@ public:
                 tmp_cpu_instances[idx].pcs = NULL;
                 tmp_cpu_instances[idx].opcodes = NULL;
                 tmp_cpu_instances[idx].stacks = NULL;
+                #ifdef COMPLEX_TRACER
                 tmp_cpu_instances[idx].memories = NULL;
                 tmp_cpu_instances[idx].touch_states = NULL;
                 tmp_cpu_instances[idx].gas_useds = NULL;
                 tmp_cpu_instances[idx].gas_limits = NULL;
                 tmp_cpu_instances[idx].gas_refunds = NULL;
                 tmp_cpu_instances[idx].error_codes = NULL;
+                #endif
             }
         }
         memcpy(
@@ -840,6 +875,7 @@ __global__ void kernel_tracers(
             dst_instances[instance].stacks,
             src_instances[instance].stacks,
             src_instances[instance].size * sizeof(typename tracer_t<params>::stack_data_t));
+        #ifdef COMPLEX_TRACER
         memcpy(
             dst_instances[instance].memories,
             src_instances[instance].memories,
@@ -864,28 +900,33 @@ __global__ void kernel_tracers(
             dst_instances[instance].error_codes,
             src_instances[instance].error_codes,
             src_instances[instance].size * sizeof(uint32_t));
+        #endif
         delete[] src_instances[instance].addresses;
         delete[] src_instances[instance].pcs;
         delete[] src_instances[instance].opcodes;
         delete[] src_instances[instance].stacks;
+        #ifdef COMPLEX_TRACER
         delete[] src_instances[instance].memories;
         delete[] src_instances[instance].touch_states;
         delete[] src_instances[instance].gas_useds;
         delete[] src_instances[instance].gas_limits;
         delete[] src_instances[instance].gas_refunds;
         delete[] src_instances[instance].error_codes;
+        #endif
         src_instances[instance].size = 0;
         src_instances[instance].capacity = 0;
         src_instances[instance].addresses = NULL;
         src_instances[instance].pcs = NULL;
         src_instances[instance].opcodes = NULL;
         src_instances[instance].stacks = NULL;
+        #ifdef COMPLEX_TRACER
         src_instances[instance].memories = NULL;
         src_instances[instance].touch_states = NULL;
         src_instances[instance].gas_useds = NULL;
         src_instances[instance].gas_limits = NULL;
         src_instances[instance].gas_refunds = NULL;
         src_instances[instance].error_codes = NULL;
+        #endif
     }
 }
 

@@ -241,8 +241,8 @@ public:
    * @return The pointer to the data.
   */
   __host__ __device__ __forceinline__ uint8_t *get_data(
-      bn_t index,
-      bn_t length,
+      bn_t &index,
+      bn_t &length,
       size_t &available_size)
   {
     available_size = 0;
@@ -304,8 +304,8 @@ public:
    * @param[out] available_size The available size of the code data
   */
   __host__ __device__ __forceinline__ uint8_t *get_byte_code_data(
-    bn_t index,
-    bn_t length,
+    bn_t &index,
+    bn_t &length,
     size_t &available_size
   )
   {
@@ -681,7 +681,7 @@ public:
                 key,
                 &(_content->access_list.accounts[idx].storage_keys[jdx]));
             // get the storage in warm accessed storage keys
-            accessed_state.get_storage(address, key, value);
+            accessed_state.get_value(address, key, value);
           }
         }
     }
@@ -736,7 +736,7 @@ public:
         // \f$T_{m} - H_{f}\f$
         cgbn_sub(_arith._env, gas_priority_fee, max_fee_per_gas, block_base_fee);
         // \f$f=min(T_{f}, T_{m} - H_{f})\f$
-        if (cgbn_compare(_arith.env, gas_priority_fee, max_priority_fee_per_gas) > 0)
+        if (cgbn_compare(_arith._env, gas_priority_fee, max_priority_fee_per_gas) > 0)
         {
             cgbn_set(_arith._env, gas_priority_fee, max_priority_fee_per_gas);
         }
@@ -778,7 +778,7 @@ public:
         // \f$T_{m} - H_{f}\f$
         cgbn_sub(_arith._env, gas_priority_fee, max_fee_per_gas, block_base_fee);
         // \f$f=min(T_{f}, T_{m} - H_{f})\f$
-        if (cgbn_compare(_arith.env, gas_priority_fee, max_priority_fee_per_gas) > 0)
+        if (cgbn_compare(_arith._env, gas_priority_fee, max_priority_fee_per_gas) > 0)
         {
             cgbn_set(_arith._env, gas_priority_fee, max_priority_fee_per_gas);
         }
@@ -819,7 +819,7 @@ public:
     bn_t intrisinc_gas; /**< YP: \f$g_{0}\f$*/
     // get the intrisinc gas and update the accessed state
     // with the access list if present
-    get_intrisinc_gas(intrisinc_gas, *touch_state.accessed_state);
+    get_intrisinc_gas(intrisinc_gas, *touch_state._accessed_state);
     bn_t up_front_cost; // YP: \f$v_{0}\f$
     bn_t m; // YP: \f$m\f$
     bn_t gas_value; // YP: \f$p \dot T_{g}\f$
@@ -839,7 +839,7 @@ public:
     get_sender(sender_address);
     error_code = ERR_NONE;
     // get the world state account
-    sender_account = touch_state.accessed_state->_world_state->get_account(
+    sender_account = touch_state._accessed_state->_world_state->get_account(
       sender_address,
       error_code
     );
@@ -867,28 +867,28 @@ public:
     // nonce are different YP: \f$T_{n} \eq \sigma(T_{s})_{n}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
-      ((cgbn_compare(_arith.env, transaction_nonce, sender_nonce) != 0) ?
+      ((cgbn_compare(_arith._env, transaction_nonce, sender_nonce) != 0) ?
         ERROR_TRANSACTION_NONCE : ERR_NONE);
     // sent gas is less than intrinisec gas YP: \f$T_{g} \geq g_{0}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
-      ((cgbn_compare(_arith.env, gas_limit, intrisinc_gas) < 0) ?
+      ((cgbn_compare(_arith._env, gas_limit, intrisinc_gas) < 0) ?
         ERROR_TRANSACTION_GAS : ERR_NONE);
     // balance is less than up front cost YP: \f$\sigma(T_{s})_{b} \geq v_{0}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
-      ((cgbn_compare(_arith.env, sender_balance, up_front_cost) < 0) ?
+      ((cgbn_compare(_arith._env, sender_balance, up_front_cost) < 0) ?
         ERROR_TRANSACTION_SENDER_BALANCE : ERR_NONE);
     // gas fee is less than than block base fee YP: \f$m \geq H_{f}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
-      ((cgbn_compare(_arith.env, m, block_base_fee) < 0) ?
+      ((cgbn_compare(_arith._env, m, block_base_fee) < 0) ?
         ERROR_TRANSACTION_GAS_PRICE : ERR_NONE);
     // Max priority fee per gas is higher than max fee per gas YP: \f$T_{m} \geq T_{f}\f$
     error_code = (error_code != ERR_NONE) ?
       error_code :
       (((_content->type == 2) &&
-      (cgbn_compare(_arith.env, max_fee_per_gas, max_priority_fee_per_gas) < 0)) ?
+      (cgbn_compare(_arith._env, max_fee_per_gas, max_priority_fee_per_gas) < 0)) ?
         ERROR_TRANSACTION_GAS_PRIORITY : ERR_NONE);
     
     // the other verification is about the block gas limit
@@ -896,7 +896,7 @@ public:
     // previous transactions
     error_code = (error_code != ERR_NONE) ?
       error_code :
-      ((cgbn_compare(_arith.env, gas_limit, block_gas_limit) > 0) ?
+      ((cgbn_compare(_arith._env, gas_limit, block_gas_limit) > 0) ?
         ERROR_TRANSACTION_BLOCK_GAS_LIMIT : ERR_NONE);
     
     // if transaction is valid update the touch state
@@ -939,7 +939,7 @@ public:
     }
     else
     {
-      account_t *account = accessed_state->get_account(to, READ_CODE);
+      account_t *account = accessed_state.get_account(to, READ_CODE);
       byte_code = account->bytecode;
       byte_code_size = account->code_size;
     }
@@ -1044,6 +1044,8 @@ public:
     // set the sender
     _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->sender, 5);
     cJSON_AddStringToObject(transaction_json, "sender", hex_string_ptr);
+    // TODO: delete this from revmi comparator
+    cJSON_AddStringToObject(transaction_json, "origin", hex_string_ptr);
 
     // set the access list
     if (_content->type >= 1)

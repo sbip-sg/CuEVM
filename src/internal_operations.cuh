@@ -109,7 +109,7 @@ public:
             gas_used,
             error_code);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             uint8_t *data;
             data = memory.get(
@@ -167,17 +167,20 @@ public:
                 gas_used,
                 error_code);
 
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 uint8_t data[arith_t::BYTES];
+                size_t available_size;
                 arith.memory_from_cgbn(
                     &(data[0]),
                     value);
+                available_size = arith_t::BYTES;
 
                 memory.set(
+                    &(data[0]),
                     memory_offset,
                     length,
-                    &(data[0]),
+                    available_size,
                     error_code);
 
                 pc = pc + 1;
@@ -224,17 +227,20 @@ public:
                 gas_used,
                 error_code);
 
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 uint8_t data[arith_t::BYTES];
+                size_t available_size;
                 arith.memory_from_cgbn(
                     &(data[0]),
                     value);
+                available_size = 1;
 
                 memory.set(
+                    &(data[arith_t::BYTES - 1]),
                     memory_offset,
                     length,
-                    &(data[arith_t::BYTES - 1]),
+                    available_size,
                     error_code);
 
                 pc = pc + 1;
@@ -283,7 +289,7 @@ public:
                 key,
                 gas_used);
 
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 bn_t value;
                 touch_state.get_value(
@@ -356,7 +362,7 @@ public:
                         gas_used,
                         gas_refund);
 
-                    if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+                    if (arith.has_gas(gas_limit, gas_used, error_code))
                     {
                         touch_state.set_value(
                             storage_address,
@@ -397,7 +403,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t destination;
             stack.pop(destination, error_code);
@@ -446,7 +452,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_HIGH);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t destination;
             stack.pop(destination, error_code);
@@ -500,7 +506,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t pc_bn;
             cgbn_set_ui32(arith._env, pc_bn, pc);
@@ -533,11 +539,11 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t size;
             size_t size_s;
-            size_s = memory.get_size(size);
+            size_s = memory.size();
 
             arith.cgbn_from_size_t(
                 size,
@@ -569,7 +575,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t gas_left;
             cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
@@ -599,7 +605,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_JUMP_DEST);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             pc = pc + 1;
         }

@@ -68,7 +68,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, r;
             stack.pop(a, error_code);
@@ -102,7 +102,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, r;
             stack.pop(a, error_code);
@@ -136,7 +136,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, r;
             stack.pop(a, error_code);
@@ -172,7 +172,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, r;
             stack.pop(a, error_code);
@@ -213,7 +213,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, r;
             stack.pop(a, error_code);
@@ -286,7 +286,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, r;
             stack.pop(a, error_code);
@@ -327,7 +327,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, r;
             stack.pop(a, error_code);
@@ -384,7 +384,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, c, N, r;
             stack.pop(a, error_code);
@@ -446,7 +446,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b, c, N, r;
             stack.pop(a, error_code);
@@ -516,7 +516,7 @@ public:
         cgbn_add(arith._env, gas_used, gas_used, dynamic_gas);
         if (error_code == ERR_NONE)
         {
-            if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
                 //^0=1 even for 0^0
                 if (last_bit == -1)
@@ -579,7 +579,7 @@ public:
         Optimised: use cgbn_bitwise_mask_ior instead of cgbn_insert_bits_ui32
         */
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t b, x, r;
             stack.pop(b, error_code);
@@ -660,7 +660,7 @@ public:
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t y;
 
@@ -689,7 +689,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t r;
             cgbn_set_ui32(arith._env, r, 0);
@@ -728,7 +728,7 @@ public:
         uint8_t &opcode)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             uint8_t push_size = (opcode & 0x1F) + 1;
             uint8_t *byte_data = &(bytecode[pc + 1]);
@@ -773,7 +773,7 @@ public:
         uint8_t &opcode)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             uint8_t dup_index = (opcode & 0x0F) + 1;
 
@@ -810,7 +810,7 @@ public:
         uint8_t &opcode)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             uint8_t swap_index = (opcode & 0x0F) + 1;
 
@@ -930,7 +930,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
 
             int32_t int_result = compare(
@@ -971,7 +971,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
 
             int32_t int_result = compare(
@@ -1012,7 +1012,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
 
             int32_t int_result = scompare(
@@ -1053,7 +1053,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
 
             int32_t int_result = scompare(
@@ -1093,7 +1093,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
 
             int32_t int_result = compare(
@@ -1133,7 +1133,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a;
             stack.pop(a, error_code);
@@ -1206,7 +1206,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b;
             stack.pop(a, error_code);
@@ -1241,7 +1241,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b;
             stack.pop(a, error_code);
@@ -1276,7 +1276,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a, b;
             stack.pop(a, error_code);
@@ -1312,7 +1312,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t a;
             stack.pop(a, error_code);
@@ -1349,7 +1349,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t i, x;
             stack.pop(i, error_code);
@@ -1395,7 +1395,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t shift, value;
             stack.pop(shift, error_code);
@@ -1436,12 +1436,11 @@ public:
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        uint8_t &byte,
         uint32_t &pc,
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t shift, value;
             stack.pop(shift, error_code);
@@ -1489,7 +1488,7 @@ public:
         stack_t &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
-        if (arith.has_gas(arith, gas_limit, gas_used, error_code))
+        if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t shift, value;
             stack.pop(shift, error_code);

@@ -333,8 +333,8 @@ public:
   */
   __host__ __device__ __forceinline__ uint8_t *get_data(
     data_content_t &data_content,
-    bn_t index,
-    bn_t length,
+    bn_t &index,
+    bn_t &length,
     size_t &available_size
   )
   {
