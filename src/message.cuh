@@ -379,6 +379,25 @@ public:
       _content->data.size = data_size;)
   }
 
+  __host__ __device__ __forceinline__ void set_byte_code(
+      uint8_t *byte_code,
+      size_t byte_code_size)
+  {
+    ONE_THREAD_PER_INSTANCE(
+      if (_content->byte_code.size > 0) {
+        delete[] _content->byte_code.data;
+        _content->byte_code.size = 0;
+        _content->byte_code.data = NULL;
+      }
+      if (byte_code_size > 0) {
+        _content->byte_code.data = new uint8_t[byte_code_size];
+        memcpy(_content->byte_code.data, byte_code, sizeof(uint8_t) * byte_code_size);
+      } else {
+        _content->byte_code.data = NULL;
+      })
+      _content->byte_code.size = byte_code_size;
+  }
+
   /**
    * Print the message.
   */

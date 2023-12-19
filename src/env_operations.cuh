@@ -1271,6 +1271,10 @@ public:
                 {
                     cgbn_set_ui32(arith._env, hash_bn, 0);
                 }
+                else if (touch_state.is_delete_account(address))
+                {
+                    cgbn_set_ui32(arith._env, hash_bn, 0);
+                }
                 else
                 {
                     uint8_t *bytecode;

@@ -60,7 +60,7 @@ __host__ __device__ __forceinline__ void print_bytes(uint8_t *bytes, size_t coun
  * Print the data content.
  * @param[in] data_content The data content.
 */
-__host__ __device__ __forceinline__ void print_data_content(data_content_t &data_content) {
+__host__ __device__ __forceinline__ void print_data_content_t(data_content_t &data_content) {
   printf("size: %lu\n", data_content.size);
   print_bytes(data_content.data, data_content.size);
 }

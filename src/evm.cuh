@@ -556,6 +556,14 @@ public:
                 // set the new gas limit
                 new_message.set_gas_limit(gas);
 
+                // set the byte code
+                account_t *contract;
+                contract = touch_state.get_account(contract_address, READ_CODE);
+
+                new_message.set_byte_code(
+                    contract->bytecode,
+                    contract->code_size);
+
                 uint8_t *call_data;
                 size_t call_data_size;
                 call_data = memory.get(
@@ -639,8 +647,6 @@ public:
                 bn_t storage_address;
                 cgbn_set(arith._env, storage_address, address); // t
 
-                account_t *contract;
-                contract = touch_state.get_account(contract_address, READ_CODE);
                 message_t *new_message = new message_t(
                     arith,
                     sender,
@@ -653,8 +659,8 @@ public:
                     storage_address,
                     NULL,
                     0,
-                    contract->bytecode,
-                    contract->code_size,
+                    NULL,
+                    0,
                     ret_offset,
                     ret_size,
                     message.get_static_env());
@@ -711,8 +717,6 @@ public:
                 cgbn_set(arith._env, contract_address, address); // t
                 bn_t storage_address;
                 cgbn_set(arith._env, storage_address, sender); // I_{a}
-                account_t *contract;
-                contract = touch_state.get_account(contract_address, READ_CODE);
 
                 message_t *new_message = new message_t(
                     arith,
@@ -726,8 +730,8 @@ public:
                     storage_address,
                     NULL,
                     0,
-                    contract->bytecode,
-                    contract->code_size,
+                    NULL,
+                    0,
                     ret_offset,
                     ret_size,
                     message.get_static_env());
@@ -826,8 +830,6 @@ public:
                 cgbn_set(arith._env, contract_address, address); // t
                 bn_t storage_address;
                 message.get_recipient(storage_address); // I_{a}
-                account_t *contract;
-                contract = touch_state.get_account(contract_address, READ_CODE);
 
                 message_t *new_message = new message_t(
                     arith,
@@ -841,8 +843,8 @@ public:
                     storage_address,
                     NULL,
                     0,
-                    contract->bytecode,
-                    contract->code_size,
+                    NULL,
+                    0,
                     ret_offset,
                     ret_size,
                     message.get_static_env());
@@ -915,8 +917,6 @@ public:
                 cgbn_set(arith._env, contract_address, address); // t
                 bn_t storage_address;
                 cgbn_set(arith._env, storage_address, address); // t
-                account_t *contract;
-                contract = touch_state.get_account(contract_address, READ_CODE);
 
                 message_t *new_message = new message_t(
                     arith,
@@ -930,8 +930,8 @@ public:
                     storage_address,
                     NULL,
                     0,
-                    contract->bytecode,
-                    contract->code_size,
+                    NULL,
+                    0,
                     ret_offset,
                     ret_size,
                     1);
@@ -1013,12 +1013,66 @@ public:
             uint32_t &pc,
             stack_t &stack,
             message_t &message,
-            memory_t &memory,
             touch_state_t &touch_state,
-            uint8_t &opcode,
+            return_data_t &return_data,
             evm_t &evm)
         {
-            error_code = ERR_NOT_IMPLEMENTED;
+            if (message.get_static_env())
+            {
+                error_code = ERROR_STATIC_CALL_CONTEXT_CALL_VALUE;
+            }
+            else
+            {
+                bn_t recipient;
+                stack.pop(recipient, error_code);
+
+                cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_SELFDESTRUCT);
+
+                bn_t dummy_gas;
+                cgbn_set_ui32(arith._env, dummy_gas, 0);
+                touch_state.charge_gas_access_account(
+                    recipient,
+                    dummy_gas);
+                if (cgbn_compare_ui32(arith._env, dummy_gas, GAS_WARM_ACCESS) != 0)
+                {
+                    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
+                }
+
+                bn_t sender;
+                message.get_recipient(sender); // I_{a}
+                bn_t sender_balance;
+                touch_state.get_account_balance(sender, sender_balance);
+
+                if (cgbn_compare_ui32(arith._env, sender_balance, 0) > 0)
+                {
+                    if (touch_state.is_empty_account(recipient))
+                    {
+                        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_NEW_ACCOUNT);
+                    }
+                }
+
+                if (arith.has_gas(gas_limit, gas_used, error_code))
+                {
+                    bn_t recipient_balance;
+                    touch_state.get_account_balance(recipient, recipient_balance);
+
+                    if (cgbn_compare(arith._env, recipient, sender) != 0)
+                    {
+                        cgbn_add(arith._env, recipient_balance, recipient_balance, sender_balance);
+                        touch_state.set_account_balance(recipient, recipient_balance);
+                    }
+                    cgbn_set_ui32(arith._env, sender_balance, 0);
+                    touch_state.set_account_balance(sender, sender_balance);
+                    // TODO: delete or not the storage/code?
+                    touch_state.delete_account(sender);
+
+                    return_data.set(
+                        NULL,
+                        0);
+                    error_code = ERR_RETURN;
+                }
+
+            }
         }
     };
 
@@ -2029,18 +2083,34 @@ public:
                 break;
                 case OP_SELFDESTRUCT: // SELFDESTRUCT
                 {
-                    system_operations::operation_SELFDESTRUCT(
-                        _arith,
-                        _gas_limit,
-                        _gas_useds[_depth],
-                        error_code,
-                        _pcs[_depth],
-                        *_stack_ptrs[_depth],
-                        *_message_ptrs[_depth],
-                        *_memory_ptrs[_depth],
-                        *_touch_state_ptrs[_depth],
-                        _opcode,
-                        *this);
+                    if (_depth == 0)
+                    {
+                        system_operations::operation_SELFDESTRUCT(
+                            _arith,
+                            _gas_limit,
+                            _gas_useds[_depth],
+                            error_code,
+                            _pcs[_depth],
+                            *_stack_ptrs[_depth],
+                            *_message_ptrs[_depth],
+                            *_touch_state_ptrs[_depth],
+                            *_final_return_data,
+                            *this);
+                    }
+                    else
+                    {
+                        system_operations::operation_SELFDESTRUCT(
+                            _arith,
+                            _gas_limit,
+                            _gas_useds[_depth],
+                            error_code,
+                            _pcs[_depth],
+                            *_stack_ptrs[_depth],
+                            *_message_ptrs[_depth],
+                            *_touch_state_ptrs[_depth],
+                            *_last_return_data_ptrs[_depth - 1],
+                            *this);
+                    }
                 }
                 break;
                 default:
