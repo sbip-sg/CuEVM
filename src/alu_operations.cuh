@@ -737,7 +737,7 @@ public:
             // if pushx is outside code size
             if ((pc + push_size) >= code_size)
             {
-                available_size = code_size - pc;
+                available_size = code_size - pc - 1;
             }
             stack.pushx(push_size, error_code, byte_data, available_size);
 

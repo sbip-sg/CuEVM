@@ -32,6 +32,9 @@ debug_interpreter: src/interpreter.cu
 cpu_interpreter: src/interpreter.cu
 	$(NVCC) -D TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
 
+cpu_debug_interpreter: src/interpreter.cu
+	$(NVCC) -D TRACER -D COMPLEX_TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
+
 % :: src/test/%.cu
 	$(NVCC) $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
 

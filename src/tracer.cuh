@@ -342,8 +342,10 @@ public:
         cJSON *tracer_json = cJSON_CreateArray();
         cJSON *item = NULL;
         cJSON *stack_json = NULL;
+        #ifdef COMPLEX_TRACER
         cJSON *memory_json = NULL;
         cJSON *touch_state_json = NULL;
+        #endif
         for (size_t idx = 0; idx < tracer_data.size; idx++)
         {
             item = cJSON_CreateObject();

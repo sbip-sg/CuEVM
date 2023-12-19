@@ -13,8 +13,8 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
   evm_instances_t         cpu_instances;
   #ifndef ONLY_CPU
   evm_instances_t tmp_gpu_instances, *gpu_instances;
-  #endif
   cgbn_error_report_t     *report;
+  #endif
 
   arith_t arith(cgbn_report_monitor, 0);
   

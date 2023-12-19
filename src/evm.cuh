@@ -419,6 +419,22 @@ public:
         account = _touch_state_ptrs[_depth]->get_account(sender, READ_NONE);
         account = _touch_state_ptrs[_depth]->get_account(receiver, READ_NONE);
         account = NULL;
+        // if code size is zero. verify if is consider a last return data
+        if (_code_size == 0)
+        {
+            if (_depth == 0)
+            {
+                system_operations::operation_STOP(
+                    *_final_return_data,
+                    error_code);
+            }
+            else
+            {
+                system_operations::operation_STOP(
+                    *_last_return_data_ptrs[_depth - 1],
+                    error_code);
+            }
+        }
     }
 
     /**
@@ -767,11 +783,13 @@ public:
                         error_code);
                     arith.size_t_from_cgbn(data_size, length);
 
-                    return_data.set(
-                        data,
-                        data_size);
-
-                    error_code = ERR_RETURN;
+                    if (error_code == ERR_NONE)
+                    {
+                        return_data.set(
+                            data,
+                            data_size);
+                        error_code = ERR_RETURN;
+                    }
                 }
             }
         }
@@ -969,11 +987,14 @@ public:
                         error_code);
                     arith.size_t_from_cgbn(data_size, length);
 
-                    return_data.set(
-                        data,
-                        data_size);
+                    if (error_code == ERR_NONE)
+                    {
+                        return_data.set(
+                            data,
+                            data_size);
 
-                    error_code = ERR_REVERT;
+                        error_code = ERR_REVERT;
+                    }
                 }
             }
         }
@@ -1922,7 +1943,7 @@ public:
                             error_code,
                             *_stack_ptrs[_depth],
                             *_memory_ptrs[_depth],
-                            *_last_return_data_ptrs[_depth]);
+                            *_last_return_data_ptrs[_depth - 1]);
                     }
                 }
                 break;
@@ -1996,7 +2017,7 @@ public:
                             error_code,
                             *_stack_ptrs[_depth],
                             *_memory_ptrs[_depth],
-                            *_last_return_data_ptrs[_depth]);
+                            *_last_return_data_ptrs[_depth - 1]);
                     }
                 }
                 break;

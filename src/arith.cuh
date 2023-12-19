@@ -306,6 +306,7 @@ public:
    * @param[in] gas_limit The gas limit
    * @param[in] gas_used The gas used
    * @param[inout] error_code The error code
+   * @return 1 for enough gas and no previous errors, 0 otherwise
   */
   __host__ __device__ __forceinline__ int32_t has_gas(
     bn_t &gas_limit,
@@ -315,7 +316,7 @@ public:
   {
     int32_t gas_sign = cgbn_compare(_env, gas_limit, gas_used);
     error_code = (gas_sign < 0) ? ERROR_GAS_LIMIT_EXCEEDED : error_code;
-    return (gas_sign >= 0);
+    return (gas_sign >= 0) && (error_code == ERR_NONE);
   }
   
   /**
