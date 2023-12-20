@@ -727,7 +727,7 @@ public:
         tmp_cpu_instances = NULL;
         printf("Copying the data arrays...\n");
         // copy the data array with the kernel
-        kernel_tracers<params><<<1, count>>>(tmp_gpu_instances, gpu_instances, count);
+        kernel_tracers<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaFree(gpu_instances));
         printf("Copying the data arrays done.\n");

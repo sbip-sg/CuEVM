@@ -21,6 +21,7 @@
         "stdlib.h": "c",
         "typeinfo": "cpp",
         "cstdint": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "atomic": "cpp"
     }
 }

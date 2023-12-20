@@ -14,6 +14,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
   #ifndef ONLY_CPU
   evm_instances_t tmp_gpu_instances, *gpu_instances;
   cgbn_error_report_t     *report;
+  CUDA_CHECK(cudaDeviceReset());
   #endif
 
   arith_t arith(cgbn_report_monitor, 0);
@@ -31,7 +32,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     printf("Generating instances\n");
     evm_t::get_cpu_instances(cpu_instances, test);
     #ifndef ONLY_CPU
-    CUDA_CHECK(cudaDeviceReset());
     evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
     CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
     CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
@@ -43,8 +43,10 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     CUDA_CHECK(cgbn_error_report_alloc(&report)); 
     size_t heap_size;
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024*1024*1024));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
+    heap_size = 4;
+    heap_size = heap_size*1024*1024*1024;
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 256*1024));
     printf("Heap size: %zu\n", heap_size);
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
     printf("Heap size: %zu\n", heap_size);
@@ -52,6 +54,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
 
     #ifndef ONLY_CPU
     printf("Running GPU kernel ...\n");
+    CUDA_CHECK(cudaDeviceSynchronize());
     kernel_evm<params><<<cpu_instances.count, params::TPI>>>(report, gpu_instances);
     //CUDA_CHECK(cudaPeekAtLastError());
     // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
@@ -62,7 +65,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     // copy the results back to the CPU
     printf("Copying results back to CPU\n");
     CUDA_CHECK(cudaMemcpy(&tmp_gpu_instances, gpu_instances, sizeof(evm_instances_t), cudaMemcpyDeviceToHost));
-    evm_t::get_cpu_from_gpu_instances(cpu_instances, tmp_gpu_instances);
+    evm_t::get_cpu_instances_from_gpu_instances(cpu_instances, tmp_gpu_instances);
     printf("Results copied\n");
     #else
     printf("Running CPU EVM\n");
@@ -79,6 +82,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
           &(cpu_instances.transactions_data[instance]),
           &(cpu_instances.accessed_states_data[instance]),
           &(cpu_instances.touch_states_data[instance]),
+          &(cpu_instances.logs_data[instance]),
           #ifdef TRACER
           &(cpu_instances.tracers_data[instance]),
           #endif

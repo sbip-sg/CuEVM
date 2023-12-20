@@ -548,7 +548,7 @@ public:
     tmp_cpu_instances = NULL;
 
     // 2. call the kernel to copy the memory between the gpu memories
-    kernel_get_memory<params><<<1, count>>>(tmp_gpu_instances, gpu_instances, count);
+    kernel_get_memory<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
     CUDA_CHECK(cudaDeviceSynchronize());
     CUDA_CHECK(cudaFree(gpu_instances));
     gpu_instances = tmp_gpu_instances;

@@ -11,6 +11,7 @@
 #include "state.cuh"
 #include "keccak.cuh"
 #include "jump_destinations.cuh"
+#include "logs.cuh"
 #include "alu_operations.cuh"
 #include "env_operations.cuh"
 #include "internal_operations.cuh"
@@ -105,6 +106,14 @@ public:
      */
     typedef typename keccak_t::sha3_parameters_t sha3_parameters_t;
     /**
+     * The logs state class.
+     */
+    typedef log_state_t<params> log_state_t;
+    /**
+     * The logs state data type.
+    */
+    typedef log_state_t::log_state_data_t log_state_data_t;
+    /**
      * The arithmetic operations class.
      */
     typedef arithmetic_operations<params> arithmetic_operations;
@@ -146,6 +155,7 @@ public:
         transaction_data_t *transactions_data;
         accessed_state_data_t *accessed_states_data;
         touch_state_data_t *touch_states_data;
+        log_state_data_t *logs_data;
 #ifdef TRACER
         tracer_data_t *tracers_data;
 #endif
@@ -160,6 +170,7 @@ public:
     transaction_t *_transaction;
     accessed_state_t *_accessed_state;
     touch_state_t *_transaction_touch_state;
+    log_state_t *_transaction_log_state;
     uint32_t _instance;
 #ifdef TRACER
     tracer_t *_tracer;
@@ -168,6 +179,7 @@ public:
     bn_t _trace_address;
 #endif
     touch_state_t **_touch_state_ptrs;
+    log_state_t **_log_state_ptrs;
     return_data_t **_last_return_data_ptrs;
     return_data_t *_final_return_data;
     message_t **_message_ptrs;
@@ -178,6 +190,7 @@ public:
     uint32_t *_pcs;
     accessed_state_data_t *_final_accessed_state_data;
     touch_state_data_t *_final_touch_state_data;
+    log_state_data_t *_final_log_state_data;
     uint32_t _depth;
     uint32_t _allocated_depth;
     bn_t _gas_limit;        /** YP: \f$T_{g}\f$*/
@@ -211,6 +224,7 @@ public:
         transaction_data_t *transaction_data,
         accessed_state_data_t *accessed_state_data,
         touch_state_data_t *touch_state_data,
+        log_state_data_t *log_state_data,
 #ifdef TRACER
         tracer_data_t *tracer_data,
 #endif
@@ -223,11 +237,14 @@ public:
         _transaction = new transaction_t(arith, transaction_data);
         _accessed_state = new accessed_state_t(_world_state);
         _transaction_touch_state = new touch_state_t(_accessed_state, NULL);
+        _transaction_log_state = new log_state_t(arith);
         _final_accessed_state_data = accessed_state_data;
         _final_touch_state_data = touch_state_data;
+        _final_log_state_data = log_state_data;
         _depth = 0;
         _allocated_depth = DEPTH_PAGE_SIZE;
         _touch_state_ptrs = new touch_state_t *[_allocated_depth];
+        _log_state_ptrs = new log_state_t *[_allocated_depth];
         _last_return_data_ptrs = new return_data_t *[_allocated_depth];
         _final_return_data = new return_data_t();
         _message_ptrs = new message_t *[_allocated_depth];
@@ -247,16 +264,19 @@ public:
     {
         _accessed_state->to_accessed_state_data_t(*_final_accessed_state_data);
         _transaction_touch_state->to_touch_state_data_t(*_final_touch_state_data);
+        _transaction_log_state->to_log_state_data_t(*_final_log_state_data);
         delete _world_state;
         delete _block;
         delete _keccak;
         delete _transaction;
         delete _accessed_state;
         delete _transaction_touch_state;
+        delete _transaction_log_state;
 #ifdef TRACER
         delete _tracer;
 #endif
         delete[] _touch_state_ptrs;
+        delete[] _log_state_ptrs;
         delete[] _last_return_data_ptrs;
         delete _final_return_data;
         delete[] _message_ptrs;
@@ -273,6 +293,7 @@ public:
     {
         uint32_t new_allocated_depth = _allocated_depth + DEPTH_PAGE_SIZE;
         touch_state_t **new_touch_state_ptrs = new touch_state_t *[new_allocated_depth];
+        log_state_t **new_log_state_ptrs = new log_state_t *[new_allocated_depth];
         return_data_t **new_return_data_ptrs = new return_data_t *[new_allocated_depth];
         message_t **new_message_ptrs = new message_t *[new_allocated_depth];
         memory_t **new_memory_ptrs = new memory_t *[new_allocated_depth];
@@ -285,6 +306,10 @@ public:
             new_touch_state_ptrs,
             _touch_state_ptrs,
             _allocated_depth * sizeof(touch_state_t *));
+        memcpy(
+            new_log_state_ptrs,
+            _log_state_ptrs,
+            _allocated_depth * sizeof(log_state_t *));
         memcpy(
             new_return_data_ptrs,
             _last_return_data_ptrs,
@@ -315,6 +340,7 @@ public:
             _allocated_depth * sizeof(uint32_t));
 
         delete[] _touch_state_ptrs;
+        delete[] _log_state_ptrs;
         delete[] _last_return_data_ptrs;
         delete[] _message_ptrs;
         delete[] _memory_ptrs;
@@ -323,6 +349,7 @@ public:
         delete[] _gas_refunds;
         delete[] _pcs;
         _touch_state_ptrs = new_touch_state_ptrs;
+        _log_state_ptrs = new_log_state_ptrs;
         _last_return_data_ptrs = new_return_data_ptrs;
         _message_ptrs = new_message_ptrs;
         _memory_ptrs = new_memory_ptrs;
@@ -386,6 +413,7 @@ public:
                 _accessed_state,
                 _transaction_touch_state);
         }
+        _log_state_ptrs[_depth] = new log_state_t(_arith);
         _pcs[_depth] = 0;
         cgbn_set_ui32(_arith._env, _gas_useds[_depth], 0);
         cgbn_set_ui32(_arith._env, _gas_refunds[_depth], 0);
@@ -1158,6 +1186,9 @@ public:
                     error_code,
                     _pcs[_depth],
                     *_stack_ptrs[_depth],
+                    *_memory_ptrs[_depth],
+                    *_message_ptrs[_depth],
+                    *_log_state_ptrs[_depth],
                     _opcode);
             }
             else
@@ -2154,16 +2185,22 @@ public:
                     {
                         _transaction_touch_state->update_with_child_state(
                             *_touch_state_ptrs[_depth]);
+                        _transaction_log_state->update_with_child_state(
+                            *_log_state_ptrs[_depth]);
                     }
                     else
                     {
                         _touch_state_ptrs[_depth - 1]->update_with_child_state(
                             *_touch_state_ptrs[_depth]);
+                        _log_state_ptrs[_depth - 1]->update_with_child_state(
+                            *_log_state_ptrs[_depth]);
                     }
                 }
                 // delete the touch state
                 delete _touch_state_ptrs[_depth];
                 _touch_state_ptrs[_depth] = NULL;
+                delete _log_state_ptrs[_depth];
+                _log_state_ptrs[_depth] = NULL;
                 // gas refund
                 if (_depth > 0)
                 {
@@ -2361,11 +2398,19 @@ public:
         delete keccak;
         keccak = NULL;
 
-        instances.transactions_data = transaction_t::get_transactions(test, instances.count);
+        //instances.transactions_data = transaction_t::get_transactions(test, instances.count);
+        transaction_t::get_transactions(instances.transactions_data, test, instances.count);
+        for (size_t idx = 0; idx < instances.count; idx++)
+        {
+            printf("Transaction %lu\n", idx);
+            transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
+        }
 
         instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
 
         instances.touch_states_data = touch_state_t::get_cpu_instances(instances.count);
+
+        instances.logs_data = log_state_t::get_cpu_instances(instances.count);
 
         #ifdef TRACER
         instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
@@ -2401,6 +2446,8 @@ public:
 
         gpu_instances.touch_states_data = touch_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.touch_states_data, cpu_instances.count);
 
+        gpu_instances.logs_data = log_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.logs_data, cpu_instances.count);
+
         #ifdef TRACER
         gpu_instances.tracers_data = tracer_t::get_gpu_instances_from_cpu_instances(cpu_instances.tracers_data, cpu_instances.count);
         #endif
@@ -2408,7 +2455,7 @@ public:
         gpu_instances.errors = cpu_instances.errors;
     }
 
-    __host__ static void get_cpu_from_gpu_instances(
+    __host__ static void get_cpu_instances_from_gpu_instances(
         evm_instances_t &cpu_instances,
         evm_instances_t &gpu_instances)
     {
@@ -2419,12 +2466,14 @@ public:
         cpu_instances.sha3_parameters = gpu_instances.sha3_parameters;
         cpu_instances.transactions_data = gpu_instances.transactions_data;
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
-        cpu_instances.accessed_states_data = accessed_state_t::get_cpu_instances_from_gpu(gpu_instances.accessed_states_data, gpu_instances.count);
+        cpu_instances.accessed_states_data = accessed_state_t::get_cpu_instances_from_gpu_instances(gpu_instances.accessed_states_data, gpu_instances.count);
         touch_state_t::free_cpu_instances(cpu_instances.touch_states_data, cpu_instances.count);
-        cpu_instances.touch_states_data = touch_state_t::get_cpu_instances_from_gpu(gpu_instances.touch_states_data, gpu_instances.count);
+        cpu_instances.touch_states_data = touch_state_t::get_cpu_instances_from_gpu_instances(gpu_instances.touch_states_data, gpu_instances.count);
+        log_state_t::free_cpu_instances(cpu_instances.logs_data, cpu_instances.count);
+        cpu_instances.logs_data = log_state_t::get_cpu_instances_from_gpu_instances(gpu_instances.logs_data, gpu_instances.count);
         #ifdef TRACER
         tracer_t::free_cpu_instances(cpu_instances.tracers_data, cpu_instances.count);
-        cpu_instances.tracers_data = tracer_t::get_cpu_instances_from_gpu(gpu_instances.tracers_data, gpu_instances.count);
+        cpu_instances.tracers_data = tracer_t::get_cpu_instances_from_gpu_instances(gpu_instances.tracers_data, gpu_instances.count);
         #endif
         cpu_instances.errors = gpu_instances.errors;
     }
@@ -2461,6 +2510,9 @@ public:
         touch_state_t::free_cpu_instances(cpu_instances.touch_states_data, cpu_instances.count);
         cpu_instances.touch_states_data = NULL;
 
+        log_state_t::free_cpu_instances(cpu_instances.logs_data, cpu_instances.count);
+        cpu_instances.logs_data = NULL;
+
         #ifdef TRACER
         tracer_t::free_cpu_instances(cpu_instances.tracers_data, cpu_instances.count);
         cpu_instances.tracers_data = NULL;
@@ -2493,18 +2545,16 @@ public:
         cpu_block = NULL;
 
         printf("Instances:\n");
-        transaction_t *transaction;
         for (size_t idx = 0; idx < instances.count; idx++)
         {
             printf("Instance %lu\n", idx);
-            transaction = new transaction_t(arith, &(instances.transactions_data[idx]));
-            transaction->print();
-            delete transaction;
-            transaction = NULL;
+            transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
 
             accessed_state_t::print_accessed_state_data_t(arith, instances.accessed_states_data[idx]);
 
             touch_state_t::print_touch_state_data_t(arith, instances.touch_states_data[idx]);
+
+            log_state_t::print_log_state_data_t(arith, instances.logs_data[idx]);
 
             #ifdef TRACER
             tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx]);
@@ -2555,6 +2605,9 @@ public:
             cJSON *touch_state_json = touch_state_t::json_from_touch_state_data_t(arith, instances.touch_states_data[idx]);
             cJSON_AddItemToObject(instance_json, "touch_state", touch_state_json);
 
+            cJSON *log_state_json = log_state_t::json_from_log_state_data_t(arith, instances.logs_data[idx]);
+            cJSON_AddItemToObject(instance_json, "log_state", log_state_json);
+
             #ifdef TRACER
             cJSON *tracer_json = tracer_t::json_from_tracer_data_t(arith, instances.tracers_data[idx]);
             cJSON_AddItemToObject(instance_json, "traces", tracer_json);
@@ -2573,6 +2626,7 @@ __global__ void kernel_evm(
     typename evm_t<params>::evm_instances_t *instances)
 {
     uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
+    typedef transaction_t<params> transaction_t;
 
     if (instance >= instances->count)
         return;
@@ -2597,6 +2651,7 @@ __global__ void kernel_evm(
         &(instances->transactions_data[instance]),
         &(instances->accessed_states_data[instance]),
         &(instances->touch_states_data[instance]),
+        &(instances->logs_data[instance]),
         #ifdef TRACER
         &(instances->tracers_data[instance]),
         #endif
@@ -2604,6 +2659,7 @@ __global__ void kernel_evm(
         &(instances->errors[instance]));
 
     uint32_t tmp_error_code;
+    tmp_error_code = ERR_NONE;
     // run the evm
     evm->run(tmp_error_code);
 

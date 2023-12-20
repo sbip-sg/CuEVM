@@ -511,7 +511,7 @@ public:
         cudaMemcpyHostToDevice));
     delete[] tmp_cpu_instances;
     tmp_cpu_instances = NULL;
-    kernel_stacks<params><<<1, count>>>(
+    kernel_stacks<params><<<count, 1>>>(
         tmp_gpu_instances,
         gpu_instances,
         count);

@@ -117,18 +117,18 @@ void run_test() {
   cgbn_error_report_t           *report;
   #endif
   //read the json file with the transactions
-  cJSON *root = get_json_from_file("input/evm_test.json");
+  cJSON *root = get_json_from_file("input/evm_arith.json");
   if(root == NULL) {
     printf("Error: could not read the json file\n");
     exit(1);
   }
   const cJSON *test = NULL;
-  test = cJSON_GetObjectItemCaseSensitive(root, "mstore8");
+  test = cJSON_GetObjectItemCaseSensitive(root, "arith");
 
 
   printf("Generating transactions\n");
   size_t transactions_count=1;
-  transactions_data = transaction_t::get_transactions(test, transactions_count);
+  transaction_t::get_transactions(transactions_data, test, transactions_count);
   printf("no_transactions: %lu\n", transactions_count);
   printf("Global transactions generated\n");
 

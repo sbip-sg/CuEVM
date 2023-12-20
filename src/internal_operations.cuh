@@ -12,6 +12,7 @@
 #include "block.cuh"
 #include "state.cuh"
 #include "message.cuh"
+#include "logs.cuh"
 
 /**
  * The internal operations class.
@@ -69,6 +70,10 @@ public:
      * The message class.
      */
     typedef message_t<params> message_t;
+    /**
+     * The logs state class.
+     */
+    typedef log_state_t<params> log_state_t;
     /**
      * The number of bytes in a hash.
      */
@@ -611,6 +616,24 @@ public:
         }
     }
 
+    /**
+     * The LOGX operation implementation.
+     * Takes the memory offset, the memory length and the topics from the stack and
+     * stores the memory data togheter with the topics in the logs.
+     * Adittional gas cost is added for the memory expansion and for the topics.
+     * Every byte of memory costs additional GAS_LOG_DATA gas.
+     * Every topic costs additional GAS_LOG_TOPIC gas.
+     * @param[in] arith The arithmetical environment.
+     * @param[in] gas_limit The gas limit.
+     * @param[inout] gas_used The gas used.
+     * @param[out] error_code The error code.
+     * @param[inout] pc The program counter.
+     * @param[in] stack The stack.
+     * @param[in] memory The memory.
+     * @param[in] message The message that started the execution.
+     * @param[out] log_state The logs state.
+     * @param[in] opcode The opcode.
+    */
     __host__ __device__ __forceinline__ static void operation_LOGX(
         arith_t &arith,
         bn_t &gas_limit,
@@ -618,10 +641,82 @@ public:
         uint32_t &error_code,
         uint32_t &pc,
         stack_t &stack,
+        memory_t &memory,
+        message_t &message,
+        log_state_t &log_state,
         uint8_t &opcode)
     {
-        uint8_t log_index = opcode & 0x0F;
-        error_code = ERR_NOT_IMPLEMENTED;
+        if (message.get_static_env())
+        {
+            error_code = ERROR_STATIC_CALL_CONTEXT_LOG;
+        }
+        else
+        {
+            uint8_t log_index = opcode & 0x0F;
+            
+            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOG);
+
+            bn_t memory_offset;
+            stack.pop(memory_offset, error_code);
+            bn_t length;
+            stack.pop(length, error_code);
+
+            bn_t topics[4];
+
+            bn_t dynamic_gas;
+            cgbn_mul_ui32(arith._env, dynamic_gas, length, GAS_LOG_DATA);
+            cgbn_add(arith._env, gas_used, gas_used, dynamic_gas);
+
+            bn_t topic_gas;
+            cgbn_set_ui32(arith._env, topic_gas, GAS_LOG_TOPIC);
+            cgbn_mul_ui32(arith._env, topic_gas, topic_gas, log_index);
+            cgbn_add(arith._env, gas_used, gas_used, topic_gas);
+
+            uint32_t no_topics = log_index;
+
+            for (uint32_t idx = 0; idx < no_topics; idx++)
+            {
+                stack.pop(topics[idx], error_code);
+            }
+            for (uint32_t idx = no_topics; idx < 4; idx++)
+            {
+                cgbn_set_ui32(arith._env, topics[idx], 0);
+            }
+
+            if (error_code == ERR_NONE)
+            {
+                memory.grow_cost(
+                    memory_offset,
+                    length,
+                    gas_used,
+                    error_code);
+
+                if (arith.has_gas(gas_limit, gas_used, error_code))
+                {
+                    SHARED_MEMORY data_content_t record;
+                    record.data = memory.get(
+                        memory_offset,
+                        length,
+                        error_code);
+
+                    arith.size_t_from_cgbn(record.size, length);
+
+                    bn_t address;
+                    message.get_contract_address(address);
+
+                    log_state.push(
+                        address,
+                        record,
+                        topics[0],
+                        topics[1],
+                        topics[2],
+                        topics[3],
+                        no_topics);
+
+                    pc = pc + 1;
+                }
+            }
+        }
     }
     
 };

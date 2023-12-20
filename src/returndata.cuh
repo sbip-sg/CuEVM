@@ -327,7 +327,7 @@ public:
     tmp_cpu_instances = NULL;
 
     // 2. call the kernel to copy the memory between the gpu memories
-    kernel_get_returns<<<1, count>>>(tmp_gpu_instances, gpu_instances, count);
+    kernel_get_returns<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
     CUDA_CHECK(cudaDeviceSynchronize());
     cudaFree(gpu_instances);
     gpu_instances = tmp_gpu_instances;
@@ -375,7 +375,7 @@ public:
   */
   __host__ __device__ void print()
   {
-    print_data_content(*_content);
+    print_data_content_t(*_content);
   }
 
   /**
@@ -384,7 +384,7 @@ public:
   */
   __host__ cJSON *json()
   {
-    return json_from_data_content(*_content);
+    return json_from_data_content_t(*_content);
   }
 };
 #endif

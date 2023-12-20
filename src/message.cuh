@@ -985,50 +985,65 @@ public:
         return_data_size,
         static_env);
   }
+
+
+  /**
+   * Print the transaction data structure.
+   * @param[in] arith The arithmetical environment.
+   * @param[in] transaction_data The transaction data.
+  */
+  __host__ __device__ static void print_transaction_data_t(
+    arith_t &arith,
+    transaction_data_t &transaction_data
+  )
+  {
+    printf("TYPE: %hhu\nNONCE: ", transaction_data.type);
+    arith.print_cgbn_memory(transaction_data.nonce);
+    printf("GAS_LIMIT: ");
+    arith.print_cgbn_memory(transaction_data.gas_limit);
+    printf("TO: ");
+    arith.print_cgbn_memory(transaction_data.to);
+    printf("VALUE: ");
+    arith.print_cgbn_memory(transaction_data.value);
+    printf("SENDER: ");
+    arith.print_cgbn_memory(transaction_data.sender);
+    if (transaction_data.type >= 1)
+    {
+      printf("ACCESS_LIST: ");
+      for (size_t idx = 0; idx < transaction_data.access_list.no_accounts; idx++)
+      {
+        printf("ADDRESS: ");
+        arith.print_cgbn_memory(transaction_data.access_list.accounts[idx].address);
+        printf("NO_STORAGE_KEYS: %d", transaction_data.access_list.accounts[idx].no_storage_keys);
+        for (size_t jdx = 0; jdx < transaction_data.access_list.accounts[idx].no_storage_keys; jdx++)
+        {
+          printf("STORAGE_KEY[%lu]: ", jdx);
+          arith.print_cgbn_memory(transaction_data.access_list.accounts[idx].storage_keys[jdx]);
+        }
+      }
+    }
+    if (transaction_data.type == 2)
+    {
+      printf("MAX_FEE_PER_GAS: ");
+      arith.print_cgbn_memory(transaction_data.max_fee_per_gas);
+      printf("MAX_PRIORITY_FEE_PER_GAS: ");
+      arith.print_cgbn_memory(transaction_data.max_priority_fee_per_gas);
+    }
+    else
+    {
+      printf("GAS_PRICE: ");
+      arith.print_cgbn_memory(transaction_data.gas_price);
+    }
+    printf("DATA_INIT: ");
+    print_data_content_t(transaction_data.data_init);
+  }
+
   /**
    * Print the transaction information.
   */
   __host__ __device__ void print()
   {
-    printf("TYPE: %hhu\nNONCE: ", _content->type);
-    _arith.print_cgbn_memory(_content->nonce);
-    printf("GAS_LIMIT: ");
-    _arith.print_cgbn_memory(_content->gas_limit);
-    printf("TO: ");
-    _arith.print_cgbn_memory(_content->to);
-    printf("VALUE: ");
-    _arith.print_cgbn_memory(_content->value);
-    printf("SENDER: ");
-    _arith.print_cgbn_memory(_content->sender);
-    if (_content->type >= 1)
-    {
-      printf("ACCESS_LIST: ");
-      for (size_t idx = 0; idx < _content->access_list.no_accounts; idx++)
-      {
-        printf("ADDRESS: ");
-        _arith.print_cgbn_memory(_content->access_list.accounts[idx].address);
-        printf("NO_STORAGE_KEYS: %d", _content->access_list.accounts[idx].no_storage_keys);
-        for (size_t jdx = 0; jdx < _content->access_list.accounts[idx].no_storage_keys; jdx++)
-        {
-          printf("STORAGE_KEY[%lu]: ", jdx);
-          _arith.print_cgbn_memory(_content->access_list.accounts[idx].storage_keys[jdx]);
-        }
-      }
-    }
-    if (_content->type == 2)
-    {
-      printf("MAX_FEE_PER_GAS: ");
-      _arith.print_cgbn_memory(_content->max_fee_per_gas);
-      printf("MAX_PRIORITY_FEE_PER_GAS: ");
-      _arith.print_cgbn_memory(_content->max_priority_fee_per_gas);
-    }
-    else
-    {
-      printf("GAS_PRICE: ");
-      _arith.print_cgbn_memory(_content->gas_price);
-    }
-    printf("DATA_INIT: ");
-    print_bytes(_content->data_init.data, _content->data_init.size);
+    print_transaction_data_t(_arith, *_content);
   }
 
   /**
@@ -1148,23 +1163,26 @@ public:
   /**
    * Get the transactions from a test in json format.
    * The number of transaction is limited by MAX_TRANSACTION_COUNT.
+   * @param[out] transactions The transactions.
    * @param[in] test The json format of the test.
    * @param[out] count The number of transactions.
    * @param[in] start_index The index of the first transaction to be returned.
   */
-  __host__ static transaction_data_t *get_transactions(
+  __host__ static void get_transactions(
+      transaction_data_t *&transactions,
       const cJSON *test,
       size_t &count,
       size_t start_index = 0)
   {
     const cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(test, "transaction");
     arith_t arith(cgbn_report_monitor, 0);
-    transaction_data_t *transactions = NULL;
+    //transaction_data_t *transactions = NULL;
     size_t available_no_transactions = get_no_transaction(test);
     if (start_index >= available_no_transactions)
     {
       count = 0;
-      return NULL;
+      transactions = NULL;
+      return;
     }
     // set the number of transactions
     count = available_no_transactions - start_index;
@@ -1332,7 +1350,7 @@ public:
     }
     delete template_transaction;
     template_transaction = NULL;
-    return transactions;
+    //return transactions;
   }
 
   /**

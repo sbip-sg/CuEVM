@@ -80,7 +80,7 @@ __host__ char *hex_from_data_content(data_content_t &data_content) {
  * @param[in] data_content The data content.
  * @return The json object.
  */
-__host__ __forceinline__ cJSON *json_from_data_content(data_content_t &data_content) {
+__host__ __forceinline__ cJSON *json_from_data_content_t(data_content_t &data_content) {
   cJSON *data_json = cJSON_CreateObject();
   char *hex_string;
   //cJSON_AddNumberToObject(json, "size", data_content.size);

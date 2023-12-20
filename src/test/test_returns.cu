@@ -86,9 +86,9 @@ void run_test(uint32_t instance_count) {
   cJSON *post = cJSON_CreateArray();
   for(uint32_t instance=0; instance<instance_count; instance++) {
     printf("Instance %d:  ", instance);
-    print_data_content(cpu_returns[instance]);
+    print_data_content_t(cpu_returns[instance]);
     printf("\n");
-    cJSON_AddItemToArray(post, json_from_data_content(cpu_returns[instance]));
+    cJSON_AddItemToArray(post, json_from_data_content_t(cpu_returns[instance]));
   }
   printf("Results printed\n");
   cJSON_AddItemToObject(root, "post", post);
