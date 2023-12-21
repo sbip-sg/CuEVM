@@ -146,6 +146,10 @@ public:
     static const uint32_t MAX_DEPTH = 1024;
     static const uint32_t MAX_EXECUTION_STEPS = 30000;
     static const uint32_t DEPTH_PAGE_SIZE = 32;
+    /**
+     * The numver of bytes in a hash.
+     */
+    static const uint32_t HASH_BYTES = 32;
 
     typedef struct
     {
@@ -908,9 +912,136 @@ public:
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
+            keccak_t &keccak,
             evm_t &evm)
         {
-            error_code = ERR_NOT_IMPLEMENTED;
+            if (message.get_static_env())
+            {
+                error_code = ERROR_STATIC_CALL_CONTEXT_CREATE2;
+            }
+            else
+            {
+                bn_t value, memory_offset, length, salt;
+                stack.pop(value, error_code);
+                stack.pop(memory_offset, error_code);
+                stack.pop(length, error_code);
+                stack.pop(salt, error_code);
+
+                // create cost
+                cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
+
+                // compute the dynamic gas cost
+                bn_t dynamic_gas_cost;
+                // word_size = (length + 31) / 32
+                cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
+                cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
+                // dynamic_gas_cost = word_size * GAS_CREATE2_WORD
+                cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_CREATE2_WORD);
+                // gas_used += dynamic_gas_cost
+                cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+
+                // compute the memory cost
+                memory.grow_cost(
+                    memory_offset,
+                    length,
+                    gas_used,
+                    error_code);
+
+                if (arith.has_gas(gas_limit, gas_used, error_code))
+                {
+                    SHARED_MEMORY data_content_t initialisation_code;
+
+                    arith.size_t_from_cgbn(initialisation_code.size, length);
+                    initialisation_code.data = memory.get(
+                        memory_offset,
+                        length,
+                        error_code);
+                    
+                    bn_t sender_address;
+                    message.get_recipient(sender_address); // I_{a}
+                    SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
+                    arith.memory_from_cgbn(
+                        &(sender_address_bytes[0]),
+                        sender_address);
+                    SHARED_MEMORY uint8_t salt_bytes[arith_t::BYTES];
+                    arith.memory_from_cgbn(
+                        &(salt_bytes[0]),
+                        salt);
+
+                    size_t total_bytes = 1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES;
+
+                    SHARED_MEMORY uint8_t hash_code[HASH_BYTES];
+                    keccak.sha3(
+                        initialisation_code.data,
+                        initialisation_code.size,
+                        &(hash_code[0]),
+                        HASH_BYTES);
+                    
+                    SHARED_MEMORY uint8_t input_data[1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES];
+                    input_data[0] = 0xff;
+                    ONE_THREAD_PER_INSTANCE(
+                    memcpy(
+                        &(input_data[1]),
+                        &(sender_address_bytes[0]),
+                        arith_t::BYTES);
+                    memcpy(
+                        &(input_data[1 + arith_t::BYTES]),
+                        &(salt_bytes[0]),
+                        arith_t::BYTES);
+                    memcpy(
+                        &(input_data[1 + arith_t::BYTES + arith_t::BYTES]),
+                        &(hash_code[0]),
+                        HASH_BYTES);
+                    )
+                    SHARED_MEMORY uint8_t address_bytes[HASH_BYTES];
+                    keccak.sha3(
+                        input_data,
+                        total_bytes,
+                        &(address_bytes[0]),
+                        HASH_BYTES);
+                    bn_t address;
+                    arith.cgbn_from_memory(
+                        address,
+                        &(address_bytes[0]));
+
+                    // TODO: verify if the address already exists
+
+                    // compute the remaining gas
+                    bn_t gas_left;
+                    cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
+                    bn_t ret_offset, ret_size;
+                    cgbn_set_ui32(arith._env, ret_offset, 0);
+                    cgbn_set_ui32(arith._env, ret_size, 0);
+                    // create the message
+                    message_t *new_message = new message_t(
+                        arith,
+                        sender_address,
+                        address,
+                        address,
+                        gas_left,
+                        value,
+                        message.get_depth() + 1,
+                        opcode,
+                        address,
+                        initialisation_code.data,
+                        initialisation_code.size,
+                        initialisation_code.data,
+                        initialisation_code.size,
+                        ret_offset,
+                        ret_size,
+                        message.get_static_env());
+                    
+                    generic_create(
+                        error_code);
+
+                }
+                
+                
+
+
+            }
+
+
         }
 
         __host__ __device__ __forceinline__ static void operation_STATICCALL(
@@ -1047,7 +1178,7 @@ public:
         {
             if (message.get_static_env())
             {
-                error_code = ERROR_STATIC_CALL_CONTEXT_CALL_VALUE;
+                error_code = ERROR_STATIC_CALL_CONTEXT_SELFDESTRUCT;
             }
             else
             {
