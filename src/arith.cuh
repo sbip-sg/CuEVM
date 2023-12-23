@@ -198,6 +198,32 @@ public:
   }
 
   /**
+   * Get a uint64_t from a CGBN type.
+   * @param[out] dst The destination uint64_t
+   * @param[in] src The source CGBN
+   * @return 1 for overflow, 0 otherwiese
+  */
+  __host__ __device__ __forceinline__ int32_t uint64_t_from_cgbn(
+    uint64_t &dst,
+    bn_t &src
+  )
+  {
+    bn_t MAX_uint64_t;
+    cgbn_set_ui32(_env, MAX_uint64_t, 1);
+    cgbn_shift_left(_env, MAX_uint64_t, MAX_uint64_t, 64);
+    dst = 0;
+    dst = cgbn_extract_bits_ui32(_env, src, 0, 32);
+    dst |= ((uint64_t)cgbn_extract_bits_ui32(_env, src, 32, 32)) << 32;
+    if (cgbn_compare(_env, src, MAX_uint64_t) >= 0)
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+  }
+  /**
    * Get a hex string from the CGBn memory.
    * The hex string is in Big Endian format.
    * The hex string must be allocated by the caller.
@@ -317,6 +343,27 @@ public:
     int32_t gas_sign = cgbn_compare(_env, gas_limit, gas_used);
     error_code = (gas_sign < 0) ? ERROR_GAS_LIMIT_EXCEEDED : error_code;
     return (gas_sign >= 0) && (error_code == ERR_NONE);
+  }
+
+  /**
+   * Compute the max gas call.
+   * @param[out] gas_capped The gas capped
+   * @param[in] gas_limit The gas limit
+   * @param[in] gas_used The gas used
+  */
+  __host__ __device__ __forceinline__ void max_gas_call(
+    bn_t &gas_capped,
+    bn_t &gas_limit,
+    bn_t &gas_used
+  )
+  {
+      // compute the remaining gas
+      bn_t gas_left;
+      cgbn_sub(_env, gas_left, gas_limit, gas_used);
+
+      // gas capped = (63/64) * gas_left
+      cgbn_div_ui32(_env, gas_capped, gas_left, 64);
+      cgbn_sub(_env, gas_capped, gas_left, gas_capped);
   }
   
   /**

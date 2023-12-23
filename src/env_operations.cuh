@@ -81,7 +81,9 @@ public:
             stack.pop(number, error_code);
 
             bn_t hash;
-            block.get_previous_hash(hash, number, error_code);
+            // even if error of invalid number/index, the hash is set to zero
+            uint32_t tmp_error_code;
+            block.get_previous_hash(hash, number, tmp_error_code);
 
             stack.push(hash, error_code);
 

@@ -146,6 +146,8 @@ public:
     static const uint32_t MAX_DEPTH = 1024;
     static const uint32_t MAX_EXECUTION_STEPS = 30000;
     static const uint32_t DEPTH_PAGE_SIZE = 32;
+    static const uint32_t MAX_CODE_SIZE = 24576; // EIP-170
+    static const uint32_t MAX_INIT_CODE_SIZE = 2 * MAX_CODE_SIZE; // EIP-3860
     /**
      * The numver of bytes in a hash.
      */
@@ -364,7 +366,7 @@ public:
         _allocated_depth = new_allocated_depth;
     }
 
-    __host__ __device__ void process_transaction(
+    __host__ __device__ void start_TRANSACTION(
         bn_t &gas_used, /**< YP: \f$g_{0}\f$*/
         uint32_t &error_code)
     {
@@ -382,7 +384,7 @@ public:
             block_gas_limit);
     }
 
-    __host__ __device__ void update_env()
+    __host__ __device__ void update_CALL()
     {
         _message_ptrs[_depth]->get_gas_limit(_gas_limit);
         _bytecode = _message_ptrs[_depth]->get_byte_code();
@@ -398,10 +400,10 @@ public:
         _jump_destinations = new jump_destinations_t(_bytecode, _code_size);
     }
 
-    __host__ __device__ void init_message_call(
+    __host__ __device__ void start_CALL(
         uint32_t &error_code)
     {
-        update_env();
+        update_CALL();
         _last_return_data_ptrs[_depth] = new return_data_t();
         _stack_ptrs[_depth] = new stack_t(_arith);
         _memory_ptrs[_depth] = new memory_t(_arith);
@@ -428,6 +430,21 @@ public:
         _message_ptrs[_depth]->get_sender(sender);
         _message_ptrs[_depth]->get_recipient(receiver);
         _message_ptrs[_depth]->get_value(value);
+
+        // in create call verify if the the account at the
+        // address is not a contract
+        if ( (_message_ptrs[_depth]->get_call_type() == OP_CREATE) ||
+                (_message_ptrs[_depth]->get_call_type() == OP_CREATE2) )
+        {
+            if (_touch_state_ptrs[_depth]->is_contract(receiver))
+            {
+                error_code = ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
+                return;
+            }
+        }
+
+
+        // Transfer the value
         if ((cgbn_compare_ui32(_arith._env, value, 0) > 0) &&       // value>0
             (cgbn_compare(_arith._env, sender, receiver) != 0) &&   // sender != receiver
             (_message_ptrs[_depth]->get_call_type() != OP_DELEGATECALL) // no delegatecall
@@ -435,12 +452,6 @@ public:
         {
             _touch_state_ptrs[_depth]->get_account_balance(sender, sender_balance);
             _touch_state_ptrs[_depth]->get_account_balance(receiver, receiver_balance);
-            // verify the balance before transfer
-            if (cgbn_compare(_arith._env, sender_balance, value) < 0)
-            {
-                error_code = ERROR_MESSAGE_CALL_SENDER_BALANCE;
-                return;
-            }
             cgbn_sub(_arith._env, sender_balance, sender_balance, value);
             cgbn_add(_arith._env, receiver_balance, receiver_balance, value);
             _touch_state_ptrs[_depth]->set_account_balance(sender, sender_balance);
@@ -489,21 +500,121 @@ public:
     class system_operations
     {
     public:
-        __host__ __device__ __forceinline__ static void generic_call(
+
+
+        /**
+         * Get if a message call is valid.
+         * @param[in] arith The arithmetical environment.
+         * @param[in] message The message call.
+         * @param[in] touch_state The touch state.
+         * @return 1 if the message call is valid, 0 otherwise.
+        */
+        __host__ __device__ __forceinline__ static int32_t valid_CALL(
+            arith_t &arith,
+            message_t &message,
+            touch_state_t &touch_state)
+        {
+            bn_t sender, receiver, value;
+            bn_t sender_balance;
+            //bn_t receiver_balance;
+            uint8_t call_type;
+            uint32_t depth;
+            message.get_sender(sender);
+            //message.get_recipient(receiver);
+            message.get_value(value);
+            call_type = message.get_call_type();
+            depth = message.get_depth();
+
+
+            // verify depth
+            if (depth >= MAX_DEPTH)
+            {
+                //error_code = ERROR_MESSAGE_CALL_DEPTH_EXCEEDED;
+                return 0;
+            }
+
+            // verify if the value can be transfered
+            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) &&       // value>0
+                //(cgbn_compare(arith._env, sender, receiver) != 0) &&   // sender != receiver matter only on transfer
+                (call_type != OP_DELEGATECALL) // no delegatecall
+            )
+            {
+                touch_state.get_account_balance(sender, sender_balance);
+                //touch_state.get_account_balance(receiver, receiver_balance);
+                // verify the balance before transfer
+                if (cgbn_compare(arith._env, sender_balance, value) < 0)
+                {
+                    //error_code = ERROR_MESSAGE_CALL_SENDER_BALANCE;
+                    return 0;
+                }
+            }
+
+            return 1;
+        }
+
+        /**
+         * Get if a message create call is valid.
+         * @param[in] arith The arithmetical environment.
+         * @param[in] message The message call.
+         * @param[in] touch_state The touch state.
+         * @return 1 if the message create call is valid, 0 otherwise.
+        */
+        __host__ __device__ __forceinline__ static int32_t valid_CREATE(
+            arith_t &arith,
+            message_t &message,
+            touch_state_t &touch_state
+        )
+        {
+            bn_t sender;
+            message.get_sender(sender);
+            if (touch_state.is_contract(sender))
+            {
+                bn_t sender_nonce;
+                touch_state.get_account_nonce(sender, sender_nonce);
+                cgbn_add_ui32(arith._env, sender_nonce, sender_nonce, 1);
+                size_t nonce;
+                if (arith.uint64_t_from_cgbn(nonce, sender_nonce))
+                {
+                    //error_code = ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED;
+                    return 0;
+                }
+
+            }
+
+            return valid_CALL(arith, message, touch_state);
+
+        }
+
+        /**
+         * Make a generic call.
+         * @param[in] arith The arithmetical environment.
+         * @param[in] gas_limit The gas limit.
+         * @param[inout] gas_used The gas used.
+         * @param[out] error_code The error code.
+         * @param[inout] stack The stack.
+         * @param[in] message The current context message call.
+         * @param[in] memory The memory.
+         * @param[in] touch_state The touch state.
+         * @param[out] evm The evm.
+         * @param[in] new_message The new message call.
+         * @param[in] args_offset The message offset for call data.
+         * @param[in] args_size The message size for call data.
+         * @param[out] return_data The return data.
+        */
+        __host__ __device__ __forceinline__ static void generic_CALL(
             arith_t &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
-            uint32_t &pc,
             stack_t &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
-            uint8_t &opcode,
             evm_t &evm,
             message_t &new_message,
             bn_t &args_offset,
-            bn_t &args_size)
+            bn_t &args_size,
+            return_data_t &return_data)
         {
             // try to send value in static call
             bn_t value;
@@ -565,18 +676,13 @@ public:
                 bn_t gas;
                 new_message.get_gas_limit(gas);
 
-                bn_t gas_left;
-                cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
-
                 // gas capped = (63/64) * gas_left
-                bn_t gas_left_capped;
-                cgbn_set(arith._env, gas_left_capped, gas_left);
-                cgbn_div_ui32(arith._env, gas_left_capped, gas_left_capped, 64);
-                cgbn_sub(arith._env, gas_left_capped, gas_left, gas_left_capped);
+                bn_t gas_capped;
+                arith.max_gas_call(gas_capped, gas_limit, gas_used);
 
-                if (cgbn_compare(arith._env, gas, gas_left_capped) > 0)
+                if (cgbn_compare(arith._env, gas, gas_capped) > 0)
                 {
-                    cgbn_set(arith._env, gas, gas_left_capped);
+                    cgbn_set(arith._env, gas, gas_capped);
                 }
 
                 // add to gas used the sent gas
@@ -606,18 +712,133 @@ public:
 
                 new_message.set_data(call_data, call_data_size);
 
-                // new message done
-                // call the child
-                evm.child_call(
-                    error_code,
-                    new_message);
+                if (valid_CALL(arith, new_message, touch_state))
+                {
+                    // new message done
+                    // call the child
+                    evm.child_call(
+                        error_code,
+                        new_message);
+                }
+                else
+                {
+                    bn_t child_success;
+                    cgbn_set_ui32(arith._env, child_success, 0);
+                    stack.push(child_success, error_code);
+                    return_data.set(
+                        NULL,
+                        0);
+                    // TODO: verify better if contains the GAS STIPPEND
+                    cgbn_sub(arith._env, gas_used, gas_used, gas);
+                    delete &new_message;
+                }
             }
         }
 
-        __host__ __device__ __forceinline__ static void generic_create(
-            uint32_t &error_code)
+        /**
+         * Make a generic create call.
+         * @param[in] arith The arithmetical environment.
+         * @param[in] gas_limit The gas limit.
+         * @param[inout] gas_used The gas used.
+         * @param[out] error_code The error code.
+         * @param[inout] stack The stack.
+         * @param[in] message The current context message call.
+         * @param[in] memory The memory.
+         * @param[in] touch_state The touch state.
+         * @param[out] evm The evm.
+         * @param[in] new_message The new message call.
+         * @param[in] args_offset The message offset for init code.
+         * @param[in] args_size The message size for init code.
+         * @param[out] return_data The return data.
+        */
+        __host__ __device__ __forceinline__ static void generic_CREATE(
+            arith_t &arith,
+            bn_t &gas_limit,
+            bn_t &gas_used,
+            uint32_t &error_code,
+            stack_t &stack,
+            message_t &message,
+            memory_t &memory,
+            touch_state_t &touch_state,
+            evm_t &evm,
+            message_t &new_message,
+            bn_t &args_offset,
+            bn_t &args_size,
+            return_data_t &return_data)
         {
-            error_code = ERR_NOT_IMPLEMENTED;
+            if (message.get_static_env())
+            {
+                error_code = ERROR_STATIC_CALL_CONTEXT_CREATE;
+            }
+            else if (cgbn_compare_ui32(arith._env, args_size, MAX_INIT_CODE_SIZE) >=0)
+            {
+                // EIP-3860
+                error_code = ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
+            }
+            else
+            {
+                // set the init code
+                SHARED_MEMORY data_content_t initialisation_code;
+                arith.size_t_from_cgbn(initialisation_code.size, args_size);
+                initialisation_code.data = memory.get(
+                    args_offset,
+                    args_size,
+                    error_code);
+                new_message.set_byte_code(
+                    initialisation_code.data,
+                    initialisation_code.size);
+                
+                // set the gas limit
+                bn_t gas_capped;
+                arith.max_gas_call(gas_capped, gas_limit, gas_used);
+                new_message.set_gas_limit(gas_capped);
+
+                // add to gas used
+                cgbn_add(arith._env, gas_used, gas_used, gas_capped);
+
+                // warm up the contract address
+                bn_t contract_address;
+                new_message.get_recipient(contract_address);
+                account_t *account = touch_state.get_account(contract_address, READ_NONE);
+
+                // setup return offset to null
+                bn_t ret_offset, ret_size;
+                cgbn_set_ui32(arith._env, ret_offset, 0);
+                cgbn_set_ui32(arith._env, ret_size, 0);
+                new_message.set_return_data_offset(ret_offset);
+                new_message.set_return_data_size(ret_size);
+
+                if (valid_CREATE(arith, new_message, touch_state))
+                {
+                    // increase the none if the sender is a contract
+                    // TODO: seems like an akward think to do
+                    bn_t sender;
+                    new_message.get_sender(sender);
+                    if (touch_state.is_contract(sender))
+                    {
+                        bn_t sender_nonce;
+                        touch_state.get_account_nonce(sender, sender_nonce);
+                        cgbn_add_ui32(arith._env, sender_nonce, sender_nonce, 1);
+                        touch_state.set_account_nonce(sender, sender_nonce);
+                    }
+                    // new message done
+                    // call the child
+                    evm.child_call(
+                        error_code,
+                        new_message);
+                }
+                else
+                {
+                    bn_t child_success;
+                    cgbn_set_ui32(arith._env, child_success, 0);
+                    stack.push(child_success, error_code);
+                    cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
+                    return_data.set(
+                        NULL,
+                        0);
+                    delete &new_message;
+                }
+            }
         }
 
         __host__ __device__ __forceinline__ static void operation_STOP(
@@ -641,9 +862,77 @@ public:
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
-            evm_t &evm)
+            keccak_t &keccak,
+            evm_t &evm,
+            return_data_t &return_data)
         {
-            error_code = ERR_NOT_IMPLEMENTED;
+            bn_t value, memory_offset, length;
+            stack.pop(value, error_code);
+            stack.pop(memory_offset, error_code);
+            stack.pop(length, error_code);
+
+            // create cost
+            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
+
+            // compute the memory cost
+            memory.grow_cost(
+                memory_offset,
+                length,
+                gas_used,
+                error_code);
+            
+            if (arith.has_gas(gas_limit, gas_used, error_code))
+            {
+                printf("CREATE\n");
+                bn_t sender_address;
+                message.get_recipient(sender_address); // I_{a}
+                bn_t sender_nonce;
+                touch_state.get_account_nonce(sender_address, sender_nonce);
+                
+                // compute the address
+                bn_t address;
+                message_t::get_create_contract_address(
+                    arith,
+                    address,
+                    sender_address,
+                    sender_nonce,
+                    keccak);
+
+                message_t *new_message = new message_t(
+                    arith,
+                    sender_address,
+                    address,
+                    address,
+                    gas_limit,
+                    value,
+                    message.get_depth() + 1,
+                    opcode,
+                    address,
+                    NULL,
+                    0,
+                    NULL,
+                    0,
+                    memory_offset,
+                    length,
+                    message.get_static_env());
+                
+                generic_CREATE(
+                    arith,
+                    gas_limit,
+                    gas_used,
+                    error_code,
+                    stack,
+                    message,
+                    memory,
+                    touch_state,
+                    evm,
+                    *new_message,
+                    memory_offset,
+                    length,
+                    return_data);
+
+                pc = pc + 1;
+            }
         }
 
         __host__ __device__ __forceinline__ static void operation_CALL(
@@ -657,7 +946,8 @@ public:
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
-            evm_t &evm)
+            evm_t &evm,
+            return_data_t &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -697,21 +987,20 @@ public:
                     ret_size,
                     message.get_static_env());
 
-                generic_call(
+                generic_CALL(
                     arith,
                     gas_limit,
                     gas_used,
                     error_code,
-                    pc,
                     stack,
                     message,
                     memory,
                     touch_state,
-                    opcode,
                     evm,
                     *new_message,
                     args_offset,
-                    args_size);
+                    args_size,
+                    return_data);
 
                 pc = pc + 1;
             }
@@ -728,7 +1017,8 @@ public:
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
-            evm_t &evm)
+            evm_t &evm,
+            return_data_t &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -768,21 +1058,20 @@ public:
                     ret_size,
                     message.get_static_env());
 
-                generic_call(
+                generic_CALL(
                     arith,
                     gas_limit,
                     gas_used,
                     error_code,
-                    pc,
                     stack,
                     message,
                     memory,
                     touch_state,
-                    opcode,
                     evm,
                     *new_message,
                     args_offset,
-                    args_size);
+                    args_size,
+                    return_data);
 
                 pc = pc + 1;
             }
@@ -841,7 +1130,8 @@ public:
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
-            evm_t &evm)
+            evm_t &evm,
+            return_data_t &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -881,21 +1171,20 @@ public:
                     ret_size,
                     message.get_static_env());
 
-                generic_call(
+                generic_CALL(
                     arith,
                     gas_limit,
                     gas_used,
                     error_code,
-                    pc,
                     stack,
                     message,
                     memory,
                     touch_state,
-                    opcode,
                     evm,
                     *new_message,
                     args_offset,
-                    args_size);
+                    args_size,
+                    return_data);
 
                 pc = pc + 1;
             }
@@ -913,135 +1202,94 @@ public:
             touch_state_t &touch_state,
             uint8_t &opcode,
             keccak_t &keccak,
-            evm_t &evm)
+            evm_t &evm,
+            return_data_t &return_data)
         {
-            if (message.get_static_env())
+            bn_t value, memory_offset, length, salt;
+            stack.pop(value, error_code);
+            stack.pop(memory_offset, error_code);
+            stack.pop(length, error_code);
+            stack.pop(salt, error_code);
+
+            // create cost
+            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
+
+            // compute the dynamic gas cost
+            bn_t dynamic_gas_cost;
+            // word_size = (length + 31) / 32
+            cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
+            cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
+            // dynamic_gas_cost = word_size * GAS_KECCAK256_WORD
+            cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_KECCAK256_WORD);
+            // gas_used += dynamic_gas_cost
+            cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+
+            // compute the memory cost
+            memory.grow_cost(
+                memory_offset,
+                length,
+                gas_used,
+                error_code);
+
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
-                error_code = ERROR_STATIC_CALL_CONTEXT_CREATE2;
-            }
-            else
-            {
-                bn_t value, memory_offset, length, salt;
-                stack.pop(value, error_code);
-                stack.pop(memory_offset, error_code);
-                stack.pop(length, error_code);
-                stack.pop(salt, error_code);
+                SHARED_MEMORY data_content_t initialisation_code;
 
-                // create cost
-                cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
-
-                // compute the dynamic gas cost
-                bn_t dynamic_gas_cost;
-                // word_size = (length + 31) / 32
-                cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-                cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-                // dynamic_gas_cost = word_size * GAS_CREATE2_WORD
-                cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_CREATE2_WORD);
-                // gas_used += dynamic_gas_cost
-                cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
-
-                // compute the memory cost
-                memory.grow_cost(
+                arith.size_t_from_cgbn(initialisation_code.size, length);
+                initialisation_code.data = memory.get(
                     memory_offset,
                     length,
-                    gas_used,
                     error_code);
-
-                if (arith.has_gas(gas_limit, gas_used, error_code))
-                {
-                    SHARED_MEMORY data_content_t initialisation_code;
-
-                    arith.size_t_from_cgbn(initialisation_code.size, length);
-                    initialisation_code.data = memory.get(
-                        memory_offset,
-                        length,
-                        error_code);
-                    
-                    bn_t sender_address;
-                    message.get_recipient(sender_address); // I_{a}
-                    SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
-                    arith.memory_from_cgbn(
-                        &(sender_address_bytes[0]),
-                        sender_address);
-                    SHARED_MEMORY uint8_t salt_bytes[arith_t::BYTES];
-                    arith.memory_from_cgbn(
-                        &(salt_bytes[0]),
-                        salt);
-
-                    size_t total_bytes = 1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES;
-
-                    SHARED_MEMORY uint8_t hash_code[HASH_BYTES];
-                    keccak.sha3(
-                        initialisation_code.data,
-                        initialisation_code.size,
-                        &(hash_code[0]),
-                        HASH_BYTES);
-                    
-                    SHARED_MEMORY uint8_t input_data[1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES];
-                    input_data[0] = 0xff;
-                    ONE_THREAD_PER_INSTANCE(
-                    memcpy(
-                        &(input_data[1]),
-                        &(sender_address_bytes[0]),
-                        arith_t::BYTES);
-                    memcpy(
-                        &(input_data[1 + arith_t::BYTES]),
-                        &(salt_bytes[0]),
-                        arith_t::BYTES);
-                    memcpy(
-                        &(input_data[1 + arith_t::BYTES + arith_t::BYTES]),
-                        &(hash_code[0]),
-                        HASH_BYTES);
-                    )
-                    SHARED_MEMORY uint8_t address_bytes[HASH_BYTES];
-                    keccak.sha3(
-                        input_data,
-                        total_bytes,
-                        &(address_bytes[0]),
-                        HASH_BYTES);
-                    bn_t address;
-                    arith.cgbn_from_memory(
-                        address,
-                        &(address_bytes[0]));
-
-                    // TODO: verify if the address already exists
-
-                    // compute the remaining gas
-                    bn_t gas_left;
-                    cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
-                    bn_t ret_offset, ret_size;
-                    cgbn_set_ui32(arith._env, ret_offset, 0);
-                    cgbn_set_ui32(arith._env, ret_size, 0);
-                    // create the message
-                    message_t *new_message = new message_t(
-                        arith,
-                        sender_address,
-                        address,
-                        address,
-                        gas_left,
-                        value,
-                        message.get_depth() + 1,
-                        opcode,
-                        address,
-                        initialisation_code.data,
-                        initialisation_code.size,
-                        initialisation_code.data,
-                        initialisation_code.size,
-                        ret_offset,
-                        ret_size,
-                        message.get_static_env());
-                    
-                    generic_create(
-                        error_code);
-
-                }
                 
+                bn_t sender_address;
+                message.get_recipient(sender_address); // I_{a}
                 
+                // compute the address
+                bn_t address;
+                message_t::get_create2_contract_address(
+                    arith,
+                    address,
+                    sender_address,
+                    salt,
+                    initialisation_code,
+                    keccak);
 
-
+                // create the message
+                message_t *new_message = new message_t(
+                    arith,
+                    sender_address,
+                    address,
+                    address,
+                    gas_limit,
+                    value,
+                    message.get_depth() + 1,
+                    opcode,
+                    address,
+                    NULL,
+                    0,
+                    NULL,
+                    0,
+                    memory_offset,
+                    length,
+                    message.get_static_env());
+                
+                generic_CREATE(
+                    arith,
+                    gas_limit,
+                    gas_used,
+                    error_code,
+                    stack,
+                    message,
+                    memory,
+                    touch_state,
+                    evm,
+                    *new_message,
+                    memory_offset,
+                    length,
+                    return_data);
+                
+                pc = pc + 1;
             }
-
-
         }
 
         __host__ __device__ __forceinline__ static void operation_STATICCALL(
@@ -1055,7 +1303,8 @@ public:
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
-            evm_t &evm)
+            evm_t &evm,
+            return_data_t &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -1095,21 +1344,20 @@ public:
                     ret_size,
                     1);
 
-                generic_call(
+                generic_CALL(
                     arith,
                     gas_limit,
                     gas_used,
                     error_code,
-                    pc,
                     stack,
                     message,
                     memory,
                     touch_state,
-                    opcode,
                     evm,
                     *new_message,
                     args_offset,
-                    args_size);
+                    args_size,
+                    return_data);
 
                 pc = pc + 1;
             }
@@ -1239,17 +1487,18 @@ public:
         uint32_t error_code)
     {
         // get the first message call from transaction
-        _message_ptrs[_depth] = _transaction->get_message_call(*_accessed_state);
+        _message_ptrs[_depth] = _transaction->get_message_call(*_accessed_state, *_keccak);
         // process the transaction
         bn_t intrsinc_gas_used;
-        process_transaction(intrsinc_gas_used, error_code);
+        start_TRANSACTION(intrsinc_gas_used, error_code);
+        start_CALL(error_code);
         if (error_code != ERR_NONE)
         {
-            // TODO: do stuff for fail transaction
+            finish_TRANSACTION(error_code);
+            free_CALL();
             return;
         }
         // init the first message call
-        init_message_call(error_code);
         // add the transaction cost
         cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], intrsinc_gas_used);
         // run the message call
@@ -1827,6 +2076,7 @@ public:
                         *_touch_state_ptrs[_depth],
                         *_keccak);
                 }
+                break;
                 case OP_BLOCKHASH: // BLOCKHASH
                 {
                     block_operations::operation_BLOCKHASH(
@@ -2102,7 +2352,9 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *this);
+                        *_keccak,
+                        *this,
+                        *_last_return_data_ptrs[_depth]);
                 }
                 break;
                 case OP_CALL: // CALL
@@ -2118,7 +2370,8 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *this);
+                        *this,
+                        *_last_return_data_ptrs[_depth]);
                 }
                 break;
                 case OP_CALLCODE: // CALLCODE
@@ -2134,7 +2387,8 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *this);
+                        *this,
+                        *_last_return_data_ptrs[_depth]);
                 }
                 break;
                 case OP_RETURN: // RETURN
@@ -2176,7 +2430,8 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *this);
+                        *this,
+                        *_last_return_data_ptrs[_depth]);
                 }
                 break;
                 case OP_CREATE2: // CREATE2
@@ -2192,7 +2447,9 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *this);
+                        *_keccak,
+                        *this,
+                        *_last_return_data_ptrs[_depth]);
                 }
                 break;
                 case OP_STATICCALL: // STATICCALL
@@ -2208,7 +2465,8 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *this);
+                        *this,
+                        *_last_return_data_ptrs[_depth]);
                 }
                 break;
                 case OP_REVERT: // REVERT
@@ -2286,6 +2544,17 @@ public:
 
             if (error_code != ERR_NONE)
             {
+                // FIRST verify if is a createX operation and success
+                if ( 
+                     (error_code == ERR_RETURN) &&
+                     (
+                    (_message_ptrs[_depth]->get_call_type() == OP_CREATE) ||
+                    (_message_ptrs[_depth]->get_call_type() == OP_CREATE2) )
+                )
+                {
+                   finish_CREATEX(error_code);
+                }
+
                 if (_depth == 0)
                 {
                     #ifdef TRACER
@@ -2301,154 +2570,16 @@ public:
                         _gas_refunds[_depth],
                         error_code);
                     #endif
-                }
-                // delete the env
-                delete _stack_ptrs[_depth];
-                _stack_ptrs[_depth] = NULL;
-                delete _memory_ptrs[_depth];
-                _memory_ptrs[_depth] = NULL;
-                delete _last_return_data_ptrs[_depth];
-                _last_return_data_ptrs[_depth] = NULL;
-                if (error_code == ERR_RETURN)
-                {
-                    // tocuh state update father
-                    if (_depth == 0)
-                    {
-                        _transaction_touch_state->update_with_child_state(
-                            *_touch_state_ptrs[_depth]);
-                        _transaction_log_state->update_with_child_state(
-                            *_log_state_ptrs[_depth]);
-                    }
-                    else
-                    {
-                        _touch_state_ptrs[_depth - 1]->update_with_child_state(
-                            *_touch_state_ptrs[_depth]);
-                        _log_state_ptrs[_depth - 1]->update_with_child_state(
-                            *_log_state_ptrs[_depth]);
-                    }
-                }
-                // delete the touch state
-                delete _touch_state_ptrs[_depth];
-                _touch_state_ptrs[_depth] = NULL;
-                delete _log_state_ptrs[_depth];
-                _log_state_ptrs[_depth] = NULL;
-                // gas refund
-                if (_depth > 0)
-                {
-                    if (error_code == ERR_RETURN)
-                    {
-                        cgbn_add(_arith._env, _gas_refunds[_depth - 1], _gas_refunds[_depth - 1], _gas_refunds[_depth]);
-                    }
-                    if ((error_code == ERR_RETURN) || (error_code == ERR_REVERT))
-                    {
-                        bn_t gas_left;
-                        cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
-                        cgbn_sub(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], gas_left);
-                    }
-                    // reset the gas
-                    cgbn_set_ui32(_arith._env, _gas_useds[_depth], 0);
-                    cgbn_set_ui32(_arith._env, _gas_refunds[_depth], 0);
+                    finish_TRANSACTION(error_code);
+                    free_CALL();
+                    return;
                 }
                 else
                 {
-                    bn_t gas_value;
-                    bn_t beneficiary;
-                    _block->get_coin_base(beneficiary);
-                    if (error_code == ERR_RETURN)
-                    {
-                        bn_t gas_left;
-                        // \f$T_{g} - g\f$
-                        cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
-                        bn_t capped_refund_gas;
-                        // \f$g/5\f$
-                        cgbn_div_ui32(_arith._env, capped_refund_gas, gas_left, 5);
-                        // min ( \f$g/5\f$, \f$R_{g}\f$)
-                        if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
-                        {
-                            cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
-                        }
-                        // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
-                        cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
-                        // add to sender balance g^{*}
-                        bn_t sender_balance;
-                        bn_t sender_address;
-                        _transaction->get_sender(sender_address);
-                        _transaction_touch_state->get_account_balance(sender_address, sender_balance);
-                        cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
-                        _transaction_touch_state->set_account_balance(sender_address, sender_balance);
-
-                        // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
-                        cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
-                    }
-                    else
-                    {
-                        cgbn_mul(_arith._env, gas_value, _gas_limit, _gas_priority_fee);
-                    }
-                    bn_t beneficiary_balance;
-                    _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
-                    cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
-                    _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
-                }
-
-                bn_t ret_offset, ret_size;
-                _message_ptrs[_depth]->get_return_data_offset(ret_offset);
-                _message_ptrs[_depth]->get_return_data_size(ret_size);
-                // delete the message
-                delete _message_ptrs[_depth];
-                _message_ptrs[_depth] = NULL;
-
-                // add the answer in the parent
-                if (_depth == 0)
-                {
-                    // sent the gas value to the block, and sender
-                    _transaction_touch_state->to_touch_state_data_t(
-                        *_final_touch_state_data);
-                    _accessed_state->to_accessed_state_data_t(
-                        *_final_accessed_state_data);
-                    if (error_code == ERR_RETURN)
-                    {
-                        _error_code = ERR_NONE;
-                    }
-                    else
-                    {
-                        _error_code = error_code;
-                    }
-                    *_final_error = _error_code;
-                    delete _jump_destinations;
-                    _jump_destinations = NULL;
-                    break;
-                }
-                else
-                {
-                    bn_t child_success;
-                    if (error_code == ERR_RETURN)
-                    {
-                        cgbn_set_ui32(_arith._env, child_success, 1);
-                    }
-                    else
-                    {
-                        cgbn_set_ui32(_arith._env, child_success, 0);
-                    }
-                    // go back in the parent call
+                    finish_CALL(error_code);
+                    free_CALL();
                     _depth = _depth - 1;
-                    update_env();
-                    error_code = ERR_NONE;
-                    _stack_ptrs[_depth]->push(child_success, error_code);
-                    bn_t return_data_index;
-                    cgbn_set_ui32(_arith._env, return_data_index, 0);
-                    uint8_t *data;
-                    size_t data_size;
-                    data = _arith.get_data(
-                        *(_last_return_data_ptrs[_depth]->get_data()),
-                        return_data_index,
-                        ret_size,
-                        data_size);
-                    _memory_ptrs[_depth]->set(
-                        data,
-                        ret_offset,
-                        ret_size,
-                        data_size,
-                        error_code);
+                    update_CALL();
                     #ifdef TRACER
                     _tracer->push(
                         _trace_address,
@@ -2483,26 +2614,257 @@ public:
         }
     }
 
+    /**
+     * Finish the CREATEX operation
+     * @param[out] error_code error code
+    */
+    __host__ __device__ __forceinline__ void finish_CREATEX(
+        uint32_t &error_code
+    )
+    {
+        // compute the gas to deposit the contract
+        bn_t gas_value;
+        cgbn_set_ui32(_arith._env, gas_value, GAS_CODE_DEPOSIT);
+        bn_t code_size;
+
+        if (_depth > 0)
+        {
+            _arith.cgbn_from_size_t(code_size, _last_return_data_ptrs[_depth-1]->size());
+        }
+        else
+        {
+            _arith.cgbn_from_size_t(code_size, _final_return_data->size());
+        }
+        cgbn_mul(_arith._env, gas_value, gas_value, code_size);
+        cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], gas_value);
+        uint32_t tmp_error_code;
+        tmp_error_code = ERR_NONE;
+        
+        // if enough gas set the bytecode for the contract
+        // and the nonce of the new contract
+        if (_arith.has_gas(_gas_limit, _gas_useds[_depth], tmp_error_code))
+        {
+            // compute the address of the contract
+            bn_t contract_address;
+            _message_ptrs[_depth]->get_recipient(contract_address);
+            uint8_t *code;
+            size_t code_size;
+            if (_depth > 0)
+            {
+                code = _last_return_data_ptrs[_depth-1]->get_data()->data;
+                code_size = _last_return_data_ptrs[_depth-1]->size();
+            }
+            else
+            {
+                code = _final_return_data->get_data()->data;
+                code_size = _final_return_data->size();
+            }
+            if (code_size <= MAX_CODE_SIZE)
+            {
+                // set the bytecode
+                _touch_state_ptrs[_depth]->set_account_code(
+                    contract_address,
+                    code,
+                    code_size);
+                // set the account none to 1
+                bn_t contract_nonce;
+                cgbn_set_ui32(_arith._env, contract_nonce, 1);
+                _touch_state_ptrs[_depth]->set_account_nonce(contract_address, contract_nonce);
+                // the balance is done at the begining of the call
+            }
+            else
+            {
+                error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
+            }
+        }
+        else
+        {
+            error_code = tmp_error_code;
+        }
+    }
+
+    /**
+     * Finish the CALL operation or CREATE CALL operation.
+     * @param[out] error_code error code
+    */
+    __host__ __device__ __forceinline__ void finish_CALL(
+        uint32_t &error_code
+    )
+    {
+        bn_t child_success;
+        // set the child call to failure
+        cgbn_set_ui32(_arith._env, child_success, 0);
+        // if the child call return from normal halting
+        // no errors
+        if ( (error_code == ERR_RETURN) || (error_code == ERR_REVERT) )
+        {
+            // give back the gas left from the child computation
+            bn_t gas_left;
+            cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
+            cgbn_sub(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], gas_left);
+
+            // if is a succesfull call
+            if (error_code == ERR_RETURN)
+            {
+                // update the parent state with the states of the child
+                _touch_state_ptrs[_depth - 1]->update_with_child_state(
+                    *_touch_state_ptrs[_depth]);
+                _log_state_ptrs[_depth - 1]->update_with_child_state(
+                    *_log_state_ptrs[_depth]);
+                // sum the refund gas
+                cgbn_add(
+                    _arith._env,
+                    _gas_refunds[_depth - 1],
+                    _gas_refunds[_depth - 1],
+                    _gas_refunds[_depth]);
+                // for CALL operations set the child success to 1
+                cgbn_set_ui32(_arith._env, child_success, 1);
+                // if CREATEX operation, set the address of the contract
+                if (
+                    (_message_ptrs[_depth]->get_call_type() == OP_CREATE) ||
+                    (_message_ptrs[_depth]->get_call_type() == OP_CREATE2)
+                )
+                {
+                    _message_ptrs[_depth]->get_recipient(child_success);
+                }
+            }
+        }
+        // reset the gas used and gas refund in the child
+        cgbn_set_ui32(_arith._env, _gas_useds[_depth], 0);
+        cgbn_set_ui32(_arith._env, _gas_refunds[_depth], 0);
+        // get the memory offset and size of the return data
+        // in the parent memory
+        bn_t ret_offset, ret_size;
+        _message_ptrs[_depth]->get_return_data_offset(ret_offset);
+        _message_ptrs[_depth]->get_return_data_size(ret_size);
+        // reset the error code for the parent
+        error_code = ERR_NONE;
+        
+        // push the result in the parent stack
+        _stack_ptrs[_depth-1]->push(child_success, error_code);
+        // set the parent memory with the return data
+        bn_t return_data_index;
+        cgbn_set_ui32(_arith._env, return_data_index, 0);
+        uint8_t *data;
+        size_t data_size;
+        data = _arith.get_data(
+            *(_last_return_data_ptrs[_depth-1]->get_data()),
+            return_data_index,
+            ret_size,
+            data_size);
+
+        // It writes on memory even if the call was reverted
+        _memory_ptrs[_depth-1]->set(
+            data,
+            ret_offset,
+            ret_size,
+            data_size,
+            error_code);
+        
+    }
+
+    /**
+     * Free the memory allocated for the CALL/CREATEX operation.
+    */
+    __host__ __device__ __forceinline__ void free_CALL()
+    {
+        delete _stack_ptrs[_depth];
+        _stack_ptrs[_depth] = NULL;
+        delete _memory_ptrs[_depth];
+        _memory_ptrs[_depth] = NULL;
+        delete _last_return_data_ptrs[_depth];
+        _last_return_data_ptrs[_depth] = NULL;
+        // delete the touch state
+        delete _touch_state_ptrs[_depth];
+        _touch_state_ptrs[_depth] = NULL;
+        delete _log_state_ptrs[_depth];
+        _log_state_ptrs[_depth] = NULL;
+        // delete the message
+        delete _message_ptrs[_depth];
+        _message_ptrs[_depth] = NULL;
+    }
+
+    /**
+     * Finish the transaction.
+     * @param[out] error_code error code
+    */
+    __host__ __device__ __forceinline__ void finish_TRANSACTION(
+        uint32_t &error_code
+    )
+    {
+        // sent the gas value to the block beneficiary
+        bn_t gas_value;
+        bn_t beneficiary;
+        _block->get_coin_base(beneficiary);
+        if (error_code == ERR_RETURN)
+        {
+            bn_t gas_left;
+            // \f$T_{g} - g\f$
+            cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
+            bn_t capped_refund_gas;
+            // \f$g/5\f$
+            cgbn_div_ui32(_arith._env, capped_refund_gas, gas_left, 5);
+            // min ( \f$g/5\f$, \f$R_{g}\f$)
+            if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
+            {
+                cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
+            }
+            // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
+            cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
+            // add to sender balance g^{*}
+            bn_t sender_balance;
+            bn_t sender_address;
+            // send back the gas left and gas refund to the sender
+            _transaction->get_sender(sender_address);
+            _transaction_touch_state->get_account_balance(sender_address, sender_balance);
+            cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
+            _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+
+            // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
+            cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
+
+            // update the transaction state
+            _transaction_touch_state->update_with_child_state(
+                *_touch_state_ptrs[_depth]);
+            _transaction_log_state->update_with_child_state(
+                *_log_state_ptrs[_depth]);
+            // set the eror code for a succesfull transaction
+            _error_code = ERR_NONE;
+        }
+        else
+        {
+            cgbn_mul(_arith._env, gas_value, _gas_limit, _gas_priority_fee);
+            // set z to the given error or 1 TODO: 1 in YP
+            _error_code = error_code;
+        }
+        // send the gas value to the beneficiary
+        bn_t beneficiary_balance;
+        _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
+        cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
+        _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
+
+        
+        // update the final state modification done by the transaction
+        _transaction_touch_state->to_touch_state_data_t(
+            *_final_touch_state_data);
+        _accessed_state->to_accessed_state_data_t(
+            *_final_accessed_state_data);
+        *_final_error = _error_code;
+        delete _jump_destinations;
+        _jump_destinations = NULL;
+    }
+
     __host__ __device__ __forceinline__ void child_call(
         uint32_t &error_code,
         message_t &new_message)
     {
-        if ((_depth + 1) < MAX_DEPTH)
+        if (_depth == _allocated_depth)
         {
-            if (_depth == _allocated_depth)
-            {
-                grow();
-            }
-            _pcs[_depth + 1] = 0;
-            _depth = _depth + 1;
-            _message_ptrs[_depth] = &new_message;
-            init_message_call(error_code);
-            update_env();
+            grow();
         }
-        else
-        {
-            error_code = ERROR_MAX_DEPTH_EXCEEDED;
-        }
+        _depth = _depth + 1;
+        _message_ptrs[_depth] = &new_message;
+        start_CALL(error_code);
     }
 
     __host__ static void get_cpu_instances(

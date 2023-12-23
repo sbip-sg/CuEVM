@@ -139,7 +139,7 @@ public:
         (_content->data != NULL)
       )
       {
-        memcpy(new_data, _content->data, _content->size);
+        memcpy(new_data, _content->data, _content->allocated_size);
         delete[] _content->data;
         _content->data = NULL;
         _content->allocated_size = 0;
@@ -261,11 +261,11 @@ public:
       (offset > _content->size)
     )
     {
-      _content->size = offset;
       if (offset > _content->allocated_size)
       {
         allocate_pages(offset, error_code);
       }
+      _content->size = offset;
     }
   }
 

@@ -9,6 +9,7 @@
 
 #include "utils.h"
 #include "state.cuh"
+#include "keccak.cuh"
 
 /**
  * The message call class.
@@ -32,6 +33,11 @@ public:
    * It is defined as the EVM word type.
    */
   typedef cgbn_mem_t<params::BITS> evm_word_t;
+  /**
+   * THe keccak class
+  */
+  typedef keccak::keccak_t keccak_t;
+  static const uint32_t HASH_BYTES = 32; /**< the number of byte in hash*/
 
   /**
    * The message data.
@@ -379,6 +385,11 @@ public:
       _content->data.size = data_size;)
   }
 
+  /**
+   * Set the byte code.
+   * @param[in] byte_code The byte code YP: \f$b\f$.
+   * @param[in] byte_code_size The byte code size YP: \f$|b|\f$.
+  */
   __host__ __device__ __forceinline__ void set_byte_code(
       uint8_t *byte_code,
       size_t byte_code_size)
@@ -396,6 +407,159 @@ public:
         _content->byte_code.data = NULL;
       })
       _content->byte_code.size = byte_code_size;
+  }
+
+  /**
+   * Set the return data offset.
+   * @param[in] return_data_offset The return data offset in memory.
+  */
+  __host__ __device__ __forceinline__ void set_return_data_offset(
+      bn_t &return_data_offset)
+  {
+    cgbn_store(_arith._env, &(_content->return_data_offset), return_data_offset);
+  }
+
+  /**
+   * Set the return data size.
+   * @param[in] return_data_size The return data size in memory.
+  */
+  __host__ __device__ __forceinline__ void set_return_data_size(
+      bn_t &return_data_size)
+  {
+    cgbn_store(_arith._env, &(_content->return_data_size), return_data_size);
+  }
+
+  __host__ __device__ __forceinline__ static void get_create_contract_address(
+    arith_t &arith,
+    bn_t &contract_address,
+    bn_t &sender_address,
+    bn_t &sender_nonce,
+    keccak_t &keccak
+  )
+  {
+    SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
+    arith.memory_from_cgbn(
+        &(sender_address_bytes[0]),
+        sender_address);
+    SHARED_MEMORY uint8_t sender_nonce_bytes[arith_t::BYTES];
+    arith.memory_from_cgbn(
+        &(sender_nonce_bytes[0]),
+        sender_nonce);
+    
+    uint8_t nonce_bytes;
+    for (nonce_bytes = arith_t::BYTES; nonce_bytes > 0; nonce_bytes--)
+    {
+      if (sender_nonce_bytes[arith_t::BYTES - nonce_bytes] != 0)
+      {
+        break;
+      }
+    }
+
+    // TODO: this might work only for arith_t::BYTES == 32
+
+    SHARED_MEMORY uint8_t rlp_list[21 + 1 + arith_t::BYTES];
+
+    // the adress has only 20 bytes
+    rlp_list[1] = 0x80 + 20;
+    for (uint8_t idx = 0; idx < 20; idx++)
+    {
+      rlp_list[2 + idx] = sender_address_bytes[12 + idx];
+    }
+
+    uint8_t rlp_list_length;
+    // 21 is from the address the 20 bytes is the length of the address
+    // and the 1 byte is the 0x80 + length of the address (20)
+    if (cgbn_compare_ui32(arith._env, sender_nonce, 128) < 0)
+    {
+      rlp_list_length = 21 + 1;
+      rlp_list[22] = sender_nonce_bytes[arith_t::BYTES - 1];
+    }
+    else
+    {
+      // 1 byte for the length of the nonce
+      // 0x80 + length of the nonce
+      rlp_list_length = 21 + 1 + nonce_bytes;
+      rlp_list[22] = 0x80 + nonce_bytes;
+      for (uint8_t idx = 0; idx < nonce_bytes; idx++)
+      {
+        rlp_list[23 + idx] = sender_nonce_bytes[arith_t::BYTES - nonce_bytes + idx];
+      }
+    }
+    rlp_list[0] = 0xc0 + rlp_list_length;
+
+    SHARED_MEMORY uint8_t address_bytes[HASH_BYTES];
+    keccak.sha3(
+        &(rlp_list[0]),
+        rlp_list_length,
+        &(address_bytes[0]),
+        HASH_BYTES);
+    arith.cgbn_from_memory(
+        contract_address,
+        &(address_bytes[0]));
+  }
+
+  /**
+   * Get the CREATE2 contract address.
+   * @param[in] arith The arithmetical environment.
+   * @param[out] contract_address The contract address YP: \f$a\f$.
+   * @param[in] sender_address The sender address YP: \f$s\f$.
+   * @param[in] salt The salt YP: \f$n\f$.
+   * @param[in] byte_code The byte code YP: \f$b\f$.
+   * @param[in] keccak The keccak class.
+  */
+  __host__ __device__ __forceinline__ static void get_create2_contract_address(
+    arith_t &arith,
+    bn_t &contract_address,
+    bn_t &sender_address,
+    bn_t &salt,
+    data_content_t &byte_code,
+    keccak_t &keccak
+  )
+  {
+    SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
+    arith.memory_from_cgbn(
+        &(sender_address_bytes[0]),
+        sender_address);
+    SHARED_MEMORY uint8_t salt_bytes[arith_t::BYTES];
+    arith.memory_from_cgbn(
+        &(salt_bytes[0]),
+        salt);
+
+    size_t total_bytes = 1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES;
+
+    SHARED_MEMORY uint8_t hash_code[HASH_BYTES];
+    keccak.sha3(
+        byte_code.data,
+        byte_code.size,
+        &(hash_code[0]),
+        HASH_BYTES);
+    
+    SHARED_MEMORY uint8_t input_data[1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES];
+    input_data[0] = 0xff;
+    ONE_THREAD_PER_INSTANCE(
+    memcpy(
+        &(input_data[1]),
+        &(sender_address_bytes[0]),
+        arith_t::BYTES);
+    memcpy(
+        &(input_data[1 + arith_t::BYTES]),
+        &(salt_bytes[0]),
+        arith_t::BYTES);
+    memcpy(
+        &(input_data[1 + arith_t::BYTES + arith_t::BYTES]),
+        &(hash_code[0]),
+        HASH_BYTES);
+    )
+    SHARED_MEMORY uint8_t address_bytes[HASH_BYTES];
+    keccak.sha3(
+        input_data,
+        total_bytes,
+        &(address_bytes[0]),
+        HASH_BYTES);
+    arith.cgbn_from_memory(
+        contract_address,
+        &(address_bytes[0]));
+    
   }
 
   /**
@@ -481,6 +645,10 @@ public:
    * The account class.
   */
   typedef world_state_t::account_t account_t;
+  /**
+   * THe keccak class
+  */
+  typedef keccak::keccak_t keccak_t;
   /**
    * The maximum number of transactions per test.
    */
@@ -937,7 +1105,8 @@ public:
    * @return The message call.
   */
   __host__ __device__ message_t *get_message_call(
-      accessed_state_t &accessed_state
+      accessed_state_t &accessed_state,
+      keccak_t &keccak
   )
   {
     bn_t sender, to, gas_limit, value;
@@ -951,10 +1120,22 @@ public:
     size_t byte_code_size = 0;
     if (cgbn_compare_ui32(_arith._env, to, 0) == 0)
     {
-      // TODO: to see which type of create CREATE or CREATE2
+      // is CREATE type not CREATE2 because no salt
       call_type = OP_CREATE;
       byte_code = _content->data_init.data;
       byte_code_size = _content->data_init.size;
+      // TODO: code size does not execede the maximum allowed
+      account_t *account = accessed_state.get_account(sender, READ_NONCE);
+      bn_t sender_nonce;
+      // nonce is -1 in YP but here is before validating the transaction
+      // and increasing the nonce
+      cgbn_load(_arith._env, sender_nonce, &(account->nonce));
+      message_t::get_create_contract_address(
+          _arith,
+          to,
+          sender,
+          sender_nonce,
+          keccak);
     }
     else
     {

@@ -2093,7 +2093,7 @@ public:
                 }
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
-            // if the account does not exist in the three of touch states
+            // if the account does not exist in the tree of touch states
             // search it in the accessed state/global state
             if (tmp_error_code != ERR_SUCCESS)
             {
@@ -2532,6 +2532,117 @@ public:
                     return (tmp_parent_state->_content->touch[account_idx] & WRITE_DELETE);
                 }
                 tmp_parent_state = tmp_parent_state->_parent_state;
+            }
+            
+            return 0;
+        }
+    }
+
+
+    /**
+     * Get if the account with the given address exists.
+     * @param[in] address The address of the account
+     * @return 1 if the account exists, 0 otherwise
+    */
+    __host__ __device__ __forceinline__ int32_t is_alive_account(
+        bn_t &address
+    )
+    {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        size_t account_idx = 0;
+        // get the index of the account
+        account_idx = get_account_index(address, tmp_error_code);
+        // if the account exist in the current touch state
+        if (tmp_error_code == ERR_SUCCESS)
+        {
+            return 1;
+        }
+        else
+        {
+            // if the storage does not exist in the current touch state
+            // search the storage in the  tree of parent touch states
+            // recursivilly until it is found or the root touch state is reached
+            touch_state_t *tmp_parent_state = _parent_state;
+            while (tmp_parent_state != NULL)
+            {
+                tmp_error_code = ERR_SUCCESS;
+                account_idx = tmp_parent_state->get_account_index(address, tmp_error_code);
+                if (tmp_error_code == ERR_SUCCESS)
+                {
+                    return 1;
+                }
+                tmp_parent_state = tmp_parent_state->_parent_state;
+            }
+
+            
+            // if the account does not exist in the tree of touch states
+            // search it in the accessed state/global state
+            tmp_error_code = ERR_SUCCESS;
+            account_idx = _accessed_state->get_account_index(address, tmp_error_code);
+            if (tmp_error_code == ERR_SUCCESS)
+            {
+                return 1;
+            }
+            tmp_error_code = ERR_SUCCESS;
+            account_idx = _accessed_state->_world_state->get_account_index(address, tmp_error_code);
+            if (tmp_error_code == ERR_SUCCESS)
+            {
+                return 1;
+            }
+            
+            return 0;
+        }
+    }
+
+    /**
+     * Get if the account with the given address is a contract.
+     * @param[in] address The address of the account
+     * @return 1 if the account is a contract, 0 otherwise
+    */
+    __host__ __device__ __forceinline__ int32_t is_contract(
+        bn_t &address
+    )
+    {
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        size_t account_idx = 0;
+        // get the index of the account
+        account_idx = get_account_index(address, tmp_error_code);
+        // if the account exist in the current touch state
+        if (tmp_error_code == ERR_SUCCESS)
+        {
+            return _content->touch_accounts.accounts[account_idx].code_size > 0;
+        }
+        else
+        {
+            // if the storage does not exist in the current touch state
+            // search the storage in the  tree of parent touch states
+            // recursivilly until it is found or the root touch state is reached
+            touch_state_t *tmp_parent_state = _parent_state;
+            while (tmp_parent_state != NULL)
+            {
+                tmp_error_code = ERR_SUCCESS;
+                account_idx = tmp_parent_state->get_account_index(address, tmp_error_code);
+                if (tmp_error_code == ERR_SUCCESS)
+                {
+                    return tmp_parent_state->_content->touch_accounts.accounts[account_idx].code_size > 0;
+                }
+                tmp_parent_state = tmp_parent_state->_parent_state;
+            }
+
+            
+            // if the account does not exist in the tree of touch states
+            // search it in the accessed state/global state
+            tmp_error_code = ERR_SUCCESS;
+            account_idx = _accessed_state->get_account_index(address, tmp_error_code);
+            if (tmp_error_code == ERR_SUCCESS)
+            {
+                return _accessed_state->_content->accessed_accounts.accounts[account_idx].code_size > 0;
+            }
+            tmp_error_code = ERR_SUCCESS;
+            account_idx = _accessed_state->_world_state->get_account_index(address, tmp_error_code);
+            if (tmp_error_code == ERR_SUCCESS)
+            {
+                return _accessed_state->_world_state->_content->accounts[account_idx].code_size > 0;
             }
             
             return 0;
