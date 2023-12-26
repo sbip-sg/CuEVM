@@ -531,6 +531,7 @@ public:
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
         stack.pop(address, error_code);
+        arith.address_conversion(address);
 
         if (error_code == ERR_NONE)
         {
@@ -995,6 +996,7 @@ public:
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
         stack.pop(address, error_code);
+        arith.address_conversion(address);
         if (error_code == ERR_NONE)
         {
             touch_state.charge_gas_access_account(
@@ -1051,6 +1053,7 @@ public:
 
         bn_t address, memory_offset, code_offset, length;
         stack.pop(address, error_code);
+        arith.address_conversion(address);
         stack.pop(memory_offset, error_code);
         stack.pop(code_offset, error_code);
         stack.pop(length, error_code);
@@ -1260,6 +1263,7 @@ public:
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
         stack.pop(address, error_code);
+        arith.address_conversion(address);
         if (error_code == ERR_NONE)
         {
             touch_state.charge_gas_access_account(

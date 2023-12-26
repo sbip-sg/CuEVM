@@ -422,6 +422,60 @@ public:
     }
   }
 
+  /**
+   * Add the gas cost for the given length of bytes, but considering
+   * evm words.
+   * @param[inout] gas_used The gas used
+   * @param[in] length The length of the bytes
+   * @param[in] gas_per_word The gas per evm word
+  */
+  __host__ __device__ __forceinline__ void evm_words_gas_cost
+  (
+    bn_t &gas_used,
+    bn_t &length,
+    uint32_t gas_per_word
+  )
+  {
+    // gas_used += gas_per_word * emv word count of length
+    // length = (length + 31) / 32
+    bn_t evm_words_gas;
+    cgbn_add_ui32(_env, evm_words_gas, length, BYTES -1);
+    cgbn_div_ui32(_env, evm_words_gas, evm_words_gas, BYTES);
+    cgbn_mul_ui32(_env, evm_words_gas, evm_words_gas, gas_per_word);
+    cgbn_add(_env, gas_used, gas_used, evm_words_gas);
+  }
+
+  /**
+   * Add the cost for initiliasation code.
+   * EIP-3860: https://eips.ethereum.org/EIPS/eip-3860
+   * @param[inout] gas_used The gas used
+   * @param[in] initcode_length The length of the initcode
+  */
+  __host__ __device__ __forceinline__ void initcode_cost(
+    bn_t &gas_used,
+    bn_t &initcode_length
+  )
+  {
+    // gas_used += GAS_INITCODE_WORD_COST * emv word count of initcode
+    // length = (initcode_length + 31) / 32
+    evm_words_gas_cost(gas_used, initcode_length, GAS_INITCODE_WORD_COST);
+  }
+
+  /**
+   * Add the cost for keccak hashing.
+   * @param[inout] gas_used The gas used
+   * @param[in] length The length of the data in bytes
+  */
+  __host__ __device__ __forceinline__ void keccak_cost(
+    bn_t &gas_used,
+    bn_t &length
+  )
+  {
+    evm_words_gas_cost(gas_used, length, GAS_KECCAK256_WORD);
+  }
+
+
+
 };
 
 #endif

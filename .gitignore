@@ -9,3 +9,9 @@
 /out
 /input
 /output
+
+
+build/
+_build/
+_static/
+_templates/

@@ -895,6 +895,7 @@ public:
     }
 
     // if create transaction add the cost
+    // EIP-3869
     if (cgbn_compare_ui32(_arith._env, to, 0) == 0)
     {
       // compute the dynamic gas cost for initcode
