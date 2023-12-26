@@ -256,9 +256,17 @@ public:
         _message_ptrs = new message_t *[_allocated_depth];
         _memory_ptrs = new memory_t *[_allocated_depth];
         _stack_ptrs = new stack_t *[_allocated_depth];
+        // TODO: infeficient but because of their form 
+        // we allocate them with maximum depth from the
+        // begining
+        _gas_useds = new bn_t[MAX_DEPTH];
+        _gas_refunds = new bn_t[MAX_DEPTH];
+        _pcs = new uint32_t[MAX_DEPTH];
+        /*
         _gas_useds = new bn_t[_allocated_depth];
         _gas_refunds = new bn_t[_allocated_depth];
         _pcs = new uint32_t[_allocated_depth];
+        */
 #ifdef TRACER
         _tracer = new tracer_t(arith, tracer_data);
 #endif
@@ -304,9 +312,11 @@ public:
         message_t **new_message_ptrs = new message_t *[new_allocated_depth];
         memory_t **new_memory_ptrs = new memory_t *[new_allocated_depth];
         stack_t **new_stack_ptrs = new stack_t *[new_allocated_depth];
+        /*
         bn_t *new_gas_useds = new bn_t[new_allocated_depth];
         bn_t *new_gas_refunds = new bn_t[new_allocated_depth];
         uint32_t *new_pcs = new uint32_t[new_allocated_depth];
+        */
 
         memcpy(
             new_touch_state_ptrs,
@@ -332,6 +342,7 @@ public:
             new_stack_ptrs,
             _stack_ptrs,
             _allocated_depth * sizeof(stack_t *));
+        /*
         memcpy(
             new_gas_useds,
             _gas_useds,
@@ -344,6 +355,7 @@ public:
             new_pcs,
             _pcs,
             _allocated_depth * sizeof(uint32_t));
+        */
 
         delete[] _touch_state_ptrs;
         delete[] _log_state_ptrs;
@@ -351,18 +363,22 @@ public:
         delete[] _message_ptrs;
         delete[] _memory_ptrs;
         delete[] _stack_ptrs;
+        /*
         delete[] _gas_useds;
         delete[] _gas_refunds;
         delete[] _pcs;
+        */
         _touch_state_ptrs = new_touch_state_ptrs;
         _log_state_ptrs = new_log_state_ptrs;
         _last_return_data_ptrs = new_return_data_ptrs;
         _message_ptrs = new_message_ptrs;
         _memory_ptrs = new_memory_ptrs;
         _stack_ptrs = new_stack_ptrs;
+        /*
         _gas_useds = new_gas_useds;
         _gas_refunds = new_gas_refunds;
         _pcs = new_pcs;
+        */
         _allocated_depth = new_allocated_depth;
     }
 
@@ -430,24 +446,30 @@ public:
         _message_ptrs[_depth]->get_sender(sender);
         _message_ptrs[_depth]->get_recipient(receiver);
         _message_ptrs[_depth]->get_value(value);
+        uint32_t call_type;
+        call_type = _message_ptrs[_depth]->get_call_type();
 
         // in create call verify if the the account at the
         // address is not a contract
-        if ( (_message_ptrs[_depth]->get_call_type() == OP_CREATE) ||
-                (_message_ptrs[_depth]->get_call_type() == OP_CREATE2) )
+        if ( (call_type == OP_CREATE) ||
+                (call_type == OP_CREATE2) )
         {
             if (_touch_state_ptrs[_depth]->is_contract(receiver))
             {
                 error_code = ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
                 return;
             }
+            // set the account nonce to 1
+            bn_t contract_nonce;
+            cgbn_set_ui32(_arith._env, contract_nonce, 1);
+            _touch_state_ptrs[_depth]->set_account_nonce(receiver, contract_nonce);
         }
 
 
         // Transfer the value
         if ((cgbn_compare_ui32(_arith._env, value, 0) > 0) &&       // value>0
             (cgbn_compare(_arith._env, sender, receiver) != 0) &&   // sender != receiver
-            (_message_ptrs[_depth]->get_call_type() != OP_DELEGATECALL) // no delegatecall
+            (call_type != OP_DELEGATECALL) // no delegatecall
         )
         {
             _touch_state_ptrs[_depth]->get_account_balance(sender, sender_balance);
@@ -463,7 +485,10 @@ public:
         account = _touch_state_ptrs[_depth]->get_account(receiver, READ_NONE);
         account = NULL;
         // if code size is zero. verify if is consider a last return data
-        if (_code_size == 0)
+        // only for calls not for create
+        if ( (_code_size == 0) &&
+            (call_type != OP_CREATE) &&
+            (call_type != OP_CREATE2) )
         {
             if (_depth == 0)
             {
@@ -621,7 +646,10 @@ public:
             new_message.get_value(value);
             if (message.get_static_env())
             {
-                if (cgbn_compare_ui32(arith._env, value, 0) != 0)
+                if (
+                    (cgbn_compare_ui32(arith._env, value, 0) != 0) &&
+                    (new_message.get_call_type() == OP_CALL) // TODO: akward that is just CALL
+                )
                 {
                     error_code = ERROR_STATIC_CALL_CONTEXT_CALL_VALUE;
                 }
@@ -733,6 +761,10 @@ public:
                     delete &new_message;
                 }
             }
+            else
+            {
+                delete &new_message;
+            }
         }
 
         /**
@@ -769,11 +801,13 @@ public:
             if (message.get_static_env())
             {
                 error_code = ERROR_STATIC_CALL_CONTEXT_CREATE;
+                delete &new_message;
             }
             else if (cgbn_compare_ui32(arith._env, args_size, MAX_INIT_CODE_SIZE) >=0)
             {
                 // EIP-3860
                 error_code = ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
+                delete &new_message;
             }
             else
             {
@@ -810,8 +844,11 @@ public:
 
                 if (valid_CREATE(arith, new_message, touch_state))
                 {
-                    // increase the none if the sender is a contract
+                    // increase the nonce if the sender is a contract
                     // TODO: seems like an akward think to do
+                    // why in the parent and not in the child the nonce
+                    // if the contract deployment fails the nonce is still
+                    // increased?
                     bn_t sender;
                     new_message.get_sender(sender);
                     if (touch_state.is_contract(sender))
@@ -881,9 +918,16 @@ public:
                 gas_used,
                 error_code);
             
+            // compute the dynamic gas cost for initcode
+            bn_t initcode_gas;
+            // evm word INITCODE_WORD_COST * ceil(len(initcode) / 32)
+            cgbn_add_ui32(arith._env, initcode_gas, length, 31);
+            cgbn_div_ui32(arith._env, initcode_gas, initcode_gas, 32);
+            cgbn_mul_ui32(arith._env, initcode_gas, initcode_gas, GAS_INITCODE_WORD_COST);
+            cgbn_add(arith._env, gas_used, gas_used, initcode_gas);
+            
             if (arith.has_gas(gas_limit, gas_used, error_code))
             {
-                printf("CREATE\n");
                 bn_t sender_address;
                 message.get_recipient(sender_address); // I_{a}
                 bn_t sender_nonce;
@@ -960,6 +1004,8 @@ public:
 
             if (error_code == ERR_NONE)
             {
+                // clean the address
+                arith.address_conversion(address);
                 bn_t sender;
                 message.get_recipient(sender); // I_{a}
                 bn_t recipient;
@@ -1031,6 +1077,8 @@ public:
 
             if (error_code == ERR_NONE)
             {
+                // clean the address
+                arith.address_conversion(address);
                 bn_t sender;
                 message.get_recipient(sender); // I_{a}
                 bn_t recipient;
@@ -1144,6 +1192,8 @@ public:
 
             if (error_code == ERR_NONE)
             {
+                // clean the address
+                arith.address_conversion(address);
                 bn_t sender;
                 message.get_sender(sender); // keep the message call sender I_{s}
                 bn_t recipient;
@@ -1230,6 +1280,15 @@ public:
                 length,
                 gas_used,
                 error_code);
+            
+            // compute the dynamic gas cost for initcode
+            bn_t initcode_gas;
+            // evm word INITCODE_WORD_COST * ceil(len(initcode) / 32)
+            cgbn_add_ui32(arith._env, initcode_gas, length, 31);
+            cgbn_div_ui32(arith._env, initcode_gas, initcode_gas, 32);
+            cgbn_mul_ui32(arith._env, initcode_gas, initcode_gas, GAS_INITCODE_WORD_COST);
+            cgbn_add(arith._env, gas_used, gas_used, initcode_gas);
+            
 
             if (arith.has_gas(gas_limit, gas_used, error_code))
             {
@@ -1317,6 +1376,8 @@ public:
 
             if (error_code == ERR_NONE)
             {
+                // clean the address
+                arith.address_conversion(address);
                 bn_t sender;
                 message.get_recipient(sender); // I_{a}
                 bn_t recipient;
@@ -2661,16 +2722,19 @@ public:
             }
             if (code_size <= MAX_CODE_SIZE)
             {
-                // set the bytecode
-                _touch_state_ptrs[_depth]->set_account_code(
-                    contract_address,
-                    code,
-                    code_size);
-                // set the account none to 1
-                bn_t contract_nonce;
-                cgbn_set_ui32(_arith._env, contract_nonce, 1);
-                _touch_state_ptrs[_depth]->set_account_nonce(contract_address, contract_nonce);
-                // the balance is done at the begining of the call
+                if ( (code_size > 0) && (code[0] == 0xef) ) // EIP-3541
+                {
+                    error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
+                }
+                else
+                {
+                    // set the bytecode
+                    _touch_state_ptrs[_depth]->set_account_code(
+                        contract_address,
+                        code,
+                        code_size);
+                    // the balance and the nonce is done at the begining of the call
+                }
             }
             else
             {
@@ -2858,11 +2922,11 @@ public:
         uint32_t &error_code,
         message_t &new_message)
     {
+        _depth = _depth + 1;
         if (_depth == _allocated_depth)
         {
             grow();
         }
-        _depth = _depth + 1;
         _message_ptrs[_depth] = &new_message;
         start_CALL(error_code);
     }

@@ -39,6 +39,7 @@
 #define GAS_COPY 3
 #define GAS_BLOCKHASH 20
 #define GAS_STIPEND 2300
+#define GAS_INITCODE_WORD_COST 2
 
 
 #endif  // __GAS_COST_H__

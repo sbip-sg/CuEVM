@@ -25,3 +25,10 @@ TODO: change options, configs, and how we use the tool in the future.
 
 ## Code structure
 TODO
+
+## Documentation
+https://www.doxygen.nl/manual/index.html
+https://developer.lsst.io/cpp/api-docs.html
+https://www.sphinx-doc.org/en/master/usage/domains/cpp.html
+
+https://medium.com/@aytackahveci93/documenting-c-code-with-sphinx-d6315b338615

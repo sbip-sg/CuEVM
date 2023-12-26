@@ -54,6 +54,7 @@ public:
   static const uint32_t BITS = params::BITS; /**< The number of the bits for the CGBN */
   static const uint32_t BYTES = params::BITS / 8; /**< The number of the bytes for the CGBN */
   static const uint32_t LIMBS = params::BITS / 32; /**< The number of the limbs for the CGBN */
+  static const uint32_t ADDRESS_BYTES = 20; /**< The number of the bytes for the address */
 
   context_t _context; /**< The CGBN context */
   env_t _env;        /**< The CGBN environment */
@@ -118,6 +119,13 @@ public:
   {
   }
 
+  __host__ __device__ __forceinline__ void address_conversion(
+    bn_t &address
+  )
+  {
+    int32_t address_bits = int32_t(ADDRESS_BYTES) * 8;
+    cgbn_bitwise_mask_and(_env, address, address, address_bits);
+  }
   /**
    * Get a memory byte array from CGBN base type.
    * The memory byte array is in Big Endian format.

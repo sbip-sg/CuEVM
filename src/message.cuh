@@ -457,13 +457,13 @@ public:
 
     // TODO: this might work only for arith_t::BYTES == 32
 
-    SHARED_MEMORY uint8_t rlp_list[21 + 1 + arith_t::BYTES];
+    SHARED_MEMORY uint8_t rlp_list[1 + 1 + arith_t::ADDRESS_BYTES + 1 + arith_t::BYTES];
 
     // the adress has only 20 bytes
-    rlp_list[1] = 0x80 + 20;
-    for (uint8_t idx = 0; idx < 20; idx++)
+    rlp_list[1] = 0x80 + arith_t::ADDRESS_BYTES;
+    for (uint8_t idx = 0; idx < arith_t::ADDRESS_BYTES; idx++)
     {
-      rlp_list[2 + idx] = sender_address_bytes[12 + idx];
+      rlp_list[2 + idx] = sender_address_bytes[arith_t::BYTES - arith_t::ADDRESS_BYTES + idx];
     }
 
     uint8_t rlp_list_length;
@@ -471,28 +471,45 @@ public:
     // and the 1 byte is the 0x80 + length of the address (20)
     if (cgbn_compare_ui32(arith._env, sender_nonce, 128) < 0)
     {
-      rlp_list_length = 21 + 1;
-      rlp_list[22] = sender_nonce_bytes[arith_t::BYTES - 1];
+      rlp_list_length = 1 + arith_t::ADDRESS_BYTES + 1;
+      if (cgbn_compare_ui32(arith._env, sender_nonce, 0)  == 0)
+      {
+        rlp_list[2 + arith_t::ADDRESS_BYTES] = 0x80; // special case for nonce 0
+      }
+      else
+      {
+        rlp_list[2 + arith_t::ADDRESS_BYTES] = sender_nonce_bytes[arith_t::BYTES - 1];
+      }
     }
     else
     {
       // 1 byte for the length of the nonce
       // 0x80 + length of the nonce
       rlp_list_length = 21 + 1 + nonce_bytes;
-      rlp_list[22] = 0x80 + nonce_bytes;
+      rlp_list[2 + arith_t::ADDRESS_BYTES] = 0x80 + nonce_bytes;
       for (uint8_t idx = 0; idx < nonce_bytes; idx++)
       {
-        rlp_list[23 + idx] = sender_nonce_bytes[arith_t::BYTES - nonce_bytes + idx];
+        rlp_list[2 + arith_t::ADDRESS_BYTES + 1 + idx] = sender_nonce_bytes[arith_t::BYTES - nonce_bytes + idx];
       }
     }
     rlp_list[0] = 0xc0 + rlp_list_length;
 
+    /*
+    ONE_THREAD_PER_INSTANCE(
+    print_bytes(&(rlp_list[0]), rlp_list_length + 1);
+    )
+    */
+
     SHARED_MEMORY uint8_t address_bytes[HASH_BYTES];
     keccak.sha3(
         &(rlp_list[0]),
-        rlp_list_length,
+        rlp_list_length + 1,
         &(address_bytes[0]),
         HASH_BYTES);
+    for (uint8_t idx = 0; idx < arith_t::BYTES - arith_t::ADDRESS_BYTES; idx++)
+    {
+      address_bytes[idx] = 0;
+    }
     arith.cgbn_from_memory(
         contract_address,
         &(address_bytes[0]));
@@ -525,7 +542,7 @@ public:
         &(salt_bytes[0]),
         salt);
 
-    size_t total_bytes = 1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES;
+    size_t total_bytes = 1 + arith_t::ADDRESS_BYTES + arith_t::BYTES + HASH_BYTES;
 
     SHARED_MEMORY uint8_t hash_code[HASH_BYTES];
     keccak.sha3(
@@ -534,19 +551,19 @@ public:
         &(hash_code[0]),
         HASH_BYTES);
     
-    SHARED_MEMORY uint8_t input_data[1 + arith_t::BYTES + arith_t::BYTES + HASH_BYTES];
+    SHARED_MEMORY uint8_t input_data[1 + arith_t::ADDRESS_BYTES + arith_t::BYTES + HASH_BYTES];
     input_data[0] = 0xff;
     ONE_THREAD_PER_INSTANCE(
     memcpy(
         &(input_data[1]),
-        &(sender_address_bytes[0]),
-        arith_t::BYTES);
+        &(sender_address_bytes[arith_t::BYTES - arith_t::ADDRESS_BYTES]),
+        arith_t::ADDRESS_BYTES);
     memcpy(
-        &(input_data[1 + arith_t::BYTES]),
+        &(input_data[1 + arith_t::ADDRESS_BYTES]),
         &(salt_bytes[0]),
         arith_t::BYTES);
     memcpy(
-        &(input_data[1 + arith_t::BYTES + arith_t::BYTES]),
+        &(input_data[1 + arith_t::ADDRESS_BYTES + arith_t::BYTES]),
         &(hash_code[0]),
         HASH_BYTES);
     )
@@ -556,6 +573,10 @@ public:
         total_bytes,
         &(address_bytes[0]),
         HASH_BYTES);
+    for (uint8_t idx = 0; idx < arith_t::BYTES - arith_t::ADDRESS_BYTES; idx++)
+    {
+      address_bytes[idx] = 0;
+    }
     arith.cgbn_from_memory(
         contract_address,
         &(address_bytes[0]));
@@ -871,6 +892,20 @@ public:
             accessed_state.get_value(address, key, value);
           }
         }
+    }
+
+    // if create transaction add the cost
+    if (cgbn_compare_ui32(_arith._env, to, 0) == 0)
+    {
+      // compute the dynamic gas cost for initcode
+      bn_t initcode_gas;
+      bn_t initcode_length;
+      _arith.cgbn_from_size_t(initcode_length, _content->data_init.size);
+      // evm word INITCODE_WORD_COST * ceil(len(initcode) / 32)
+      cgbn_add_ui32(_arith._env, initcode_gas, initcode_length, 31);
+      cgbn_div_ui32(_arith._env, initcode_gas, initcode_gas, 32);
+      cgbn_mul_ui32(_arith._env, initcode_gas, initcode_gas, GAS_INITCODE_WORD_COST);
+      cgbn_add(_arith._env, intrisinc_gas, intrisinc_gas, initcode_gas);
     }
   }
 
