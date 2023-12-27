@@ -24,12 +24,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4.1.1
-    - name: Setup TZ
-      uses: szenius/set-timezone@v1.1
-      with:
-        timezoneLinux: "Asia/Singapore"
     - name: Apt Requirements
-      run: apt-get update && apt-get install -y doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
+      run: DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
     - name: Pip3 Requirements
       run: pip3 install -r ${{github.workspace}}/docs/requirements.txt
     - name: Configure CMake
