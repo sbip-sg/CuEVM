@@ -65,6 +65,13 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: cuevm-docs-artifact
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        # Upload entire repository
+        path: '.'
     - name: Deploy to GitHub Pages
       id: deployment
       uses: actions/deploy-pages@v4
