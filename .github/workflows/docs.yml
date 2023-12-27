@@ -21,12 +21,10 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4.1.1
-    - uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
-        version: 1.0
+    - uses: Apt Requirements
+      run: sudo apt-get update && apt-get install -y doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
     - name: Pip3 Requirements
-      run: cd docs && pip3 install -r requirements.txt
+      run: pip3 install -r ${{github.workspace}}/docs/requirements.txt
     - name: Configure CMake
       run: cmake -S . -B ${{github.workspace}}/build -G "Unix Makefiles" -DWITH_DOCS=ON
     - name: Build docs
