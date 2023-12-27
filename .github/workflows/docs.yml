@@ -13,21 +13,21 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+      conntainer: nvidia/cuda:12.0.0-devel-ubuntu22.04
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4.1.1
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: doxygen sphinx cmake python3-pip
+        packages: doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
         version: 1.0
     - name: Pip3 Requirements
       run: cd docs && pip3 install -r requirements.txt
+    - name: Configure CMake
+      run: cmake -S . -B ${{github.workspace}}/build -G "Unix Makefiles" -DWITH_DOCS=ON
     - name: Build docs
-      run: mkdir build
-        && cd build
-        && cmake .. -DWITH_DOCS=ON
-        && make docs
+      run:  cmake --build ${{github.workspace}}/build --target docs 
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@v4
       with:
