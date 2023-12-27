@@ -22,7 +22,7 @@ jobs:
         packages: doxygen sphinx cmake python3-pip
         version: 1.0
     - name: Pip3 Requirements
-      run: cd docs && pip3 install -r requirments.txt
+      run: cd docs && pip3 install -r requirements.txt
     - name: Build docs
       run: mkdir build
         && cd build
