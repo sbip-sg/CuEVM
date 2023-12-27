@@ -26,7 +26,7 @@ jobs:
     - name: Build docs
       run: mkdir build
         && cd build
-        && cmake ..
+        && cmake .. -DWITH_DOCS=ON
         && make docs
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@v4
