@@ -12,9 +12,9 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
       container:
-        iamge: ghcr.io/devcontainers/features/nvidia-cuda:1.1.0
+        iamge: ubuntu-22.04
 
     steps:
     - name: Checkout
