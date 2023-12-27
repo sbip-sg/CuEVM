@@ -31,10 +31,22 @@ jobs:
     - name: Configure CMake
       run: cmake -S . -B build -G "Unix Makefiles" -DWITH_DOCS=ON
     - name: Build docs
-      run:  cmake --build build --target docs 
-    - name: Deploy
-      uses: JamesIves/github-pages-deploy-action@v4
+      run:  cmake --build build --target docs
+    - name: Upload page artficat
+      uses: actions/upload-artifact@v4
       with:
-        TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        BRANCH: gh-pages # The branch the action should deploy to.
-        FOLDER: build/docs/docs/sphinx # The folder the action should deploy.
+        name: cuevm-docs-artifact
+        path: build/docs/docs/sphinx/
+  
+  deploy:
+    runs-on: ubuntu-22.04
+    needs: build
+
+    steps:
+    - name: Download artficat
+      uses: actions/download-artifact@v4
+      with:
+        name: cuevm-docs-artifact
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
