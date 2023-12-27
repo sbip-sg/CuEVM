@@ -17,6 +17,8 @@ jobs:
       credentials:
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_TOKEN }}
+    env:
+      TZ: "Asia/Singapore"
 
     steps:
     - name: Checkout
