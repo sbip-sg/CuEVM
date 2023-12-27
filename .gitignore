@@ -15,3 +15,4 @@ build/
 _build/
 _static/
 _templates/
+docs/api/

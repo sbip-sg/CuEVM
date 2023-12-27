@@ -1,0 +1,33 @@
+name: Docs
+
+on:
+  #push:
+  #  branches-ignore:
+  #    - '**'  
+  push:
+    branches: [ yellow_paper ]
+  pull_request:
+    branches: [ master ]
+  
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4.1.1
+    - name: Requirements
+      run: apt-get install -y doxygen sphinx cmake python3-pip
+        && pip3 install breathe exhale sphinx_book_theme
+    - name: Build docs
+      run: mkdir build
+        && cd build
+        && cmake ..
+        && make docs
+    - name: Deploy
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BRANCH: gh-pages # The branch the action should deploy to.
+        FOLDER: build/docs/docs/sphinx # The folder the action should deploy.

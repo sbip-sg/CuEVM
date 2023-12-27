@@ -20,3 +20,5 @@ ENV TZ=Asia/Singapore
 RUN apt-get update && apt-get upgrade -y && apt-get install -y locales && locale-gen "en_US.UTF-8" && dpkg-reconfigure locales && apt-get install -y curl zip unzip git wget libgmp-dev libcjson1 libcjson-dev libclang-dev valgrind clang-format
 # install rustup for REVMI
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o sh.rustup.rs && sh sh.rustup.rs -y && rm sh.rustup.rs
+# install tools for documentation
+RUN apt-get update && apt-get install -y doxygen sphinx cmake python3-pip && pip3 install breathe exhale sphinx_rtd_theme sphinx_book_theme
