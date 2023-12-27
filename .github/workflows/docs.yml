@@ -25,16 +25,16 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4.1.1
     - name: Apt Requirements
-      run: DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
+      run: timedatectl set-timezone Asia/Singapore && DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
     - name: Pip3 Requirements
-      run: pip3 install -r ${{github.workspace}}/docs/requirements.txt
+      run: pip3 install -r docs/requirements.txt
     - name: Configure CMake
-      run: cmake -S . -B ${{github.workspace}}/build -G "Unix Makefiles" -DWITH_DOCS=ON
+      run: cmake -S . -B build -G "Unix Makefiles" -DWITH_DOCS=ON
     - name: Build docs
-      run:  cmake --build ${{github.workspace}}/build --target docs 
+      run:  cmake --build build --target docs 
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@v4
       with:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         BRANCH: gh-pages # The branch the action should deploy to.
-        FOLDER: ${{github.workspace}}/build/docs/docs/sphinx # The folder the action should deploy.
+        FOLDER: build/docs/docs/sphinx # The folder the action should deploy.
