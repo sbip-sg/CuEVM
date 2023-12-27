@@ -17,9 +17,12 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4.1.1
-    - name: Requirements
-      run: apt-get install -y doxygen sphinx cmake python3-pip
-        && pip3 install breathe exhale sphinx_book_theme
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: doxygen sphinx cmake python3-pip
+        version: 1.0
+    - name: Pip3 Requirements
+      run: cd docs && pip3 install -r requirments.txt
     - name: Build docs
       run: mkdir build
         && cd build
