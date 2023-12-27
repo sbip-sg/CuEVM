@@ -21,7 +21,7 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4.1.1
-    - uses: Apt Requirements
+    - name: Apt Requirements
       run: sudo apt-get update && apt-get install -y doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev
     - name: Pip3 Requirements
       run: pip3 install -r ${{github.workspace}}/docs/requirements.txt
