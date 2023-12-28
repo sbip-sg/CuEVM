@@ -2,6 +2,26 @@
     "files.associations": {
         "*.ejs": "html",
         "iostream": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "random": "cpp",
+        "chrono": "cpp",
+        "algorithm": "cpp",
+        "*.tcc": "cpp",
+        "string": "cpp",
+        "functional": "cpp",
+        "ratio": "cpp",
+        "system_error": "cpp",
+        "array": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "limits": "cpp",
+        "initializer_list": "cpp",
+        "memory": "cpp",
+        "stdlib.h": "c",
+        "typeinfo": "cpp",
+        "cstdint": "cpp",
+        "vector": "cpp",
+        "atomic": "cpp"
     }
 }

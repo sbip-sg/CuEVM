@@ -8,13 +8,18 @@ Cuda implementation of EVM bytecode executor
 - A C++ compiler compatible with the CUDA Toolkit
 
 ## Compile
-* `make`
-Or with custom nvcc path
-* `make NVCC=/usr/local/cuda-10.0/bin/nvcc`
+* `make interpreter`
+Or for running with cpu
+* `make cpu_interpreter`
 
 ## Usage
 
-* `./cuEVM --bytecode [hex string of byte code] --input [hex string of input]`
+* `clear && compute-sanitizer --tool memcheck --leak-check=full ./out/interpreter --input [inpot_json_file] --output [output_json_file]`
+* `clear && valgrind --leak-check=full --show-leak-kinds=all ./out/*`
+Or for running with cpu
+* `./out/cpu_interpreter --input [inpot_json_file] --output [output_json_file]`
+Easy test:
+* `./out/cpu_interpreter --input ./input/evm_arith.json --output ./output/evm_test.json`
 
 Sample testing bytecode :
 
@@ -75,3 +80,7 @@ TODO: change options, configs, and how we use the tool in the future.
 
 ## Code structure
 TODO
+
+## Documentation
+TODO
+docygen+sphinx+breathe+exhale

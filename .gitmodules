@@ -1,0 +1,6 @@
+[submodule "CGBN"]
+	path = CGBN
+	url = https://github.com/NVlabs/CGBN.git
+[submodule "REVMI"]
+	path = REVMI
+	url = https://github.com/cassc/evm_interpreter.git

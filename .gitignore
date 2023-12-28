@@ -4,5 +4,17 @@
 *.ptx
 *.cubin
 *.fatbin
+
+# binaries
+/out
+/input
+/output
+
+
+build/
+_build/
+_static/
+_templates/
+docs/api/
 *.o
 cuEVM
