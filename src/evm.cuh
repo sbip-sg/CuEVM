@@ -793,7 +793,7 @@ public:
                 {
                     // new message done
                     // call the child
-                    evm.child_call(
+                    evm.child_CALL(
                         error_code,
                         new_message);
                 }
@@ -909,7 +909,7 @@ public:
                     }
                     // new message done
                     // call the child
-                    evm.child_call(
+                    evm.child_CALL(
                         error_code,
                         new_message);
                 }
@@ -3095,7 +3095,7 @@ public:
      * @param[out] error_code error code
      * @param[in] new_message new message call
     */
-    __host__ __device__ __forceinline__ void child_call(
+    __host__ __device__ __forceinline__ void child_CALL(
         uint32_t &error_code,
         message_t &new_message)
     {
