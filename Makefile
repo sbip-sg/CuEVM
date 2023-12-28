@@ -1,3 +1,4 @@
+# Compiler
 NVCC = nvcc
 NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo
 GCC = gcc
@@ -6,10 +7,6 @@ GPP = g++
 GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson 
 OUT_DIRECTORY = ./out
 
-all: cuEVM
-
-cuEVM:
-	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/cuEVM src/cu_evm.cu
 
 test_gmp: src/test/test_gmp.c
 	$(GCC) -o $(OUT_DIRECTORY)/test_gmp src/test/test_gmp.c $(GCC_FLAGS) 
