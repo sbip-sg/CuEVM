@@ -1,0 +1,29 @@
+{
+    "contract_name": "ERC20",
+    "storage" : {
+    },
+    "test_cases": [
+      {
+        "function": "mint",
+        "type": "exec",
+        "input_types": [],
+        "input": [],
+        "value": 512,
+        "sender": 0
+      },
+      {
+        "function": "transfer",
+        "type": "exec",
+        "input_types": ["address","uint256"],
+        "input": ["0x0000000000000000000000000000000000000001",512],
+        "sender": 0
+      },
+      {
+        "function": "transfer",
+        "type": "exec",
+        "input_types": ["address","uint256"],
+        "input": ["0x0000000000000000000000000000000000000001",10],
+        "sender": 0
+      }
+    ]
+  }
