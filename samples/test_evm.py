@@ -141,6 +141,7 @@ def run_test(source, config, evm_executable, output_path="/tmp/evm_test", detect
     contract_bin_runtime = contract_instance.get("binary_runtime")
     merged_config = []
     # the merged config fields : "env", "pre" (populated with code), "transaction" (populated with tx data and value)
+    pre_env = tx_sequence_config.get("pre", {})
     for idx, test_case in enumerate(tx_sequence_config.get("test_cases")):
         new_test = {}
         new_test["env"] = default_config["env"].copy()
@@ -150,6 +151,7 @@ def run_test(source, config, evm_executable, output_path="/tmp/evm_test", detect
         new_test["pre"][target_address]["storage"] = tx_sequence_config.get(
             "storage", {}
         )
+        new_test["pre"].update(pre_env)
         new_test["transaction"] = default_config["transaction"].copy()
 
         new_test["transaction"]["to"] = target_address
