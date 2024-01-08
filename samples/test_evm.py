@@ -70,7 +70,7 @@ def compile_file(
 ):
     print ("compile file ", file_path, contract_name)
     # The input can be a file path or source code
-    parser = CombinedJsonParser(file_path)
+    parser = CombinedJsonParser(file_path, try_install_solc=True)
     compiler_output = parser.original_compilation_output
     # print (compiler_output)
     compiled_sol = {k.split(":")[-1]: v for k, v in compiler_output.items()}

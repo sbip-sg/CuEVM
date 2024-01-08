@@ -12,6 +12,11 @@ There are two methods, one requires installing all prequisited in the system, th
 
 #### On your own system
 
+Note : In Makefile, there is one `ENABLE_TRACING` flag that is required for now to compare the results against reference REVM and to demonstrate bug detection. It will slowdown the execution.
+
+* Example : `make ENABLE_TRACING=1 interpreter`
+* `mkdir out` folder if it does not exist
+
 Building on Ubuntu (with sudo):
 * Setup required libraries: `sudo apt install libgmp-dev`
 * Setup cJSON: `git clone https://github.com/DaveGamble/cJSON ; cd cJSON ; make ; sudo make install`
