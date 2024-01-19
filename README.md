@@ -19,14 +19,14 @@ Note : In Makefile, there is one `ENABLE_TRACING` flag that is required for now 
 
 Building on Ubuntu (with sudo):
 * Setup required libraries: `sudo apt install libgmp-dev`
-* Setup cJSON: `git clone https://github.com/DaveGamble/cJSON ; cd cJSON ; make ; sudo make install`
+* Setup cJSON: `sudo apt install libcjson-dev`
 * `make interpreter` or for running with cpu :`make cpu_interpreter`
 
 Building without sudo is also possible with extra configuration and modification on the Makefile or evironment variables, please refer to online tutorials on how to build and use libraries in custom directory
 
 Building using docker image:
 * Build the docker image first: `docker build -f .devcontainer/Dockerfile -t cuevm`
-* Run and mount the current code folder `docker run -it -v $(pwd):/CuEVM cuvm`
+* Run and mount the current code folder `docker run -it -v $(pwd):/CuEVM cuevm`
 * `cd CuEVM` then `make interpreter` or for running with cpu: `make cpu_interpreter`
 
 ## Usage
