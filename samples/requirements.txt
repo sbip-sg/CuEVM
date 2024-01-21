@@ -1,0 +1,4 @@
+py-solc-x
+eth-utils
+solc-json-parser
+eth_abi

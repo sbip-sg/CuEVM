@@ -4,33 +4,41 @@ NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -
 GCC = gcc
 GCC_FLAGS = -lm -lgmp -lcjson
 GPP = g++
-GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson 
+GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson
 OUT_DIRECTORY = ./out
+
+ENABLE_TRACING ?= 0
+
+ifeq ($(ENABLE_TRACING),1)
+    TRACER_FLAG = -D TRACER
+else
+    TRACER_FLAG =
+endif
 
 
 test_gmp: src/test/test_gmp.c
-	$(GCC) -o $(OUT_DIRECTORY)/test_gmp src/test/test_gmp.c $(GCC_FLAGS) 
-	
+	$(GCC) -o $(OUT_DIRECTORY)/test_gmp src/test/test_gmp.c $(GCC_FLAGS)
+
 test_cjson: src/test/test_cjson.c
-	$(GCC) -o $(OUT_DIRECTORY)/test_cjson src/test/test_cjson.c $(GCC_FLAGS) 
-	
+	$(GCC) -o $(OUT_DIRECTORY)/test_cjson src/test/test_cjson.c $(GCC_FLAGS)
+
 test_cjson_evm: src/test/test_cjson_evm.c
 	$(GCC) -o $(OUT_DIRECTORY)/test_cjson_evm src/test/test_cjson_evm.c $(GCC_FLAGS)
 
 test_cgbn: src/test/test_cgbn.cu
 	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/test_cgbn src/test/test_cgbn.cu
 
-interpreter: src/interpreter.cu
-	$(NVCC) -D TRACER $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ $<
+interpreter:
+	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
-debug_interpreter: src/interpreter.cu
-	$(NVCC) -D TRACER $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
+debug_interpreter:
+	$(NVCC) -D TRACER $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
-cpu_interpreter: src/interpreter.cu
-	$(NVCC) -D TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
+cpu_interpreter:
+	$(NVCC) -D ONLY_CPU $(TRACER_FLAG) -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
-cpu_debug_interpreter: src/interpreter.cu
-	$(NVCC) -D TRACER -D COMPLEX_TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<
+cpu_debug_interpreter:
+	$(NVCC) -D TRACER -D COMPLEX_TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
 % :: src/test/%.cu
 	$(NVCC) $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<

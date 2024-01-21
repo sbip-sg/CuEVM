@@ -1,0 +1,21 @@
+{
+    "contract_name": "TestOverflow",
+    "storage" : {
+    },
+    "test_cases": [
+      {
+        "function": "set_state",
+        "type": "exec",
+        "input_types": ["uint256"],
+        "input": [57896044618658097711785492504343953926634992332820282019728792003956564819969],
+        "sender": 0
+      },
+      {
+        "function": "multiply",
+        "type": "exec",
+        "input_types": ["uint256"],
+        "input": [4],
+        "sender": 0
+      }
+    ]
+  }
