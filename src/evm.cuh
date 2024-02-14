@@ -115,18 +115,6 @@ public:
      */
     typedef log_state_t::log_state_data_t log_state_data_t;
 
-    /**
-     * The block operations class.
-     */
-    typedef block_operations<params> block_operations;
-    /**
-     * The environmental operations class.
-     */
-    typedef environmental_operations<params> environmental_operations;
-    /**
-     * The internal operations class.
-     */
-    typedef internal_operations<params> internal_operations;
 
     // constants
     static const uint32_t MAX_DEPTH = 1024; /**< The maximum call depth*/

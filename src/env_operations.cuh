@@ -30,27 +30,24 @@
  * SELFBALANCE is moved to environmental operations because it is
  * not related to the block.
  */
-template <class params>
-class block_operations
-{
-public:
+namespace block_operations{
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    typedef arith_env_t<params> arith_t;
+    using arith_t = arith_env_t<evm_params>;
     /**
      * The arbitrary length integer type.
      */
-    typedef typename arith_t::bn_t bn_t;
+    using bn_t = typename arith_t::bn_t;
     /**
      * The stackk class.
      */
-    typedef stack_t<params> stack_t;
+    using stack_t = ::stack_t<evm_params>;
     /**
      * The block class.
      */
-    typedef block_t<params> block_t;
+    using block_t = ::block_t<evm_params>;
 
     /**
      * The BLOCKHASH operation implementation.
@@ -316,7 +313,7 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 /**
  * The environmental operations class.
@@ -341,47 +338,44 @@ public:
  *      - RETURNDATACOPY
  *      - EXTCODEHASH
 */
-template <class params>
-class environmental_operations
-{
-public:
+namespace environmental_operations{
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    typedef arith_env_t<params> arith_t;
+    using arith_t = arith_env_t<evm_params>;
     /**
      * The arbitrary length integer type.
      */
-    typedef typename arith_t::bn_t bn_t;
+    using bn_t = typename arith_t::bn_t;
     /**
      * The stackk class.
      */
-    typedef stack_t<params> stack_t;
+    using stack_t = ::stack_t<evm_params>;
     /**
      * The block class.
      */
-    typedef block_t<params> block_t;
+    using block_t = ::block_t<evm_params>;
     /**
      * The touch state class.
      */
-    typedef touch_state_t<params> touch_state_t;
+    using touch_state_t = ::touch_state_t<evm_params>;
     /**
      * The memory class.
      */
-    typedef memory_t<params> memory_t;
+    using memory_t = ::memory_t<evm_params>;
     /**
      * The transaction class.
      */
-    typedef transaction_t<params> transaction_t;
+    using transaction_t = ::transaction_t<evm_params>;
     /**
      * The message class.
      */
-    typedef message_t<params> message_t;
+    using message_t = ::message_t<evm_params>;
     /**
      * The keccak class.
      */
-    typedef keccak::keccak_t keccak_t;
+    using keccak::keccak_t;
     /**
      * The numver of bytes in a hash.
      */
@@ -1352,6 +1346,6 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 #endif

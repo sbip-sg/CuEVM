@@ -33,47 +33,45 @@
  * a0s: Logging Operations:
  * - LOGX
  */
-template <class params>
-class internal_operations
-{
-public:
+namespace internal_operations{
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    typedef arith_env_t<params> arith_t;
+    using arith_t = arith_env_t<evm_params>;
     /**
      * The arbitrary length integer type.
      */
-    typedef typename arith_t::bn_t bn_t;
+    using bn_t = typename arith_t::bn_t;
+
     /**
      * The stackk class.
      */
-    typedef stack_t<params> stack_t;
+    using stack_t = ::stack_t<evm_params> ;
     /**
      * The block class.
      */
-    typedef block_t<params> block_t;
+    using block_t = ::block_t<evm_params>;
     /**
      * The touch state class.
      */
-    typedef touch_state_t<params> touch_state_t;
+    using touch_state_t = ::touch_state_t<evm_params>;
     /**
      * The memory class.
      */
-    typedef memory_t<params> memory_t;
+    using memory_t = ::memory_t<evm_params>;
     /**
      * The transaction class.
      */
-    typedef transaction_t<params> transaction_t;
+    using transaction_t = ::transaction_t<evm_params>;
     /**
      * The message class.
      */
-    typedef message_t<params> message_t;
+    using message_t = ::message_t<evm_params>;
     /**
      * The logs state class.
      */
-    typedef log_state_t<params> log_state_t;
+    using log_state_t = ::log_state_t<evm_params>;
     /**
      * The number of bytes in a hash.
      */
@@ -719,6 +717,6 @@ public:
         }
     }
     
-};
+}
 
 #endif
