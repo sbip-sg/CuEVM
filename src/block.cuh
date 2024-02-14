@@ -7,7 +7,7 @@
 #ifndef _BLOCK_H_
 #define _BLOCK_H_
 
-#include "utils.h"
+#include "include/utils.h"
 
 /**
  * The block class is used to store the block information

@@ -7,7 +7,7 @@
 #ifndef _INTERNAL_OP_H_
 #define _INTERNAL_OP_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 #include "block.cuh"
 #include "state.cuh"

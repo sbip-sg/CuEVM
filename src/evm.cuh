@@ -1,7 +1,7 @@
 #ifndef _EVM_H_
 #define _EVM_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 #include "message.cuh"
 #include "memory.cuh"
@@ -13,7 +13,6 @@
 #include "jump_destinations.cuh"
 #include "logs.cuh"
 #include "alu_operations.cuh"
-// #include "arithmetic_operations.cuh"
 #include "env_operations.cuh"
 #include "internal_operations.cuh"
 

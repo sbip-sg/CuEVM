@@ -7,7 +7,7 @@
 #ifndef _ALU_H_
 #define _ALU_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 
 /**

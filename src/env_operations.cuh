@@ -7,7 +7,7 @@
 #ifndef _ENVIRONMENTAL_OP_H_
 #define _ENVIRONMENTAL_OP_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 #include "block.cuh"
 #include "state.cuh"

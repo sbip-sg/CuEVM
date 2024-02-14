@@ -7,7 +7,7 @@
 #ifndef _MESSAGE_H_
 #define _MESSAGE_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "state.cuh"
 #include "keccak.cuh"
 

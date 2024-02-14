@@ -7,7 +7,7 @@
 #ifndef _STACK_H_
 #define _STACK_H_
 
-#include "utils.h"
+#include "include/utils.h"
 
 /**
  * The stack class (YP: \f$\mu_{s}\f$)

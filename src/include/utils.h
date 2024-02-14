@@ -8,11 +8,11 @@
 #include <cuda.h>
 #include <cjson/cJSON.h>
 
-#include "include/cgbn_wrapper.h"
-#include "include/data_content.h"
-#include "include/opcodes.h"
-#include "include/error_codes.h"
-#include "include/gas_cost.h"
+#include "cgbn_wrapper.h"
+#include "data_content.h"
+#include "opcodes.h"
+#include "error_codes.h"
+#include "gas_cost.h"
 #include "arith.cuh"
 
 #ifdef __CUDA_ARCH__

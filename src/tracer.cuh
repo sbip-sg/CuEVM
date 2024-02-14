@@ -7,7 +7,7 @@
 #ifndef _TRACER_H_
 #define _TRACER_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 #include "memory.cuh"
 #include "state.cuh"

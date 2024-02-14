@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "include/utils.h"
 
 __host__ size_t adjusted_length(char** hex_string) {
     if (strncmp(*hex_string, "0x", 2) == 0 || strncmp(*hex_string, "0X", 2) == 0) {

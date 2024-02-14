@@ -7,7 +7,7 @@
 #ifndef _MEMORY_H_
 #define _MEMORY_H_
 
-#include "utils.h"
+#include "include/utils.h"
 
 /**
  * The memory class (YP: \f$\mu_{m}\f$).
