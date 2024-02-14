@@ -13,6 +13,7 @@
 #include "jump_destinations.cuh"
 #include "logs.cuh"
 #include "alu_operations.cuh"
+// #include "arithmetic_operations.cuh"
 #include "env_operations.cuh"
 #include "internal_operations.cuh"
 
@@ -113,22 +114,7 @@ public:
      * The logs state data type.
      */
     typedef log_state_t::log_state_data_t log_state_data_t;
-    /**
-     * The arithmetic operations class.
-     */
-    typedef arithmetic_operations<params> arithmetic_operations;
-    /**
-     * The comparison operations class.
-     */
-    typedef comparison_operations<params> comparison_operations;
-    /**
-     * The bitwise operations class.
-     */
-    typedef bitwise_operations<params> bitwise_operations;
-    /**
-     * The stack operations class.
-     */
-    typedef stack_operations<params> stack_operations;
+
     /**
      * The block operations class.
      */
@@ -3403,7 +3389,8 @@ __global__ void kernel_evm(
     if (instance >= instances->count)
         return;
 
-    typedef arith_env_t<params> arith_t;
+    // typedef arith_env_t<params> arith_t;
+    using arith_t = arith_env_t<params>;
     typedef typename arith_t::bn_t bn_t;
     typedef evm_t<params> evm_t;
 

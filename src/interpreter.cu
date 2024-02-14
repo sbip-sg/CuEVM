@@ -1,8 +1,10 @@
 
-#include "utils.h"
 #include "evm.cuh"
-#include <getopt.h>
 
+#include <getopt.h>
+#include <fstream>
+
+#include "utils.cu"
 
 template<class params>
 void run_interpreter(char *read_json_filename, char *write_json_filename) {
@@ -46,7 +48,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     #ifndef ONLY_CPU
     CUDA_CHECK(cgbn_error_report_alloc(&report)); 
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
-    heap_size = 2*1024*1024*1024; // 2GB
+    heap_size = (size_t(2)<<30); // 2GB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
     // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 256*1024));
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
@@ -159,6 +161,13 @@ int main(int argc, char *argv[]) {//getting the input
   {
       fprintf(stderr, "Both --input and --output flags are required\n");
       exit(EXIT_FAILURE);
+  }
+
+  // check if the file exists
+  std::ifstream file(read_json_filename);
+  if (!file) {
+    fprintf(stderr, "File '%s' does not exist\n", read_json_filename);
+    exit(EXIT_FAILURE);
   }
   run_interpreter<utils_params>(read_json_filename, write_json_filename);
 }
