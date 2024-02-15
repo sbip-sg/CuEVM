@@ -15,7 +15,7 @@
  * The message call class.
  * YP: \f$M\f$
  */
-template <class params>
+
 class message_t
 {
 public:
@@ -23,7 +23,7 @@ public:
    * The arithmetical environment used by the arbitrary length
    * integer library.
    */
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<evm_params> arith_t;
   /**
    * The arbitrary length integer type.
    */
@@ -32,7 +32,7 @@ public:
    * The arbitrary length integer type used for the storage.
    * It is defined as the EVM word type.
    */
-  typedef cgbn_mem_t<params::BITS> evm_word_t;
+  typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
   /**
    * THe keccak class
   */
@@ -628,7 +628,6 @@ public:
  * The transaction type
  * YP: \f$T\f$
  */
-template <class params>
 class transaction_t
 {
 public:
@@ -636,7 +635,7 @@ public:
    * The arithmetical environment used by the arbitrary length
    * integer library.
    */
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<evm_params> arith_t;
   /**
    * The arbitrary length integer type.
    */
@@ -645,23 +644,8 @@ public:
    * The arbitrary length integer type used for the storage.
    * It is defined as the EVM word type.
    */
-  typedef cgbn_mem_t<params::BITS> evm_word_t;
-  /**
-   * The message type.
-   */
-  typedef message_t<params> message_t;
-  /**
-   * The world state class.
-   */
-  typedef world_state_t<params> world_state_t;
-  /**
-   * The accessed state class.
-  */
-  typedef accessed_state_t<params> accessed_state_t;
-  /**
-   * The touch state class.
-  */
-  typedef touch_state_t<params> touch_state_t;
+  typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
+
   /**
    * The account class.
   */

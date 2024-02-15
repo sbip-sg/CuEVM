@@ -43,7 +43,7 @@ namespace arithmetic_operations {
     /**
      * The stackk class.
      */
-    using stack_t = ::stack_t<evm_params> ;
+    // using stack_t = ::stack_t;
 
     /**
      * The ADD operation implementation.
@@ -632,7 +632,7 @@ namespace stack_operations{
     /**
      * The stackk class.
      */
-    using stack_t = ::stack_t<evm_params> ;
+    // using stack_t = ::stack_t<evm_params> ;
 
     /**
      * The POP operation implementation.
@@ -838,7 +838,7 @@ namespace comparison_operations{
     /**
      * The stack class.
      */
-    using stack_t = ::stack_t<evm_params>;
+    // using stack_t = ::stack_t<evm_params>;
 
     /**
      * Compare the top two values from the stack.
@@ -1172,7 +1172,7 @@ namespace bitwise_operations{
     /**
      * The stack class.
      */
-    using stack_t = ::stack_t<evm_params>;
+    // using stack_t = ::stack_t<evm_params>;
 
     /**
      * The AND operation implementation.

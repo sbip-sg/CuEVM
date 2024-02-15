@@ -10,17 +10,27 @@
 #include "include/utils.h"
 
 /**
+ * The kernel to copy the stack data structures.
+ * @param[out] dst The destination stack data structure
+ * @param[in] src The source stack data structure
+ * @param[in] count The number of instances
+*/
+template <typename T, typename E>
+__global__ void kernel_stacks(
+    T *dst,
+    T *src,
+    uint32_t count);
+
+/**
  * The stack class (YP: \f$\mu_{s}\f$)
 */
-template <class params>
-class stack_t
-{
+class stack_t{
 public:
   /**
    * The arithmetical environment used by the arbitrary length
    * integer library.
    */
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<evm_params> arith_t;
   /**
    * The arbitrary length integer type.
    */
@@ -29,16 +39,16 @@ public:
    * The arbitrary length integer type used for the storage.
    * It is defined as the EVM word type.
    */
-  typedef cgbn_mem_t<params::BITS> evm_word_t;
+  typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
   /**
    * The arbitrary length integer type with double the size of the
    * EVM word type.
    */
-  typedef typename arith_env_t<params>::bn_wide_t bn_wide_t;
+  typedef typename arith_env_t<evm_params>::bn_wide_t bn_wide_t;
   /**
    * The size of the stack.
    */
-  static const uint32_t STACK_SIZE = params::STACK_SIZE;
+  static const uint32_t STACK_SIZE = evm_params::STACK_SIZE;
 
   /**
    * The stack data structure.
@@ -511,7 +521,7 @@ public:
         cudaMemcpyHostToDevice));
     delete[] tmp_cpu_instances;
     tmp_cpu_instances = NULL;
-    kernel_stacks<params><<<count, 1>>>(
+    kernel_stacks<stack_data_t,  evm_word_t><<<count, 1>>>(
         tmp_gpu_instances,
         gpu_instances,
         count);
@@ -559,20 +569,12 @@ public:
   }
 };
 
-/**
- * The kernel to copy the stack data structures.
- * @param[out
- * ] dst The destination stack data structure
- * @param[in] src The source stack data structure
- * @param[in] count The number of instances
-*/
-template <class params>
+template <typename T, typename E>
 __global__ void kernel_stacks(
-    typename stack_t<params>::stack_data_t *dst,
-    typename stack_t<params>::stack_data_t *src,
+    T *dst,
+    T *src,
     uint32_t count)
 {
-  typedef typename stack_t<params>::evm_word_t evm_word_t;
   uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
   if (instance >= count)
   {
@@ -584,7 +586,7 @@ __global__ void kernel_stacks(
     memcpy(
         dst[instance].stack_base,
         src[instance].stack_base,
-        sizeof(evm_word_t) * src[instance].stack_offset);
+        sizeof(E) * src[instance].stack_offset);
     delete[] src[instance].stack_base;
     src[instance].stack_base = NULL;
     src[instance].stack_offset = 0;

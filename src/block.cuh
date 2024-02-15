@@ -13,7 +13,7 @@
  * The block class is used to store the block information
  * before the transaction are done. YP: H
  */
-template <class params>
+
 class block_t
 {
 public:
@@ -21,7 +21,7 @@ public:
    * The arithmetical environment used by the arbitrary length
    * integer library.
    */
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<evm_params> arith_t;
   /**
    * The arbitrary length integer type.
    */
@@ -30,7 +30,7 @@ public:
    * The arbitrary length integer type used for the storage.
    * It is defined as the EVM word type.
    */
-  typedef cgbn_mem_t<params::BITS> evm_word_t;
+  typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
 
   /**
    * The previous block hash information.

@@ -9,10 +9,21 @@
 
 #include "include/utils.h"
 
+
+/**
+ * The kernel to copy the memory data structures between the GPU memories.
+*/
+template <typename T>
+__global__ void kernel_get_memory(
+  T *dst_instances,
+  T *src_instances,
+  uint32_t instance_count
+);
+
 /**
  * The memory class (YP: \f$\mu_{m}\f$).
 */
-template <class params>
+
 class memory_t
 {
 public:
@@ -20,7 +31,7 @@ public:
    * The arithmetical environment used by the arbitrary length
    * integer library.
   */
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<evm_params> arith_t;
   /**
    * The arbitrary length integer type.
   */
@@ -29,8 +40,8 @@ public:
    * The arbitrary length integer type used for the storage.
    * It is defined as the EVM word type.
   */
-  typedef cgbn_mem_t<params::BITS> evm_word_t;
-  static const size_t PAGE_SIZE = params::PAGE_SIZE;
+  typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
+  static const size_t PAGE_SIZE = evm_params::PAGE_SIZE;
 
   /**
    * The memory data structure.
@@ -548,7 +559,7 @@ public:
     tmp_cpu_instances = NULL;
 
     // 2. call the kernel to copy the memory between the gpu memories
-    kernel_get_memory<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+    kernel_get_memory<memory_data_t><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
     CUDA_CHECK(cudaDeviceSynchronize());
     CUDA_CHECK(cudaFree(gpu_instances));
     gpu_instances = tmp_gpu_instances;
@@ -656,13 +667,11 @@ public:
   }
 };
 
-/**
- * The kernel to copy the memory data structures between the GPU memories.
-*/
-template <class params>
+
+template <typename T>
 __global__ void kernel_get_memory(
-  typename memory_t<params>::memory_data_t *dst_instances,
-  typename memory_t<params>::memory_data_t *src_instances,
+  T *dst_instances,
+  T *src_instances,
   uint32_t instance_count
 )
 {

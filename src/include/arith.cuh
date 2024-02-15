@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <cuda.h>
 
-#include "data_content.h"
+#include "utils.h"
 
 /**
  * The arithmetic environment class is a wrapper around the CGBN library.

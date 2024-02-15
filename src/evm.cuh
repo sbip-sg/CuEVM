@@ -29,10 +29,7 @@ public:
      * The arbitrary length integer type.
      */
     typedef typename arith_t::bn_t bn_t;
-    /**
-     * The block information class.
-     */
-    typedef block_t<params> block_t;
+
     /**
      * The block information data type.
      */
@@ -40,7 +37,7 @@ public:
     /**
      * World state information class.
      */
-    typedef world_state_t<params> world_state_t;
+    // typedef world_state_t<params> world_state_t;
     /**
      * World state information data type.
      */
@@ -52,7 +49,7 @@ public:
     /**
      * The access state class.
      */
-    typedef accessed_state_t<params> accessed_state_t;
+    // typedef accessed_state_t<params> accessed_state_t;
     /**
      * The access state data type.
      */
@@ -60,23 +57,12 @@ public:
     /**
      * The touch state class.
      */
-    typedef touch_state_t<params> touch_state_t;
+    // typedef touch_state_t<params> touch_state_t;
     /**
      * The touch state data type.
      */
     typedef touch_state_t::touch_state_data_t touch_state_data_t;
-    /**
-     * The stackk class.
-     */
-    typedef stack_t<params> stack_t;
-    /**
-     * The memory class.
-     */
-    typedef memory_t<params> memory_t;
-    /**
-     * The transaction class.
-     */
-    typedef transaction_t<params> transaction_t;
+
     /**
      * The transaction content data structure.
      */
@@ -84,15 +70,12 @@ public:
     /**
      * The message class.
      */
-    typedef message_t<params> message_t;
+    // typedef message_t<params> message_t;
     /**
      * The message content data structure.
      */
     typedef typename message_t::message_data_t message_data_t;
-    /**
-     * The tracer class.
-     */
-    typedef tracer_t<params> tracer_t;
+
     /**
      * The tracer data structure.
      */
@@ -105,10 +88,7 @@ public:
      * The keccak parameters.
      */
     typedef typename keccak_t::sha3_parameters_t sha3_parameters_t;
-    /**
-     * The logs state class.
-     */
-    typedef log_state_t<params> log_state_t;
+
     /**
      * The logs state data type.
      */
@@ -3371,7 +3351,6 @@ __global__ void kernel_evm(
     typename evm_t<params>::evm_instances_t *instances)
 {
     uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
-    typedef transaction_t<params> transaction_t;
 
     if (instance >= instances->count)
         return;

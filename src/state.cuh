@@ -21,11 +21,65 @@
 #define WRITE_STORAGE 8
 #define WRITE_DELETE 16
 
+
+/**
+ * Kernel to copy the accounts details and read operations
+ * between two instances of the accessed state data.
+ * @param[out] dst_instances The destination instances
+ * @param[in] src_instances The source instances
+ * @param[in] count The number of instances
+*/
+template <typename T>
+__global__ void kernel_accessed_state_S1(
+    T *dst_instances,
+    T *src_instances,
+    uint32_t count);
+
+
+/**
+ * Kernel to copy the bytecode and storage
+ * between two instances of the accessed state data.
+ * @param[out] dst_instances The destination instances
+ * @param[in] src_instances The source instances
+ * @param[in] count The number of instances
+*/
+template <typename T>
+__global__ void kernel_accessed_state_S2(
+    T *dst_instances,
+    T *src_instances,
+    uint32_t count);
+
+/**
+ * Kernel to copy the accounts details and write operations
+ * between two instances of the touch state data.
+ * @param[out] dst_instances The destination instances
+ * @param[in] src_instances The source instances
+ * @param[in] count The number of instances
+*/
+template <typename T>
+__global__ void kernel_touch_state_S1(
+    T *dst_instances,
+    T *src_instances,
+    uint32_t count);
+
+/**
+ * Kernel to copy the bytecode and storage
+ * between two instances of the touch state data.
+ * @param[out] dst_instances The destination instances
+ * @param[in] src_instances The source instances
+ * @param[in] count The number of instances
+*/
+template <typename T>
+__global__ void kernel_touch_state_S2(
+    T *dst_instances,
+    T *src_instances,
+    uint32_t count);
+
 /**
  * The world state (YP: \f$\sigma\f$) class. It cotains all the active accounts and
  * their storage.
 */
-template <class params>
+
 class world_state_t
 {
 public:
@@ -33,7 +87,7 @@ public:
      * The arithmetical environment used by the arbitrary length
      * integer library.
     */
-    typedef arith_env_t<params> arith_t;
+    typedef arith_env_t<evm_params> arith_t;
     /**
      * The arbitrary length integer type.
     */
@@ -42,7 +96,7 @@ public:
      * The arbitrary length integer type used for the storage.
      * It is defined as the EVM word type.
     */
-    typedef cgbn_mem_t<params::BITS> evm_word_t;
+    typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
 
     /**
      * The storage entry type.
@@ -551,11 +605,10 @@ public:
  *  \f$A_{a}\f$ for accessed accounts
  *  \f$A_{k}\f$ for accessed storage keys
 */
-template <class params>
 class accessed_state_t
 {
 public:
-    typedef world_state_t<params> world_state_t;
+    // typedef world_state_t<params> world_state_t;
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
@@ -1323,7 +1376,7 @@ public:
         delete[] tmp_cpu_instances;
 
         // run the first kernel which copy the accoutns details and read operations
-        kernel_accessed_state_S1<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+        kernel_accessed_state_S1<accessed_state_data_t><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
 
         cudaFree(gpu_instances);
@@ -1421,7 +1474,7 @@ public:
         delete[] tmp_cpu_instances;
 
         // run the second kernel which copy the bytecode and storage
-        kernel_accessed_state_S2<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+        kernel_accessed_state_S2<accessed_state_data_t><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
 
         // free the memory on GPU for the first kernel (accounts details)
@@ -1605,21 +1658,15 @@ public:
     }
 };
 
-/**
- * Kernel to copy the accounts details and read operations
- * between two instances of the accessed state data.
- * @param[out] dst_instances The destination instances
- * @param[in] src_instances The source instances
- * @param[in] count The number of instances
-*/
-template <class params>
+
+template <typename T>
 __global__ void kernel_accessed_state_S1(
-    typename accessed_state_t<params>::accessed_state_data_t *dst_instances,
-    typename accessed_state_t<params>::accessed_state_data_t *src_instances,
+    T *dst_instances,
+    T *src_instances,
     uint32_t count)
 {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-    typedef typename world_state_t<params>::account_t account_t;
+    typedef typename world_state_t::account_t account_t;
 
     if (instance >= count)
         return;
@@ -1647,22 +1694,15 @@ __global__ void kernel_accessed_state_S1(
     }
 }
 
-/**
- * Kernel to copy the bytecode and storage
- * between two instances of the accessed state data.
- * @param[out] dst_instances The destination instances
- * @param[in] src_instances The source instances
- * @param[in] count The number of instances
-*/
-template <class params>
+template <typename T>
 __global__ void kernel_accessed_state_S2(
-    typename accessed_state_t<params>::accessed_state_data_t *dst_instances,
-    typename accessed_state_t<params>::accessed_state_data_t *src_instances,
+    T *dst_instances,
+    T *src_instances,
     uint32_t count)
 {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-    typedef typename world_state_t<params>::account_t account_t;
-    typedef typename world_state_t<params>::contract_storage_t contract_storage_t;
+    typedef typename world_state_t::account_t account_t;
+    typedef typename world_state_t::contract_storage_t contract_storage_t;
 
     if (instance >= count)
         return;
@@ -1714,14 +1754,13 @@ __global__ void kernel_accessed_state_S2(
  * YP: accrued transaction substate
  *  \f$A_{t}\f$ for touch accounts
 */
-template <class params>
 class touch_state_t
 {
 public:
     /**
      * The world state type.
     */
-    typedef world_state_t<params> world_state_t;
+    // typedef world_state_t<params> world_state_t;
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
@@ -1752,7 +1791,7 @@ public:
      * The accessed state data type. Contains the accounts with their storage
      * and the read operations done on the accounts.
     */
-    typedef accessed_state_t<params> accessed_state_t;
+    // typedef accessed_state_t<params> accessed_state_t;
 
     /**
      * The touch state data type. Contains the accounts with their storage
@@ -3107,7 +3146,7 @@ public:
         delete[] tmp_cpu_instances;
 
         // run the first kernel which copy the accoutns details and read operations
-        kernel_touch_state_S1<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+        kernel_touch_state_S1<touch_state_data_t><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaFree(gpu_instances));
 
@@ -3205,7 +3244,7 @@ public:
         delete[] tmp_cpu_instances;
 
         // run the second kernel which copy the bytecode and storage
-        kernel_touch_state_S2<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+        kernel_touch_state_S2<touch_state_data_t><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
 
         // free the memory on GPU for the first kernel (accounts details)
@@ -3392,21 +3431,14 @@ public:
 };
 
 
-/**
- * Kernel to copy the accounts details and write operations
- * between two instances of the touch state data.
- * @param[out] dst_instances The destination instances
- * @param[in] src_instances The source instances
- * @param[in] count The number of instances
-*/
-template <class params>
+template <typename T>
 __global__ void kernel_touch_state_S1(
-    typename touch_state_t<params>::touch_state_data_t *dst_instances,
-    typename touch_state_t<params>::touch_state_data_t *src_instances,
+    T *dst_instances,
+    T *src_instances,
     uint32_t count)
 {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-    typedef typename world_state_t<params>::account_t account_t;
+    typedef typename world_state_t::account_t account_t;
 
     if (instance >= count)
         return;
@@ -3441,15 +3473,15 @@ __global__ void kernel_touch_state_S1(
  * @param[in] src_instances The source instances
  * @param[in] count The number of instances
 */
-template <class params>
+template <typename T>
 __global__ void kernel_touch_state_S2(
-    typename touch_state_t<params>::touch_state_data_t *dst_instances,
-    typename touch_state_t<params>::touch_state_data_t *src_instances,
+    T *dst_instances,
+    T *src_instances,
     uint32_t count)
 {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-    typedef typename world_state_t<params>::account_t account_t;
-    typedef typename world_state_t<params>::contract_storage_t contract_storage_t;
+    typedef typename world_state_t::account_t account_t;
+    typedef typename world_state_t::contract_storage_t contract_storage_t;
 
     if (instance >= count)
         return;

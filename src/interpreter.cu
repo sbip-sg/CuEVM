@@ -1,16 +1,14 @@
-
-#include "evm.cuh"
-
 #include <getopt.h>
 #include <fstream>
 
 #include "utils.cu"
+#include "evm.cuh"
 
-template<class params>
+
 void run_interpreter(char *read_json_filename, char *write_json_filename) {
-  typedef evm_t<params> evm_t;
+  typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<evm_params> arith_t;
   
   evm_instances_t         cpu_instances;
   #ifndef ONLY_CPU
@@ -60,7 +58,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     #ifndef ONLY_CPU
     printf("Running GPU kernel ...\n");
     CUDA_CHECK(cudaDeviceSynchronize());
-    kernel_evm<params><<<cpu_instances.count, params::TPI>>>(report, gpu_instances);
+    kernel_evm<evm_params><<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
     //CUDA_CHECK(cudaPeekAtLastError());
     // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
     CUDA_CHECK(cudaDeviceSynchronize());
@@ -169,5 +167,5 @@ int main(int argc, char *argv[]) {//getting the input
     fprintf(stderr, "File '%s' does not exist\n", read_json_filename);
     exit(EXIT_FAILURE);
   }
-  run_interpreter<utils_params>(read_json_filename, write_json_filename);
+  run_interpreter(read_json_filename, write_json_filename);
 }

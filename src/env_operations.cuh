@@ -40,14 +40,6 @@ namespace block_operations{
      * The arbitrary length integer type.
      */
     using bn_t = typename arith_t::bn_t;
-    /**
-     * The stackk class.
-     */
-    using stack_t = ::stack_t<evm_params>;
-    /**
-     * The block class.
-     */
-    using block_t = ::block_t<evm_params>;
 
     /**
      * The BLOCKHASH operation implementation.
@@ -348,30 +340,7 @@ namespace environmental_operations{
      * The arbitrary length integer type.
      */
     using bn_t = typename arith_t::bn_t;
-    /**
-     * The stackk class.
-     */
-    using stack_t = ::stack_t<evm_params>;
-    /**
-     * The block class.
-     */
-    using block_t = ::block_t<evm_params>;
-    /**
-     * The touch state class.
-     */
-    using touch_state_t = ::touch_state_t<evm_params>;
-    /**
-     * The memory class.
-     */
-    using memory_t = ::memory_t<evm_params>;
-    /**
-     * The transaction class.
-     */
-    using transaction_t = ::transaction_t<evm_params>;
-    /**
-     * The message class.
-     */
-    using message_t = ::message_t<evm_params>;
+
     /**
      * The keccak class.
      */
