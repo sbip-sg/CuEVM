@@ -27,11 +27,7 @@ __global__ void kernel_get_memory(
 class memory_t
 {
 public:
-  /**
-   * The arithmetical environment used by the arbitrary length
-   * integer library.
-  */
-  typedef arith_env_t<evm_params> arith_t;
+
   static const size_t PAGE_SIZE = evm_params::PAGE_SIZE;
 
   /**

@@ -26,11 +26,6 @@
  * - SIGNEXTEND
  */
 namespace arithmetic_operations {
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    using arith_t = arith_env_t<evm_params>;
 
     /**
      * The stackk class.

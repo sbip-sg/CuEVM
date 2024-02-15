@@ -83,11 +83,6 @@ __global__ void kernel_touch_state_S2(
 class world_state_t
 {
 public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-    */
-    typedef arith_env_t<evm_params> arith_t;
 
     /**
      * The storage entry type.
@@ -599,12 +594,6 @@ public:
 class accessed_state_t
 {
 public:
-    // typedef world_state_t<params> world_state_t;
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-    */
-    typedef world_state_t::arith_t arith_t;
     /**
      * The storage entry type.
     */
@@ -1739,15 +1728,6 @@ __global__ void kernel_accessed_state_S2(
 class touch_state_t
 {
 public:
-    /**
-     * The world state type.
-    */
-    // typedef world_state_t<params> world_state_t;
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-    */
-    typedef world_state_t::arith_t arith_t;
 
     /**
      * The storage entry type.

@@ -31,11 +31,6 @@
  * not related to the block.
  */
 namespace block_operations{
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    using arith_t = arith_env_t<evm_params>;
 
     /**
      * The BLOCKHASH operation implementation.
@@ -327,11 +322,6 @@ namespace block_operations{
  *      - EXTCODEHASH
 */
 namespace environmental_operations{
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    using arith_t = arith_env_t<evm_params>;
 
     /**
      * The keccak class.

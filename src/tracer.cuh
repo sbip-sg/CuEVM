@@ -44,16 +44,7 @@ __global__ void kernel_tracers(
 class tracer_t
 {
 public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    typedef arith_env_t<evm_params> arith_t;
 
-    /**
-     * The stack type.
-    */
-    // typedef stack_t<params> stack_t;
     /**
      * The stack data type
     */
@@ -66,10 +57,7 @@ public:
      * The memory data type.
     */
     typedef typename memory_t::memory_data_t memory_data_t;
-    /**
-     * The touch state type.
-    */
-    // typedef touch_state_t<params> touch_state_t;
+
     /**
      * The touch state data type.
     */

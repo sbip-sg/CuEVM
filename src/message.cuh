@@ -19,11 +19,7 @@
 class message_t
 {
 public:
-  /**
-   * The arithmetical environment used by the arbitrary length
-   * integer library.
-   */
-  typedef arith_env_t<evm_params> arith_t;
+
   /**
    * THe keccak class
   */
@@ -622,11 +618,6 @@ public:
 class transaction_t
 {
 public:
-  /**
-   * The arithmetical environment used by the arbitrary length
-   * integer library.
-   */
-  typedef arith_env_t<evm_params> arith_t;
 
   /**
    * The account class.

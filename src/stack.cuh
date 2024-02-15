@@ -26,11 +26,6 @@ __global__ void kernel_stacks(
 */
 class stack_t{
 public:
-  /**
-   * The arithmetical environment used by the arbitrary length
-   * integer library.
-   */
-  typedef arith_env_t<evm_params> arith_t;
 
   /**
    * The size of the stack.

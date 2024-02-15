@@ -10,7 +10,7 @@ Cuda implementation of EVM bytecode executor
 ## Compile and Run
 There are two methods, one requires installing all prequisited in the system, the second one use docker image:
 
-#### On your own system
+### On your own system
 
 Note : In Makefile, there is one `ENABLE_TRACING` flag that is required for now to compare the results against reference REVM and to demonstrate bug detection. It will slowdown the execution.
 
@@ -22,12 +22,20 @@ Building on Ubuntu (with sudo):
 * Setup cJSON: `sudo apt install libcjson-dev`
 * `make interpreter` or for running with cpu :`make cpu_interpreter`
 
+
 Building without sudo is also possible with extra configuration and modification on the Makefile or evironment variables, please refer to online tutorials on how to build and use libraries in custom directory
 
-Building using docker image:
+#### Building using docker image:
 * Build the docker image first: `docker build -f .devcontainer/Dockerfile -t cuevm`
 * Run and mount the current code folder `docker run -it -v $(pwd):/CuEVM cuevm`
 * `cd CuEVM` then `make interpreter` or for running with cpu: `make cpu_interpreter`
+
+#### CMake 
+
+* `mkdir build`
+* `cmake ..` (to build only CPU version : `-DONLY_CPU=ON)
+* `cmake --build .`
+
 
 ## Usage
 

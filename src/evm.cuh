@@ -19,11 +19,6 @@
 class evm_t
 {
 public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    typedef arith_env_t<evm_params> arith_t;
 
     /**
      * The block information data type.
@@ -3340,18 +3335,14 @@ __global__ void kernel_evm(
     if (instance >= instances->count)
         return;
 
-    // typedef arith_env_t<params> arith_t;
-    using arith_t = arith_env_t<evm_params>;
-
     // setup arith
     arith_t arith(
         cgbn_report_monitor,
         report,
         instance);
 
-    // setup evm
-    evm_t *evm = NULL;
-    evm = new evm_t(
+    // setup evm 
+    evm_t evm (
         arith,
         instances->world_state_data,
         instances->block_data,
@@ -3369,11 +3360,7 @@ __global__ void kernel_evm(
     uint32_t tmp_error_code;
     tmp_error_code = ERR_NONE;
     // run the evm
-    evm->run(tmp_error_code);
-
-    // free the evm
-    delete evm;
-    evm = NULL;
+    evm.run(tmp_error_code);
 }
 
 #endif

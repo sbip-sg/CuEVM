@@ -46,11 +46,6 @@ __global__ void kernel_log_state_S2(
 class log_state_t
 {
 public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-    */
-    typedef arith_env_t<evm_params> arith_t;
 
     /**
      * The log data type for one log.

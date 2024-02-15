@@ -31,19 +31,17 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     // get instaces to run
     printf("Generating instances\n");
     evm_t::get_cpu_instances(cpu_instances, test);
+    printf("%d instances generated\n", cpu_instances.count);
+    
     #ifndef ONLY_CPU
     evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
     CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
     CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
     #endif
-    printf("%d instances generated\n", cpu_instances.count);
-    size_t heap_size, stack_size;
-    cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
-    printf("Heap size: %zu\n", heap_size);
-    cudaDeviceGetLimit(&stack_size, cudaLimitStackSize);
-    printf("Stack size: %zu\n", stack_size);
+    
     // create a cgbn_error_report for CGBN to report back errors
     #ifndef ONLY_CPU
+    size_t heap_size, stack_size;
     CUDA_CHECK(cgbn_error_report_alloc(&report)); 
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
     heap_size = (size_t(2)<<30); // 2GB
@@ -53,9 +51,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     printf("Heap size: %zu\n", heap_size);
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
     printf("Heap size: %zu\n", heap_size);
-    #endif
-
-    #ifndef ONLY_CPU
     printf("Running GPU kernel ...\n");
     CUDA_CHECK(cudaDeviceSynchronize());
     kernel_evm<<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
