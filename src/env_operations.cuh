@@ -36,10 +36,6 @@ namespace block_operations{
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
-    /**
-     * The arbitrary length integer type.
-     */
-    using bn_t = typename arith_t::bn_t;
 
     /**
      * The BLOCKHASH operation implementation.
@@ -336,10 +332,6 @@ namespace environmental_operations{
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
-    /**
-     * The arbitrary length integer type.
-     */
-    using bn_t = typename arith_t::bn_t;
 
     /**
      * The keccak class.

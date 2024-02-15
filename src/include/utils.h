@@ -13,7 +13,6 @@
 #include "opcodes.h"
 #include "error_codes.h"
 #include "gas_cost.h"
-#include "arith.cuh"
 
 #ifdef __CUDA_ARCH__
 #ifndef MULTIPLE_THREADS_PER_INSTANCE
@@ -54,6 +53,35 @@ struct mr_params {
 using utils_params = mr_params<8, 256, 1, 1024, 4096, 50>;
 using evm_params = mr_params<8, 256, 1, 1024, 4096, 50>;
 
+// common type defs
+
+/**
+ * The CGBN context type.  This is a template type that takes
+ * the number of threads per instance and the
+ * parameters class as template parameters.
+*/
+using context_t = cgbn_context_t<evm_params::TPI, evm_params>;
+
+/**
+ * The CGBN environment type. This is a template type that takes the
+ * context type as a template parameter. It provides the CGBN functions.
+*/
+using env_t = cgbn_env_t<context_t, evm_params::BITS>;
+
+/**
+ * The CGBN base type for the given number of bit in environment.
+*/
+using bn_t = env_t::cgbn_t;
+/**
+ * The CGBN wide type with double the given number of bits in environment.
+*/
+using bn_wide_t = env_t::cgbn_wide_t;
+/**
+ * The EVM word type. also use for store CGBN base type.
+*/
+using evm_word_t =  cgbn_mem_t<evm_params::BITS>;
+
+
 __host__ size_t adjusted_length(char** hex_string);
 __host__ void hex_to_bytes(const char *hex_string, uint8_t *byte_array, size_t length);
 void cuda_check(cudaError_t status, const char *action=NULL, const char *file=NULL, int32_t line=0);
@@ -61,5 +89,7 @@ void cgbn_check(cgbn_error_report_t *report, const char *file=NULL, int32_t line
 __host__ void from_mpz(uint32_t *words, uint32_t count, mpz_t value);
 __host__ void to_mpz(mpz_t r, uint32_t *x, uint32_t count);
 __host__ cJSON *get_json_from_file(const char *filepath);
+
+#include "arith.cuh"
 
 #endif

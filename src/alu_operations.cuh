@@ -31,15 +31,7 @@ namespace arithmetic_operations {
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
-    /**
-     * The arbitrary length integer type.
-     */
-    using bn_t = typename arith_t::bn_t;
-    /**
-     * The arbitrary length integer type with double the size of the
-     * EVM word type.
-     */
-    using bn_wide_t = typename arith_t::bn_wide_t;
+
     /**
      * The stackk class.
      */
@@ -625,14 +617,6 @@ namespace stack_operations{
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
-    /**
-     * The arbitrary length integer type.
-     */
-    using bn_t = typename arith_t::bn_t;
-    /**
-     * The stackk class.
-     */
-    // using stack_t = ::stack_t<evm_params> ;
 
     /**
      * The POP operation implementation.
@@ -831,10 +815,7 @@ namespace comparison_operations{
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
-    /**
-     * The arbitrary length integer type.
-     */
-    using bn_t = typename arith_t::bn_t;
+
     /**
      * The stack class.
      */
@@ -1165,10 +1146,7 @@ namespace bitwise_operations{
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
-    /**
-     * The arbitrary length integer type.
-     */
-    using bn_t = typename arith_t::bn_t;
+
     /**
      * The stack class.
      */

@@ -24,10 +24,6 @@ public:
      * integer library.
      */
     typedef arith_env_t<evm_params> arith_t;
-    /**
-     * The arbitrary length integer type.
-     */
-    typedef typename arith_t::bn_t bn_t;
 
     /**
      * The block information data type.
@@ -45,18 +41,12 @@ public:
      * The account information data.
      */
     typedef world_state_t::account_t account_t;
-    /**
-     * The access state class.
-     */
-    // typedef accessed_state_t<params> accessed_state_t;
+
     /**
      * The access state data type.
      */
     typedef accessed_state_t::accessed_state_data_t accessed_state_data_t;
-    /**
-     * The touch state class.
-     */
-    // typedef touch_state_t<params> touch_state_t;
+
     /**
      * The touch state data type.
      */
@@ -66,10 +56,7 @@ public:
      * The transaction content data structure.
      */
     typedef typename transaction_t::transaction_data_t transaction_data_t;
-    /**
-     * The message class.
-     */
-    // typedef message_t<params> message_t;
+
     /**
      * The message content data structure.
      */
@@ -3355,8 +3342,6 @@ __global__ void kernel_evm(
 
     // typedef arith_env_t<params> arith_t;
     using arith_t = arith_env_t<evm_params>;
-    typedef typename arith_t::bn_t bn_t;
-    typedef evm_t evm_t;
 
     // setup arith
     arith_t arith(

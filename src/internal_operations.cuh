@@ -39,10 +39,6 @@ namespace internal_operations{
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
-    /**
-     * The arbitrary length integer type.
-     */
-    using bn_t = typename arith_t::bn_t;
 
     /**
      * The number of bytes in a hash.

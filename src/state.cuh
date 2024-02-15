@@ -88,15 +88,6 @@ public:
      * integer library.
     */
     typedef arith_env_t<evm_params> arith_t;
-    /**
-     * The arbitrary length integer type.
-    */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The arbitrary length integer type used for the storage.
-     * It is defined as the EVM word type.
-    */
-    typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
 
     /**
      * The storage entry type.
@@ -614,15 +605,6 @@ public:
      * integer library.
     */
     typedef world_state_t::arith_t arith_t;
-    /**
-     * The arbitrary length integer type.
-    */
-    typedef world_state_t::bn_t bn_t;
-    /**
-     * The arbitrary length integer type used for the storage.
-     * It is defined as the EVM word type.
-    */
-    typedef world_state_t::evm_word_t evm_word_t;
     /**
      * The storage entry type.
     */
@@ -1766,15 +1748,7 @@ public:
      * integer library.
     */
     typedef world_state_t::arith_t arith_t;
-    /**
-     * The arbitrary length integer type.
-    */
-    typedef world_state_t::bn_t bn_t;
-    /**
-     * The arbitrary length integer type used for the storage.
-     * It is defined as the EVM word type.
-    */
-    typedef world_state_t::evm_word_t evm_word_t;
+
     /**
      * The storage entry type.
     */

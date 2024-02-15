@@ -32,15 +32,6 @@ public:
    * integer library.
   */
   typedef arith_env_t<evm_params> arith_t;
-  /**
-   * The arbitrary length integer type.
-  */
-  typedef typename arith_t::bn_t bn_t;
-  /**
-   * The arbitrary length integer type used for the storage.
-   * It is defined as the EVM word type.
-  */
-  typedef cgbn_mem_t<evm_params::BITS> evm_word_t;
   static const size_t PAGE_SIZE = evm_params::PAGE_SIZE;
 
   /**
