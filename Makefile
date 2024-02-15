@@ -31,6 +31,9 @@ test_cgbn: src/test/test_cgbn.cu
 interpreter:
 	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
+library: 
+	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -D BUILD_LIB --shared -Xcompiler '-fPIC' -o $(OUT_DIRECTORY)/libcuevm.so src/interpreter.cu
+
 debug_interpreter:
 	$(NVCC) -D TRACER $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 

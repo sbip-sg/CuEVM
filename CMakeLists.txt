@@ -3,6 +3,7 @@ option(WITH_COMPILE "Doing the nvcc compilation" ON)
 option(WITH_DOCS "Geenrating the documentation for the code" OFF)
 option(ONLY_CPU "Geenrating the documentation for the code" OFF)
 option(ENABLE_TRACING "Enable tracer" ON)
+option(BUILD_LIBRARY "Build as a shared library" OFF) # Added option for building as a library
 set(CUDA_COMPUTE_CAPABILITY "89" CACHE STRING "CUDA Compute Capability")
 
 project(cuevm

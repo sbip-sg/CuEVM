@@ -4,8 +4,7 @@
 #include "utils.cu"
 #include "evm.cuh"
 
-
-void run_interpreter(char *read_json_filename, char *write_json_filename) {
+void run_interpreter(cJSON *read_root, cJSON *write_root) {
   // typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
   typedef arith_env_t<evm_params> arith_t;
@@ -19,13 +18,11 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
 
   arith_t arith(cgbn_report_monitor, 0);
   
-  //read the json file with the global state
-  cJSON *read_root = get_json_from_file(read_json_filename);
   if(read_root == NULL) {
     printf("Error: could not read the json file\n");
     exit(EXIT_FAILURE);
   }
-  cJSON *write_root = cJSON_CreateObject();
+  
   const cJSON *test = NULL;
   cJSON_ArrayForEach(test, read_root) {
     // get instaces to run
@@ -100,12 +97,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     printf("Results printed\n");
 
     // print to json files
-    printf("Printing to json files ...\n");
+    printf("Printing to json string ...\n");
     cJSON_AddItemToObject(
       write_root,
       test->string,
       evm_t::json_from_evm_instances_t(arith, cpu_instances));
-    printf("Json files printed\n");
+    printf("Json string printed\n");
 
     // free the memory
     printf("Freeing the memory ...\n");
@@ -116,6 +113,15 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     CUDA_CHECK(cudaDeviceReset());
     #endif
   }
+}
+
+void run_json_files(char* read_json_filename, char* write_json_filename){
+  //read the json file with the global state
+  cJSON *read_root = get_json_from_file(read_json_filename);
+  cJSON *write_root = cJSON_CreateObject();
+
+  run_interpreter(read_root, write_root);
+
   cJSON_Delete(read_root);
   char *json_str=cJSON_Print(write_root);
   FILE *fp=fopen(write_json_filename, "w");
@@ -125,6 +131,34 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
   cJSON_Delete(write_root);
 }
 
+extern "C" char* run_json_string(const char* read_json_string) {
+    cJSON *read_root = cJSON_Parse(read_json_string);
+    if (read_root == NULL) {
+        // Handle parsing error (optional)
+        return NULL;
+    }
+
+    cJSON *write_root = cJSON_CreateObject();
+
+    // Assume run_interpreter modifies write_root based on read_root
+    run_interpreter(read_root, write_root);
+    cJSON_Delete(read_root);
+    char *json_str = cJSON_Print(write_root);
+    cJSON_Delete(write_root);
+
+    return json_str; // Caller needs to free this memory
+}
+
+extern "C" void free_json_string(char* json_str) {
+    // temporarily not working (invalid pointer) => potential memory leak
+    // in the future, let python manage it with PyObject
+    if (json_str) {
+      cJSON_free(json_str); // Use the appropriate deallocation function
+    }
+}
+
+
+#ifndef BUILD_LIB
 int main(int argc, char *argv[]) {//getting the input
   char *read_json_filename = NULL;
   char *write_json_filename = NULL;
@@ -162,5 +196,6 @@ int main(int argc, char *argv[]) {//getting the input
     fprintf(stderr, "File '%s' does not exist\n", read_json_filename);
     exit(EXIT_FAILURE);
   }
-  run_interpreter(read_json_filename, write_json_filename);
+  run_json_files(read_json_filename, write_json_filename);
 }
+#endif
