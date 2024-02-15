@@ -6,7 +6,7 @@
 
 
 void run_interpreter(char *read_json_filename, char *write_json_filename) {
-  typedef evm_t<evm_params> evm_t;
+  // typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
   typedef arith_env_t<evm_params> arith_t;
   
@@ -58,7 +58,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     #ifndef ONLY_CPU
     printf("Running GPU kernel ...\n");
     CUDA_CHECK(cudaDeviceSynchronize());
-    kernel_evm<evm_params><<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
+    kernel_evm<<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
     //CUDA_CHECK(cudaPeekAtLastError());
     // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
     CUDA_CHECK(cudaDeviceSynchronize());

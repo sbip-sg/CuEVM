@@ -76,7 +76,7 @@ public:
    * @param arith The arithmetical environment
    * @param content The block information content
    */
-  __device__ __forceinline__ block_t(
+  __host__ __device__  __forceinline__ block_t(
       arith_t arith,
       block_data_t *content
   ) : _arith(arith),

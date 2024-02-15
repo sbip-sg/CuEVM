@@ -16,7 +16,6 @@
 #include "env_operations.cuh"
 #include "internal_operations.cuh"
 
-template <class params>
 class evm_t
 {
 public:
@@ -24,7 +23,7 @@ public:
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    typedef arith_env_t<params> arith_t;
+    typedef arith_env_t<evm_params> arith_t;
     /**
      * The arbitrary length integer type.
      */
@@ -3345,20 +3344,19 @@ public:
  * @param[out] report error report
  * @param[in] instances evm instances
 */
-template <class params>
 __global__ void kernel_evm(
     cgbn_error_report_t *report,
-    typename evm_t<params>::evm_instances_t *instances)
+    typename evm_t::evm_instances_t *instances)
 {
-    uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
+    uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / evm_params::TPI;
 
     if (instance >= instances->count)
         return;
 
     // typedef arith_env_t<params> arith_t;
-    using arith_t = arith_env_t<params>;
+    using arith_t = arith_env_t<evm_params>;
     typedef typename arith_t::bn_t bn_t;
-    typedef evm_t<params> evm_t;
+    typedef evm_t evm_t;
 
     // setup arith
     arith_t arith(
