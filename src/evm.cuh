@@ -3326,11 +3326,12 @@ public:
  * @param[out] report error report
  * @param[in] instances evm instances
 */
+template <class params>
 __global__ void kernel_evm(
     cgbn_error_report_t *report,
     typename evm_t::evm_instances_t *instances)
 {
-    uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / evm_params::TPI;
+    uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
 
     if (instance >= instances->count)
         return;
@@ -3341,7 +3342,7 @@ __global__ void kernel_evm(
         report,
         instance);
 
-    // setup evm 
+    // setup evm
     evm_t evm (
         arith,
         instances->world_state_data,
