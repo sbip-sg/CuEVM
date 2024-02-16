@@ -8,7 +8,7 @@ void run_interpreter(cJSON *read_root, cJSON *write_root) {
   // typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
   typedef arith_env_t<evm_params> arith_t;
-  
+
   evm_instances_t         cpu_instances;
   #ifndef ONLY_CPU
   evm_instances_t tmp_gpu_instances, *gpu_instances;
@@ -29,17 +29,17 @@ void run_interpreter(cJSON *read_root, cJSON *write_root) {
     printf("Generating instances\n");
     evm_t::get_cpu_instances(cpu_instances, test);
     printf("%d instances generated\n", cpu_instances.count);
-    
+
     #ifndef ONLY_CPU
     evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
     CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
     CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
     #endif
-    
+
     // create a cgbn_error_report for CGBN to report back errors
     #ifndef ONLY_CPU
     size_t heap_size, stack_size;
-    CUDA_CHECK(cgbn_error_report_alloc(&report)); 
+    CUDA_CHECK(cgbn_error_report_alloc(&report));
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
     heap_size = (size_t(2)<<30); // 2GB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
@@ -50,7 +50,7 @@ void run_interpreter(cJSON *read_root, cJSON *write_root) {
     printf("Heap size: %zu\n", heap_size);
     printf("Running GPU kernel ...\n");
     CUDA_CHECK(cudaDeviceSynchronize());
-    kernel_evm<<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
+    kernel_evm<evm_params><<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
     //CUDA_CHECK(cudaPeekAtLastError());
     // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
     CUDA_CHECK(cudaDeviceSynchronize());
