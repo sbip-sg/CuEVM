@@ -1,7 +1,8 @@
 #ifndef _EVM_H_
 #define _EVM_H_
-
+#include <Python.h>
 #include "include/utils.h"
+#include "include/python_utils.cuh"
 #include "stack.cuh"
 #include "message.cuh"
 #include "memory.cuh"
@@ -1687,7 +1688,7 @@ public:
                 _opcode = _bytecode[_pcs[_depth]];
             }
             ONE_THREAD_PER_INSTANCE(
-                printf("pc: %d opcode: %d\n", _pcs[_depth], _opcode);)
+                /*printf("pc: %d opcode: %d\n", _pcs[_depth], _opcode);*/)
 #ifdef TRACER
             _trace_pc = _pcs[_depth];
             _trace_opcode = _opcode;
@@ -3104,7 +3105,114 @@ public:
 #endif
         memset(instances.errors, ERR_NONE, sizeof(uint32_t) * instances.count);
     }
+    __host__ static void get_cpu_instances_plain_data(
+        evm_instances_t &instances,
+        state_data_t* state_data,
+        block_data_t* block_data,
+        transaction_data_t* transactions_data,
+        size_t count
+        )
+    {
+        //setup the arithmetic environment
+        arith_t arith(cgbn_report_monitor, 0);
+        instances.world_state_data = state_data;
+        instances.block_data = block_data;
+        // setup the keccak paramameters
+        keccak_t *keccak;
+        keccak = new keccak_t();
+        instances.sha3_parameters = keccak->_parameters;
+        delete keccak;
+        keccak = NULL;
 
+        // get the transactions
+        instances.transactions_data = transactions_data;
+
+        instances.count = count;
+
+        // allocated the memory for accessed states
+        instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
+
+        // allocated the memory for touch states
+        instances.touch_states_data = touch_state_t::get_cpu_instances(instances.count);
+
+        // allocated the memory for logs
+        instances.logs_data = log_state_t::get_cpu_instances(instances.count);
+
+#ifdef TRACER
+        // allocated the memory for tracers
+        instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
+#endif
+
+        // alocate the memory for the result of the transactions
+#ifndef ONLY_CPU
+        CUDA_CHECK(cudaMallocManaged(
+            (void **)&(instances.errors),
+            sizeof(uint32_t) * instances.count));
+#else
+        instances.errors = new uint32_t[instances.count];
+#endif
+        memset(instances.errors, ERR_NONE, sizeof(uint32_t) * instances.count);
+    }
+
+/*
+    __host__ static void get_cpu_instances_pyobject(
+            evm_instances_t &instances,
+            const PyObject *test)
+        {
+            //setup the arithmetic environment
+            arith_t arith(cgbn_report_monitor, 0);
+
+            state_data_t* state_data = 
+            // get the world state
+            world_state_t *cpu_world_state;
+            cpu_world_state = new world_state_t(arith, test);
+            instances.world_state_data = cpu_world_state->_content;
+            delete cpu_world_state;
+            cpu_world_state = NULL;
+
+            // ge the current block
+            block_t *cpu_block = NULL;
+            cpu_block = new block_t(arith, test);
+            instances.block_data = cpu_block->_content;
+            delete cpu_block;
+            cpu_block = NULL;
+
+            // setup the keccak paramameters
+            keccak_t *keccak;
+            keccak = new keccak_t();
+            instances.sha3_parameters = keccak->_parameters;
+            delete keccak;
+            keccak = NULL;
+
+            // get the transactions
+            transaction_t::get_transactions(instances.transactions_data, test, instances.count);
+
+            // allocated the memory for accessed states
+            instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
+
+            // allocated the memory for touch states
+            instances.touch_states_data = touch_state_t::get_cpu_instances(instances.count);
+
+            // allocated the memory for logs
+            instances.logs_data = log_state_t::get_cpu_instances(instances.count);
+
+    #ifdef TRACER
+            // allocated the memory for tracers
+            instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
+    #endif
+
+            // alocate the memory for the result of the transactions
+    #ifndef ONLY_CPU
+            CUDA_CHECK(cudaMallocManaged(
+                (void **)&(instances.errors),
+                sizeof(uint32_t) * instances.count));
+    #else
+            instances.errors = new uint32_t[instances.count];
+    #endif
+            memset(instances.errors, ERR_NONE, sizeof(uint32_t) * instances.count);
+        }
+
+*/
     /**
      * Get the gpu instances from the cpu instances.
      * @param[out] gpu_instances evm instances

@@ -92,9 +92,9 @@ void run_interpreter(cJSON *read_root, cJSON *write_root) {
 
 
     // print the results
-    printf("Printing the results ...\n");
-    evm_t::print_evm_instances_t(arith, cpu_instances);
-    printf("Results printed\n");
+    // printf("Printing the results ...\n");
+    // evm_t::print_evm_instances_t(arith, cpu_instances);
+    // printf("Results printed\n");
 
     // print to json files
     printf("Printing to json string ...\n");
@@ -130,33 +130,6 @@ void run_json_files(char* read_json_filename, char* write_json_filename){
   free(json_str);
   cJSON_Delete(write_root);
 }
-
-extern "C" char* run_json_string(const char* read_json_string) {
-    cJSON *read_root = cJSON_Parse(read_json_string);
-    if (read_root == NULL) {
-        // Handle parsing error (optional)
-        return NULL;
-    }
-
-    cJSON *write_root = cJSON_CreateObject();
-
-    // Assume run_interpreter modifies write_root based on read_root
-    run_interpreter(read_root, write_root);
-    cJSON_Delete(read_root);
-    char *json_str = cJSON_Print(write_root);
-    cJSON_Delete(write_root);
-
-    return json_str; // Caller needs to free this memory
-}
-
-extern "C" void free_json_string(char* json_str) {
-    // temporarily not working (invalid pointer) => potential memory leak
-    // in the future, let python manage it with PyObject
-    if (json_str) {
-      cJSON_free(json_str); // Use the appropriate deallocation function
-    }
-}
-
 
 #ifndef BUILD_LIB
 int main(int argc, char *argv[]) {//getting the input

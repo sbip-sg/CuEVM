@@ -242,7 +242,7 @@ public:
   */
   __host__ int32_t cgbn_memory_from_hex_string(
     evm_word_t &dst_cgbn_memory,
-    char *src_hex_string
+    const char *src_hex_string
   )
   {
     mpz_t value;
