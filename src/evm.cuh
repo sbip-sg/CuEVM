@@ -3369,6 +3369,45 @@ public:
     }
 
     /**
+     * Get the pyobject from the evm instances after the transaction execution.
+     * @param[in] arith arithmetic environment
+     * @param[in] instances evm instances
+     * @return pyobject
+    */
+    __host__ static PyObject* pyobject_from_evm_instances_t(arith_t &arith, evm_instances_t instances) {
+        PyObject* root = PyDict_New();
+
+        // world_state_t::pyDict_from_state_data_t(arith, instances.world_state_data);
+        world_state_t *cpu_world_state = new world_state_t(arith, instances.world_state_data);
+        PyObject* world_state_json = cpu_world_state->toPyObject();  // Assuming toPyObject() is implemented
+        PyDict_SetItemString(root, "pre", world_state_json);
+        Py_DECREF(world_state_json);
+        delete cpu_world_state;
+
+
+        PyObject* instances_json = PyList_New(0);
+        PyDict_SetItemString(root, "post", instances_json);
+        Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
+
+        for (uint32_t idx = 0; idx < instances.count; idx++) {
+            PyObject* instance_json = PyDict_New();
+            PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
+
+            #ifdef TRACER
+            PyObject* tracer_json = tracer_t::pyObject_from_tracer_data_t(arith, instances.tracers_data[idx]);  
+            PyDict_SetItemString(instance_json, "traces", tracer_json);
+            Py_DECREF(tracer_json);
+            #endif
+
+            PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances.errors[idx]));
+            PyDict_SetItemString(instance_json, "success", PyBool_FromLong((instances.errors[idx] == ERR_NONE) || (instances.errors[idx] == ERR_RETURN) || (instances.errors[idx] == ERR_SUCCESS)));
+        }
+
+        return root;
+    }
+
+
+    /**
      * Get the json from the evm instances after the transaction execution.
      * @param[in] arith arithmetic environment
      * @param[in] instances evm instances

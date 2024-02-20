@@ -1,7 +1,7 @@
 
 #ifndef _UTILS_H_
 #define _UTILS_H_
-
+#include <Python.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

@@ -322,6 +322,43 @@ public:
     }
 
     /**
+     * Get the python dict object from the tracer data structure.
+     * @param[in] arith The arithmetical environment.
+     * @param[in] tracer_data The trace data structure.
+     * @return The pythonobject.
+    */
+    __host__ static PyObject* pyObject_from_tracer_data_t(arith_t &arith, tracer_data_t &tracer_data) {
+        char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        PyObject* tracer_json = PyList_New(0);
+        PyObject* item = NULL;
+        PyObject* stack_json = NULL;
+        #ifdef COMPLEX_TRACER
+        PyObject* memory_json = NULL;
+        PyObject* touch_state_json = NULL;
+        #endif
+
+        for (size_t idx = 0; idx < tracer_data.size; idx++) {
+            item = PyDict_New();
+            
+            arith.hex_string_from_cgbn_memory(hex_string_ptr, tracer_data.addresses[idx], 5);
+            PyDict_SetItemString(item, "address", PyUnicode_FromString(hex_string_ptr));
+
+            PyDict_SetItemString(item, "pc", PyLong_FromSize_t(tracer_data.pcs[idx]));
+            PyDict_SetItemString(item, "opcode", PyLong_FromSize_t(tracer_data.opcodes[idx]));
+
+            stack_json = stack_t::pyobject_from_stack_data_t(arith, tracer_data.stacks[idx]);  // Assuming toPyObject() is implemented
+            PyDict_SetItemString(item, "stack", stack_json);
+            Py_DECREF(stack_json);
+
+            PyList_Append(tracer_json, item);
+            Py_DECREF(item);  // Decrement reference count since PyList_Append increases it
+        }
+
+        delete[] hex_string_ptr;
+        return tracer_json;
+    }
+
+    /**
      * Get the json object from the tracer data structure.
      * @param[in] arith The arithmetical environment.
      * @param[in] tracer_data The trace data structure.

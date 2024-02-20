@@ -327,6 +327,41 @@ public:
   }
 
   /**
+   * Generate a Python dictionary from a stack data structure.
+   * @param[in] arith The arithmetical environment
+   * @param[in] stack_data The stack data structure
+   * @return The Python dictionary
+  */
+  __host__ static PyObject* pyobject_from_stack_data_t(arith_t &arith, stack_data_t &stack_data) {
+    char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+    PyObject* stack_json = PyDict_New();
+
+    PyObject* stack_data_json = PyList_New(0);
+    for (uint32_t idx = 0; idx < stack_data.stack_offset; idx++) {
+        // Convert stack data to hex string
+        arith.hex_string_from_cgbn_memory(hex_string_ptr, stack_data.stack_base[idx], arith_t::BYTES);
+        
+        // Create a Python string from the hex string
+        PyObject* stack_item = PyUnicode_FromString(hex_string_ptr);
+        
+        // Add the Python string to the stack data list
+        PyList_Append(stack_data_json, stack_item);
+        
+        // Decrement the reference count of stack_item since PyList_Append increases it
+        Py_DECREF(stack_item);
+    }
+
+    // Add the stack data list to the stack dictionary under the key "data"
+    PyDict_SetItemString(stack_json, "data", stack_data_json);
+    
+    // Decrement the reference count of stack_data_json since PyDict_SetItemString increases it
+    Py_DECREF(stack_data_json);
+
+    delete[] hex_string_ptr;
+    return stack_json;
+  }
+
+  /**
    * Generate a JSON object from the stack.
    * @param[in] full If false, prints only active stack elements, otherwise prints the entire stack
   */
