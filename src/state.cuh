@@ -421,60 +421,6 @@ public:
         return account_json;
     }
 
-    /*
-        * Get PyObject of the account
-        * @param[in] arith The arithmetical environment
-        * @param[in] account The account
-        * @return The PyObject of the account
-    */
-    __host__ static PyObject* pyobject_from_account_t(arith_t &arith, account_t &account) {
-        PyObject* account_json = PyDict_New();
-        PyObject* storage_json = PyDict_New();
-        char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-        char* value_hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-        size_t jdx = 0;
-
-        // Set the address
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.address, 5);
-        PyDict_SetItemString(account_json, "address", PyUnicode_FromString(hex_string_ptr));
-
-        // Set the balance
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.balance);
-        PyDict_SetItemString(account_json, "balance", PyUnicode_FromString(hex_string_ptr));
-
-        // Set the nonce
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.nonce);
-        PyDict_SetItemString(account_json, "nonce", PyUnicode_FromString(hex_string_ptr));
-
-        // Set the code
-        if (account.code_size > 0) {
-            char* bytes_string = hex_from_bytes(account.bytecode, account.code_size);  // Assuming hex_from_bytes is defined elsewhere
-            PyDict_SetItemString(account_json, "code", PyUnicode_FromString(bytes_string));
-            delete[] bytes_string;
-        } else {
-            PyDict_SetItemString(account_json, "code", PyUnicode_FromString("0x"));
-        }
-
-        // Set the storage
-        PyDict_SetItemString(account_json, "storage", storage_json);
-        if (account.storage_size > 0) {
-            for (jdx = 0; jdx < account.storage_size; jdx++) {
-                arith.hex_string_from_cgbn_memory(hex_string_ptr, account.storage[jdx].key);
-                arith.hex_string_from_cgbn_memory(value_hex_string_ptr, account.storage[jdx].value);
-                PyDict_SetItemString(storage_json, hex_string_ptr, PyUnicode_FromString(value_hex_string_ptr));
-            }
-        }
-
-        // Clean up
-        delete[] hex_string_ptr;
-        delete[] value_hex_string_ptr;
-
-        // Decrement the reference count of storage_json since it's now owned by account_json
-        Py_DECREF(storage_json);
-
-        return account_json;
-    }
-
     /**
      * Get the index of the account with the given address.
      * @param[in] address The address of the account
@@ -630,34 +576,6 @@ public:
     }
 
     /**
-     * Get pyobject of the state
-    */
-    __host__ __forceinline__ static PyObject* pyDict_from_state_data_t(arith_t &arith, state_data_t &state_data) {
-        
-        PyObject* state_json = PyDict_New();
-        PyObject* account_json = NULL;
-        char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-        size_t idx = 0;
-
-        for (idx = 0; idx < state_data.no_accounts; idx++) {
-            // Assuming an equivalent function or method exists that returns a PyObject* for an account
-            account_json = pyobject_from_account_t(arith, state_data.accounts[idx]);  // Replace with actual function/method
-            
-            // Convert account address to hex string
-            arith.hex_string_from_cgbn_memory(hex_string_ptr, state_data.accounts[idx].address, 5);
-            
-            // Add account PyObject to the state dictionary using the address as the key
-            PyDict_SetItemString(state_json, hex_string_ptr, account_json);
-            
-            // Decrement the reference count of account_json since PyDict_SetItemString increases it
-            Py_DECREF(account_json);
-        }
-
-        delete[] hex_string_ptr;
-        return state_json;
-    }
-
-    /**
      * Get json of the state
      * @return The json of the state
     */
@@ -666,13 +584,6 @@ public:
         return json_from_state_data_t(_arith, *_content);
     }
 
-    /**
-     * Get PyObject from the state
-     * @return The PyObject of the state
-     */
-    __host__ __forceinline__ PyObject *toPyObject(){
-        return pyDict_from_state_data_t(_arith, *_content);
-    }
 };
 
 /**

@@ -2,7 +2,6 @@
 #define _EVM_H_
 #include <Python.h>
 #include "include/utils.h"
-#include "include/python_utils.cuh"
 #include "stack.cuh"
 #include "message.cuh"
 #include "memory.cuh"
@@ -3105,6 +3104,15 @@ public:
 #endif
         memset(instances.errors, ERR_NONE, sizeof(uint32_t) * instances.count);
     }
+
+    /*
+        * Get the cpu instances from the plain data.
+        * @param[out] instances evm instances
+        * @param[in] state_data state data
+        * @param[in] block_data block data
+        * @param[in] transactions_data transactions data
+        * @param[in] count number of transactions
+    */
     __host__ static void get_cpu_instances_plain_data(
         evm_instances_t &instances,
         state_data_t* state_data,
@@ -3154,65 +3162,6 @@ public:
         memset(instances.errors, ERR_NONE, sizeof(uint32_t) * instances.count);
     }
 
-/*
-    __host__ static void get_cpu_instances_pyobject(
-            evm_instances_t &instances,
-            const PyObject *test)
-        {
-            //setup the arithmetic environment
-            arith_t arith(cgbn_report_monitor, 0);
-
-            state_data_t* state_data = 
-            // get the world state
-            world_state_t *cpu_world_state;
-            cpu_world_state = new world_state_t(arith, test);
-            instances.world_state_data = cpu_world_state->_content;
-            delete cpu_world_state;
-            cpu_world_state = NULL;
-
-            // ge the current block
-            block_t *cpu_block = NULL;
-            cpu_block = new block_t(arith, test);
-            instances.block_data = cpu_block->_content;
-            delete cpu_block;
-            cpu_block = NULL;
-
-            // setup the keccak paramameters
-            keccak_t *keccak;
-            keccak = new keccak_t();
-            instances.sha3_parameters = keccak->_parameters;
-            delete keccak;
-            keccak = NULL;
-
-            // get the transactions
-            transaction_t::get_transactions(instances.transactions_data, test, instances.count);
-
-            // allocated the memory for accessed states
-            instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
-
-            // allocated the memory for touch states
-            instances.touch_states_data = touch_state_t::get_cpu_instances(instances.count);
-
-            // allocated the memory for logs
-            instances.logs_data = log_state_t::get_cpu_instances(instances.count);
-
-    #ifdef TRACER
-            // allocated the memory for tracers
-            instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
-    #endif
-
-            // alocate the memory for the result of the transactions
-    #ifndef ONLY_CPU
-            CUDA_CHECK(cudaMallocManaged(
-                (void **)&(instances.errors),
-                sizeof(uint32_t) * instances.count));
-    #else
-            instances.errors = new uint32_t[instances.count];
-    #endif
-            memset(instances.errors, ERR_NONE, sizeof(uint32_t) * instances.count);
-        }
-
-*/
     /**
      * Get the gpu instances from the cpu instances.
      * @param[out] gpu_instances evm instances
@@ -3366,44 +3315,6 @@ public:
 
             printf("Error: %u\n", instances.errors[idx]);
         }
-    }
-
-    /**
-     * Get the pyobject from the evm instances after the transaction execution.
-     * @param[in] arith arithmetic environment
-     * @param[in] instances evm instances
-     * @return pyobject
-    */
-    __host__ static PyObject* pyobject_from_evm_instances_t(arith_t &arith, evm_instances_t instances) {
-        PyObject* root = PyDict_New();
-
-        // world_state_t::pyDict_from_state_data_t(arith, instances.world_state_data);
-        world_state_t *cpu_world_state = new world_state_t(arith, instances.world_state_data);
-        PyObject* world_state_json = cpu_world_state->toPyObject();  // Assuming toPyObject() is implemented
-        PyDict_SetItemString(root, "pre", world_state_json);
-        Py_DECREF(world_state_json);
-        delete cpu_world_state;
-
-
-        PyObject* instances_json = PyList_New(0);
-        PyDict_SetItemString(root, "post", instances_json);
-        Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
-
-        for (uint32_t idx = 0; idx < instances.count; idx++) {
-            PyObject* instance_json = PyDict_New();
-            PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
-
-            #ifdef TRACER
-            PyObject* tracer_json = tracer_t::pyObject_from_tracer_data_t(arith, instances.tracers_data[idx]);  
-            PyDict_SetItemString(instance_json, "traces", tracer_json);
-            Py_DECREF(tracer_json);
-            #endif
-
-            PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances.errors[idx]));
-            PyDict_SetItemString(instance_json, "success", PyBool_FromLong((instances.errors[idx] == ERR_NONE) || (instances.errors[idx] == ERR_RETURN) || (instances.errors[idx] == ERR_SUCCESS)));
-        }
-
-        return root;
     }
 
 
