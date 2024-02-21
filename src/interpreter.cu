@@ -146,20 +146,20 @@ int main(int argc, char *argv[]) {//getting the input
           write_json_filename = optarg;
           break;
       default:
-          fprintf(stderr, "Usage: %s --input <json_filename> --output <json_filename>\n", argv[0]);
+          fprintf(stdout, "Usage: %s --input <json_filename> --output <json_filename>\n", argv[0]);
           exit(EXIT_FAILURE);
       }
   }
   if (!read_json_filename || !write_json_filename)
   {
-      fprintf(stderr, "Both --input and --output flags are required\n");
+      fprintf(stdout, "Both --input and --output flags are required\n");
       exit(EXIT_FAILURE);
   }
 
   // check if the file exists
   std::ifstream file(read_json_filename);
   if (!file) {
-    fprintf(stderr, "File '%s' does not exist\n", read_json_filename);
+    fprintf(stdout, "File '%s' does not exist\n", read_json_filename);
     exit(EXIT_FAILURE);
   }
   run_interpreter(read_json_filename, write_json_filename);
