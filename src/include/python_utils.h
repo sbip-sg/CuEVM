@@ -76,12 +76,12 @@ namespace python_utils{
         size_t idx = 0, jdx = 0;
 
         type = 0;
-        
-        arith.cgbn_memory_from_hex_string(template_transaction->nonce, "0x00");
 
-        arith.cgbn_memory_from_hex_string(template_transaction->to, "0xcccccccccccccccccccccccccccccccccccccccc");
-        
-        arith.cgbn_memory_from_hex_string(template_transaction->sender, "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b");
+        arith.cgbn_memory_from_hex_string(template_transaction->nonce, PyUnicode_AsUTF8(PyDict_GetItemString(data, "nonce")));
+
+        arith.cgbn_memory_from_hex_string(template_transaction->to, PyUnicode_AsUTF8(PyDict_GetItemString(data, "to")));
+
+        arith.cgbn_memory_from_hex_string(template_transaction->sender, PyUnicode_AsUTF8(PyDict_GetItemString(data, "sender")));
 
 
         type = 0;
@@ -128,6 +128,7 @@ namespace python_utils{
         delete template_transaction;
         return transactions;
     }
+
     state_data_t* getStateDataFromPyObject(arith_t arith, PyObject* data) {
         PyObject *key, *value;
         Py_ssize_t pos = 0;
@@ -142,7 +143,7 @@ namespace python_utils{
         #endif
 
         state_data->no_accounts = PyDict_Size(data);
-        
+
         #ifndef ONLY_CPU
         CUDA_CHECK(cudaMallocManaged((void **)&(state_data->accounts), state_data->no_accounts * sizeof(account_t)));
         #else
@@ -164,14 +165,20 @@ namespace python_utils{
             arith.cgbn_memory_from_hex_string(state_data->accounts[account_index].nonce, nonce);
             // printf("Account %d: %s\n", account_index, address_str);
             // Bytecode handling
-            state_data->accounts[account_index].code_size = (strlen(code) - 2) / 2;  // Assuming each byte is represented by 2 hex characters, prefix 0x
+            if (strlen(code) >= 2 && (code[0] == '0' && (code[1] == 'x' || code[1] == 'X')))
+                code += 2;  // Skip the "0x" prefix
+            if (strlen(code) % 2 != 0) {
+                printf("Invalid bytecode length\n");
+                return NULL;
+            }
+            state_data->accounts[account_index].code_size = strlen(code) / 2;  // Assuming each byte is represented by 2 hex characters, prefix 0x
             if (state_data->accounts[account_index].code_size > 0) {
                 #ifndef ONLY_CPU
                 CUDA_CHECK(cudaMallocManaged((void **)&(state_data->accounts[account_index].bytecode), state_data->accounts[account_index].code_size));
                 #else
                 state_data->accounts[account_index].bytecode = new uint8_t[state_data->accounts[account_index].code_size];
                 #endif
-                hex_to_bytes(code, state_data->accounts[account_index].bytecode, state_data->accounts[account_index].code_size);
+                hex_to_bytes(code, state_data->accounts[account_index].bytecode, strlen(code));
             } else {
                 state_data->accounts[account_index].bytecode = NULL;
             }
@@ -181,6 +188,7 @@ namespace python_utils{
             if (storage_dict && PyDict_Size(storage_dict) > 0) {
                 // Assuming you have a function to handle storage initialization
                 // initialize_storage(&state_data->accounts[account_index], storage_dict);
+                printf("Storage handling not implemented\n");
             } else {
                 state_data->accounts[account_index].storage = NULL;
                 state_data->accounts[account_index].storage_size = 0;
@@ -202,10 +210,8 @@ namespace python_utils{
         PyObject* tracer_json = PyList_New(0);
         PyObject* item = NULL;
         PyObject* stack_json = NULL;
-
         for (size_t idx = 0; idx < tracer_data.size; idx++) {
             item = PyDict_New();
-            
             arith.hex_string_from_cgbn_memory(hex_string_ptr, tracer_data.addresses[idx], 5);
             PyDict_SetItemString(item, "address", PyUnicode_FromString(hex_string_ptr));
 
@@ -282,7 +288,7 @@ namespace python_utils{
      * Get pyobject of the state
     */
     __host__ __forceinline__ static PyObject* pyobject_from_state_data_t(arith_t &arith, state_data_t* state_data) {
-        
+
         PyObject* state_json = PyDict_New();
         PyObject* account_json = NULL;
         char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
@@ -291,13 +297,13 @@ namespace python_utils{
         for (idx = 0; idx < state_data->no_accounts; idx++) {
             // Assuming an equivalent function or method exists that returns a PyObject* for an account
             account_json = pyobject_from_account_t(arith, state_data->accounts[idx]);  // Replace with actual function/method
-            
+
             // Convert account address to hex string
             arith.hex_string_from_cgbn_memory(hex_string_ptr, state_data->accounts[idx].address, 5);
-            
+
             // Add account PyObject to the state dictionary using the address as the key
             PyDict_SetItemString(state_json, hex_string_ptr, account_json);
-            
+
             // Decrement the reference count of account_json since PyDict_SetItemString increases it
             Py_DECREF(account_json);
         }
@@ -305,7 +311,7 @@ namespace python_utils{
         delete[] hex_string_ptr;
         return state_json;
     }
-    
+
     /**
      * Get the pyobject from the evm instances after the transaction execution.
      * @param[in] arith arithmetic environment
@@ -314,7 +320,7 @@ namespace python_utils{
     */
     __host__ __forceinline__ static PyObject* pyobject_from_evm_instances_t(arith_t &arith, evm_instances_t instances) {
         PyObject* root = PyDict_New();
-        PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);  
+        PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
         PyDict_SetItemString(root, "pre", world_state_json);
         Py_DECREF(world_state_json);
 
@@ -327,7 +333,7 @@ namespace python_utils{
             PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
 
             #ifdef TRACER
-            PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);  
+            PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
             PyDict_SetItemString(instance_json, "traces", tracer_json);
             Py_DECREF(tracer_json);
             #endif
@@ -355,7 +361,7 @@ namespace python_utils{
             const char* keyStr = PyUnicode_AsUTF8(keyStrObj);
             printf("%s: ", keyStr);
             Py_DECREF(keyStrObj);
-            
+
             // Check if value is a dictionary
             if (PyDict_Check(value)) {
                 printf("\n");

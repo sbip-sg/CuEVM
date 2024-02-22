@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import sys
 import ctypes
 import json
@@ -11,22 +12,24 @@ def process_json(input_data, output_file):
     # Convert Python dictionary to JSON string
     # input_json_string = json.dumps(input_data).encode('utf-8')
 
-    input_data = input_data[list(input_data.keys())[0]] # extract first value
+    temp_input_data = input_data[list(input_data.keys())[0]] # extract first value
     # Call the library function with the JSON string
     # print ("input data")
     # print (input_data)
     # result_json = libcuevm.print_dict(input_data)
-    result_json = libcuevm.run_dict(input_data)
-    json.dump(result_json, open(output_file, 'w'), indent=4)
+    result_json = libcuevm.run_dict(temp_input_data)
 
-import argparse 
+    input_data[list(input_data.keys())[0]]["post"]= result_json["post"]
+    json.dump(input_data, open(output_file, 'w'), indent=4)
+
+import argparse
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('input', type=str, help='path to json file')
-    parser.add_argument('output', type=str, help='path to output json file')
-    parser.add_argument('num_instances', type=int, default=1, help='number of instances')
+    parser.add_argument('--input', type=str, help='path to json file')
+    parser.add_argument('--output', type=str, help='path to output json file')
+    parser.add_argument('--num_instances', type=int, default=1, help='number of instances')
     args = parser.parse_args()
 
     json_file = args.input

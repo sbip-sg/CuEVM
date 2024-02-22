@@ -1687,7 +1687,7 @@ public:
                 _opcode = _bytecode[_pcs[_depth]];
             }
             ONE_THREAD_PER_INSTANCE(
-                /*printf("pc: %d opcode: %d\n", _pcs[_depth], _opcode);*/)
+               /* printf("pc: %d opcode: %02x\n", _pcs[_depth], _opcode);*/)
 #ifdef TRACER
             _trace_pc = _pcs[_depth];
             _trace_opcode = _opcode;

@@ -137,7 +137,7 @@ public:
                     new_opcodes,
                     _content->opcodes,
                     sizeof(uint8_t) * _content->capacity);
-                
+
                 memcpy(
                     new_stacks,
                     _content->stacks,

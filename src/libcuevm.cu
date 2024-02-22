@@ -30,7 +30,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
     block_data_t* block_data = getBlockDataFromPyObject(arith, PyDict_GetItemString(read_root, "env"));
 
     state_data_t* state_data = getStateDataFromPyObject(arith, PyDict_GetItemString(read_root, "pre"));
-    
+
     transaction_data_t* transactions = getTransactionDataFromPyObject(arith, PyDict_GetItemString(read_root, "transaction"));
 
     size_t count = 1;
@@ -78,7 +78,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
         uint32_t tmp_error;
         for(uint32_t instance = 0; instance < cpu_instances.count; instance++) {
         printf("Running instance %d\n", instance);
-        // print some test accounts 
+        // print some test accounts
         // size_t no_accounts = cpu_instances.world_state_data->no_accounts > 2 ? 2 : cpu_instances.world_state_data->no_accounts;
         // printf(" print directly from world_state_data\n");
         // state_data_t *state_data_1 = cpu_instances.world_state_data;

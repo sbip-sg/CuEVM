@@ -1,11 +1,11 @@
 # Compiler
 NVCC = nvcc
-NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo 
+NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo -I/usr/include/python3.10 -I/usr/include/python3.10 -lpython3.10
 GCC = gcc
 GCC_FLAGS = -lm -lgmp -lcjson
 GPP = g++
-GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson
-OUT_DIRECTORY = ./out
+GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson  -I/usr/include/python3.10 -I/usr/include/python3.10 -lpython3.10
+OUT_DIRECTORY = ./build
 
 ENABLE_TRACING ?= 0
 
@@ -31,7 +31,7 @@ test_cgbn: src/test/test_cgbn.cu
 interpreter:
 	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
-library: 
+library:
 	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -D BUILD_LIB --shared -Xcompiler '-fPIC' -o $(OUT_DIRECTORY)/libcuevm.so src/interpreter.cu
 
 debug_interpreter:

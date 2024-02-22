@@ -2,7 +2,8 @@ enable_language(CUDA)
 find_package(CUDAToolkit REQUIRED)
 find_package(GMP REQUIRED)
 find_package(cJSON REQUIRED) # Assuming cJSON is available as a find package
-
+find_package(PythonLibs REQUIRED)
+include_directories(${PYTHON_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/CGBN/include)
 include_directories(${GMP_INCLUDE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -17,8 +18,7 @@ set(CMAKE_CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 
 # Check if building as a library or an executable
 if(BUILD_LIBRARY)
-    find_package(PythonLibs REQUIRED)
-    include_directories(${PYTHON_INCLUDE_DIRS})
+
     # Build as a shared library
     add_library(${PROJECT_NAME} SHARED libcuevm.cu)
 
@@ -28,7 +28,7 @@ if(BUILD_LIBRARY)
         target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-g>)
     endif()
     set_target_properties(${PROJECT_NAME}  PROPERTIES OUTPUT_NAME "cuevm")
-    target_link_libraries(${PROJECT_NAME}  gmp cjson ${PYTHON_LIBRARIES}) 
+    target_link_libraries(${PROJECT_NAME}  gmp cjson ${PYTHON_LIBRARIES})
 else()
     # Build as an executable
     add_executable(${PROJECT_NAME} interpreter.cu)

@@ -339,21 +339,20 @@ public:
     PyObject* stack_data_json = PyList_New(0);
     for (uint32_t idx = 0; idx < stack_data.stack_offset; idx++) {
         // Convert stack data to hex string
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, stack_data.stack_base[idx], arith_t::BYTES);
-        
+        arith.hex_string_from_cgbn_memory(hex_string_ptr, stack_data.stack_base[idx]);
         // Create a Python string from the hex string
         PyObject* stack_item = PyUnicode_FromString(hex_string_ptr);
-        
+
         // Add the Python string to the stack data list
         PyList_Append(stack_data_json, stack_item);
-        
+
         // Decrement the reference count of stack_item since PyList_Append increases it
         Py_DECREF(stack_item);
     }
 
     // Add the stack data list to the stack dictionary under the key "data"
     PyDict_SetItemString(stack_json, "data", stack_data_json);
-    
+
     // Decrement the reference count of stack_data_json since PyDict_SetItemString increases it
     Py_DECREF(stack_data_json);
 

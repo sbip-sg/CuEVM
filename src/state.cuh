@@ -198,13 +198,13 @@ public:
 
     /**
      * The constructor of the state on the host.
-     * 
+     *
      * It reads the json file and creates the state.
      * It pass through all the account and their
      * storage and creates the corresponding data.
      * It used unnified memory so the state can be
      * easily used on the device.
-     * 
+     *
      * @param arith The arithmetical environment
      * @param test the json for the current test
     */
@@ -351,9 +351,11 @@ public:
         printf("nonce: ");
         arith.print_cgbn_memory(account.nonce);
         printf("code_size: %lu\n", account.code_size);
-        printf("code: ");
-        print_bytes(account.bytecode, account.code_size);
-        printf("\n");
+        if (account.code_size > 0){
+            printf("code: ");
+            print_bytes(account.bytecode, account.code_size);
+            printf("\n");
+        }
         printf("storage_size: %lu\n", account.storage_size);
         for (size_t idx = 0; idx < account.storage_size; idx++)
         {
@@ -1720,7 +1722,7 @@ __global__ void kernel_accessed_state_S2(
 
 /**
  * Class to represent the touch state.
- * The touch state is the state which 
+ * The touch state is the state which
  * contains the acounts modified
  * by the execution of the transaction.
  * YP: accrued transaction substate
@@ -2050,10 +2052,10 @@ public:
      * Get the index of the account given by the address,
      * or if it does not exist, add it to the list of accounts,
      * and return the index of the new account.
-     * 
+     *
      * It setup the new account with the details from the most updated
      * version in the parents or the accessed state (global).
-     * 
+     *
      * @param[in] address The address of the account
     */
     __host__ __device__ __forceinline__ size_t set_account(
@@ -2307,7 +2309,7 @@ public:
 
     /**
      * Get the gas cost and gas refund for the storage set operation.
-     * 
+     *
      * @param[in] address The address of the account
      * @param[in] key The key of the storage
      * @param[in] value The new value for the storage
@@ -2407,7 +2409,7 @@ public:
         get_storage_set_gas_cost_gas_refund(address, key, value, gas_cost, set_gas_refund);
         cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
         cgbn_add(_arith._env, gas_refund, gas_refund, set_gas_refund);
-    } 
+    }
 
     /**
      * Set the storage value for the given key in the storage
@@ -2527,7 +2529,7 @@ public:
                 }
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
-            
+
             return 0;
         }
     }
@@ -2568,7 +2570,7 @@ public:
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
 
-            
+
             // if the account does not exist in the tree of touch states
             // search it in the accessed state/global state
             tmp_error_code = ERR_SUCCESS;
@@ -2583,7 +2585,7 @@ public:
             {
                 return 1;
             }
-            
+
             return 0;
         }
     }
@@ -2623,7 +2625,7 @@ public:
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
 
-            
+
             // if the account does not exist in the tree of touch states
             // search it in the accessed state/global state
             tmp_error_code = ERR_SUCCESS;
@@ -2638,7 +2640,7 @@ public:
             {
                 return _accessed_state->_world_state->_content->accounts[account_idx].code_size > 0;
             }
-            
+
             return 0;
         }
     }
@@ -3105,7 +3107,7 @@ public:
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaFree(gpu_instances));
 
-        
+
         // STEP 2: get the accounts storage and bytecode from GPU
         gpu_instances = tmp_gpu_instances;
 
