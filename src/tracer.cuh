@@ -289,32 +289,61 @@ public:
     {
         printf("Tracer data:\n");
         printf("Size: %lu\n", tracer_data.size);
-        char *p0 = new char[arith_t::BYTES * 2 + 3];
-        char *p1 = new char[arith_t::BYTES * 2 + 3];
+        char *gas_left_str = new char[arith_t::BYTES * 2 + 3];
+        char *gas_cost_str = new char[arith_t::BYTES * 2 + 3];
+        char *temp = new char[arith_t::BYTES * 2 + 3];
         bn_t gas_cost;
         bn_t prev_gas_used;
         bn_t gas_used;
+        bn_t gas_left;
+        bn_t gas_limit;
         evm_word_t *evm_word = new evm_word_t[32];
+        stack_data_t stack_data;
+
         for (size_t idx = 0; idx < tracer_data.size; idx++)
         {
           // todo https://eips.ethereum.org/EIPS/eip-3155
           // maintain a tracer data is costly in terms of memory, maybe we print in the each evm step and do not save data
           if (idx > 0){
             cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[idx -1]);
-            arith.hex_string_from_cgbn_memory(p0, tracer_data.gas_useds[idx -1]);
           }
 
-          cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx]);
+          stack_data = tracer_data.stacks[idx];
+
+          std::string stack_str = "\"";
+          if (stack_data.stack_offset > 0){
+            for (auto index =0; index<stack_data.stack_offset; index++){
+              arith.hex_string_from_cgbn_memory(temp, stack_data.stack_base[index]);
+              stack_str += temp;
+              if (index == stack_data.stack_offset - 1) {
+                stack_str += "\"";
+              } else {
+                stack_str += "\", ";
+              }
+            }
+          }
+
+          // calculate gas_cost in this operation
           cgbn_sub(arith._env, gas_cost, gas_used, prev_gas_used);
 
-          cgbn_store(arith._env, evm_word, gas_cost);
-          arith.hex_string_from_cgbn_memory(p1, *evm_word);
+          // calculate gas_left
+          cgbn_load(arith._env, gas_limit, &tracer_data.gas_limits[idx]);
+          cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx]);
+          cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
+          cgbn_add(arith._env, gas_left, gas_left, gas_cost); // gas_left in EIP-3155 is the value before the operation
+          cgbn_store(arith._env, evm_word, gas_left);
+          arith.hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
-          fprintf(stderr, "{\"pc\": %d, \"op\": %d, \"gas\": \"%s\", \"gasCost\": \"%s\", \"stack\": [], \"depth\": %d, \"memSize\": %lu}\n",
+
+
+          // cgbn_store(arith._env, evm_word, gas_cost);
+          // arith.hex_string_from_cgbn_memory(gas_cost_str, *evm_word);
+
+          fprintf(stderr, "{\"pc\": %d, \"op\": %d, \"gas\": \"%s\", \"stack\": [%s], \"depth\": %d, \"memSize\": %lu}\n",
                   tracer_data.pcs[idx],
                   tracer_data.opcodes[idx],
-                  p0, // gas used before this operation
-                  p1, // gas cost of this operation
+                  gas_left_str, // gas left before this operation
+                  stack_str.c_str(), // stack array as "0x...", "0x..."
                   1, // call depth
                   tracer_data.memories[idx].size // Size of memory array // TODO: we don't need the whole memory, maybe keep the size only
                   );
@@ -338,10 +367,12 @@ public:
             printf("Error code: %d\n", tracer_data.error_codes[idx]);
             #endif
         }
-        delete[] p0;
-        delete[] p1;
-        p0 = nullptr;
-        p1 = nullptr;
+        delete[] gas_left_str;
+        delete[] gas_cost_str;
+        delete[] temp;
+        gas_cost_str = nullptr;
+        gas_left_str = nullptr;
+        temp = nullptr;
     }
 
     /**
