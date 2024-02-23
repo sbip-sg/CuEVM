@@ -23,6 +23,7 @@ using transaction_data_t = transaction_t::transaction_data_t;
 using account_t = world_state_t::account_t;
 using tracer_data_t = tracer_t::tracer_data_t;
 using evm_instances_t = evm_t::evm_instances_t;
+using contract_storage_t = world_state_t::contract_storage_t;
 
 namespace python_utils{
 
@@ -185,14 +186,52 @@ namespace python_utils{
 
             // Storage handling (assuming a function to handle storage initialization)
             PyObject* storage_dict = PyDict_GetItemString(value, "storage");
-            if (storage_dict && PyDict_Size(storage_dict) > 0) {
+            state_data->accounts[account_index].storage_size = PyDict_Size(storage_dict);
+            if (storage_dict && state_data->accounts[account_index].storage_size > 0) {
+
                 // Assuming you have a function to handle storage initialization
                 // initialize_storage(&state_data->accounts[account_index], storage_dict);
-                printf("Storage handling not implemented\n");
+                PyObject *key_storage, *value_storage;
+
+                Py_ssize_t pos_storage = 0;
+                Py_ssize_t idx_storage = 0;
+                // allocate the storage
+                #ifndef ONLY_CPU
+                CUDA_CHECK(cudaMallocManaged(
+                    (void **)&(state_data->accounts[account_index].storage),
+                    state_data->accounts[account_index].storage_size * sizeof(contract_storage_t)
+                ));
+                #else
+                state_data->accounts[account_index].storage = new contract_storage_t[state_data->accounts[account_index].storage_size];
+                #endif
+
+                size_t idx = 0;
+                // Iterate through the dictionary
+                while (PyDict_Next(storage_dict, &pos_storage, &key_storage, &value_storage)) {
+                    // Increase reference count for key and value before storing them
+                    Py_INCREF(key_storage);
+                    Py_INCREF(value_storage);
+
+                    PyObject* keyStrObj = PyObject_Str(key_storage);
+                    const char* keyStr = PyUnicode_AsUTF8(keyStrObj);
+                    arith.cgbn_memory_from_hex_string(state_data->accounts[account_index].storage[idx].key, keyStr);
+                    Py_DECREF(keyStrObj);
+
+                    PyObject* valueStrObj = PyObject_Str(value_storage);
+                    const char* valueStr = PyUnicode_AsUTF8(valueStrObj);
+                    arith.cgbn_memory_from_hex_string(state_data->accounts[account_index].storage[idx].value, valueStr);
+                    Py_DECREF(valueStrObj);
+
+                    idx++;
+                }
+
+
             } else {
                 state_data->accounts[account_index].storage = NULL;
                 state_data->accounts[account_index].storage_size = 0;
             }
+
+        // world_state_t::print_account_t(arith, state_data->accounts[account_index]);
 
         }
 
@@ -311,6 +350,93 @@ namespace python_utils{
         delete[] hex_string_ptr;
         return state_json;
     }
+    /*
+        * Get PyObject of the transaction
+        * @param[in] arith The arithmetical environment
+        * @param[in] transaction The transaction
+        * @return The PyObject of the transaction
+    */
+    PyObject* pyobject_from_transaction_content(arith_t &_arith, transaction_data_t* _content) {
+        PyObject* transaction_json = PyDict_New();
+        char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        char* bytes_string = NULL;
+
+        // Set the type
+        PyDict_SetItemString(transaction_json, "type", PyLong_FromLong(_content->type));
+
+        // Set the nonce
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->nonce);
+        PyDict_SetItemString(transaction_json, "nonce", PyUnicode_FromString(hex_string_ptr));
+
+        // Set the gas limit
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->gas_limit);
+        PyDict_SetItemString(transaction_json, "gasLimit", PyUnicode_FromString(hex_string_ptr));
+
+        // Set the to address
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->to, 5);
+        PyDict_SetItemString(transaction_json, "to", PyUnicode_FromString(hex_string_ptr));
+
+        // Set the value
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->value);
+        PyDict_SetItemString(transaction_json, "value", PyUnicode_FromString(hex_string_ptr));
+
+        // Set the sender
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->sender, 5);
+        PyDict_SetItemString(transaction_json, "sender", PyUnicode_FromString(hex_string_ptr));
+        // TODO: delete this from revmi comparator
+        PyDict_SetItemString(transaction_json, "origin", PyUnicode_FromString(hex_string_ptr));
+
+        // Set the access list
+        if (_content->type >= 1) {
+            PyObject* access_list_json = PyList_New(0);
+            PyDict_SetItemString(transaction_json, "accessList", access_list_json);
+            Py_DECREF(access_list_json);  // Decrement because PyDict_SetItemString increases the ref count
+
+            for (size_t idx = 0; idx < _content->access_list.no_accounts; idx++) {
+                PyObject* account_json = PyDict_New();
+                PyList_Append(access_list_json, account_json);  // Append steals the reference, so no need to DECREF
+
+                _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->access_list.accounts[idx].address, 5);
+                PyDict_SetItemString(account_json, "address", PyUnicode_FromString(hex_string_ptr));
+
+                PyObject* storage_keys_json = PyList_New(0);
+                PyDict_SetItemString(account_json, "storageKeys", storage_keys_json);
+                Py_DECREF(storage_keys_json);  // Decrement because PyDict_SetItemString increases the ref count
+
+                for (size_t jdx = 0; jdx < _content->access_list.accounts[idx].no_storage_keys; jdx++) {
+                    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->access_list.accounts[idx].storage_keys[jdx]);
+                    PyList_Append(storage_keys_json, PyUnicode_FromString(hex_string_ptr));
+                }
+            }
+        }
+
+        // Set the gas price
+        if (_content->type == 2) {
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->max_fee_per_gas);
+            PyDict_SetItemString(transaction_json, "maxFeePerGas", PyUnicode_FromString(hex_string_ptr));
+
+            // Set the max priority fee per gas
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->max_priority_fee_per_gas);
+            PyDict_SetItemString(transaction_json, "maxPriorityFeePerGas", PyUnicode_FromString(hex_string_ptr));
+        } else {
+            // Set the gas price
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->gas_price);
+            PyDict_SetItemString(transaction_json, "gasPrice", PyUnicode_FromString(hex_string_ptr));
+        }
+
+        // Set the data
+        if (_content->data_init.size > 0) {
+            bytes_string = hex_from_data_content(_content->data_init);  // Assuming this function exists and converts data to hex string
+            PyDict_SetItemString(transaction_json, "data", PyUnicode_FromString(bytes_string));
+            delete[] bytes_string;
+        } else {
+            PyDict_SetItemString(transaction_json, "data", PyUnicode_FromString("0x"));
+        }
+
+        delete[] hex_string_ptr;
+        return transaction_json;
+    }
+
 
     /**
      * Get the pyobject from the evm instances after the transaction execution.
@@ -331,7 +457,8 @@ namespace python_utils{
         for (uint32_t idx = 0; idx < instances.count; idx++) {
             PyObject* instance_json = PyDict_New();
             PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
-
+            PyObject* transaction_json = pyobject_from_transaction_content(arith, &instances.transactions_data[idx]);
+            PyDict_SetItemString(instance_json, "msg", transaction_json);
             #ifdef TRACER
             PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
             PyDict_SetItemString(instance_json, "traces", tracer_json);
