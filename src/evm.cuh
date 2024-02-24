@@ -1691,6 +1691,18 @@ public:
 #ifdef TRACER
             _trace_pc = _pcs[_depth];
             _trace_opcode = _opcode;
+            _tracer->push(
+                _trace_address,
+                _trace_pc,
+                _trace_opcode,
+                *_stack_ptrs[_depth],
+                *_memory_ptrs[_depth],
+                *_touch_state_ptrs[_depth],
+                _gas_useds[_depth],
+                _gas_limit,
+                _gas_refunds[_depth],
+                error_code);
+
 #endif
             // PUSHX
             if (((_opcode & 0xF0) == 0x60) || ((_opcode & 0xF0) == 0x70))
@@ -2730,19 +2742,6 @@ public:
                 // if it is the root call
                 if (_depth == 0)
                 {
-#ifdef TRACER
-                    _tracer->push(
-                        _trace_address,
-                        _trace_pc,
-                        _trace_opcode,
-                        *_stack_ptrs[_depth],
-                        *_memory_ptrs[_depth],
-                        *_touch_state_ptrs[_depth],
-                        _gas_useds[_depth],
-                        _gas_limit,
-                        _gas_refunds[_depth],
-                        error_code);
-#endif
                     finish_TRANSACTION(error_code);
                     free_CALL();
                     return;
@@ -2753,36 +2752,10 @@ public:
                     free_CALL();
                     _depth = _depth - 1;
                     update_CALL();
-#ifdef TRACER
-                    _tracer->push(
-                        _trace_address,
-                        _trace_pc,
-                        _trace_opcode,
-                        *_stack_ptrs[_depth],
-                        *_memory_ptrs[_depth],
-                        *_touch_state_ptrs[_depth],
-                        _gas_useds[_depth],
-                        _gas_limit,
-                        _gas_refunds[_depth],
-                        error_code);
-#endif
                 }
             }
             else
             {
-#ifdef TRACER
-                _tracer->push(
-                    _trace_address,
-                    _trace_pc,
-                    _trace_opcode,
-                    *_stack_ptrs[_depth],
-                    *_memory_ptrs[_depth],
-                    *_touch_state_ptrs[_depth],
-                    _gas_useds[_depth],
-                    _gas_limit,
-                    _gas_refunds[_depth],
-                    error_code);
-#endif
             }
         }
     }

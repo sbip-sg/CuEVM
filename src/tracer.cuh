@@ -313,14 +313,16 @@ public:
           std::string stack_str = "\"";
           if (stack_data.stack_offset > 0){
             for (auto index =0; index<stack_data.stack_offset; index++){
-              arith.hex_string_from_cgbn_memory(temp, stack_data.stack_base[index]);
+              arith.pretty_hex_string_from_cgbn_memory(temp, stack_data.stack_base[index]);
               stack_str += temp;
               if (index == stack_data.stack_offset - 1) {
                 stack_str += "\"";
               } else {
-                stack_str += "\", ";
+                stack_str += "\",\"";
               }
             }
+          }else{
+            stack_str += "\"";
           }
 
           // calculate gas_cost in this operation
@@ -332,14 +334,14 @@ public:
           cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
           cgbn_add(arith._env, gas_left, gas_left, gas_cost); // gas_left in EIP-3155 is the value before the operation
           cgbn_store(arith._env, evm_word, gas_left);
-          arith.hex_string_from_cgbn_memory(gas_left_str, *evm_word);
+          arith.pretty_hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
 
 
           // cgbn_store(arith._env, evm_word, gas_cost);
           // arith.hex_string_from_cgbn_memory(gas_cost_str, *evm_word);
 
-          fprintf(stderr, "{\"pc\": %d, \"op\": %d, \"gas\": \"%s\", \"stack\": [%s], \"depth\": %d, \"memSize\": %lu}\n",
+          fprintf(stderr, "{\"pc\":%d,\"op\":%d,\"gas\":\"%s\",\"stack\":[%s],\"depth\":%d,\"memSize\":%lu}\n",
                   tracer_data.pcs[idx],
                   tracer_data.opcodes[idx],
                   gas_left_str, // gas left before this operation
@@ -367,6 +369,9 @@ public:
             printf("Error code: %d\n", tracer_data.error_codes[idx]);
             #endif
         }
+        arith.pretty_hex_string_from_cgbn_memory(gas_left_str, tracer_data.gas_useds[tracer_data.size-1]);
+        printf ("all gas used %s\n", gas_left_str);
+
         delete[] gas_left_str;
         delete[] gas_cost_str;
         delete[] temp;

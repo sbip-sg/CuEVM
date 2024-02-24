@@ -214,7 +214,7 @@ public:
    * @param[in] count The number of limbs
   */
   __host__ void hex_string_from_cgbn_memory(
-    char *dst_hex_string, 
+    char *dst_hex_string,
     evm_word_t &src_cgbn_mem,
     uint32_t count = LIMBS
   )
@@ -230,6 +230,49 @@ public:
       );
     }
     dst_hex_string[count * 8 + 2] = '\0';
+  }
+  /*
+    * Get a pretty hex string from the CGBn memory.
+    * The hex string is in Big Endian format.
+    * The hex string must be allocated by the caller.
+    * @param[out] dst_hex_string The destination hex string
+    * @param[in] src_cgbn_mem The source CGBN memory
+    * @param[in] count The number of limbs
+  */
+  __host__ void pretty_hex_string_from_cgbn_memory(
+    char *dst_hex_string,
+    evm_word_t &src_cgbn_mem,
+    uint32_t count = LIMBS
+  )
+  {
+    dst_hex_string[0] = '0';
+    dst_hex_string[1] = 'x';
+    int offset = 2; // Start after "0x"
+
+    for (uint32_t idx = 0, first = 1; idx < count; ++idx)
+    {
+      uint32_t value = src_cgbn_mem._limbs[count - 1 - idx];
+      if (value != 0 || !first)
+      {
+        if (first)
+        {
+          first = 0; // No longer at the first non-zero value
+          offset += sprintf(dst_hex_string + offset, "%x", value);
+        }
+        else
+        {
+          offset += sprintf(dst_hex_string + offset, "%08x", value);
+        }
+      }
+    }
+
+    if (offset == 2) // Handle the case where all values are zero
+    {
+      strcpy(dst_hex_string + offset, "0");
+      offset += 1;
+    }
+
+    dst_hex_string[offset] = '\0'; // Null-terminate the string
   }
 
   /**
@@ -347,7 +390,7 @@ public:
       cgbn_div_ui32(_env, gas_capped, gas_left, 64);
       cgbn_sub(_env, gas_capped, gas_left, gas_capped);
   }
-  
+
   /**
    * Get the data at the given index for the given length.
    * If the index is greater than the data size, it returns NULL.
