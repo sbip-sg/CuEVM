@@ -20,7 +20,7 @@ def process_json(input_data, output_file):
     result_json = libcuevm.run_dict(temp_input_data)
 
     input_data[list(input_data.keys())[0]]["post"]= result_json["post"]
-    json.dump(input_data, open(output_file, 'w'), indent=4)
+    # json.dump(input_data, open(output_file, 'w'), indent=4)
 
 import argparse
 

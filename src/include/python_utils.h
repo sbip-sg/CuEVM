@@ -111,9 +111,7 @@ namespace python_utils{
     }
 
 
-    transaction_data_t* getTransactionDataFromPyObject(arith_t arith, PyObject* data){
-        print_dict_recursive(data, 0);
-        printf("Transaction data extraction\n");
+    transaction_data_t* getTransactionDataFromPyObject(arith_t arith, PyObject* data, size_t &instances_count){
         // get data size
         PyObject* tx_data =  PyDict_GetItemString(data, "data");
         PyObject* tx_gas_limit = PyDict_GetItemString(data, "gasLimit");
@@ -126,6 +124,7 @@ namespace python_utils{
         size_t gas_limit_count = PyList_Size(tx_gas_limit);
         size_t value_count = PyList_Size(tx_value);
         size_t count = max(max(tx_data_count, gas_limit_count), value_count);
+        instances_count = count;
         printf("Transaction count: %d\n", count);
         transaction_data_t *transactions;
     #ifndef ONLY_CPU
@@ -185,8 +184,7 @@ namespace python_utils{
             {
                 transactions[idx].data_init.data = NULL;
             }
-            printf("Transaction %d\n", idx);
-            transaction_t::print_transaction_data_t(arith, transactions[idx]);
+
         }
         delete template_transaction;
         return transactions;
@@ -287,8 +285,6 @@ namespace python_utils{
                 state_data->accounts[account_index].storage = NULL;
                 state_data->accounts[account_index].storage_size = 0;
             }
-
-        // world_state_t::print_account_t(arith, state_data->accounts[account_index]);
 
         }
 
