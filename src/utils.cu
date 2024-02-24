@@ -8,6 +8,15 @@ __host__ size_t adjusted_length(char** hex_string) {
     return (strlen(*hex_string) / 2);
 }
 
+__host__ const char* adjust_hex_string(const char* hex_string) {
+    if (strlen(hex_string) >= 2 && (hex_string[0] == '0' && (hex_string[1] == 'x' || hex_string[1] == 'X')))
+                hex_string += 2;  // Skip the "0x" prefix
+    if (strlen(hex_string) % 2 != 0) {
+        printf("Invalid hex_string length\n");
+        return NULL;
+    }
+    return hex_string;
+}
 __host__ void hex_to_bytes(const char *hex_string, uint8_t *byte_array, size_t length)
 {
     for (size_t idx = 0; idx < length; idx += 2)

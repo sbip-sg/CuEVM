@@ -38,8 +38,11 @@ if __name__ == "__main__":
 
     input_data = json.loads(open(json_file).read())
     instance_data = input_data[list(input_data.keys())[0]]
-    instance_data["transaction"]["data"] = instance_data["transaction"]["data"] * (num_instances//len(instance_data["transaction"]["data"]))
-    instance_data["transaction"]["gasLimit"] = instance_data["transaction"]["gasLimit"] * (num_instances//len(instance_data["transaction"]["gasLimit"]))
-    instance_data["transaction"]["value"] = instance_data["transaction"]["value"] * (num_instances//len(instance_data["transaction"]["value"]))
+    if len(instance_data["transaction"]["data"]) < num_instances:
+        instance_data["transaction"]["data"] = instance_data["transaction"]["data"] * (num_instances//len(instance_data["transaction"]["data"]))
+    if len(instance_data["transaction"]["gasPrice"]) < num_instances:
+        instance_data["transaction"]["gasPrice"] = instance_data["transaction"]["gasPrice"] * (num_instances//len(instance_data["transaction"]["gasPrice"]))
+    if len(instance_data["transaction"]["gasLimit"]) < num_instances:
+        instance_data["transaction"]["gasLimit"] = instance_data["transaction"]["gasLimit"] * (num_instances//len(instance_data["transaction"]["gasLimit"]))
     # print (f'generated {len(instance_data["transaction"]["data"])} instances')
     process_json(input_data, output_file)

@@ -59,13 +59,77 @@ namespace python_utils{
         return block_data;
     }
 
+
+    void print_dict_recursive(PyObject* dict, int indent_level) {
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+
+        // Iterate over dictionary items
+        while (PyDict_Next(dict, &pos, &key, &value)) {
+            // Print indent
+            for (int i = 0; i < indent_level; ++i) {
+                printf("    "); // 4 spaces for each indent level
+            }
+
+            // Convert key to string and print
+            PyObject* keyStrObj = PyObject_Str(key);
+            const char* keyStr = PyUnicode_AsUTF8(keyStrObj);
+            printf("%s: ", keyStr);
+            Py_DECREF(keyStrObj);
+
+            // Check if value is a dictionary
+            if (PyDict_Check(value)) {
+                printf("\n");
+                print_dict_recursive(value, indent_level + 1);  // Recursively print nested dictionary
+            } else if (PyList_Check(value)) {
+                // Handle list of items
+                printf("[\n");
+                for (Py_ssize_t i = 0; i < PyList_Size(value); ++i) {
+                    PyObject* item = PyList_GetItem(value, i);  // Borrowed reference, no need to DECREF
+                    // Print list item with additional indent
+                    for (int j = 0; j <= indent_level; ++j) {
+                        printf("    ");
+                    }
+                    PyObject* itemStrObj = PyObject_Str(item);
+                    const char* itemStr = PyUnicode_AsUTF8(itemStrObj);
+                    printf("%s\n", itemStr);
+                    Py_DECREF(itemStrObj);
+                }
+                // Print closing bracket with indent
+                for (int i = 0; i < indent_level; ++i) {
+                    printf("    ");
+                }
+                printf("]\n");
+            } else {
+                // For other types, convert to string and print
+                PyObject* valueStrObj = PyObject_Str(value);
+                const char* valueStr = PyUnicode_AsUTF8(valueStrObj);
+                printf("%s\n", valueStr);
+                Py_DECREF(valueStrObj);
+            }
+        }
+    }
+
+
     transaction_data_t* getTransactionDataFromPyObject(arith_t arith, PyObject* data){
-        size_t count = 1;
+        print_dict_recursive(data, 0);
+        printf("Transaction data extraction\n");
+        // get data size
+        PyObject* tx_data =  PyDict_GetItemString(data, "data");
+        PyObject* tx_gas_limit = PyDict_GetItemString(data, "gasLimit");
+        PyObject* tx_value = PyDict_GetItemString(data, "value");
+        if (tx_data == NULL || !PyList_Check(tx_data)){
+            printf("Invalid transaction data\n");
+            return NULL;
+        }
+        size_t tx_data_count = PyList_Size(tx_data);
+        size_t gas_limit_count = PyList_Size(tx_gas_limit);
+        size_t value_count = PyList_Size(tx_value);
+        size_t count = max(max(tx_data_count, gas_limit_count), value_count);
+        printf("Transaction count: %d\n", count);
         transaction_data_t *transactions;
     #ifndef ONLY_CPU
-        CUDA_CHECK(cudaMallocManaged(
-            (void **)&(transactions),
-            count * sizeof(transaction_data_t)));
+        CUDA_CHECK(cudaMallocManaged((void **)&(transactions), count * sizeof(transaction_data_t)));
     #else
         transactions = new transaction_data_t[count];
     #endif
@@ -73,8 +137,7 @@ namespace python_utils{
         memset(template_transaction, 0, sizeof(transaction_data_t));
 
         uint8_t type;
-        size_t data_index, gas_limit_index, value_index;
-        size_t idx = 0, jdx = 0;
+        size_t idx = 0;
 
         type = 0;
 
@@ -93,38 +156,37 @@ namespace python_utils{
         template_transaction->type = type;
 
         size_t index;
-        char *bytes_string = NULL;
+        // char *bytes_string = NULL;
         for (idx = 0; idx < count; idx++)
         {
 
-        data_index = index;
-        gas_limit_index = index;
-        value_index = index;
-        memcpy(&(transactions[idx]), template_transaction, sizeof(transaction_data_t));
-        arith.cgbn_memory_from_hex_string(
-            transactions[idx].gas_limit,"0x04c4b400");
-        arith.cgbn_memory_from_hex_string(
-            transactions[idx].value, "0x01");
-        bytes_string = "0x00";
-        transactions[idx].data_init.size = adjusted_length(&bytes_string);
-        if (transactions[idx].data_init.size > 0)
-        {
-    #ifndef ONLY_CPU
-            CUDA_CHECK(cudaMallocManaged(
-                (void **)&(transactions[idx].data_init.data),
-                transactions[idx].data_init.size * sizeof(uint8_t)));
-    #else
-            transactions[idx].data_init.data = new uint8_t[transactions[idx].data_init.size];
-    #endif
-            hex_to_bytes(
-                bytes_string,
-                transactions[idx].data_init.data,
-                2 * transactions[idx].data_init.size);
-        }
-        else
-        {
-            transactions[idx].data_init.data = NULL;
-        }
+            memcpy(&(transactions[idx]), template_transaction, sizeof(transaction_data_t));
+            arith.cgbn_memory_from_hex_string(transactions[idx].gas_limit, PyUnicode_AsUTF8(PyList_GetItem(tx_gas_limit, idx < gas_limit_count ? idx : 0)));
+            arith.cgbn_memory_from_hex_string(transactions[idx].value, PyUnicode_AsUTF8(PyList_GetItem(tx_value, idx < value_count ? idx : 0)));
+            const char* bytes_string = PyUnicode_AsUTF8(PyList_GetItem(tx_data, idx < tx_data_count ? idx : 0));
+
+            bytes_string = adjust_hex_string(bytes_string);
+            transactions[idx].data_init.size = strlen(bytes_string)/2;
+            if (transactions[idx].data_init.size > 0)
+            {
+        #ifndef ONLY_CPU
+                CUDA_CHECK(cudaMallocManaged(
+                    (void **)&(transactions[idx].data_init.data),
+                    transactions[idx].data_init.size * sizeof(uint8_t)));
+        #else
+                transactions[idx].data_init.data = new uint8_t[transactions[idx].data_init.size];
+        #endif
+                hex_to_bytes(
+                    bytes_string,
+                    transactions[idx].data_init.data,
+                    2 * transactions[idx].data_init.size);
+            }
+            else
+            {
+                transactions[idx].data_init.data = NULL;
+            }
+            printf("Transaction %d\n", idx);
+            transaction_t::print_transaction_data_t(arith, transactions[idx]);
         }
         delete template_transaction;
         return transactions;
@@ -166,12 +228,7 @@ namespace python_utils{
             arith.cgbn_memory_from_hex_string(state_data->accounts[account_index].nonce, nonce);
             // printf("Account %d: %s\n", account_index, address_str);
             // Bytecode handling
-            if (strlen(code) >= 2 && (code[0] == '0' && (code[1] == 'x' || code[1] == 'X')))
-                code += 2;  // Skip the "0x" prefix
-            if (strlen(code) % 2 != 0) {
-                printf("Invalid bytecode length\n");
-                return NULL;
-            }
+            code = adjust_hex_string(code);
             state_data->accounts[account_index].code_size = strlen(code) / 2;  // Assuming each byte is represented by 2 hex characters, prefix 0x
             if (state_data->accounts[account_index].code_size > 0) {
                 #ifndef ONLY_CPU
@@ -470,56 +527,6 @@ namespace python_utils{
         }
 
         return root;
-    }
-
-    void print_dict_recursive(PyObject* dict, int indent_level) {
-        PyObject *key, *value;
-        Py_ssize_t pos = 0;
-
-        // Iterate over dictionary items
-        while (PyDict_Next(dict, &pos, &key, &value)) {
-            // Print indent
-            for (int i = 0; i < indent_level; ++i) {
-                printf("    "); // 4 spaces for each indent level
-            }
-
-            // Convert key to string and print
-            PyObject* keyStrObj = PyObject_Str(key);
-            const char* keyStr = PyUnicode_AsUTF8(keyStrObj);
-            printf("%s: ", keyStr);
-            Py_DECREF(keyStrObj);
-
-            // Check if value is a dictionary
-            if (PyDict_Check(value)) {
-                printf("\n");
-                print_dict_recursive(value, indent_level + 1);  // Recursively print nested dictionary
-            } else if (PyList_Check(value)) {
-                // Handle list of items
-                printf("[\n");
-                for (Py_ssize_t i = 0; i < PyList_Size(value); ++i) {
-                    PyObject* item = PyList_GetItem(value, i);  // Borrowed reference, no need to DECREF
-                    // Print list item with additional indent
-                    for (int j = 0; j <= indent_level; ++j) {
-                        printf("    ");
-                    }
-                    PyObject* itemStrObj = PyObject_Str(item);
-                    const char* itemStr = PyUnicode_AsUTF8(itemStrObj);
-                    printf("%s\n", itemStr);
-                    Py_DECREF(itemStrObj);
-                }
-                // Print closing bracket with indent
-                for (int i = 0; i < indent_level; ++i) {
-                    printf("    ");
-                }
-                printf("]\n");
-            } else {
-                // For other types, convert to string and print
-                PyObject* valueStrObj = PyObject_Str(value);
-                const char* valueStr = PyUnicode_AsUTF8(valueStrObj);
-                printf("%s\n", valueStr);
-                Py_DECREF(valueStrObj);
-            }
-        }
     }
 
 }
