@@ -81,6 +81,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
           &(cpu_instances.accessed_states_data[instance]),
           &(cpu_instances.touch_states_data[instance]),
           &(cpu_instances.logs_data[instance]),
+          &(cpu_instances.return_data[instance]),
           #ifdef TRACER
           &(cpu_instances.tracers_data[instance]),
           #endif

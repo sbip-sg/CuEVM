@@ -82,6 +82,7 @@ public:
         evm_word_t *gas_limits; /**< The gas limits*/
         evm_word_t *gas_refunds; /**< The gas refunds*/
         uint32_t *error_codes; /**< The error codes*/
+        bn_t last_gas_used; /**< The cost including the last instruction*/
         #endif
     } tracer_data_t;
 
@@ -285,7 +286,7 @@ public:
     */
     __host__ __forceinline__ static void print_tracer_data_t(
         arith_t &arith,
-        tracer_data_t &tracer_data)
+        tracer_data_t &tracer_data, data_content_t* return_data)
     {
         printf("Tracer data:\n");
         printf("Size: %lu\n", tracer_data.size);
@@ -304,14 +305,14 @@ public:
         {
           // todo https://eips.ethereum.org/EIPS/eip-3155
           // maintain a tracer data is costly in terms of memory, maybe we print in the each evm step and do not save data
-          if (idx > 0){
-            cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[idx -1]);
-          }
+            cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[idx]);
+
 
           stack_data = tracer_data.stacks[idx];
 
-          std::string stack_str = "\"";
+          std::string stack_str;
           if (stack_data.stack_offset > 0){
+            stack_str += "\"";
             for (auto index =0; index<stack_data.stack_offset; index++){
               arith.pretty_hex_string_from_cgbn_memory(temp, stack_data.stack_base[index]);
               stack_str += temp;
@@ -321,30 +322,30 @@ public:
                 stack_str += "\",\"";
               }
             }
-          }else{
-            stack_str += "\"";
           }
-
-          // calculate gas_cost in this operation
-          cgbn_sub(arith._env, gas_cost, gas_used, prev_gas_used);
 
           // calculate gas_left
           cgbn_load(arith._env, gas_limit, &tracer_data.gas_limits[idx]);
           cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx]);
           cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
-          cgbn_add(arith._env, gas_left, gas_left, gas_cost); // gas_left in EIP-3155 is the value before the operation
           cgbn_store(arith._env, evm_word, gas_left);
           arith.pretty_hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
+          // calculate gas_cost in this operation
+          if (idx == tracer_data.size - 1)
+            cgbn_set(arith._env, gas_used, tracer_data.last_gas_used);
+          else
+            cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx+1]);
 
+          cgbn_sub(arith._env, gas_cost, gas_used, prev_gas_used);
+          cgbn_store(arith._env, evm_word, gas_cost);
+          arith.pretty_hex_string_from_cgbn_memory(gas_cost_str, *evm_word);
 
-          // cgbn_store(arith._env, evm_word, gas_cost);
-          // arith.hex_string_from_cgbn_memory(gas_cost_str, *evm_word);
-
-          fprintf(stderr, "{\"pc\":%d,\"op\":%d,\"gas\":\"%s\",\"stack\":[%s],\"depth\":%d,\"memSize\":%lu}\n",
+          fprintf(stderr, "{\"pc\":%d,\"op\":%d,\"gas\":\"%s\",\"gasCost\":\"%s\",\"stack\":[%s],\"depth\":%d,\"memSize\":%lu}\n",
                   tracer_data.pcs[idx],
                   tracer_data.opcodes[idx],
                   gas_left_str, // gas left before this operation
+                  gas_cost_str,
                   stack_str.c_str(), // stack array as "0x...", "0x..."
                   1, // call depth
                   tracer_data.memories[idx].size // Size of memory array // TODO: we don't need the whole memory, maybe keep the size only
@@ -356,22 +357,28 @@ public:
             // printf("Stack:\n");
             // stack_t::print_stack_data_t(arith, tracer_data.stacks[idx]);
             #ifdef COMPLEX_TRACER
-            printf("Memory:\n");
-            memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
-            printf("Touch state:\n");
-            touch_state_t::print_touch_state_data_t(arith, tracer_data.touch_states[idx]);
-            printf("Gas used: ");
-            arith.print_cgbn_memory(tracer_data.gas_useds[idx]);
-            printf("Gas limit: ");
-            arith.print_cgbn_memory(tracer_data.gas_limits[idx]);
-            printf("Gas refund: ");
-            arith.print_cgbn_memory(tracer_data.gas_refunds[idx]);
-            printf("Error code: %d\n", tracer_data.error_codes[idx]);
+            // printf("Memory:\n");
+            // memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
+            // printf("Touch state:\n");
+            // touch_state_t::print_touch_state_data_t(arith, tracer_data.touch_states[idx]);
+            // printf("Gas used: ");
+            // arith.print_cgbn_memory(tracer_data.gas_useds[idx]);
+            // printf("Gas limit: ");
+            // arith.print_cgbn_memory(tracer_data.gas_limits[idx]);
+            // printf("Gas refund: ");
+            // arith.print_cgbn_memory(tracer_data.gas_refunds[idx]);
+            // printf("Error code: %d\n", tracer_data.error_codes[idx]);
             #endif
         }
-        arith.pretty_hex_string_from_cgbn_memory(gas_left_str, tracer_data.gas_useds[tracer_data.size-1]);
-        printf ("all gas used %s\n", gas_left_str);
+        cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[0]);
+        cgbn_sub(arith._env, gas_used, tracer_data.last_gas_used, prev_gas_used);
+        cgbn_store(arith._env, evm_word, gas_used);
+        arith.pretty_hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
+        if (return_data != nullptr) {
+            char* return_data_str =  hex_from_bytes(return_data->data, return_data->size);
+            fprintf(stderr, "{\"output\":\"%s\",\"gasUsed\":\"%s\"}\n", return_data_str+2, gas_left_str);
+        }
         delete[] gas_left_str;
         delete[] gas_cost_str;
         delete[] temp;
@@ -385,7 +392,7 @@ public:
     */
     __host__ __device__ void print()
     {
-        print_tracer_data_t(_arith, *_content);
+        print_tracer_data_t(_arith, *_content, nullptr);
     }
 
     /**
