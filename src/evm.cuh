@@ -2728,7 +2728,7 @@ public:
                 }
             }
 #ifdef TRACER
-        cgbn_set(_arith._env, _tracer->_content->last_gas_used, _gas_useds[_depth]);
+        cgbn_store(_arith._env, &_tracer->_content->last_gas_used, _gas_useds[_depth]);
 #endif
             // If the operation ended with halting
             // can be normal or exceptional
@@ -3108,6 +3108,8 @@ public:
         gpu_instances.touch_states_data = touch_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.touch_states_data, cpu_instances.count);
 
         gpu_instances.logs_data = log_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.logs_data, cpu_instances.count);
+
+        gpu_instances.return_data = return_data_t::get_gpu_instances_from_cpu_instances(cpu_instances.return_data, cpu_instances.count);
 
 #ifdef TRACER
         gpu_instances.tracers_data = tracer_t::get_gpu_instances_from_cpu_instances(cpu_instances.tracers_data, cpu_instances.count);

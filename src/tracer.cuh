@@ -83,7 +83,7 @@ public:
         evm_word_t *gas_refunds; /**< The gas refunds*/
         uint32_t *error_codes; /**< The error codes*/
         #endif
-        bn_t last_gas_used; /**< The cost including the last instruction*/
+        evm_word_t last_gas_used; /**< The cost including the last instruction*/
     } tracer_data_t;
 
     tracer_data_t *_content; /**< The content of the tracer*/
@@ -334,7 +334,7 @@ public:
 
           // calculate gas_cost in this operation
           if (idx == tracer_data.size - 1)
-            cgbn_set(arith._env, gas_used, tracer_data.last_gas_used);
+            cgbn_load(arith._env, gas_used, &tracer_data.last_gas_used);
           else
             cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx+1]);
 
@@ -363,8 +363,8 @@ public:
             // memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
             // printf("Touch state:\n");
             // touch_state_t::print_touch_state_data_t(arith, tracer_data.touch_states[idx]);
-            // printf("Gas used: ");
-            // arith.print_cgbn_memory(tracer_data.gas_useds[idx]);
+            printf("Gas used: ");
+            arith.print_cgbn_memory(tracer_data.gas_useds[idx]);
             // printf("Gas limit: ");
             // arith.print_cgbn_memory(tracer_data.gas_limits[idx]);
             // printf("Gas refund: ");
@@ -374,7 +374,8 @@ public:
         }
         #ifdef COMPLEX_TRACER
         cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[0]);
-        cgbn_sub(arith._env, gas_used, tracer_data.last_gas_used, prev_gas_used);
+        cgbn_load(arith._env, gas_limit, &tracer_data.last_gas_used);
+        cgbn_sub(arith._env, gas_used, gas_used, prev_gas_used);
         cgbn_store(arith._env, evm_word, gas_used);
         arith.pretty_hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
