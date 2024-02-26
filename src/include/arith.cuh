@@ -205,6 +205,20 @@ public:
       return 0;
     }
   }
+
+
+    /**
+   * Get a uint64_t from a CGBN type.
+   * @param[dst] dst The destination to store the trimmed number
+   * @param[src] src The number to trim down to uint64
+  */
+  __host__ __device__ __forceinline__ void trim_to_uint64(bn_t &dst, bn_t &src)
+  {
+    const uint32_t numbits = 256 - 64;
+    cgbn_shift_left(_env, dst, src, numbits);
+    cgbn_shift_right(_env, dst, src, numbits);
+  }
+
   /**
    * Get a hex string from the CGBn memory.
    * The hex string is in Big Endian format.

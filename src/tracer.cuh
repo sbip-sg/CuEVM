@@ -338,6 +338,7 @@ public:
             cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx+1]);
 
           cgbn_sub(arith._env, gas_cost, gas_used, prev_gas_used);
+          arith.trim_to_uint64(gas_cost, gas_cost);
           cgbn_store(arith._env, evm_word, gas_cost);
           arith.pretty_hex_string_from_cgbn_memory(gas_cost_str, *evm_word);
 
