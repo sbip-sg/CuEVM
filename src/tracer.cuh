@@ -82,8 +82,8 @@ public:
         evm_word_t *gas_limits; /**< The gas limits*/
         evm_word_t *gas_refunds; /**< The gas refunds*/
         uint32_t *error_codes; /**< The error codes*/
-        bn_t last_gas_used; /**< The cost including the last instruction*/
         #endif
+        bn_t last_gas_used; /**< The cost including the last instruction*/
     } tracer_data_t;
 
     tracer_data_t *_content; /**< The content of the tracer*/
@@ -305,8 +305,6 @@ public:
         {
           // todo https://eips.ethereum.org/EIPS/eip-3155
           // maintain a tracer data is costly in terms of memory, maybe we print in the each evm step and do not save data
-            cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[idx]);
-
 
           stack_data = tracer_data.stacks[idx];
 
@@ -323,6 +321,9 @@ public:
               }
             }
           }
+
+          #ifdef COMPLEX_TRACER
+          cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[idx]);
 
           // calculate gas_left
           cgbn_load(arith._env, gas_limit, &tracer_data.gas_limits[idx]);
@@ -357,7 +358,7 @@ public:
             // printf("Opcode: %d\n", tracer_data.opcodes[idx]);
             // printf("Stack:\n");
             // stack_t::print_stack_data_t(arith, tracer_data.stacks[idx]);
-            #ifdef COMPLEX_TRACER
+
             // printf("Memory:\n");
             // memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
             // printf("Touch state:\n");
@@ -369,8 +370,9 @@ public:
             // printf("Gas refund: ");
             // arith.print_cgbn_memory(tracer_data.gas_refunds[idx]);
             // printf("Error code: %d\n", tracer_data.error_codes[idx]);
-            #endif
+          #endif
         }
+        #ifdef COMPLEX_TRACER
         cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[0]);
         cgbn_sub(arith._env, gas_used, tracer_data.last_gas_used, prev_gas_used);
         cgbn_store(arith._env, evm_word, gas_used);
@@ -380,6 +382,7 @@ public:
             char* return_data_str =  hex_from_bytes(return_data->data, return_data->size);
             fprintf(stderr, "{\"output\":\"%s\",\"gasUsed\":\"%s\"}\n", return_data_str+2, gas_left_str);
         }
+        #endif
         delete[] gas_left_str;
         delete[] gas_cost_str;
         delete[] temp;

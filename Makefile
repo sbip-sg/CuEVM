@@ -1,6 +1,6 @@
 # Compiler
 NVCC = nvcc
-NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo 
+NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo
 GCC = gcc
 GCC_FLAGS = -lm -lgmp -lcjson
 GPP = g++
@@ -32,7 +32,7 @@ interpreter:
 	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
 debug_interpreter:
-	$(NVCC) -D TRACER $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
+	$(NVCC) -D TRACER -D COMPLEX_TRACER -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
 cpu_interpreter:
 	$(NVCC) -D ONLY_CPU $(TRACER_FLAG) -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
