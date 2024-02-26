@@ -70,7 +70,7 @@ __host__ void from_mpz(uint32_t *words, uint32_t count, mpz_t value) {
   size_t written;
 
   if(mpz_sizeinbase(value, 2)>count*32) {
-    fprintf(stderr, "from_mpz failed -- result does not fit\n");
+    fprintf(stdout, "from_mpz failed -- result does not fit\n");
     exit(1);
   }
 

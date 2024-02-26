@@ -99,6 +99,7 @@ public:
         accessed_state_data_t *accessed_states_data; /**< The data cotaining the states access by the transactions execution*/
         touch_state_data_t *touch_states_data; /**< The data containing the states modified by the transactions execution*/
         log_state_data_t *logs_data; /**< The logs done by the transactions*/
+        data_content_t *return_data; /**< The return data of the transactions*/
 #ifdef TRACER
         tracer_data_t *tracers_data; /**< Tracer datas for debug*/
 #endif
@@ -182,6 +183,7 @@ public:
         accessed_state_data_t *accessed_state_data,
         touch_state_data_t *touch_state_data,
         log_state_data_t *log_state_data,
+        data_content_t *return_data,
 #ifdef TRACER
         tracer_data_t *tracer_data,
 #endif
@@ -203,7 +205,7 @@ public:
         _touch_state_ptrs = new touch_state_t *[_allocated_depth];
         _log_state_ptrs = new log_state_t *[_allocated_depth];
         _last_return_data_ptrs = new return_data_t *[_allocated_depth];
-        _final_return_data = new return_data_t();
+        _final_return_data = new return_data_t(return_data);
         _message_ptrs = new message_t *[_allocated_depth];
         _memory_ptrs = new memory_t *[_allocated_depth];
         _stack_ptrs = new stack_t *[_allocated_depth];
@@ -247,7 +249,7 @@ public:
         delete[] _touch_state_ptrs;
         delete[] _log_state_ptrs;
         delete[] _last_return_data_ptrs;
-        delete _final_return_data;
+        // delete _final_return_data;
         delete[] _message_ptrs;
         delete[] _memory_ptrs;
         delete[] _stack_ptrs;
@@ -1691,6 +1693,18 @@ public:
 #ifdef TRACER
             _trace_pc = _pcs[_depth];
             _trace_opcode = _opcode;
+            _tracer->push(
+                _trace_address,
+                _trace_pc,
+                _trace_opcode,
+                *_stack_ptrs[_depth],
+                *_memory_ptrs[_depth],
+                *_touch_state_ptrs[_depth],
+                _gas_useds[_depth],
+                _gas_limit,
+                _gas_refunds[_depth],
+                error_code);
+
 #endif
             // PUSHX
             if (((_opcode & 0xF0) == 0x60) || ((_opcode & 0xF0) == 0x70))
@@ -2713,7 +2727,9 @@ public:
                 break;
                 }
             }
-
+#ifdef TRACER
+        cgbn_set(_arith._env, _tracer->_content->last_gas_used, _gas_useds[_depth]);
+#endif
             // If the operation ended with halting
             // can be normal or exceptional
             if (error_code != ERR_NONE)
@@ -2730,19 +2746,6 @@ public:
                 // if it is the root call
                 if (_depth == 0)
                 {
-#ifdef TRACER
-                    _tracer->push(
-                        _trace_address,
-                        _trace_pc,
-                        _trace_opcode,
-                        *_stack_ptrs[_depth],
-                        *_memory_ptrs[_depth],
-                        *_touch_state_ptrs[_depth],
-                        _gas_useds[_depth],
-                        _gas_limit,
-                        _gas_refunds[_depth],
-                        error_code);
-#endif
                     finish_TRANSACTION(error_code);
                     free_CALL();
                     return;
@@ -2753,36 +2756,10 @@ public:
                     free_CALL();
                     _depth = _depth - 1;
                     update_CALL();
-#ifdef TRACER
-                    _tracer->push(
-                        _trace_address,
-                        _trace_pc,
-                        _trace_opcode,
-                        *_stack_ptrs[_depth],
-                        *_memory_ptrs[_depth],
-                        *_touch_state_ptrs[_depth],
-                        _gas_useds[_depth],
-                        _gas_limit,
-                        _gas_refunds[_depth],
-                        error_code);
-#endif
                 }
             }
             else
             {
-#ifdef TRACER
-                _tracer->push(
-                    _trace_address,
-                    _trace_pc,
-                    _trace_opcode,
-                    *_stack_ptrs[_depth],
-                    *_memory_ptrs[_depth],
-                    *_touch_state_ptrs[_depth],
-                    _gas_useds[_depth],
-                    _gas_limit,
-                    _gas_refunds[_depth],
-                    error_code);
-#endif
             }
         }
     }
@@ -3089,6 +3066,8 @@ public:
         // allocated the memory for logs
         instances.logs_data = log_state_t::get_cpu_instances(instances.count);
 
+        // allocated the memory for return data
+        instances.return_data = return_data_t::get_cpu_instances(instances.count);
 #ifdef TRACER
         // allocated the memory for tracers
         instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
@@ -3209,6 +3188,7 @@ public:
         cpu_instances.block_data = gpu_instances.block_data;
         cpu_instances.sha3_parameters = gpu_instances.sha3_parameters;
         cpu_instances.transactions_data = gpu_instances.transactions_data;
+        cpu_instances.return_data = return_data_t::get_cpu_instances_from_gpu_instances(gpu_instances.return_data, gpu_instances.count);
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
         cpu_instances.accessed_states_data = accessed_state_t::get_cpu_instances_from_gpu_instances(gpu_instances.accessed_states_data, gpu_instances.count);
         touch_state_t::free_cpu_instances(cpu_instances.touch_states_data, cpu_instances.count);
@@ -3296,7 +3276,7 @@ public:
         cpu_block->print();
         delete cpu_block;
         cpu_block = NULL;
-
+        printf("return data count %lu\n", instances.return_data[0].size);
         printf("Instances:\n");
         for (size_t idx = 0; idx < instances.count; idx++)
         {
@@ -3310,7 +3290,7 @@ public:
             log_state_t::print_log_state_data_t(arith, instances.logs_data[idx]);
 
 #ifdef TRACER
-            tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx]);
+            tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx], &instances.return_data[idx]);
 #endif
 
             printf("Error: %u\n", instances.errors[idx]);
@@ -3410,6 +3390,7 @@ __global__ void kernel_evm(
         &(instances->accessed_states_data[instance]),
         &(instances->touch_states_data[instance]),
         &(instances->logs_data[instance]),
+        &(instances->return_data[instance]),
 #ifdef TRACER
         &(instances->tracers_data[instance]),
 #endif
