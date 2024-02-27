@@ -1696,6 +1696,7 @@ public:
             _tracer->push(
                 _trace_address,
                 _trace_pc,
+                _depth,
                 _trace_opcode,
                 *_stack_ptrs[_depth],
                 *_memory_ptrs[_depth],

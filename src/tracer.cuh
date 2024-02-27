@@ -73,6 +73,7 @@ public:
         size_t capacity; /**< The capacity allocated of the trace*/
         evm_word_t *addresses; /**< The addresses of the contracts*/
         uint32_t *pcs; /**< The program counters*/
+        uint32_t *depths; /**< Depths of call stacks*/
         uint8_t *opcodes; /**< The opcodes*/
         stack_data_t *stacks; /**< The stacks*/
         #ifdef COMPLEX_TRACER
@@ -115,6 +116,7 @@ public:
         ONE_THREAD_PER_INSTANCE(
             evm_word_t *new_addresses = new evm_word_t[_content->capacity + PAGE_SIZE];
             uint32_t *new_pcs = new uint32_t[_content->capacity + PAGE_SIZE];
+            uint32_t *new_depths = new uint32_t[_content->capacity + PAGE_SIZE];
             uint8_t *new_opcodes = new uint8_t[_content->capacity + PAGE_SIZE];
             stack_data_t *new_stacks = new stack_data_t[_content->capacity + PAGE_SIZE];
             #ifdef COMPLEX_TRACER
@@ -134,6 +136,10 @@ public:
                     new_pcs,
                     _content->pcs,
                     sizeof(uint32_t) * _content->capacity);
+                memcpy(
+                       new_depths,
+                       _content->depths,
+                       sizeof(uint32_t) * _content->capacity);
                 memcpy(
                     new_opcodes,
                     _content->opcodes,
@@ -185,6 +191,7 @@ public:
             _content->capacity = _content->capacity + PAGE_SIZE;
             _content->addresses = new_addresses;
             _content->pcs = new_pcs;
+            _content->depths = new_depths;
             _content->opcodes = new_opcodes;
             _content->stacks = new_stacks;
             #ifdef COMPLEX_TRACER
@@ -226,6 +233,7 @@ public:
     __host__ __device__ __forceinline__ void push(
         bn_t &address,
         uint32_t pc,
+        uint32_t depth,
         uint8_t opcode,
         stack_t &stack,
         memory_t &memory,
@@ -244,6 +252,7 @@ public:
             &(_content->addresses[_content->size]),
             address);
         _content->pcs[_content->size] = pc;
+        _content->depths[_content->size] = depth;
         _content->opcodes[_content->size] = opcode;
         stack.to_stack_data_t(
             _content->stacks[_content->size]);
@@ -349,7 +358,7 @@ public:
                   gas_left_str, // gas left before this operation
                   gas_cost_str,
                   stack_str.c_str(), // stack array as "0x...", "0x..."
-                  1, // call depth
+                  tracer_data.depths[idx] + 1, // call depth index starts from 1
                   tracer_data.memories[idx].size // Size of memory array // TODO: we don't need the whole memory, maybe keep the size only
                   );
             // printf("Address: ");
@@ -566,9 +575,17 @@ public:
                 CUDA_CHECK(cudaMalloc(
                     (void **)&(tmp_cpu_instances[idx].pcs),
                     sizeof(uint32_t) * tmp_cpu_instances[idx].size));
+                CUDA_CHECK(cudaMalloc(
+                    (void **)&(tmp_cpu_instances[idx].depths),
+                    sizeof(uint32_t) * tmp_cpu_instances[idx].size));
                 CUDA_CHECK(cudaMemcpy(
                     tmp_cpu_instances[idx].pcs,
                     cpu_instances[idx].pcs,
+                    sizeof(uint32_t) * tmp_cpu_instances[idx].size,
+                    cudaMemcpyHostToDevice));
+                CUDA_CHECK(cudaMemcpy(
+                    tmp_cpu_instances[idx].depths,
+                    cpu_instances[idx].depths,
                     sizeof(uint32_t) * tmp_cpu_instances[idx].size,
                     cudaMemcpyHostToDevice));
                 CUDA_CHECK(cudaMalloc(
@@ -721,6 +738,9 @@ public:
                     sizeof(evm_word_t) * cpu_instances[idx].size));
                 CUDA_CHECK(cudaMalloc(
                     (void **)&(tmp_cpu_instances[idx].pcs),
+                    sizeof(uint32_t) * cpu_instances[idx].size));
+                CUDA_CHECK(cudaMalloc(
+                    (void **)&(tmp_cpu_instances[idx].depths),
                     sizeof(uint32_t) * cpu_instances[idx].size));
                 CUDA_CHECK(cudaMalloc(
                     (void **)&(tmp_cpu_instances[idx].opcodes),

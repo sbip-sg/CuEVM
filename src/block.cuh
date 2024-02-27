@@ -161,10 +161,11 @@ public:
       _arith.cgbn_memory_from_size_t(_content->previous_blocks[0].number, 0);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");
-      _arith.cgbn_memory_from_hex_string(
-        _content->previous_blocks[0].hash,
-        element_json->valuestring
-      );
+
+      if (element_json != NULL){
+        _arith.cgbn_memory_from_hex_string(_content->previous_blocks[0].hash, element_json->valuestring);
+      }
+
       idx++;
     }
 
