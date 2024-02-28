@@ -5,7 +5,7 @@
 #include "evm.cuh"
 
 
-void run_interpreter(char *read_json_filename, char *write_json_filename) {
+void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose=false) {
   // typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
   typedef arith_env_t<evm_params> arith_t;
@@ -29,8 +29,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
   const cJSON *test = NULL;
   cJSON_ArrayForEach(test, read_root) {
     // get instaces to run
-    printf("Generating instances\n");
-    evm_t::get_cpu_instances(cpu_instances, test);
+    evm_t::get_cpu_instances(cpu_instances, test, clones);
     printf("%d instances generated\n", cpu_instances.count);
 
     #ifndef ONLY_CPU
@@ -45,7 +44,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
     // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 256*1024));
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
-    printf("Heap size: %zu\n", heap_size);
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
     printf("Heap size: %zu\n", heap_size);
     printf("Running GPU kernel ...\n");
@@ -94,7 +92,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
 
     // print the results
     printf("Printing the results ...\n");
-    evm_t::print_evm_instances_t(arith, cpu_instances);
+    evm_t::print_evm_instances_t(arith, cpu_instances, verbose);
     printf("Results printed\n");
 
     // print to json files
@@ -126,15 +124,18 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
 int main(int argc, char *argv[]) {//getting the input
   char *read_json_filename = NULL;
   char *write_json_filename = NULL;
+  size_t clones = 1;
+  bool verbose = false; // Verbose flag
   static struct option long_options[] = {
         {"input", required_argument, 0, 'i'},
         {"output", required_argument, 0, 'o'},
+        {"clones", required_argument, 0, 'c'},
+        {"verbose", no_argument, 0, 'v'},
         {0, 0, 0, 0}};
 
   int opt;
   int option_index = 0;
-  while ((opt = getopt_long(argc, argv, "i:o:", long_options, &option_index)) != -1)
-  {
+  while ((opt = getopt_long(argc, argv, "i:o:c:v", long_options, &option_index)) != -1) {
       switch (opt)
       {
       case 'i':
@@ -143,8 +144,14 @@ int main(int argc, char *argv[]) {//getting the input
       case 'o':
           write_json_filename = optarg;
           break;
+      case 'c':
+            clones = strtoul(optarg, NULL, 10);
+            break;
+      case 'v': // Case for verbose flag
+          verbose = true;
+          break;
       default:
-          fprintf(stdout, "Usage: %s --input <json_filename> --output <json_filename>\n", argv[0]);
+          fprintf(stdout, "Usage: %s --input <json_filename> --output <json_filename> --clones <number_of_clones> [--verbose]\n", argv[0]);
           exit(EXIT_FAILURE);
       }
   }
@@ -160,5 +167,5 @@ int main(int argc, char *argv[]) {//getting the input
     fprintf(stdout, "File '%s' does not exist\n", read_json_filename);
     exit(EXIT_FAILURE);
   }
-  run_interpreter(read_json_filename, write_json_filename);
+  run_interpreter(read_json_filename, write_json_filename, clones, verbose);
 }

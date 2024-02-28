@@ -432,7 +432,7 @@ public:
     arith.memory_from_cgbn(
         &(sender_nonce_bytes[0]),
         sender_nonce);
-    
+
     uint8_t nonce_bytes;
     for (nonce_bytes = arith_t::BYTES; nonce_bytes > 0; nonce_bytes--)
     {
@@ -537,7 +537,7 @@ public:
         byte_code.size,
         &(hash_code[0]),
         HASH_BYTES);
-    
+
     SHARED_MEMORY uint8_t input_data[1 + arith_t::ADDRESS_BYTES + arith_t::BYTES + HASH_BYTES];
     input_data[0] = 0xff;
     ONE_THREAD_PER_INSTANCE(
@@ -567,7 +567,7 @@ public:
     arith.cgbn_from_memory(
         contract_address,
         &(address_bytes[0]));
-    
+
   }
 
   /**
@@ -630,7 +630,7 @@ public:
   /**
    * The maximum number of transactions per test.
    */
-  static const size_t MAX_TRANSACTION_COUNT = 2000;
+  static const size_t MAX_TRANSACTION_COUNT = 10000;
 
   /**
    * The access list account.
@@ -1013,7 +1013,7 @@ public:
         m,
         block_base_fee
     );
-    
+
     bn_t sender_address;
     account_t *sender_account;
     get_sender(sender_address);
@@ -1070,7 +1070,7 @@ public:
       (((_content->type == 2) &&
       (cgbn_compare(_arith._env, max_fee_per_gas, max_priority_fee_per_gas) < 0)) ?
         ERROR_TRANSACTION_GAS_PRIORITY : ERR_NONE);
-    
+
     // the other verification is about the block gas limit
     // YP: \f$T_{g} \leq H_{l}\f$ ... different because it takes in account
     // previous transactions
@@ -1078,7 +1078,7 @@ public:
       error_code :
       ((cgbn_compare(_arith._env, gas_limit, block_gas_limit) > 0) ?
         ERROR_TRANSACTION_BLOCK_GAS_LIMIT : ERR_NONE);
-    
+
     // if transaction is valid update the touch state
     if (error_code == ERR_NONE)
     {
@@ -1346,7 +1346,8 @@ public:
       transaction_data_t *&transactions,
       const cJSON *test,
       size_t &count,
-      size_t start_index = 0)
+      size_t start_index = 0,
+      size_t clones=1)
   {
     const cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(test, "transaction");
     arith_t arith(cgbn_report_monitor, 0);
@@ -1358,8 +1359,10 @@ public:
       transactions = NULL;
       return;
     }
+    size_t original_count;
     // set the number of transactions
-    count = available_no_transactions - start_index;
+    original_count = available_no_transactions - start_index;
+    count = (original_count > clones) ? original_count : original_count*(clones/original_count);
     count = (count > MAX_TRANSACTION_COUNT) ? MAX_TRANSACTION_COUNT : count;
 #ifndef ONLY_CPU
     CUDA_CHECK(cudaMallocManaged(
@@ -1490,7 +1493,7 @@ public:
     char *bytes_string = NULL;
     for (idx = 0; idx < count; idx++)
     {
-      index = start_index + idx;
+      index = (start_index + idx)%original_count;
       data_index = index % data_counts;
       gas_limit_index = (index / data_counts) % gas_limit_counts;
       value_index = (index / (data_counts * gas_limit_counts)) % value_counts;

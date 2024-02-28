@@ -1688,8 +1688,7 @@ public:
             {
                 _opcode = _bytecode[_pcs[_depth]];
             }
-            ONE_THREAD_PER_INSTANCE(
-                printf("pc: %d opcode: %d\n", _pcs[_depth], _opcode);)
+            // ONE_THREAD_PER_INSTANCE(printf("pc: %d opcode: %d\n", _pcs[_depth], _opcode);)
 #ifdef TRACER
             _trace_pc = _pcs[_depth];
             _trace_opcode = _opcode;
@@ -3029,7 +3028,8 @@ public:
     */
     __host__ static void get_cpu_instances(
         evm_instances_t &instances,
-        const cJSON *test)
+        const cJSON *test,
+        size_t clones=1)
     {
         //setup the arithmetic environment
         arith_t arith(cgbn_report_monitor, 0);
@@ -3056,7 +3056,7 @@ public:
         keccak = NULL;
 
         // get the transactions
-        transaction_t::get_transactions(instances.transactions_data, test, instances.count);
+        transaction_t::get_transactions(instances.transactions_data, test, instances.count, 0, clones);
 
         // allocated the memory for accessed states
         instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
@@ -3207,39 +3207,46 @@ public:
     */
     __host__ static void print_evm_instances_t(
         arith_t &arith,
-        evm_instances_t instances)
+        evm_instances_t instances,
+        bool verbose = false)
     {
-        world_state_t *cpu_world_state;
-        cpu_world_state = new world_state_t(arith, instances.world_state_data);
-        printf("World state:\n");
-        cpu_world_state->print();
-        delete cpu_world_state;
-        cpu_world_state = NULL;
+        printf("verbose mode %d\n", verbose);
+        if (verbose){
+            world_state_t *cpu_world_state;
+            cpu_world_state = new world_state_t(arith, instances.world_state_data);
+            printf("World state:\n");
+            cpu_world_state->print();
+            delete cpu_world_state;
+            cpu_world_state = NULL;
 
-        block_t *cpu_block = NULL;
-        cpu_block = new block_t(arith, instances.block_data);
-        printf("Block:\n");
-        cpu_block->print();
-        delete cpu_block;
-        cpu_block = NULL;
-        printf("return data count %lu\n", instances.return_data[0].size);
-        printf("Instances:\n");
+            block_t *cpu_block = NULL;
+            cpu_block = new block_t(arith, instances.block_data);
+            printf("Block:\n");
+            cpu_block->print();
+            delete cpu_block;
+            cpu_block = NULL;
+            printf("return data count %lu\n", instances.return_data[0].size);
+            printf("Instances:\n");
+        }
         for (size_t idx = 0; idx < instances.count; idx++)
         {
-            printf("Instance %lu\n", idx);
-            transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
+            if (verbose){
+                printf("Instance %lu\n", idx);
+                transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
 
-            accessed_state_t::print_accessed_state_data_t(arith, instances.accessed_states_data[idx]);
+                accessed_state_t::print_accessed_state_data_t(arith, instances.accessed_states_data[idx]);
 
-            touch_state_t::print_touch_state_data_t(arith, instances.touch_states_data[idx]);
+                touch_state_t::print_touch_state_data_t(arith, instances.touch_states_data[idx]);
 
-            log_state_t::print_log_state_data_t(arith, instances.logs_data[idx]);
+                log_state_t::print_log_state_data_t(arith, instances.logs_data[idx]);
+
+                printf("Error: %u\n", instances.errors[idx]);
+            }
 
 #ifdef TRACER
             tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx], &instances.return_data[idx]);
 #endif
 
-            printf("Error: %u\n", instances.errors[idx]);
         }
     }
 
