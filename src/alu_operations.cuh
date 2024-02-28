@@ -687,7 +687,7 @@ namespace stack_operations{
      * @param[inout] stack The stack.
      * @param[in] bytecode The bytecode.
      * @param[in] code_size The size of the bytecode.
-     * @param[in] opcode The opcode. 
+     * @param[in] opcode The opcode.
     */
     __host__ __device__ __forceinline__ static void operation_PUSHX(
         arith_t &arith,
@@ -1434,7 +1434,7 @@ namespace bitwise_operations{
      * The first value is considered unsigned and the second value is considered
      * signed.
      * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit. 
+     * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
      * @param[out] error_code The error code.
      * @param[out] pc The program counter.
@@ -1448,7 +1448,7 @@ namespace bitwise_operations{
         uint32_t &pc,
         stack_t &stack)
     {
-        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
+        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t shift, value;
