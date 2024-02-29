@@ -21,6 +21,7 @@
 #define WRITE_STORAGE 8
 #define WRITE_DELETE 16
 
+#define STORAGE_CHUNK 32 // allocate storage in chunks of 32
 
 /**
  * Kernel to copy the accounts details and read operations
@@ -198,13 +199,13 @@ public:
 
     /**
      * The constructor of the state on the host.
-     * 
+     *
      * It reads the json file and creates the state.
      * It pass through all the account and their
      * storage and creates the corresponding data.
      * It used unnified memory so the state can be
      * easily used on the device.
-     * 
+     *
      * @param arith The arithmetical environment
      * @param test the json for the current test
     */
@@ -302,6 +303,8 @@ public:
             // set the storage
             storage_json = cJSON_GetObjectItemCaseSensitive(account_json, "storage");
             _content->accounts[idx].storage_size = cJSON_GetArraySize(storage_json);
+            // round to the next multiple of STORAGE_CHUNK
+            _content->accounts[idx].storage_size = ((_content->accounts[idx].storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
             if (_content->accounts[idx].storage_size > 0)
             {
                 // allocate the storage
@@ -1719,7 +1722,7 @@ __global__ void kernel_accessed_state_S2(
 
 /**
  * Class to represent the touch state.
- * The touch state is the state which 
+ * The touch state is the state which
  * contains the acounts modified
  * by the execution of the transaction.
  * YP: accrued transaction substate
@@ -2049,10 +2052,10 @@ public:
      * Get the index of the account given by the address,
      * or if it does not exist, add it to the list of accounts,
      * and return the index of the new account.
-     * 
+     *
      * It setup the new account with the details from the most updated
      * version in the parents or the accessed state (global).
-     * 
+     *
      * @param[in] address The address of the account
     */
     __host__ __device__ __forceinline__ size_t set_account(
@@ -2306,7 +2309,7 @@ public:
 
     /**
      * Get the gas cost and gas refund for the storage set operation.
-     * 
+     *
      * @param[in] address The address of the account
      * @param[in] key The key of the storage
      * @param[in] value The new value for the storage
@@ -2406,7 +2409,7 @@ public:
         get_storage_set_gas_cost_gas_refund(address, key, value, gas_cost, set_gas_refund);
         cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
         cgbn_add(_arith._env, gas_refund, gas_refund, set_gas_refund);
-    } 
+    }
 
     /**
      * Set the storage value for the given key in the storage
@@ -2436,18 +2439,22 @@ public:
         {
             storage_idx = account->storage_size;
             ONE_THREAD_PER_INSTANCE(
-                contract_storage_t *tmp_storage = new contract_storage_t[account->storage_size + 1];
-                if (account->storage_size > 0)
-                {
-                    memcpy(
-                        tmp_storage,
-                        account->storage,
-                        account->storage_size * sizeof(contract_storage_t)
-                    );
-                    delete[] account->storage;
+                size_t new_storage_size = ++account->storage_size;
+                if (new_storage_size % STORAGE_CHUNK == 1) {
+                    // Round up to the next multiple of STORAGE_CHUNK
+                    size_t new_capacity = ((new_storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
+                    contract_storage_t *tmp_storage = new contract_storage_t[new_capacity];
+                    if (account->storage_size > 0)
+                    {
+                        memcpy(
+                            tmp_storage,
+                            account->storage,
+                            (new_storage_size-1) * sizeof(contract_storage_t)
+                        );
+                        delete[] account->storage;
+                    }
+                    account->storage = tmp_storage;
                 }
-                account->storage = tmp_storage;
-                account->storage_size++;
             )
             // set the key
             cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);
@@ -2526,7 +2533,7 @@ public:
                 }
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
-            
+
             return 0;
         }
     }
@@ -2567,7 +2574,7 @@ public:
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
 
-            
+
             // if the account does not exist in the tree of touch states
             // search it in the accessed state/global state
             tmp_error_code = ERR_SUCCESS;
@@ -2582,7 +2589,7 @@ public:
             {
                 return 1;
             }
-            
+
             return 0;
         }
     }
@@ -2622,7 +2629,7 @@ public:
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
 
-            
+
             // if the account does not exist in the tree of touch states
             // search it in the accessed state/global state
             tmp_error_code = ERR_SUCCESS;
@@ -2637,7 +2644,7 @@ public:
             {
                 return _accessed_state->_world_state->_content->accounts[account_idx].code_size > 0;
             }
-            
+
             return 0;
         }
     }
@@ -3104,7 +3111,7 @@ public:
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaFree(gpu_instances));
 
-        
+
         // STEP 2: get the accounts storage and bytecode from GPU
         gpu_instances = tmp_gpu_instances;
 
