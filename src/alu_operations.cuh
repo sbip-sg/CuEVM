@@ -1400,7 +1400,7 @@ namespace bitwise_operations{
         uint32_t &pc,
         stack_t &stack)
     {
-        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
+        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
         {
             bn_t shift, value;
