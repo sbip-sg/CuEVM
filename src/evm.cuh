@@ -783,6 +783,7 @@ public:
             bn_t &args_size,
             return_data_t &return_data)
         {
+
             if (message.get_static_env())
             {
                 error_code = ERROR_STATIC_CALL_CONTEXT_CREATE;
@@ -807,13 +808,13 @@ public:
                     initialisation_code.data,
                     initialisation_code.size);
 
-                // set the gas limit
-                bn_t gas_capped;
-                arith.max_gas_call(gas_capped, gas_limit, gas_used);
-                new_message.set_gas_limit(gas_capped);
+                // // set the gas limit
+                // bn_t gas_capped;
+                // arith.max_gas_call(gas_capped, gas_limit, gas_used);
+                // new_message.set_gas_limit(gas_capped);
 
-                // add to gas used
-                cgbn_add(arith._env, gas_used, gas_used, gas_capped);
+                // // add to gas used
+                // cgbn_add(arith._env, gas_used, gas_used, gas_capped);
 
                 // warm up the contract address
                 bn_t contract_address;
@@ -854,7 +855,7 @@ public:
                     bn_t child_success;
                     cgbn_set_ui32(arith._env, child_success, 0);
                     stack.push(child_success, error_code);
-                    cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
+                    // cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
                     return_data.set(
                         NULL,
                         0);
@@ -909,27 +910,34 @@ public:
             evm_t &evm,
             return_data_t &return_data)
         {
-            bn_t value, memory_offset, length;
+          bn_t value, memory_offset, length, temp, gas_passed_in;
             stack.pop(value, error_code);
             stack.pop(memory_offset, error_code);
             stack.pop(length, error_code);
 
-            // create cost
+            // // create cost
             cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
 
-            // compute the memory cost
-            memory.grow_cost(
-                memory_offset,
-                length,
-                gas_used,
-                error_code);
+            // add (gas_remaining / 64) to gas_used
+            cgbn_sub(arith._env, temp, gas_limit, gas_used);
+            cgbn_div_ui32(arith._env, temp, temp, 64);
+            cgbn_add(arith._env, gas_used, gas_used, temp);
+            cgbn_sub(arith._env, gas_passed_in, gas_limit, gas_used);
 
-            // compute the initcode gas cost
-            arith.initcode_cost(
-                gas_used,
-                length);
 
-            if (arith.has_gas(gas_limit, gas_used, error_code))
+            // // compute the memory cost
+            // memory.grow_cost(
+            //     memory_offset,
+            //     length,
+            //     gas_used,
+            //     error_code);
+
+            // // compute the initcode gas cost
+            // arith.initcode_cost(
+            //     gas_used,
+            //     length);
+
+            if (arith.has_gas(gas_passed_in, gas_used, error_code))
             {
                 bn_t sender_address;
                 message.get_recipient(sender_address); // I_{a}
@@ -950,7 +958,7 @@ public:
                     sender_address,
                     address,
                     address,
-                    gas_limit,
+                    gas_passed_in,
                     value,
                     message.get_depth() + 1,
                     opcode,
@@ -965,7 +973,7 @@ public:
 
                 generic_CREATE(
                     arith,
-                    gas_limit,
+                    gas_passed_in,
                     gas_used,
                     error_code,
                     stack,
@@ -1180,6 +1188,8 @@ public:
             bn_t memory_offset, length;
             stack.pop(memory_offset, error_code);
             stack.pop(length, error_code);
+
+            // TODO addback dynamic cost from sub execution
 
             if (error_code == ERR_NONE)
             {

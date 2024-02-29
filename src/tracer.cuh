@@ -372,8 +372,8 @@ public:
             // memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
             // printf("Touch state:\n");
             // touch_state_t::print_touch_state_data_t(arith, tracer_data.touch_states[idx]);
-            printf("Gas used: ");
-            arith.print_cgbn_memory(tracer_data.gas_useds[idx]);
+            // printf("Gas used: ");
+            // arith.print_cgbn_memory(tracer_data.gas_useds[idx]);
             // printf("Gas limit: ");
             // arith.print_cgbn_memory(tracer_data.gas_limits[idx]);
             // printf("Gas refund: ");
