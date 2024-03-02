@@ -11,12 +11,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <cuda.h>
-#include <gmp.h>
-#ifndef __CGBN_H__
-#define __CGBN_H__
-#include <cgbn/cgbn.h>
-#endif
-#include "data_content.h"
+
+#include "utils.h"
 
 /**
  * The arithmetic environment class is a wrapper around the CGBN library.
@@ -28,29 +24,7 @@ template <class params>
 class arith_env_t
 {
 public:
-  /**
-   * The CGBN context type.  This is a template type that takes
-   * the number of threads per instance and the
-   * parameters class as template parameters.
-  */
-  typedef cgbn_context_t<params::TPI, params> context_t;
-  /**
-   * The CGBN environment type. This is a template type that takes the
-   * context type as a template parameter. It provides the CGBN functions.
-  */
-  typedef cgbn_env_t<context_t, params::BITS> env_t;
-  /**
-   * The CGBN base type for the given number of bit in environment.
-  */
-  typedef typename env_t::cgbn_t bn_t;
-  /**
-   * The CGBN wide type with double the given number of bits in environment.
-  */
-  typedef typename env_t::cgbn_wide_t bn_wide_t;
-  /**
-   * The EVM word type. also use for store CGBN base type.
-  */
-  typedef cgbn_mem_t<params::BITS> evm_word_t;
+
   static const uint32_t BITS = params::BITS; /**< The number of the bits for the CGBN */
   static const uint32_t BYTES = params::BITS / 8; /**< The number of the bytes for the CGBN */
   static const uint32_t LIMBS = params::BITS / 32; /**< The number of the limbs for the CGBN */
@@ -477,5 +451,11 @@ public:
 
 
 };
+
+/**
+ * The arithmetical environment used by the arbitrary length
+ * integer library.
+ */
+typedef arith_env_t<evm_params> arith_t;
 
 #endif

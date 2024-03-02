@@ -1,7 +1,7 @@
 #ifndef _EVM_H_
 #define _EVM_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 #include "message.cuh"
 #include "memory.cuh"
@@ -16,23 +16,10 @@
 #include "env_operations.cuh"
 #include "internal_operations.cuh"
 
-template <class params>
 class evm_t
 {
 public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    typedef arith_env_t<params> arith_t;
-    /**
-     * The arbitrary length integer type.
-     */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The block information class.
-     */
-    typedef block_t<params> block_t;
+
     /**
      * The block information data type.
      */
@@ -40,7 +27,7 @@ public:
     /**
      * World state information class.
      */
-    typedef world_state_t<params> world_state_t;
+    // typedef world_state_t<params> world_state_t;
     /**
      * World state information data type.
      */
@@ -49,50 +36,27 @@ public:
      * The account information data.
      */
     typedef world_state_t::account_t account_t;
-    /**
-     * The access state class.
-     */
-    typedef accessed_state_t<params> accessed_state_t;
+
     /**
      * The access state data type.
      */
     typedef accessed_state_t::accessed_state_data_t accessed_state_data_t;
-    /**
-     * The touch state class.
-     */
-    typedef touch_state_t<params> touch_state_t;
+
     /**
      * The touch state data type.
      */
     typedef touch_state_t::touch_state_data_t touch_state_data_t;
-    /**
-     * The stackk class.
-     */
-    typedef stack_t<params> stack_t;
-    /**
-     * The memory class.
-     */
-    typedef memory_t<params> memory_t;
-    /**
-     * The transaction class.
-     */
-    typedef transaction_t<params> transaction_t;
+
     /**
      * The transaction content data structure.
      */
     typedef typename transaction_t::transaction_data_t transaction_data_t;
-    /**
-     * The message class.
-     */
-    typedef message_t<params> message_t;
+
     /**
      * The message content data structure.
      */
     typedef typename message_t::message_data_t message_data_t;
-    /**
-     * The tracer class.
-     */
-    typedef tracer_t<params> tracer_t;
+
     /**
      * The tracer data structure.
      */
@@ -105,42 +69,12 @@ public:
      * The keccak parameters.
      */
     typedef typename keccak_t::sha3_parameters_t sha3_parameters_t;
-    /**
-     * The logs state class.
-     */
-    typedef log_state_t<params> log_state_t;
+
     /**
      * The logs state data type.
      */
     typedef log_state_t::log_state_data_t log_state_data_t;
-    /**
-     * The arithmetic operations class.
-     */
-    typedef arithmetic_operations<params> arithmetic_operations;
-    /**
-     * The comparison operations class.
-     */
-    typedef comparison_operations<params> comparison_operations;
-    /**
-     * The bitwise operations class.
-     */
-    typedef bitwise_operations<params> bitwise_operations;
-    /**
-     * The stack operations class.
-     */
-    typedef stack_operations<params> stack_operations;
-    /**
-     * The block operations class.
-     */
-    typedef block_operations<params> block_operations;
-    /**
-     * The environmental operations class.
-     */
-    typedef environmental_operations<params> environmental_operations;
-    /**
-     * The internal operations class.
-     */
-    typedef internal_operations<params> internal_operations;
+
 
     // constants
     static const uint32_t MAX_DEPTH = 1024; /**< The maximum call depth*/
@@ -3395,17 +3329,12 @@ public:
 template <class params>
 __global__ void kernel_evm(
     cgbn_error_report_t *report,
-    typename evm_t<params>::evm_instances_t *instances)
+    typename evm_t::evm_instances_t *instances)
 {
     uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
-    typedef transaction_t<params> transaction_t;
 
     if (instance >= instances->count)
         return;
-
-    typedef arith_env_t<params> arith_t;
-    typedef typename arith_t::bn_t bn_t;
-    typedef evm_t<params> evm_t;
 
     // setup arith
     arith_t arith(
@@ -3414,8 +3343,7 @@ __global__ void kernel_evm(
         instance);
 
     // setup evm
-    evm_t *evm = NULL;
-    evm = new evm_t(
+    evm_t evm (
         arith,
         instances->world_state_data,
         instances->block_data,
@@ -3433,11 +3361,7 @@ __global__ void kernel_evm(
     uint32_t tmp_error_code;
     tmp_error_code = ERR_NONE;
     // run the evm
-    evm->run(tmp_error_code);
-
-    // free the evm
-    delete evm;
-    evm = NULL;
+    evm.run(tmp_error_code);
 }
 
 #endif

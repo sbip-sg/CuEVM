@@ -7,31 +7,16 @@
 #ifndef _BLOCK_H_
 #define _BLOCK_H_
 
-#include "utils.h"
+#include "include/utils.h"
 
 /**
  * The block class is used to store the block information
  * before the transaction are done. YP: H
  */
-template <class params>
+
 class block_t
 {
 public:
-  /**
-   * The arithmetical environment used by the arbitrary length
-   * integer library.
-   */
-  typedef arith_env_t<params> arith_t;
-  /**
-   * The arbitrary length integer type.
-   */
-  typedef typename arith_t::bn_t bn_t;
-  /**
-   * The arbitrary length integer type used for the storage.
-   * It is defined as the EVM word type.
-   */
-  typedef cgbn_mem_t<params::BITS> evm_word_t;
-
   /**
    * The previous block hash information.
    *  (YP: \f$P(h, n, a)\f$)
@@ -76,7 +61,7 @@ public:
    * @param arith The arithmetical environment
    * @param content The block information content
    */
-  __device__ __forceinline__ block_t(
+  __host__ __device__  __forceinline__ block_t(
       arith_t arith,
       block_data_t *content
   ) : _arith(arith),

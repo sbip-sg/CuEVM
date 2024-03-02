@@ -7,10 +7,24 @@
 #ifndef _TRACER_H_
 #define _TRACER_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 #include "memory.cuh"
 #include "state.cuh"
+
+
+/**
+ * The kernel to copy the tracer data structures.
+ * @param[out] dst_instances The destination tracer data structures.
+ * @param[in] src_instances The source tracer data structures.
+ * @param[in] count The number of tracer data structures.
+*/
+template <typename T, typename E>
+__global__ void kernel_tracers(
+    T *dst_instances,
+    T *src_instances,
+    uint32_t count);
+
 
 /**
  * The tracer class is used to store the execution trace of the
@@ -27,28 +41,10 @@
  * - the gas refund
  * - the error code
 */
-template <class params>
 class tracer_t
 {
 public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    typedef arith_env_t<params> arith_t;
-    /**
-     * The arbitrary length integer type.
-     */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The arbitrary length integer type used for the storage.
-     * It is defined as the EVM word type.
-     */
-    typedef cgbn_mem_t<params::BITS> evm_word_t;
-    /**
-     * The stack type.
-    */
-    typedef stack_t<params> stack_t;
+
     /**
      * The stack data type
     */
@@ -56,15 +52,12 @@ public:
     /**
      * The memory type.
     */
-    typedef memory_t<params> memory_t;
+    // typedef memory_t<params> memory_t;
     /**
      * The memory data type.
     */
     typedef typename memory_t::memory_data_t memory_data_t;
-    /**
-     * The touch state type.
-    */
-    typedef touch_state_t<params> touch_state_t;
+
     /**
      * The touch state data type.
     */
@@ -144,7 +137,7 @@ public:
                     new_opcodes,
                     _content->opcodes,
                     sizeof(uint8_t) * _content->capacity);
-                
+
                 memcpy(
                     new_stacks,
                     _content->stacks,
@@ -290,21 +283,53 @@ public:
      * @param[in] arith The arithmetical environment.
      * @param[in] tracer_data The trace data structure.
     */
-    __host__ __device__ __forceinline__ static void print_tracer_data_t(
+    __host__ __forceinline__ static void print_tracer_data_t(
         arith_t &arith,
         tracer_data_t &tracer_data)
     {
         printf("Tracer data:\n");
         printf("Size: %lu\n", tracer_data.size);
+        char *p0 = new char[arith_t::BYTES * 2 + 3];
+        char *p1 = new char[arith_t::BYTES * 2 + 3];
+        bn_t gas_cost;
+        bn_t prev_gas_used;
+        bn_t gas_used;
+        evm_word_t *evm_word = new evm_word_t;
         for (size_t idx = 0; idx < tracer_data.size; idx++)
         {
-            printf("Address: ");
-            arith.print_cgbn_memory(tracer_data.addresses[idx]);
-            printf("PC: %d\n", tracer_data.pcs[idx]);
-            printf("Opcode: %d\n", tracer_data.opcodes[idx]);
-            printf("Stack:\n");
-            stack_t::print_stack_data_t(arith, tracer_data.stacks[idx]);
+            // todo https://eips.ethereum.org/EIPS/eip-3155
+            // maintain a tracer data is costly in terms of memory, maybe we print in the each evm step and do not save data
+            // printf("Address: ");
+            // arith.print_cgbn_memory(tracer_data.addresses[idx]);
+            // printf("PC: %d\n", tracer_data.pcs[idx]);
+            // printf("Opcode: %d\n", tracer_data.opcodes[idx]);
+            // printf("Stack:\n");
+            // stack_t::print_stack_data_t(arith, tracer_data.stacks[idx]);
             #ifdef COMPLEX_TRACER
+            if (idx > 0){
+                cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[idx -1]);
+                arith.hex_string_from_cgbn_memory(p0, tracer_data.gas_useds[idx -1]);
+            } else {
+                cgbn_set_ui32(arith._env, prev_gas_used, 0);
+                p0[0] = '0';
+                p0[1] = '\0';
+            }
+
+            cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx]);
+            cgbn_sub(arith._env, gas_cost, gas_used, prev_gas_used);
+
+            cgbn_store(arith._env, evm_word, gas_cost);
+            arith.hex_string_from_cgbn_memory(p1, *evm_word);
+
+            fprintf(stderr, "{\"pc\": %d, \"op\": %d, \"gas\": \"%s\", \"gasCost\": \"%s\", \"stack\": [], \"depth\": %d, \"memSize\": %lu}\n",
+                    tracer_data.pcs[idx],
+                    (uint32_t)tracer_data.opcodes[idx],
+                    p0, // gas used before this operation
+                    p1, // gas cost of this operation
+                    1, // call depth
+                    tracer_data.memories[idx].size // Size of memory array // TODO: we don't need the whole memory, maybe keep the size only
+                    );
+            /*
             printf("Memory:\n");
             memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
             printf("Touch state:\n");
@@ -316,8 +341,14 @@ public:
             printf("Gas refund: ");
             arith.print_cgbn_memory(tracer_data.gas_refunds[idx]);
             printf("Error code: %d\n", tracer_data.error_codes[idx]);
+            */
             #endif
         }
+        delete evm_word;
+        delete[] p0;
+        delete[] p1;
+        p0 = nullptr;
+        p1 = nullptr;
     }
 
     /**
@@ -595,10 +626,10 @@ public:
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].addresses));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].pcs));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].opcodes));
-                stack_data_t::free_gpu_instances(tmp_cpu_instances[idx].stacks, tmp_cpu_instances[idx].size);
+                stack_t::free_gpu_instances(tmp_cpu_instances[idx].stacks, tmp_cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER
-                memory_data_t::free_gpu_instances(tmp_cpu_instances[idx].memories, tmp_cpu_instances[idx].size);
-                touch_state_data_t::free_gpu_instances(tmp_cpu_instances[idx].touch_states, tmp_cpu_instances[idx].size);
+                memory_t::free_gpu_instances(tmp_cpu_instances[idx].memories, tmp_cpu_instances[idx].size);
+                touch_state_t::free_gpu_instances(tmp_cpu_instances[idx].touch_states, tmp_cpu_instances[idx].size);
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_useds));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_limits));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_refunds));
@@ -727,7 +758,7 @@ public:
         tmp_cpu_instances = NULL;
         printf("Copying the data arrays...\n");
         // copy the data array with the kernel
-        kernel_tracers<params><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+        kernel_tracers<tracer_data_t, evm_word_t><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaFree(gpu_instances));
         printf("Copying the data arrays done.\n");
@@ -840,21 +871,16 @@ public:
     }
 };
 
-/**
- * The kernel to copy the tracer data structures.
- * @param[out] dst_instances The destination tracer data structures.
- * @param[in] src_instances The source tracer data structures.
- * @param[in] count The number of tracer data structures.
-*/
-template <class params>
+
+template <typename T, typename E>
 __global__ void kernel_tracers(
-    typename tracer_t<params>::tracer_data_t *dst_instances,
-    typename tracer_t<params>::tracer_data_t *src_instances,
+    T *dst_instances,
+    T *src_instances,
     uint32_t count)
 {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-    typedef typename tracer_t<params>::tracer_data_t tracer_data_t;
-    typedef cgbn_mem_t<params::BITS> evm_word_t;
+    typedef T tracer_data_t;
+    typedef E evm_word_t;
 
     if (instance >= count)
         return;
@@ -876,16 +902,16 @@ __global__ void kernel_tracers(
         memcpy(
             dst_instances[instance].stacks,
             src_instances[instance].stacks,
-            src_instances[instance].size * sizeof(typename tracer_t<params>::stack_data_t));
+            src_instances[instance].size * sizeof(typename tracer_t::stack_data_t));
         #ifdef COMPLEX_TRACER
         memcpy(
             dst_instances[instance].memories,
             src_instances[instance].memories,
-            src_instances[instance].size * sizeof(typename tracer_t<params>::memory_data_t));
+            src_instances[instance].size * sizeof(typename tracer_t::memory_data_t));
         memcpy(
             dst_instances[instance].touch_states,
             src_instances[instance].touch_states,
-            src_instances[instance].size * sizeof(typename tracer_t<params>::touch_state_data_t));
+            src_instances[instance].size * sizeof(typename tracer_t::touch_state_data_t));
         memcpy(
             dst_instances[instance].gas_useds,
             src_instances[instance].gas_useds,

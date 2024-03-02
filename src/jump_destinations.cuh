@@ -7,7 +7,6 @@
 #ifndef _JUMP_DESTINATION_H_
 #define _JUMP_DESTINATION_H_
 
-#include "utils.h"
 
 /**
  * The class for keeping the valid jump destination of the code

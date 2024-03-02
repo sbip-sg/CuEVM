@@ -7,7 +7,7 @@
 #ifndef _KECCAK_H_
 #define _KECCAK_H_
 
-#include "utils.h"
+// #include "utils.h"
 
 #ifndef ROTL64
 #define ROTL64(x, y) (((x) << (y)) | ((x) >> (64 - (y))))

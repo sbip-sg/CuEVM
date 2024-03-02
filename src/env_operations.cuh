@@ -7,7 +7,7 @@
 #ifndef _ENVIRONMENTAL_OP_H_
 #define _ENVIRONMENTAL_OP_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 #include "block.cuh"
 #include "state.cuh"
@@ -30,27 +30,7 @@
  * SELFBALANCE is moved to environmental operations because it is
  * not related to the block.
  */
-template <class params>
-class block_operations
-{
-public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    typedef arith_env_t<params> arith_t;
-    /**
-     * The arbitrary length integer type.
-     */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The stackk class.
-     */
-    typedef stack_t<params> stack_t;
-    /**
-     * The block class.
-     */
-    typedef block_t<params> block_t;
+namespace block_operations{
 
     /**
      * The BLOCKHASH operation implementation.
@@ -316,7 +296,7 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 /**
  * The environmental operations class.
@@ -341,47 +321,12 @@ public:
  *      - RETURNDATACOPY
  *      - EXTCODEHASH
 */
-template <class params>
-class environmental_operations
-{
-public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    typedef arith_env_t<params> arith_t;
-    /**
-     * The arbitrary length integer type.
-     */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The stackk class.
-     */
-    typedef stack_t<params> stack_t;
-    /**
-     * The block class.
-     */
-    typedef block_t<params> block_t;
-    /**
-     * The touch state class.
-     */
-    typedef touch_state_t<params> touch_state_t;
-    /**
-     * The memory class.
-     */
-    typedef memory_t<params> memory_t;
-    /**
-     * The transaction class.
-     */
-    typedef transaction_t<params> transaction_t;
-    /**
-     * The message class.
-     */
-    typedef message_t<params> message_t;
+namespace environmental_operations{
+
     /**
      * The keccak class.
      */
-    typedef keccak::keccak_t keccak_t;
+    using keccak::keccak_t;
     /**
      * The numver of bytes in a hash.
      */
@@ -1352,6 +1297,6 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 #endif

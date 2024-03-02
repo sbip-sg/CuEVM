@@ -247,13 +247,13 @@ int main(int argc, char *argv[]) {
                 test_stack();
                 exit(0);
             default:
-                fprintf(stderr, "Usage: %s --bytecode <hexstring> --input <hexstring>\n", argv[0]);
+                fprintf(stdout, "Usage: %s --bytecode <hexstring> --input <hexstring>\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
     }
 
     if (!byte_code_hex || !input_hex) {
-        fprintf(stderr, "Both --bytecode and --input flags are required\n");
+        fprintf(stdout, "Both --bytecode and --input flags are required\n");
         exit(EXIT_FAILURE);
     }
 

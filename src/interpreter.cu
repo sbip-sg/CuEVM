@@ -1,15 +1,15 @@
-
-#include "utils.h"
-#include "evm.cuh"
 #include <getopt.h>
+#include <fstream>
+
+#include "utils.cu"
+#include "evm.cuh"
 
 
-template<class params>
 void run_interpreter(char *read_json_filename, char *write_json_filename) {
-  typedef evm_t<params> evm_t;
+  // typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
-  typedef arith_env_t<params> arith_t;
-  
+  typedef arith_env_t<evm_params> arith_t;
+
   evm_instances_t         cpu_instances;
   #ifndef ONLY_CPU
   evm_instances_t tmp_gpu_instances, *gpu_instances;
@@ -18,7 +18,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
   #endif
 
   arith_t arith(cgbn_report_monitor, 0);
-  
+
   //read the json file with the global state
   cJSON *read_root = get_json_from_file(read_json_filename);
   if(read_root == NULL) {
@@ -31,31 +31,29 @@ void run_interpreter(char *read_json_filename, char *write_json_filename) {
     // get instaces to run
     printf("Generating instances\n");
     evm_t::get_cpu_instances(cpu_instances, test);
+    printf("%d instances generated\n", cpu_instances.count);
+
     #ifndef ONLY_CPU
     evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
     CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
     CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
     #endif
-    printf("Instances generated\n");
 
     // create a cgbn_error_report for CGBN to report back errors
     #ifndef ONLY_CPU
-    CUDA_CHECK(cgbn_error_report_alloc(&report)); 
-    size_t heap_size;
+    size_t heap_size, stack_size;
+    CUDA_CHECK(cgbn_error_report_alloc(&report));
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
-    heap_size = 4;
-    heap_size = heap_size*1024*1024*1024;
+    heap_size = (size_t(2)<<30); // 2GB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 256*1024));
+    // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 256*1024));
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
     printf("Heap size: %zu\n", heap_size);
     cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
     printf("Heap size: %zu\n", heap_size);
-    #endif
-
-    #ifndef ONLY_CPU
     printf("Running GPU kernel ...\n");
     CUDA_CHECK(cudaDeviceSynchronize());
-    kernel_evm<params><<<cpu_instances.count, params::TPI>>>(report, gpu_instances);
+    kernel_evm<evm_params><<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
     //CUDA_CHECK(cudaPeekAtLastError());
     // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
     CUDA_CHECK(cudaDeviceSynchronize());
@@ -148,14 +146,21 @@ int main(int argc, char *argv[]) {//getting the input
           write_json_filename = optarg;
           break;
       default:
-          fprintf(stderr, "Usage: %s --input <json_filename> --output <json_filename>\n", argv[0]);
+          fprintf(stdout, "Usage: %s --input <json_filename> --output <json_filename>\n", argv[0]);
           exit(EXIT_FAILURE);
       }
   }
   if (!read_json_filename || !write_json_filename)
   {
-      fprintf(stderr, "Both --input and --output flags are required\n");
+      fprintf(stdout, "Both --input and --output flags are required\n");
       exit(EXIT_FAILURE);
   }
-  run_interpreter<utils_params>(read_json_filename, write_json_filename);
+
+  // check if the file exists
+  std::ifstream file(read_json_filename);
+  if (!file) {
+    fprintf(stdout, "File '%s' does not exist\n", read_json_filename);
+    exit(EXIT_FAILURE);
+  }
+  run_interpreter(read_json_filename, write_json_filename);
 }

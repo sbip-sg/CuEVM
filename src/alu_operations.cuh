@@ -7,7 +7,7 @@
 #ifndef _ALU_H_
 #define _ALU_H_
 
-#include "utils.h"
+#include "include/utils.h"
 #include "stack.cuh"
 
 /**
@@ -25,28 +25,12 @@
  * - EXP
  * - SIGNEXTEND
  */
-template <class params>
-class arithmetic_operations
-{
-public:
-    /**
-     * The arithmetical environment used by the arbitrary length
-     * integer library.
-     */
-    typedef arith_env_t<params> arith_t;
-    /**
-     * The arbitrary length integer type.
-     */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The arbitrary length integer type with double the size of the
-     * EVM word type.
-     */
-    typedef typename arith_t::bn_wide_t bn_wide_t;
+namespace arithmetic_operations {
+
     /**
      * The stackk class.
      */
-    typedef stack_t<params> stack_t;
+    // using stack_t = ::stack_t;
 
     /**
      * The ADD operation implementation.
@@ -611,7 +595,7 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 /**
  * The stack operations class.
@@ -622,23 +606,12 @@ public:
  * - DUPX 80s: Duplication Operations
  * - SWAPX 90s: Exchange Operations
  */
-template <class params>
-class stack_operations
-{
-public:
+namespace stack_operations{
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    typedef arith_env_t<params> arith_t;
-    /**
-     * The arbitrary length integer type.
-     */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The stackk class.
-     */
-    typedef stack_t<params> stack_t;
+    using arith_t = arith_env_t<evm_params>;
 
     /**
      * The POP operation implementation.
@@ -819,7 +792,7 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 /**
  * The comparison operations class.
@@ -831,23 +804,17 @@ public:
  * - EQ
  * - ISZERO
  */
-template <class params>
-class comparison_operations
-{
-public:
+namespace comparison_operations{
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    typedef arith_env_t<params> arith_t;
+    using arith_t = arith_env_t<evm_params>;
+
     /**
-     * The arbitrary length integer type.
+     * The stack class.
      */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The stackk class.
-     */
-    typedef stack_t<params> stack_t;
+    // using stack_t = ::stack_t<evm_params>;
 
     /**
      * Compare the top two values from the stack.
@@ -1154,7 +1121,7 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 /**
  * The bitwise operations class.
@@ -1168,23 +1135,17 @@ public:
  * - SHR
  * - SAR
  */
-template <class params>
-class bitwise_operations
-{
-public:
+namespace bitwise_operations{
     /**
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    typedef arith_env_t<params> arith_t;
+    using arith_t = arith_env_t<evm_params>;
+
     /**
-     * The arbitrary length integer type.
+     * The stack class.
      */
-    typedef typename arith_t::bn_t bn_t;
-    /**
-     * The stackk class.
-     */
-    typedef stack_t<params> stack_t;
+    // using stack_t = ::stack_t<evm_params>;
 
     /**
      * The AND operation implementation.
@@ -1512,6 +1473,6 @@ public:
             pc = pc + 1;
         }
     }
-};
+}
 
 #endif
