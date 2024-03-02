@@ -33,12 +33,12 @@ Building without sudo is also possible with extra configuration and modification
 #### CMake 
 
 * `mkdir build`
-* `cmake ..` (to build only CPU version : `-DONLY_CPU=ON)
-* `cmake --build .`
+* `cmake -S . -B build ` (to build only CPU version : `-DONLY_CPU=ON)
+* `cmake --build build`
 
 
 ## Usage
-
+`{interpreter}` is `build/cuevm` for CMake build and one of the `out/cpu_interpreter` or `out/interpreter` 
 #### Demo of functionality for testing transaction sequences:
 Please refer to subfolder `samples/README.md` for testing and demo how to use this CuEVM.
 #### Testing of the EVM using ethtest:
@@ -46,17 +46,17 @@ Please refer to `REVMI/` for usage.
 
 For example, test all json files in VMTest:
 
-`cd REVMI ; ./evm-interpreter compare --executable ../out/interpreter --test-json dev-resources/ethtest/GeneralStateTests/VMTests/ --limit 10000`
+`cd REVMI; cargo install --path . ; evm-interpreter compare --executable {interpreter} --test-json dev-resources/ethtest/GeneralStateTests/VMTests/ --limit 10000`
 
 
 
 ## Tool usage [TODO after completion]
-* `clear && compute-sanitizer --tool memcheck --leak-check=full ./out/interpreter --input [inpot_json_file] --output [output_json_file]`
-* `clear && valgrind --leak-check=full --show-leak-kinds=all ./out/*`
+* `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [inpot_json_file] --output [output_json_file]`
+* `clear && valgrind --leak-check=full --show-leak-kinds=all {cpu_interpreter}  --input [inpot_json_file] --output [output_json_file]`
 Or for running with cpu
-* `./out/cpu_interpreter --input [inpot_json_file] --output [output_json_file]`
+* `{interpreter} --input [inpot_json_file] --output [output_json_file]`
 Easy test:
-* `./out/cpu_interpreter --input ./input/evm_arith.json --output ./output/evm_test.json`
+* `{interpreter} --input ./input/evm_arith.json --output ./output/evm_test.json`
 
 
 
