@@ -732,6 +732,14 @@ public:
                     evm.child_CALL(
                         error_code,
                         new_message);
+                    // todo return gas unused in child call
+                    memory.grow_cost(args_offset,
+                                     args_size,
+                                     gas_used,
+                                     error_code);
+
+                    // compute the initcode gas cost
+                    arith.initcode_cost(gas_used, args_size);
                 }
                 else
                 {
@@ -828,6 +836,8 @@ public:
                 new_message.set_return_data_offset(ret_offset);
                 new_message.set_return_data_size(ret_size);
 
+                bn_t gas_capped;
+
                 if (valid_CREATE(arith, new_message, touch_state))
                 {
                     // increase the nonce if the sender is a contract
@@ -849,6 +859,19 @@ public:
                     evm.child_CALL(
                         error_code,
                         new_message);
+
+                    // // set the gas limit
+                    // arith.max_gas_call(gas_capped, gas_limit, gas_used);
+                    // new_message.set_gas_limit(gas_capped);
+
+                    // add to gas used
+                    // cgbn_add(arith._env, gas_used, gas_used, gas_capped); // todo_cl uncomment
+
+                    // TODO update gas cost
+                    memory.grow_cost(args_offset, args_size, gas_used, error_code); // create_gas: memory_expansion_cost
+
+                    // compute the initcode gas cost
+                    arith.initcode_cost(gas_used, args_size); // create_gas: init_code_cost
                 }
                 else
                 {
@@ -916,21 +939,17 @@ public:
             stack.pop(length, error_code);
 
             // // create cost
-            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
+            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);// create_gas: add static_gas to gas_used
 
             // add (gas_remaining / 64) to gas_used
             cgbn_sub(arith._env, temp, gas_limit, gas_used);
             cgbn_div_ui32(arith._env, temp, temp, 64);
-            cgbn_add(arith._env, gas_used, gas_used, temp);
-            cgbn_sub(arith._env, gas_passed_in, gas_limit, gas_used);
-
+            cgbn_add(arith._env, gas_used, gas_used, temp); // create_gas: add gl/64 to gas_used
 
             // // compute the memory cost
-            // memory.grow_cost(
-            //     memory_offset,
-            //     length,
-            //     gas_used,
-            //     error_code);
+            // memory.grow_cost(memory_offset, length, gas_used, error_code); // create_gas: init_code_cost
+
+            cgbn_sub(arith._env, gas_passed_in, gas_limit, gas_used);
 
             // // compute the initcode gas cost
             // arith.initcode_cost(
@@ -985,6 +1004,8 @@ public:
                     memory_offset,
                     length,
                     return_data);
+
+                cgbn_sub(arith._env, gas_used, gas_used, temp); // create_gas: deduct gl/64 from gas_used
 
                 pc = pc + 1;
             }
@@ -2795,7 +2816,12 @@ public:
             _arith.cgbn_from_size_t(code_size, _final_return_data->size());
         }
         cgbn_mul(_arith._env, gas_value, gas_value, code_size);
-        cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], gas_value);
+
+        if (_depth > 0){
+          cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], gas_value); // create_gas: 200 * deployed_code_size
+          // cgbn_add(_arith._env, _gas_useds[_depth-1], _gas_useds[_depth-1], _gas_useds[_depth]);
+        }
+
         uint32_t tmp_error_code;
         tmp_error_code = ERR_NONE;
 
@@ -2861,8 +2887,11 @@ public:
         {
             // give back the gas left from the child computation
             bn_t gas_left;
-            cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
-            cgbn_sub(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], gas_left);
+            // cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
+            // cgbn_sub(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], gas_left);
+            cgbn_add(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], _gas_useds[_depth]); // create_gas: add subprocess gas to caller gas
+
+            // TODO_CL breakpoint at this function to test _gas_useds
 
             // if is a succesfull call
             if (error_code == ERR_RETURN)

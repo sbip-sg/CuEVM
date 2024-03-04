@@ -34,7 +34,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
   cJSON_ArrayForEach(test, read_root) {
     // get instaces to run
     evm_t::get_cpu_instances(cpu_instances, test, clones);
-    printf("%d instances generated\n", cpu_instances.count);
+    printf("%lu instances generated\n", cpu_instances.count);
 
     #ifndef ONLY_CPU
     CUDA_CHECK(cudaEventRecord(start));
