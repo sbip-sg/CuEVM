@@ -38,12 +38,14 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o sh.rustup.rs &&
 RUN apt-get update && apt-get install -y doxygen sphinx cmake python3-pip && pip3 install breathe exhale sphinx_rtd_theme sphinx_book_theme
 
 # Go-evmlab targets
-COPY --from=golang-builder /go/goevmlab/generic-fuzzer /
-COPY --from=golang-builder /go/goevmlab/checkslow  /
-COPY --from=golang-builder /go/goevmlab/minimizer /
-COPY --from=golang-builder /go/goevmlab/repro /
-COPY --from=golang-builder /go/goevmlab/runtest /
-COPY --from=golang-builder /go/goevmlab/tracediff /
-COPY --from=golang-builder /go/goevmlab/traceview /
+RUN mkdir /goevmlab
+ENV PATH="${PATH}:/goevmlab"
+COPY --from=golang-builder /go/goevmlab/generic-fuzzer /goevmlab/
+COPY --from=golang-builder /go/goevmlab/checkslow  /goevmlab/
+COPY --from=golang-builder /go/goevmlab/minimizer /goevmlab/
+COPY --from=golang-builder /go/goevmlab/repro /goevmlab/
+COPY --from=golang-builder /go/goevmlab/runtest /goevmlab/
+COPY --from=golang-builder /go/goevmlab/tracediff /goevmlab/
+COPY --from=golang-builder /go/goevmlab/traceview /goevmlab/
 
-COPY --from=golang-builder /go/go-ethereum/build/bin/evm /gethvm
+COPY --from=golang-builder /go/go-ethereum/build/bin/evm /goevmlab/gethvm
