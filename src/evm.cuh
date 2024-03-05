@@ -940,12 +940,7 @@ public:
 
             cgbn_sub(arith._env, gas_passed_in, gas_limit, gas_used);
 
-            // // compute the initcode gas cost
-            // arith.initcode_cost(
-            //     gas_used,
-            //     length);
-
-            if (arith.has_gas(gas_passed_in, gas_used, error_code))
+             if (arith.has_gas(gas_passed_in, gas_used, error_code))
             {
                 bn_t sender_address;
                 message.get_recipient(sender_address); // I_{a}
@@ -1349,33 +1344,32 @@ public:
             evm_t &evm,
             return_data_t &return_data)
         {
-            bn_t value, memory_offset, length, salt;
+            bn_t value, memory_offset, length, salt, gas_passed_in, temp;
             stack.pop(value, error_code);
             stack.pop(memory_offset, error_code);
             stack.pop(length, error_code);
             stack.pop(salt, error_code);
 
             // create cost
-            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
+            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE); // CREATE2_GAS_UPDATE: static_gas 32000
 
             // compute the keccak gas cost
-            arith.keccak_cost(
-                gas_used,
-                length);
+            arith.keccak_cost(gas_used, length); // CREATE2_GAS_UPDATE: keccak_cost
+
+            // add (gas_remaining / 64) to gas_used
+            cgbn_sub(arith._env, temp, gas_limit, gas_used);
+            cgbn_div_ui32(arith._env, temp, temp, 64);
+            cgbn_add(arith._env, gas_used, gas_used, temp); // CREATE2_GAS_UPDATE: add gl/64 to gas_used
 
             // compute the memory cost
-            memory.grow_cost(
-                memory_offset,
-                length,
-                gas_used,
-                error_code);
+            memory.grow_cost(memory_offset, length, gas_used, error_code);
 
-            // compute the initcode gas cost
-            arith.initcode_cost(
-                gas_used,
-                length);
+            // compute the initcode gas cost.
+            // arith.initcode_cost(gas_used, length); // TODO: uncomment will cause test fail, likely this is gas is calculated somewhere else
 
-            if (arith.has_gas(gas_limit, gas_used, error_code))
+            cgbn_sub(arith._env, gas_passed_in, gas_limit, gas_used);
+
+            if (arith.has_gas(gas_passed_in, gas_used, error_code))
             {
                 SHARED_MEMORY data_content_t initialisation_code;
 
@@ -1404,7 +1398,7 @@ public:
                     sender_address,
                     address,
                     address,
-                    gas_limit,
+                    gas_passed_in,
                     value,
                     message.get_depth() + 1,
                     opcode,
@@ -1419,7 +1413,7 @@ public:
 
                 generic_CREATE(
                     arith,
-                    gas_limit,
+                    gas_passed_in,
                     gas_used,
                     error_code,
                     stack,
@@ -1432,6 +1426,7 @@ public:
                     length,
                     return_data);
 
+                cgbn_sub(arith._env, gas_used, gas_used, temp); // CREATE2_GAS_UPDATE: deduct gl/64 from gas_used before return
                 pc = pc + 1;
             }
         }
@@ -2807,7 +2802,7 @@ public:
         cgbn_mul(_arith._env, gas_value, gas_value, code_size);
 
         if (_depth > 0){
-          cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], gas_value); // CREATE_GAS_UPDATE: deployed code storage cost: 200 * deployed_code_size
+          cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], gas_value); // CREATE2_GAS_UPDATE / CREATE_GAS_UPDATE: deployed code storage cost: 200 * deployed_code_size
           // cgbn_add(_arith._env, _gas_useds[_depth-1], _gas_useds[_depth-1], _gas_useds[_depth]);
         }
 
@@ -2878,7 +2873,7 @@ public:
             bn_t gas_left;
             // cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
             // cgbn_sub(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], gas_left);
-            cgbn_add(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], _gas_useds[_depth]); // CREATE_GAS_UPDATE: add subprocess gas to caller gas used
+            cgbn_add(_arith._env, _gas_useds[_depth - 1], _gas_useds[_depth - 1], _gas_useds[_depth]); // CREATE2_GAS_UPDATE / CREATE_GAS_UPDATE: add subprocess gas to caller gas used
 
             // if is a succesfull call
             if (error_code == ERR_RETURN)

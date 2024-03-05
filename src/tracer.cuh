@@ -344,6 +344,7 @@ public:
           cgbn_load(arith._env, gas_limit, &tracer_data.gas_limits[idx]);
           cgbn_load(arith._env, gas_used, &tracer_data.gas_useds[idx]);
           cgbn_sub(arith._env, gas_left, gas_limit, gas_used);
+          arith.trim_to_uint64(gas_left, gas_left); // goevmlab assumes gas is uint64
           cgbn_store(arith._env, evm_word, gas_left);
           arith.pretty_hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
