@@ -860,7 +860,7 @@ public:
                         error_code,
                         new_message);
 
-                    memory.grow_cost(args_offset, args_size, gas_used, error_code); // CREATE_GAS_UPDATE: memory_expansion_cost
+                    // memory.grow_cost(args_offset, args_size, gas_used, error_code); // CREATE_GAS_UPDATE: memory_expansion_cost
 
                 }
                 else
