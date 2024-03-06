@@ -792,6 +792,9 @@ public:
             return_data_t &return_data)
         {
 
+            #ifdef ONLY_CPU
+            printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+            #endif
             if (message.get_static_env())
             {
                 error_code = ERROR_STATIC_CALL_CONTEXT_CREATE;
@@ -805,6 +808,9 @@ public:
             }
             else
             {
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
                 // set the init code
                 SHARED_MEMORY data_content_t initialisation_code;
                 arith.size_t_from_cgbn(initialisation_code.size, args_size);
@@ -817,12 +823,18 @@ public:
                     initialisation_code.size);
 
                 // // set the gas limit
-                // bn_t gas_capped;
-                // arith.max_gas_call(gas_capped, gas_limit, gas_used);
-                // new_message.set_gas_limit(gas_capped);
+                bn_t gas_capped;
+                arith.max_gas_call(gas_capped, gas_limit, gas_used);
+                new_message.set_gas_limit(gas_capped);
 
                 // // add to gas used
-                // cgbn_add(arith._env, gas_used, gas_used, gas_capped);
+                cgbn_add(arith._env, gas_used, gas_used, gas_capped);
+
+                #ifdef ONLY_CPU
+                bn_t pr_gas;
+                cgbn_sub(arith._env, pr_gas, gas_limit, gas_used);
+                printf("GENERIC_CREATE parent unused gas: %d\n", cgbn_get_ui32(arith._env, pr_gas));
+                #endif
 
                 // warm up the contract address
                 bn_t contract_address;
@@ -845,6 +857,9 @@ public:
                     // why in the parent and not in the child the nonce
                     // if the contract deployment fails the nonce is still
                     // increased?
+                    #ifdef ONLY_CPU
+                    printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                    #endif
                     bn_t sender;
                     new_message.get_sender(sender);
                     if (touch_state.is_contract(sender))
@@ -922,7 +937,7 @@ public:
             evm_t &evm,
             return_data_t &return_data)
         {
-          bn_t value, memory_offset, length, temp, gas_passed_in;
+            bn_t value, memory_offset, length;
             stack.pop(value, error_code);
             stack.pop(memory_offset, error_code);
             stack.pop(length, error_code);
@@ -930,18 +945,29 @@ public:
             // create cost
             cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);// CREATE_GAS_UPDATE: static_gas 32000
 
-            // add (gas_remaining / 64) to gas_used
-            cgbn_sub(arith._env, temp, gas_limit, gas_used);
-            cgbn_div_ui32(arith._env, temp, temp, 64);
-            cgbn_add(arith._env, gas_used, gas_used, temp); // CREATE_GAS_UPDATE: add gl/64 to gas_used
-
             // compute the memory cost
-            memory.grow_cost(memory_offset, length, gas_used, error_code); // CREATE_GAS_UPDATE: memory expansion cost
+            memory.grow_cost(
+                memory_offset,
+                length,
+                gas_used,
+                error_code);
 
-            cgbn_sub(arith._env, gas_passed_in, gas_limit, gas_used);
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
+            // compute the initcode gas cost
+            arith.initcode_cost(
+               gas_used,
+               length);
 
-             if (arith.has_gas(gas_passed_in, gas_used, error_code))
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
+            if (arith.has_gas(gas_limit, gas_used, error_code))
             {
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
                 bn_t sender_address;
                 message.get_recipient(sender_address); // I_{a}
                 bn_t sender_nonce;
@@ -961,7 +987,7 @@ public:
                     sender_address,
                     address,
                     address,
-                    gas_passed_in,
+                    gas_limit,
                     value,
                     message.get_depth() + 1,
                     opcode,
@@ -976,7 +1002,7 @@ public:
 
                 generic_CREATE(
                     arith,
-                    gas_passed_in,
+                    gas_limit,
                     gas_used,
                     error_code,
                     stack,

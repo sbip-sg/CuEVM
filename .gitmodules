@@ -4,3 +4,6 @@
 [submodule "REVMI"]
 	path = REVMI
 	url = https://github.com/cassc/evm_interpreter.git
+[submodule "goevmlab"]
+	path = goevmlab
+	url = https://github.com/cassc/goevmlab
