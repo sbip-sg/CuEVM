@@ -732,14 +732,6 @@ public:
                     evm.child_CALL(
                         error_code,
                         new_message);
-                    // todo return gas unused in child call
-                    memory.grow_cost(args_offset,
-                                     args_size,
-                                     gas_used,
-                                     error_code);
-
-                    // compute the initcode gas cost
-                    arith.initcode_cost(gas_used, args_size);
                 }
                 else
                 {
