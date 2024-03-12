@@ -192,8 +192,8 @@ namespace block_operations{
         {
             bn_t prev_randao;
             // TODO: to change depending on the evm version
-            // block.get_prev_randao(prev_randao);
-            block.get_difficulty(prev_randao);
+            block.get_prevrandao(prev_randao); // Assuming after merge fork
+            // block.get_difficulty(prev_randao);
 
             stack.push(prev_randao, error_code);
 
@@ -340,7 +340,7 @@ namespace environmental_operations{
      * - word_size = (length + 31) / 32
      * - dynamic_gas_cost = word_size * GAS_KECCAK256_WORD
      * Adittional gas cost is added for the memory expansion.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -686,7 +686,7 @@ namespace environmental_operations{
      * - word_size = (length + 31) / 32
      * - dynamic_gas_cost = word_size * GAS_MEMORY
      * Adittional gas cost is added for the memory expansion.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -756,7 +756,7 @@ namespace environmental_operations{
     /**
      * The CODESIZE operation implementation.
      * Pushes on the stack the size of code running in current environment.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -800,7 +800,7 @@ namespace environmental_operations{
      * - word_size = (length + 31) / 32
      * - dynamic_gas_cost = word_size * GAS_MEMORY
      * Adittional gas cost is added for the memory expansion.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -876,7 +876,7 @@ namespace environmental_operations{
      * The GASPRICE operation implementation.
      * Pushes on the stack the gas price of the current transaction.
      * The gas price is the price per unit of gas in the transaction.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -920,7 +920,7 @@ namespace environmental_operations{
      * of the account with that address.
      * Gas is charged for accessing the account if it is warm
      * or cold access.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -974,7 +974,7 @@ namespace environmental_operations{
      * Adittional gas cost is added for the memory expansion.
      * Gas is charged for accessing the account if it is warm
      * or cold access.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -1054,7 +1054,7 @@ namespace environmental_operations{
     /**
      * The RETURNDATASIZE operation implementation.
      * Pushes on the stack the size of the return data of the last call.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -1097,7 +1097,7 @@ namespace environmental_operations{
      * - word_size = (length + 31) / 32
      * - dynamic_gas_cost = word_size * GAS_MEMORY
      * Adittional gas cost is added for the memory expansion.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -1185,7 +1185,7 @@ namespace environmental_operations{
      * or cold access.
      * If the account does not exist or is empty or the account is
      * selfdestructed, the hash is zero.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
@@ -1260,7 +1260,7 @@ namespace environmental_operations{
      * Pushes on the stack the balance of the current contract.
      * The current contract is consider the contract that owns the
      * execution code.
-     * 
+     *
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
