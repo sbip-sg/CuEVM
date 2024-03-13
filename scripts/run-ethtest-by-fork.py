@@ -24,7 +24,7 @@ def compare_output():
     if len(geth_traces) != len(cuevm_traces) or len(geth_traces) < 2:
         raise ValueError("\033[91m💥\033[0m Mismatched trace length")
 
-    if geth_traces[0] != cuevm_traces[0]:
+    if geth_traces[:-1] != cuevm_traces[:-1]:
         raise ValueError("\033[91m💥\033[0m Mismatched traces")
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):

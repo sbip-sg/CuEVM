@@ -13,6 +13,7 @@
 #include "message.cuh"
 #include "returndata.cuh"
 #include "sha256.cuh"
+#include "ripemd160.c"
 
 /**
  * The precompile contracts
@@ -133,6 +134,29 @@ namespace precompile_operations {
             error_code = ERR_RETURN;
         }
     }
+
+  __host__ __device__ __forceinline__ static void operation_RIPEMD160(arith_t &arith,
+                                                                      bn_t &gas_limit,
+                                                                      bn_t &gas_used,
+                                                                      uint32_t &error_code,
+                                                                      return_data_t &return_data,
+                                                                      message_t &message
+                                                                      )
+  {
+    bn_t offset, length;
+    size_t size;
+    uint8_t *data;
+
+    uint8_t *input;
+    size = message._content->data.size;
+    input = message._content->data.data;
+
+    uint8_t hash[20];
+    uint8_t output[32] = {0};
+    ripemd160(input, size, hash);
+    memcpy(output + 12, hash, 20);
+    return_data.set(output, 32);
+  }
 }
 
 
