@@ -15,6 +15,7 @@
 #include "alu_operations.cuh"
 #include "env_operations.cuh"
 #include "internal_operations.cuh"
+#include "precompile.cuh"
 
 class evm_t
 {
@@ -69,6 +70,14 @@ public:
      * The keccak parameters.
      */
     typedef typename keccak_t::sha3_parameters_t sha3_parameters_t;
+    /**
+     * The sha256 class.
+    */
+    typedef sha256::sha256_t sha256_t;
+    /**
+     * The sha256 parameters.
+     */
+    typedef typename sha256_t::sha256_parameters_t sha256_parameters_t;
 
     /**
      * The logs state data type.
@@ -95,6 +104,7 @@ public:
         state_data_t *world_state_data; /**< The world state content*/
         block_data_t *block_data; /**< The current block infomation*/
         sha3_parameters_t *sha3_parameters; /**< The constants for the KECCAK*/
+        sha256_parameters_t *sha256_parameters; /**< The constants for the SHA256*/
         transaction_data_t *transactions_data; /**< The transactions information*/
         accessed_state_data_t *accessed_states_data; /**< The data cotaining the states access by the transactions execution*/
         touch_state_data_t *touch_states_data; /**< The data containing the states modified by the transactions execution*/
@@ -111,6 +121,7 @@ public:
     world_state_t *_world_state; /**< The world state*/
     block_t *_block; /**< The current block*/
     keccak_t *_keccak; /**< The keccak object*/
+    sha256_t *_sha256; /**< The sha256 object*/
     transaction_t *_transaction; /**< The current transaction*/
     accessed_state_t *_accessed_state; /**< The accessed state*/
     touch_state_t *_transaction_touch_state; /**< The final touch state of the transaction*/
@@ -165,6 +176,7 @@ public:
      * @param[in] world_state_data The world state data.
      * @param[in] block_data The block data.
      * @param[in] sha3_parameters The sha3 parameters.
+     * @param[in] sha256_parameters The sha256 parameters.
      * @param[in] transaction_data The transaction data.
      * @param[out] accessed_state_data The accessed state data.
      * @param[out] touch_state_data The touch state data.
@@ -179,6 +191,7 @@ public:
         state_data_t *world_state_data,
         block_data_t *block_data,
         sha3_parameters_t *sha3_parameters,
+        sha256_parameters_t *sha256_parameters,
         transaction_data_t *transaction_data,
         accessed_state_data_t *accessed_state_data,
         touch_state_data_t *touch_state_data,
@@ -193,6 +206,7 @@ public:
         _world_state = new world_state_t(arith, world_state_data);
         _block = new block_t(arith, block_data);
         _keccak = new keccak_t(sha3_parameters);
+        _sha256 = new sha256_t(sha256_parameters);
         _transaction = new transaction_t(arith, transaction_data);
         _accessed_state = new accessed_state_t(_world_state);
         _transaction_touch_state = new touch_state_t(_accessed_state, NULL);
@@ -480,16 +494,53 @@ public:
             (call_type != OP_CREATE) &&
             (call_type != OP_CREATE2))
         {
+            return_data_t *return_data;
             if (_depth == 0)
             {
-                system_operations::operation_STOP(
-                    *_final_return_data,
-                    error_code);
+                return_data = _final_return_data;
             }
             else
             {
+                return_data = _last_return_data_ptrs[_depth - 1];
+            }
+
+            // test for precompiled contract
+            if (cgbn_compare_ui32(_arith._env, receiver, 10) == -1) {
+                uint32_t precompiled_no = cgbn_get_ui32(_arith._env, receiver);
+                switch (precompiled_no)
+                {
+                case 2:
+                    precompile_operations::operation_SHA256(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth],
+                        *_sha256
+                    );
+                    break;
+                
+                case 4:
+                    precompile_operations::operation_IDENTITY(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+                
+                default:
+                    system_operations::operation_STOP(
+                        *return_data,
+                        error_code);
+                    break;
+                }
+            } else {
                 system_operations::operation_STOP(
-                    *_last_return_data_ptrs[_depth - 1],
+                    *return_data,
                     error_code);
             }
         }
@@ -3088,6 +3139,13 @@ public:
         delete keccak;
         keccak = NULL;
 
+        // setup the sha256 parameters
+        sha256_t *sha256;
+        sha256 = new sha256_t();
+        instances.sha256_parameters = sha256->_parameters;
+        delete sha256;
+        sha256 = NULL;
+
         // get the transactions
         transaction_t::get_transactions(instances.transactions_data, test, instances.count, 0, clones);
 
@@ -3135,6 +3193,8 @@ public:
 
         gpu_instances.sha3_parameters = cpu_instances.sha3_parameters;
 
+        gpu_instances.sha256_parameters = cpu_instances.sha256_parameters;
+
         gpu_instances.transactions_data = cpu_instances.transactions_data;
 
         gpu_instances.accessed_states_data = accessed_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
@@ -3166,6 +3226,7 @@ public:
         cpu_instances.world_state_data = gpu_instances.world_state_data;
         cpu_instances.block_data = gpu_instances.block_data;
         cpu_instances.sha3_parameters = gpu_instances.sha3_parameters;
+        cpu_instances.sha256_parameters = gpu_instances.sha256_parameters;
         cpu_instances.transactions_data = gpu_instances.transactions_data;
         cpu_instances.return_data = return_data_t::get_cpu_instances_from_gpu_instances(gpu_instances.return_data, gpu_instances.count);
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
@@ -3207,6 +3268,12 @@ public:
         keccak->free_parameters();
         delete keccak;
         keccak = NULL;
+
+        sha256_t *sha256;
+        sha256 = new sha256_t(cpu_instances.sha256_parameters);
+        sha256->free_parameters();
+        delete sha256;
+        sha256 = NULL;
 
         transaction_t::free_instances(cpu_instances.transactions_data, cpu_instances.count);
         cpu_instances.transactions_data = NULL;
@@ -3371,6 +3438,7 @@ __global__ void kernel_evm(
         instances->world_state_data,
         instances->block_data,
         instances->sha3_parameters,
+        instances->sha256_parameters,
         &(instances->transactions_data[instance]),
         &(instances->accessed_states_data[instance]),
         &(instances->touch_states_data[instance]),
