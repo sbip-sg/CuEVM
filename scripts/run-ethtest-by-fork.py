@@ -43,6 +43,7 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
     for dirpath, dirnames, filenames in os.walk(input_directory):
         rel_path = os.path.relpath(dirpath, input_directory)
         for filename in filenames:
+            print(f"Processing {filename}...")
             rootname = filename.split('.')[0]
             try:
                 if filename.endswith(".json"):
