@@ -1,107 +1,5 @@
-/**
- * Copyright (c) 2015 Jonas Schnelli
- * Copyright (c) 2013-2014 Tomas Dzetkulic
- * Copyright (c) 2013-2014 Pavol Rusnak
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
- * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
- */
-
-
-#include <string.h>
-
-// ==================================================
-// #include "ripemd160.h"
-
-#ifndef __LIBBTC_RIPEMD160_H__
-#define __LIBBTC_RIPEMD160_H__
-
-// --------------------------------------------------
-// #include "btc.h"
-
-#ifndef __LIBBTC_BTC_H__
-#define __LIBBTC_BTC_H__
-
-#include <limits.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-typedef uint8_t btc_bool; //!serialize, c/c++ save bool
-
-#ifndef true
-#define true 1
-#endif
-
-#ifndef false
-#define false 0
-#endif
-
-#ifdef __cplusplus
-# define LIBBTC_BEGIN_DECL extern "C" {
-# define LIBBTC_END_DECL	}
-#else
-# define LIBBTC_BEGIN_DECL /* empty */
-# define LIBBTC_END_DECL	/* empty */
-#endif
-
-#ifndef LIBBTC_API
-#if defined(_WIN32)
-#ifdef LIBBTC_BUILD
-#define LIBBTC_API __declspec(dllexport)
-#else
-#define LIBBTC_API
-#endif
-#elif defined(__GNUC__) && defined(LIBBTC_BUILD)
-#define LIBBTC_API __attribute__((visibility("default")))
-#else
-#define LIBBTC_API
-#endif
-#endif
-
-#define BTC_ECKEY_UNCOMPRESSED_LENGTH 65
-#define BTC_ECKEY_COMPRESSED_LENGTH 33
-#define BTC_ECKEY_PKEY_LENGTH 32
-#define BTC_ECKEY_PKEY_LENGTH 32
-#define BTC_HASH_LENGTH 32
-
-#define BTC_MIN(a,b) (((a)<(b))?(a):(b))
-#define BTC_MAX(a,b) (((a)>(b))?(a):(b))
-
-LIBBTC_BEGIN_DECL
-
-typedef uint8_t uint256[32];
-typedef uint8_t uint160[20];
-
-LIBBTC_END_DECL
-
-#endif // __LIBBTC_BTC_H__
-// --------------------------------------------------
-
-LIBBTC_BEGIN_DECL
-
-LIBBTC_API void ripemd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash);
-
-LIBBTC_END_DECL
-
-#endif // END __LIBBTC_RIPEMD160_H__
-// ==================================================
+#pragma once
+#include "include/utils.h"
 
 #define ROL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
 
@@ -172,7 +70,7 @@ LIBBTC_END_DECL
         (c) = ROL((c), 10);                           \
     }
 
-static void compress(uint32_t* MDbuf, uint32_t* X)
+__host__ __device__ static void compress(uint32_t* MDbuf, uint32_t* X)
 {
     uint32_t aa = MDbuf[0], bb = MDbuf[1], cc = MDbuf[2], dd = MDbuf[3], ee = MDbuf[4];
     uint32_t aaa = MDbuf[0], bbb = MDbuf[1], ccc = MDbuf[2], ddd = MDbuf[3], eee = MDbuf[4];
@@ -366,7 +264,7 @@ static void compress(uint32_t* MDbuf, uint32_t* X)
     MDbuf[0] = ddd;
 }
 
-void ripemd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash)
+__host__ __device__ void ripemd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash)
 {
     uint32_t i;
     int j;
@@ -397,7 +295,7 @@ void ripemd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash)
 
         if ((msg_len & 63) > 55) {
             compress(digest, chunk);
-            memset(chunk, 0, 64);
+            ONE_THREAD_PER_INSTANCE(memset(chunk, 0, 64);)
         }
 
         chunk[14] = msg_len << 3;

@@ -13,7 +13,7 @@
 #include "message.cuh"
 #include "returndata.cuh"
 #include "sha256.cuh"
-#include "ripemd160.c"
+#include "ripemd160.cuh"
 
 /**
  * The precompile contracts
@@ -153,16 +153,16 @@ namespace precompile_operations {
     size = message._content->data.size;
     input = message._content->data.data;
 
-    uint8_t hash[20];
     uint8_t output[32] = {0};
-
+    uint8_t *hash;
+    hash = output+12;
     bn_t length;
-    cgbn_set_ui32(arith._env, length, size);
+    arith.cgbn_from_size_t(length, size);
     arith.evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
 
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
-      ripemd160(input, size, hash); // TODO GPU version
-      memcpy(output + 12, hash, 20);
+      ripemd160(input, size, hash);
+      ONE_THREAD_PER_INSTANCE(memcpy(output + 12, hash, 20);)
       return_data.set(output, 32);
       error_code = ERR_RETURN;
     }
