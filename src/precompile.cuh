@@ -145,10 +145,7 @@ namespace precompile_operations {
   {
     cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
 
-
     size_t size;
-    uint8_t *data;
-
     uint8_t *input;
     size = message._content->data.size;
     input = message._content->data.data;
@@ -158,7 +155,7 @@ namespace precompile_operations {
     hash = output+12;
     bn_t length;
     arith.cgbn_from_size_t(length, size);
-    arith.evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
+    arith.ripemd160_cost(gas_used, length);
 
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
       ripemd160(input, size, hash);
