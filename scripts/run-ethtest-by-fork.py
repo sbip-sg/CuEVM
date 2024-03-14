@@ -53,57 +53,38 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
                         data = json.load(file)
 
                     for rootname in list(data.keys()):
-                        post_data = data[rootname]['post']
-
-                        if fork not in post_data:
-                            print(f"No entries related to Shanghai found in {input_filepath}. Skipping...")
-                            continue
-
-                        post_data = {key: value for key, value in post_data.items() if key == fork}
-
-                        # unwrap the transactions because cuevm does not lookup by index currently
                         transaction_data = data[rootname]['transaction']['data']
                         transaction_gaslimit = data[rootname]['transaction']['gasLimit']
                         transaction_value = data[rootname]['transaction']['value']
                         transaction = data[rootname]['transaction']
 
-                        test_index = 0
-                        for test in post_data[fork]:
-                            data = copy.deepcopy(data)
-                            data[rootname]['post'] = {fork: [test]}
-                            indexes = test.get('indexes', {})
-                            test_data_index = indexes.get('data')
-                            test_value_index = indexes.get('value')
-                            test_gas_index =  indexes.get('gas')
+                        data_len = len(transaction_data)
+                        gaslimit_len = len(transaction_gaslimit)
+                        value_len = len(transaction_value)
 
-                            new_transaction = copy.deepcopy(transaction)
+                        for data_index in range(data_len):
+                            for gas_index in range(gaslimit_len):
+                                for value_index in range(value_len):
+                                    data = copy.deepcopy(data)
+                                    data[rootname]['post'] = {fork: [{}]}
+                                    new_transaction = copy.deepcopy(transaction)
+                                    new_transaction['data'] = [transaction_data[data_index]]
+                                    new_transaction['gasLimit'] = [transaction_gaslimit[gas_index]]
+                                    new_transaction['value'] = [transaction_value[value_index]]
 
-                            if test_data_index is not None:
-                                new_transaction['data'] = [ transaction_data[test_data_index], ]
-                                indexes['data'] = 0
+                                    output_filepath = os.path.join(output_directory, rel_path, f'{rootname}-{data_index}-{gas_index}-{value_index}', filename)
+                                    os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 
-                            if test_value_index is not None:
-                                new_transaction['value'] = [ transaction_value[test_value_index], ]
-                                indexes['value'] = 0
+                                    data[rootname]['transaction'] = new_transaction
 
-                            if test_gas_index is not None:
-                                new_transaction['gasLimit'] = [ transaction_gaslimit[test_gas_index], ]
-                                indexes['gas'] = 0
+                                    with open(output_filepath, 'w', encoding='utf-8') as file:
+                                        json.dump(data, file, ensure_ascii=False, indent=2)
 
-                            output_filepath = os.path.join(output_directory, rel_path, f'{rootname}-{test_index}', filename)
-                            os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
-
-                            data[rootname]['transaction'] = new_transaction
-
-                            with open(output_filepath, 'w', encoding='utf-8') as file:
-                                json.dump(data, file, ensure_ascii=False, indent=2)
-
-                            print(f"Processed and saved {output_filepath} successfully.")
-                            run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin)
-                            test_index += 1
-                            if result:
-                                result['n_success'] += 1
-                                result['n_total'] += 1
+                                    print(f"Processed and saved {output_filepath} successfully.")
+                                    run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin)
+                                    if result:
+                                        result['n_success'] += 1
+                                        result['n_total'] += 1
             except Exception as e:
                 if result:
                     result['n_total'] += 1

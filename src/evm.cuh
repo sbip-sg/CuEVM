@@ -386,6 +386,12 @@ public:
         bn_t coin_base_address;
         _block->get_coin_base(coin_base_address);
         _accessed_state->get_account(coin_base_address, READ_BALANCE);
+        bn_t precompiled_address;
+        for (uint32_t i = 1; i < 10; i++)
+        {
+            cgbn_set_ui32(_arith._env, precompiled_address, i);
+            _accessed_state->get_account(precompiled_address, READ_CODE);
+        }
     }
 
     /**
