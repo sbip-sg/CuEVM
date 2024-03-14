@@ -538,6 +538,17 @@ public:
                     );
                     break;
                 
+                case 9:
+                    precompile_operations::operation_BLAKE2(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;                    
+
                 default:
                     system_operations::operation_STOP(
                         *return_data,
