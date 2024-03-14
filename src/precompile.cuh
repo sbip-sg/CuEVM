@@ -143,6 +143,8 @@ namespace precompile_operations {
                                                                       message_t &message
                                                                       )
   {
+    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
+
     bn_t offset, length;
     size_t size;
     uint8_t *data;
