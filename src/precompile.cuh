@@ -145,7 +145,7 @@ namespace precompile_operations {
   {
     cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
 
-    bn_t offset, length;
+
     size_t size;
     uint8_t *data;
 
@@ -155,9 +155,17 @@ namespace precompile_operations {
 
     uint8_t hash[20];
     uint8_t output[32] = {0};
-    ripemd160(input, size, hash);
-    memcpy(output + 12, hash, 20);
-    return_data.set(output, 32);
+
+    bn_t length;
+    cgbn_set_ui32(arith._env, length, size);
+    arith.evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
+
+    if (arith.has_gas(gas_limit, gas_used, error_code)) {
+      ripemd160(input, size, hash); // TODO GPU version
+      memcpy(output + 12, hash, 20);
+      return_data.set(output, 32);
+      error_code = ERR_RETURN;
+    }
   }
 }
 
