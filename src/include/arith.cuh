@@ -505,6 +505,7 @@ public:
     evm_words_gas_cost(gas_used, length, GAS_KECCAK256_WORD);
   }
 
+
   /**
    * Add the cost for memory operation on call data/return data.
    * @param[inout] gas_used The gas used
@@ -531,7 +532,18 @@ public:
   {
     evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_SHA256_WORD);
   }
-
+  /**
+   * Add the dynamic cost for ripemd160 hashing.
+   * @param[inout] gas_used The gas used
+   * @param[in] length The length of the data in bytes
+  */
+  __host__ __device__ __forceinline__ void ripemd160_cost(
+    bn_t &gas_used,
+    bn_t &length
+  )
+  {
+    evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
+  }
 
 };
 
