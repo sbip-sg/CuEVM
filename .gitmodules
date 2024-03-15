@@ -1,9 +1,9 @@
 [submodule "CGBN"]
 	path = CGBN
 	url = https://github.com/NVlabs/CGBN.git
-[submodule "REVMI"]
-	path = REVMI
-	url = https://github.com/cassc/evm_interpreter.git
 [submodule "goevmlab"]
 	path = goevmlab
 	url = https://github.com/cassc/goevmlab
+[submodule "tests"]
+	path = tests
+	url = https://github.com/ethereum/tests.git

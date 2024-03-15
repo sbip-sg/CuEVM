@@ -44,7 +44,7 @@ namespace precompile_operations {
      * @param[out] return_data The return data
      * @param[in] message The message
     */
-    __host__ __device__ __forceinline__ static void operation_IDENTITY(
+    __host__ __device__ static void operation_IDENTITY(
         arith_t &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
@@ -61,14 +61,10 @@ namespace precompile_operations {
         bn_t length;
         size_t length_size = message.get_data_size();
         arith.cgbn_from_size_t(length, length_size);
-        bn_t dynamic_gas_cost;
-        // word_size = (length + 31) / 32
-        cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-        cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-        // dynamic_gas_cost = word_size * 3
-        cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_PRECOMPILE_IDENTITY_WORD);
-        // gas_used += dynamic_gas_cost
-        cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+        arith.memory_cost(
+            gas_used,
+            length
+        );
 
 
         if (arith.has_gas(gas_limit, gas_used, error_code)) {
@@ -93,7 +89,7 @@ namespace precompile_operations {
      * @param[in] message The message
      * @param[in] sha The sha256 class
     */
-    __host__ __device__ __forceinline__ static void operation_SHA256(
+    __host__ __device__ static void operation_SHA256(
         arith_t &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
@@ -110,14 +106,10 @@ namespace precompile_operations {
         bn_t length;
         size_t length_size = message.get_data_size();
         arith.cgbn_from_size_t(length, length_size);
-        bn_t dynamic_gas_cost;
-        // word_size = (length + 31) / 32
-        cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-        cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-        // dynamic_gas_cost = word_size * 3
-        cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_PRECOMPILE_SHA256_WORD);
-        // gas_used += dynamic_gas_cost
-        cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+        arith.sha256_cost(
+            gas_used,
+            length
+        );
 
         if (arith.has_gas(gas_limit, gas_used, error_code)) {
             bn_t index;

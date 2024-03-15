@@ -368,14 +368,10 @@ namespace environmental_operations{
         stack.pop(length, error_code);
 
         // compute the dynamic gas cost
-        bn_t dynamic_gas_cost;
-        // word_size = (length + 31) / 32
-        cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-        cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-        // dynamic_gas_cost = word_size * GAS_KECCAK256_WORD
-        cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_KECCAK256_WORD);
-        // gas_used += dynamic_gas_cost
-        cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+        arith.keccak_cost(
+            gas_used,
+            length
+        );
 
         // get the memory expansion gas cost
         memory.grow_cost(
@@ -714,14 +710,10 @@ namespace environmental_operations{
         stack.pop(length, error_code);
 
         // compute the dynamic gas cost
-        bn_t dynamic_gas_cost;
-        // word_size = (length + 31) / 32
-        cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-        cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-        // dynamic_gas_cost = word_size * 6
-        cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_MEMORY);
-        // gas_used += dynamic_gas_cost
-        cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+        arith.memory_cost(
+            gas_used,
+            length
+        );
 
         // get the memory expansion gas cost
         memory.grow_cost(
@@ -831,14 +823,10 @@ namespace environmental_operations{
         if (error_code == ERR_NONE)
         {
             // compute the dynamic gas cost
-            bn_t dynamic_gas_cost;
-            // word_size = (length + 31) / 32
-            cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-            cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-            // dynamic_gas_cost = word_size * 6
-            cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_MEMORY);
-            // gas_used += dynamic_gas_cost
-            cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+            arith.memory_cost(
+                gas_used,
+                length
+            );
 
             // get the memory expansion gas cost
             memory.grow_cost(
@@ -1006,14 +994,10 @@ namespace environmental_operations{
         if (error_code == ERR_NONE)
         {
             // compute the dynamic gas cost
-            bn_t dynamic_gas_cost;
-            // word_size = (length + 31) / 32
-            cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-            cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-            // dynamic_gas_cost = word_size * 6
-            cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_MEMORY);
-            // gas_used += dynamic_gas_cost
-            cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+            arith.memory_cost(
+                gas_used,
+                length
+            );
 
             // get the memory expansion gas cost
             memory.grow_cost(
@@ -1127,14 +1111,10 @@ namespace environmental_operations{
         if (error_code == ERR_NONE)
         {
             // compute the dynamic gas cost
-            bn_t dynamic_gas_cost;
-            // word_size = (length + 31) / 32
-            cgbn_add_ui32(arith._env, dynamic_gas_cost, length, 31);
-            cgbn_div_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, 32);
-            // dynamic_gas_cost = word_size * 6
-            cgbn_mul_ui32(arith._env, dynamic_gas_cost, dynamic_gas_cost, GAS_MEMORY);
-            // gas_used += dynamic_gas_cost
-            cgbn_add(arith._env, gas_used, gas_used, dynamic_gas_cost);
+            arith.memory_cost(
+                gas_used,
+                length
+            );
 
             // get the memory expansion gas cost
             memory.grow_cost(
