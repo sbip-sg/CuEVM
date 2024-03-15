@@ -162,11 +162,179 @@ namespace precompile_operations {
             SHARED_MEMORY uint8_t *hash;
             hash = output+12;
             ripemd160(input, size, hash);
+            /*
             ONE_THREAD_PER_INSTANCE(
-                memcpy(output + 12, hash, 20);)
+                memcpy(output + 12, hash, 20);
+            )
+            */
             return_data.set(output, 32);
             error_code = ERR_RETURN;
         }
+    }
+
+    __host__ __device__ static void operation_MODEXP(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        return_data_t &return_data,
+        message_t &message) {
+        
+        // get the size of the base, exponent and modulus
+        // from the call data
+        bn_t base_size, exponent_size, modulus_size;
+        bn_t index, length;
+        cgbn_set_ui32(arith._env, index, 0);
+        cgbn_set_ui32(arith._env, length, 32);
+        uint8_t *size_bytearray;
+        size_t size_bytearray_len;
+        size_bytearray = message.get_data(index, length, size_bytearray_len);
+        arith.cgbn_from_fixed_memory(
+            base_size,
+            size_bytearray,
+            size_bytearray_len);
+        cgbn_add(arith._env, index, index, length);
+        size_bytearray = message.get_data(index, length, size_bytearray_len);
+        arith.cgbn_from_fixed_memory(
+            exponent_size,
+            size_bytearray,
+            size_bytearray_len);
+        cgbn_add(arith._env, index, index, length);
+        size_bytearray = message.get_data(index, length, size_bytearray_len);
+        arith.cgbn_from_fixed_memory(
+            modulus_size,
+            size_bytearray,
+            size_bytearray_len);
+        cgbn_add(arith._env, index, index, length);
+
+
+        // get the base, exponent and modulus
+        SHARED_MEMORY uint8_t *base, *exponent, *modulus;
+        size_t base_len, exponent_len, modulus_len;
+
+        int32_t overflow = 0;
+        overflow = arith.size_t_from_cgbn(base_len, base_size);
+        overflow = (
+            overflow |
+            arith.size_t_from_cgbn(exponent_len, exponent_size)
+        );
+        overflow = (
+            overflow |
+            arith.size_t_from_cgbn(modulus_len, modulus_size)
+        );
+        if (overflow) {
+            error_code = ERROR_PRECOMPILE_MODEXP_OVERFLOW;
+            return;
+        }
+
+        ONE_THREAD_PER_INSTANCE(
+            base = new uint8_t[base_len];
+            exponent = new uint8_t[exponent_len];
+            modulus = new uint8_t[modulus_len];
+        )
+        
+        size_t tmp_size;
+        uint8_t *tmp;
+        tmp = message.get_data(index, base_size, tmp_size);
+        for (size_t i = 0; i < tmp_size; i++) {
+            base[base_len - i] = tmp[tmp_size - i];
+        }
+        cgbn_add(arith._env, index, index, base_size);
+        tmp = message.get_data(index, exponent_size, tmp_size);
+        for (size_t i = 0; i < tmp_size; i++) {
+            exponent[exponent_len - i] = tmp[tmp_size - i];
+        }
+        cgbn_add(arith._env, index, index, exponent_size);
+        tmp = message.get_data(index, modulus_size, tmp_size);
+        for (size_t i = 0; i < tmp_size; i++) {
+            modulus[modulus_len - i] = tmp[tmp_size - i];
+        }
+
+        bn_t max_length;
+        cgbn_set(arith._env, max_length, base_size);
+        if (cgbn_compare(arith._env, max_length, exponent_size) < 0) {
+            cgbn_set(arith._env, max_length, exponent_size);
+        }
+        // words = (max_length + 7) / 8
+        // add 7
+        cgbn_add_ui32(arith._env, max_length, max_length, 7);
+        // divide by 8
+        cgbn_shift_right(arith._env, max_length, max_length, 3);
+        bn_t multiplication_complexity;
+        cgbn_mul(arith._env, multiplication_complexity, max_length, max_length);
+        
+        size_t exponent_bit_length;
+        
+        size_t exponent_byte_length;
+        arith.size_t_from_cgbn(exponent_byte_length, exponent_size);
+
+        exponent_byte_length = exponent_len;
+        while (
+            (exponent_byte_length > 0) && 
+            (exponent[exponent_byte_length - 1] == 0)
+        ) {
+            exponent_byte_length--;
+        }
+        exponent_bit_length = exponent_byte_length * 8;
+        if (exponent_bit_length != 0) {
+            uint8_t exponent_byte;
+            exponent_byte = exponent[exponent_byte_length - 1];
+            while (
+                (exponent_byte & 0x80) == 0
+             ) {
+                exponent_bit_length--;
+                exponent_byte <<= 1;
+            }
+        }
+        bn_t exponent_bit_length_bn;
+        arith.cgbn_from_size_t(exponent_bit_length_bn, exponent_bit_length);
+        bn_t iteration_count;
+        cgbn_set_ui32(arith._env, iteration_count, 0);
+        if (cgbn_compare_ui32(arith._env, exponent_size, 32) <= 0) {
+            if (exponent_bit_length != 0) {
+                // exponent.bit_length() - 1
+                cgbn_sub_ui32(arith._env, iteration_count, exponent_bit_length_bn, 1);
+            }
+        } else {
+            // elif Esize > 32: iteration_count = (8 * (Esize - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+            cgbn_sub_ui32(arith._env, iteration_count, exponent_size, 32);
+            cgbn_mul_ui32(arith._env, iteration_count, iteration_count, 8);
+            cgbn_add(arith._env, iteration_count, iteration_count, exponent_bit_length_bn);
+            cgbn_sub_ui32(arith._env, iteration_count, iteration_count, 1);
+        }
+        // iteration_count = max(iteration_count, 1)
+        if (cgbn_compare_ui32(arith._env, iteration_count, 1) < 0) {
+            cgbn_set_ui32(arith._env, iteration_count, 1);
+        }
+
+        bn_t dynamic_gas;
+        // dynamic_gas = max(200, multiplication_complexity * iteration_count / 3)
+        cgbn_mul(arith._env, dynamic_gas, iteration_count, multiplication_complexity);
+        cgbn_div_ui32(arith._env, dynamic_gas, dynamic_gas, 3);
+        if (cgbn_compare_ui32(arith._env, dynamic_gas, 200) < 0) {
+            cgbn_set_ui32(arith._env, dynamic_gas, 200);
+        }
+        cgbn_add(arith._env, gas_used, gas_used, dynamic_gas);
+        if (arith.has_gas(gas_limit, gas_used, error_code)) {
+            // perform the modular exponentiation
+            SHARED_MEMORY uint8_t *result;
+            size_t result_len;
+            ONE_THREAD_PER_INSTANCE(
+            result = new uint8_t[modulus_len];
+            )
+            // result = pow(base, exponent, modulus)
+            // need to do the bigint math
+            return_data.set(result, result_len);
+            error_code = ERR_RETURN;
+            ONE_THREAD_PER_INSTANCE(
+                delete[] result;
+            )
+        }
+        ONE_THREAD_PER_INSTANCE(
+            delete[] base;
+            delete[] exponent;
+            delete[] modulus;
+        )
     }
 
 

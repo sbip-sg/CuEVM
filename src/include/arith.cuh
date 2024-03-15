@@ -138,6 +138,34 @@ public:
   }
 
   /**
+   * Get a CGBN type from memory byte array.
+   * The memory byte array is in Big Endian format.
+   * If the memory byte array is smaller than the CGBN, it fills the
+   * remaining bytes with zeros.
+   * @param[out] dst The destination CGBN
+   * @param[in] src The memory byte array
+   * @param[in] size The size of the memory byte array
+  */
+  __host__ __device__ __forceinline__ void cgbn_from_fixed_memory(
+    bn_t &dst,
+    uint8_t *src,
+    size_t size
+  )
+  {
+    cgbn_set_ui32(_env, dst, 0);
+    for (uint8_t idx = (BYTES - size); idx < x; idx++)
+    {
+      cgbn_insert_bits_ui32(
+          _arith._env,
+          dst,
+          dst,
+          idx * 8,
+          8,
+          src[BYTES - 1 - idx]);
+    }
+  }
+
+  /**
    * Get a CGBN type from a size_t.
    * @param[out] dst The destination CGBN
    * @param[in] src The size_t
