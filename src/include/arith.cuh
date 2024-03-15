@@ -384,10 +384,10 @@ class arith_env_t {
      * @param[in] rounds Number of rounds (big-endian unsigned integer)
      */
     __host__ __device__ __forceinline__ void blake2_cost(bn_t &gas_used, uint32_t rounds) {
-        // gas_used += GAS_BLAKE2_ROUND_COST * rounds
+        // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
         bn_t temp;
         cgbn_set_ui32(_env, temp, rounds);
-        cgbn_mul_ui32(_env, temp, temp, GAS_BLAKE2_ROUND_COST);
+        cgbn_mul_ui32(_env, temp, temp, GAS_PRECOMPILE_BLAKE2_ROUND);
         cgbn_add(_env, gas_used, gas_used, temp);
     }
 };

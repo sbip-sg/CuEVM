@@ -7,6 +7,7 @@
 #ifndef _PRECOMPILE_H_
 #define _PRECOMPILE_H_
 
+#include "blake2/blake2f.cuh"
 #include "include/utils.h"
 #include "memory.cuh"
 #include "message.cuh"
@@ -101,6 +102,11 @@ __host__ __device__ static void operation_SHA256(arith_t &arith, bn_t &gas_limit
 
 __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit, bn_t &gas_used, uint32_t &error_code,
                                                  return_data_t &return_data, message_t &message) {
+    if (message.get_data_size() != 212) { // TODO consume all gas
+        error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT_LENGTH;
+        return;
+    }
+
     uint32_t rounds;
     size_t actual_size_read;
     bn_t offset, size;
@@ -108,37 +114,26 @@ __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit
     arith.cgbn_from_size_t(offset, 0);
     arith.cgbn_from_size_t(size, 4);
 
-
-
-    rounds = *((uint32_t *)message.get_data(offset, size, actual_size_read));
-
-    if (actual_size_read < 4) { // maybe we don't need this
-        error_code = ERR_RETURN;
-        return;
-    }
+    ONE_THREAD_PER_INSTANCE(memcpy(&rounds, message._content->data.data, 4);)
 
     arith.blake2_cost(gas_used, rounds);
 
-    // todo if we check the input size == 212 now, we wouldn't need to do other size checks in message.get_data?
-    if (message.get_data_size() != 212) {
-        error_code = ERR_RETURN;
-        return;
-    }
-
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
-        uint8_t h[64];
-        uint8_t m[128];
-        uint8_t t[16];
-        uint8_t f[1];
+        uint64_t h[8];
+        uint64_t m[16];
+        uint64_t t[2];
+        int f;
 
+        ONE_THREAD_PER_INSTANCE(memcpy(h, message._content->data.data + 4, 64);)
+        ONE_THREAD_PER_INSTANCE(memcpy(m, message._content->data.data + 4 + 64, 128);)
+        ONE_THREAD_PER_INSTANCE(memcpy(t, message._content->data.data + 4 + 64 + 128, 16);)
+        f = *(message._content->data.data + 4 + 64 + 128 + 16);
 
-        ONE_THREAD_PER_INSTANCE(memcpy(h, message._content->data.data + 4, 64));
-        ONE_THREAD_PER_INSTANCE(memcpy(m, message._content->data.data + 4 + 64, 128));
-        ONE_THREAD_PER_INSTANCE(memcpy(t, message._content->data.data + 4 + 64 + 128, 16));
-        ONE_THREAD_PER_INSTANCE(memcpy(f, message._content->data.data + 4 + 64 + 128 + 16, 1));
+        // blake2f(uint64_t rounds, uint64_t h[8], const uint64_t m[16], uint64_t t[2], int f)
+        blake2f(rounds, h, m, t, f);
 
-        // blake2b(h, m, t, f, rounds); // todo_cl
-
+        return_data.set((uint8_t *)h, 64);
+        error_code = ERR_RETURN;
     }
 }
 }  // namespace precompile_operations
