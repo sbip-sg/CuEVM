@@ -156,10 +156,10 @@ namespace precompile_operations {
       error_code = ERR_RETURN;
     }
   }
-}
+
 
    __host__ __device__  static void operation_ecRecover(arith_t &arith,
-                                                            keccak::keccak_t &keccak,
+                                                            keccak::keccak_t* _keccak,
                                                             bn_t &gas_limit,
                                                             bn_t &gas_used,
                                                             uint32_t &error_code,
@@ -176,6 +176,7 @@ namespace precompile_operations {
     cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
     ecc::signature_t signature;
     bn_t msg_hash, v, r, s, signer;
+    evm_word_t scratch_pad;
 
     arith.cgbn_from_memory(msg_hash, input);
     arith.cgbn_from_memory(v, input + 32);
@@ -185,15 +186,95 @@ namespace precompile_operations {
     cgbn_store(arith._env, &signature.msg_hash, msg_hash);
     cgbn_store(arith._env, &signature.r, r);
     cgbn_store(arith._env, &signature.s, s);
-    evm_word_t scratch_pad;
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
         uint8_t output[32];
-        ecc::ec_recover(arith, keccak, signature, signer);
+        ecc::ec_recover(arith, _keccak, signature, signer);
         cgbn_store(arith._env, &scratch_pad, signer);
-        arith.byte_array_from_cgbn_memory(return_data._content->data, size, scratch_pad);
-    //   ONE_THREAD_PER_INSTANCE(memcpy(output + 12, hash, 20);)
-    //   return_data.set(output, 32);
+        arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
+        return_data.set(output, 32);
+
       error_code = ERR_RETURN;
     }
   }
+
+   __host__ __device__  static void operation_ecAdd(arith_t &arith,
+                                                            bn_t &gas_limit,
+                                                            bn_t &gas_used,
+                                                            uint32_t &error_code,
+                                                            return_data_t &return_data,
+                                                            message_t &message
+                                                            )
+  {
+
+    size_t size;
+    uint8_t *input;
+    size = message._content->data.size;
+    input = message._content->data.data;
+    ecc::Curve curve = ecc::get_curve(arith,128);
+    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECADD);
+    bn_t x1, y1, x2, y2;
+    evm_word_t scratch_pad;
+
+    arith.cgbn_from_memory(x1, input);
+    arith.cgbn_from_memory(y1, input + 32);
+    arith.cgbn_from_memory(x2, input + 64);
+    arith.cgbn_from_memory(y2, input + 96);
+
+    if (arith.has_gas(gas_limit, gas_used, error_code)) {
+        uint8_t output[64];
+        int res = ecc::ec_add(arith, curve, x1, y1, x1, y1, x2, y2);
+        if (res==0){
+            cgbn_store(arith._env, &scratch_pad, x1);
+            arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
+            cgbn_store(arith._env, &scratch_pad, y1);
+            arith.byte_array_from_cgbn_memory(output + 32, size, scratch_pad);
+            return_data.set(output, 64);
+            error_code = ERR_RETURN;
+        } else{
+            // consumes all gas
+            // TODO
+        }
+    }
+  }
+
+   __host__ __device__  static void operation_ecMul(arith_t &arith,
+                                                            bn_t &gas_limit,
+                                                            bn_t &gas_used,
+                                                            uint32_t &error_code,
+                                                            return_data_t &return_data,
+                                                            message_t &message
+                                                            )
+  {
+
+    size_t size;
+    uint8_t *input;
+    size = message._content->data.size;
+    input = message._content->data.data;
+    ecc::Curve curve = ecc::get_curve(arith,128);
+    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECMUL);
+    bn_t x, y, k;
+    evm_word_t scratch_pad;
+
+    arith.cgbn_from_memory(x, input);
+    arith.cgbn_from_memory(y, input + 32);
+    arith.cgbn_from_memory(k, input + 64);
+
+    if (arith.has_gas(gas_limit, gas_used, error_code)) {
+        uint8_t output[64];
+        int res = ecc::ec_mul(arith, curve, x, y, x, y, k);
+        if (res==0){
+            cgbn_store(arith._env, &scratch_pad, x);
+            arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
+            cgbn_store(arith._env, &scratch_pad, y);
+            arith.byte_array_from_cgbn_memory(output + 32, size, scratch_pad);
+            return_data.set(output, 64);
+            error_code = ERR_RETURN;
+        } else{
+            // consumes all gas
+            // TODO
+        }
+    }
+  }
+
+}
 #endif

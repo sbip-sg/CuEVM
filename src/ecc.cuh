@@ -34,10 +34,35 @@ namespace ecc {
         uint32_t B;
         // y^2 = x^3 + 7 // y^2 = x^3 + 3
         // y^2 = x^3 + Ax + B
+        // Constructor that accepts a curve name
     } Curve;
 
+    /**
+     * @brief Get the curve object
+     *
+     * @param arith
+     * @param curve_id 256 for secp256k1, 128 for alt_BN128
+     * @return Curve
+     */
+    Curve get_curve(arith_t &arith, int curve_id) {
+        Curve curve;
+        if (curve_id == 256) {
+            arith.cgbn_memory_from_hex_string(curve.FP, secp256k1_FieldPrime);
+            arith.cgbn_memory_from_hex_string(curve.Order, secp256k1_Order);
+            arith.cgbn_memory_from_hex_string(curve.GX, secp256k1_GX);
+            arith.cgbn_memory_from_hex_string(curve.GY, secp256k1_GY);
+            curve.B = 7;
+        } else if (curve_id == 128) {
+            arith.cgbn_memory_from_hex_string(curve.FP, alt_BN128_FieldPrime);
+            arith.cgbn_memory_from_hex_string(curve.Order, alt_BN128_Order);
+            arith.cgbn_memory_from_hex_string(curve.GX, "0x1");
+            arith.cgbn_memory_from_hex_string(curve.GY, "0x2");
+            curve.B = 3;
+        }
+        return curve;
+    }
     // Add two point on the curve P and Q
-    void ec_add(arith_t arith, Curve curve, bn_t &ResX, bn_t &ResY, bn_t &Px, bn_t &Py, bn_t &Qx, bn_t &Qy) {
+    int ec_add(arith_t& arith, Curve curve, bn_t &ResX, bn_t &ResY, bn_t &Px, bn_t &Py, bn_t &Qx, bn_t &Qy) {
         bn_t mod_fp;
         bn_t lambda, numerator, denominator, temp, x_r, y_r;
         evm_word_t scratch_pad;
@@ -79,9 +104,10 @@ namespace ecc {
         // Set the result
         cgbn_set(arith._env, ResX, x_r);
         cgbn_set(arith._env, ResY, y_r);
+        return 0;
     }
     // Multiply a point on the curve G by a scalar n, store result in Res
-    void ec_mul(arith_t arith, Curve curve, bn_t &ResX, bn_t &ResY, bn_t &Gx, bn_t &Gy, bn_t &n) {
+    int ec_mul(arith_t &arith, Curve curve, bn_t &ResX, bn_t &ResY, bn_t &Gx, bn_t &Gy, bn_t &n) {
         bn_t mod_fp;
         evm_word_t scratch_pad;
         cgbn_load(arith._env, mod_fp, &curve.FP);
@@ -107,9 +133,10 @@ namespace ecc {
         }
         cgbn_set(arith._env, ResX, temp_ResX);
         cgbn_set(arith._env, ResY, temp_ResY);
+        return 0;
     }
 
-    void convert_point_to_address(arith_t arith, keccak::keccak_t keccak, bn_t& address, bn_t X, bn_t Y){
+    void convert_point_to_address(arith_t &arith, keccak::keccak_t* _keccak, bn_t& address, bn_t &X, bn_t &Y){
 
         evm_word_t scratch_pad;
         uint8_t input[64];
@@ -120,6 +147,7 @@ namespace ecc {
         for (int i = 0; i < 32; i++){
             input[i] = temp_array[i];
         }
+
         cgbn_store(arith._env, &scratch_pad, Y);
         arith.byte_array_from_cgbn_memory(temp_array, array_length, scratch_pad);
         for (int i = 0; i < 32; i++){
@@ -128,7 +156,7 @@ namespace ecc {
         // print the entire byte array
         // print_byte_array_as_hex(input, 64);
         uint32_t in_length=64, out_length=32;
-        keccak.sha3(input, in_length, (uint8_t*)temp_array, out_length);
+        _keccak->sha3(input, in_length, (uint8_t*)temp_array, out_length);
 
         arith.cgbn_from_memory( address, temp_array);
         cgbn_bitwise_mask_and(arith._env, address, address, 160);
@@ -144,7 +172,7 @@ namespace ecc {
      * @param sig
      * @param signer
      */
-    void ec_recover(arith_t arith, keccak::keccak_t keccak, signature_t sig,  bn_t &signer){
+    void ec_recover(arith_t &arith, keccak::keccak_t* _keccak, signature_t sig,  bn_t &signer){
 
         Curve  curve;
         arith.cgbn_memory_from_hex_string(curve.FP, secp256k1_FieldPrime);
@@ -202,7 +230,7 @@ namespace ecc {
         //calculate Q = Qr * r_inv %N
         ec_mul(arith, curve, ResX, ResY, ResX, ResY, r_inv);
 
-        convert_point_to_address(arith, keccak, signer, ResX, ResY);
+        convert_point_to_address(arith, _keccak, signer, ResX, ResY);
 
     }
 }  // namespace ecc

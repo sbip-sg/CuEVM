@@ -515,6 +515,17 @@ public:
                 uint32_t precompiled_no = cgbn_get_ui32(_arith._env, receiver);
                 switch (precompiled_no)
                 {
+                case 1:
+                    precompile_operations::operation_ecRecover(
+                        _arith,
+                        _keccak,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
                 case 2:
                     precompile_operations::operation_SHA256(
                         _arith,
@@ -547,7 +558,26 @@ public:
                         *_message_ptrs[_depth]
                     );
                     break;
-
+                case 6:
+                    precompile_operations::operation_ecAdd(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+                case 7:
+                    precompile_operations::operation_ecMul(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
                 default:
                     system_operations::operation_STOP(
                         *return_data,
