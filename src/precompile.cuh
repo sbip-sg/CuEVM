@@ -13,6 +13,7 @@
 #include "message.cuh"
 #include "returndata.cuh"
 #include "sha256.cuh"
+#include "ripemd160.cuh"
 #include "ecc.cuh"
 /**
  * The precompile contracts
@@ -126,8 +127,38 @@ namespace precompile_operations {
         }
     }
 
+  __host__ __device__ __forceinline__ static void operation_RIPEMD160(arith_t &arith,
+                                                                      bn_t &gas_limit,
+                                                                      bn_t &gas_used,
+                                                                      uint32_t &error_code,
+                                                                      return_data_t &return_data,
+                                                                      message_t &message
+                                                                      )
+  {
+    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
 
-    __host__ __device__  static void operation_ecRecover(arith_t &arith,
+    size_t size;
+    uint8_t *input;
+    size = message._content->data.size;
+    input = message._content->data.data;
+
+    uint8_t output[32] = {0};
+    uint8_t *hash;
+    hash = output+12;
+    bn_t length;
+    arith.cgbn_from_size_t(length, size);
+    arith.ripemd160_cost(gas_used, length);
+
+    if (arith.has_gas(gas_limit, gas_used, error_code)) {
+      ripemd160(input, size, hash);
+      ONE_THREAD_PER_INSTANCE(memcpy(output + 12, hash, 20);)
+      return_data.set(output, 32);
+      error_code = ERR_RETURN;
+    }
+  }
+}
+
+   __host__ __device__  static void operation_ecRecover(arith_t &arith,
                                                             keccak::keccak_t &keccak,
                                                             bn_t &gas_limit,
                                                             bn_t &gas_used,
@@ -165,7 +196,4 @@ namespace precompile_operations {
       error_code = ERR_RETURN;
     }
   }
-}
-
-
 #endif
