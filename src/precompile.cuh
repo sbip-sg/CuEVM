@@ -102,19 +102,23 @@ __host__ __device__ static void operation_SHA256(arith_t &arith, bn_t &gas_limit
 
 __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit, bn_t &gas_used, uint32_t &error_code,
                                                  return_data_t &return_data, message_t &message) {
-    if (message.get_data_size() != 212) { // TODO consume all gas
+    if (message.get_data_size() != 213) {  // expecting 213 bytes inputs
         error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT_LENGTH;
         return;
     }
 
+    int f = *(message._content->data.data + 4 + 64 + 128 + 16);
+    if ( f != 0 && f!= 1 ){ // final byte must be 1 or 0
+        error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+        return;
+    }
+
     uint32_t rounds;
-    size_t actual_size_read;
-    bn_t offset, size;
+    uint8_t input[4];
 
-    arith.cgbn_from_size_t(offset, 0);
-    arith.cgbn_from_size_t(size, 4);
+    ONE_THREAD_PER_INSTANCE( memcpy(message._content->data.data, &rounds, sizeof(rounds)); )
 
-    ONE_THREAD_PER_INSTANCE(memcpy(&rounds, message._content->data.data, 4);)
+    // rounds = ((uint32_t)input[0] << 24) | ((uint32_t)input[1] << 16) | ((uint32_t)input[2] << 8) | ((uint32_t)input[3]);
 
     arith.blake2_cost(gas_used, rounds);
 
@@ -122,12 +126,10 @@ __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit
         uint64_t h[8];
         uint64_t m[16];
         uint64_t t[2];
-        int f;
 
         ONE_THREAD_PER_INSTANCE(memcpy(h, message._content->data.data + 4, 64);)
         ONE_THREAD_PER_INSTANCE(memcpy(m, message._content->data.data + 4 + 64, 128);)
         ONE_THREAD_PER_INSTANCE(memcpy(t, message._content->data.data + 4 + 64 + 128, 16);)
-        f = *(message._content->data.data + 4 + 64 + 128 + 16);
 
         // blake2f(uint64_t rounds, uint64_t h[8], const uint64_t m[16], uint64_t t[2], int f)
         blake2f(rounds, h, m, t, f);
