@@ -206,6 +206,127 @@ public:
     }
   }
 
+  /**
+   * Get an array of maximum 256 bytes, each having value 1 or 0 indicating bit set or not.
+   * Use as utility for Elliptic curve point multiplication
+   * @param[out] dst_array
+   * @param[out] array_length
+   * @param[in] src_cgbn_mem
+   * @param limb_count
+   */
+  void bit_array_from_cgbn_memory(uint8_t *dst_array, uint32_t &array_length, evm_word_t &src_cgbn_mem, uint32_t limb_count = LIMBS) {
+    uint32_t current_limb;
+    uint32_t bitIndex = 0; // Index for each bit in dst_array
+    array_length = 0;
+    for (uint32_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem._limbs[limb_count - 1 - idx];
+        for (int bit = 31; bit >=0; --bit) { //hardcoded 32 bits per limb
+            // Extract each bit from the current limb and store '0' or '1' in dst_array
+            dst_array[bitIndex++] = (current_limb & (1U << bit)) ? 1 : 0;
+            if (dst_array[bitIndex-1] == 1 && array_length ==0){
+              array_length = 256 - (bitIndex - 1);
+            }
+        }
+      }
+  }
+
+  /**
+   * Get an array of bytes from CGBN memory.
+   * Use as utility for address conversion from Public Key point
+   * @param[out] dst_array
+   * @param[out] array_length
+   * @param[in] src_cgbn_mem
+   * @param limb_count
+   */
+  void byte_array_from_cgbn_memory(uint8_t *dst_array, size_t &array_length, evm_word_t &src_cgbn_mem, size_t limb_count = LIMBS) {
+    size_t current_limb;
+    array_length = limb_count * 4; // Each limb has 4 bytes
+
+    for (size_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem._limbs[limb_count - 1 - idx];
+        dst_array[idx * 4] = (current_limb >> 24) & 0xFF; // Extract the most significant byte
+        dst_array[idx * 4 + 1] = (current_limb >> 16) & 0xFF;
+        dst_array[idx * 4 + 2] = (current_limb >> 8) & 0xFF;
+        dst_array[idx * 4 + 3] = current_limb & 0xFF; // Extract the least significant byte
+    }
+  }
+
+  /**
+   * Print the byte array as hex. Utility for debugging
+   *
+   * @param byte_array
+   * @param array_length
+   * @param is_address
+   */
+  void print_byte_array_as_hex(const uint8_t *byte_array, uint32_t array_length, bool is_address=false) {
+      printf("0x");
+      for (uint32_t i = is_address? 12: 0; i < array_length; i++) {
+          printf("%02x", byte_array[i]);
+      }
+      printf("\n");
+  }
+
+  /**
+   * Mul Mod function for CGBN
+   *
+   * @param env
+   * @param res
+   * @param a
+   * @param b
+   * @param mod
+   */
+  void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
+    env_t::cgbn_wide_t temp;
+    cgbn_mul_wide(env, temp, a, b);
+    cgbn_rem_wide(env, res, temp, mod);
+  }
+
+  /**
+   * Add Mod function for CGBN
+   *
+   * @param env
+   * @param res
+   * @param a
+   * @param b
+   * @param mod
+   */
+  void cgbn_add_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
+    int32_t carry = cgbn_add(env, res, a, b);
+    env_t::cgbn_wide_t d;
+    if (carry == 1)
+    {
+        cgbn_set_ui32(env, d._high, 1);
+        cgbn_set(env, d._low, res);
+        cgbn_rem_wide(env, res, d, mod);
+    }
+    else
+    {
+        cgbn_rem(env, res, res, mod);
+    }
+  }
+
+  /**
+   * Submod function for CGBN
+   *
+   * @param env
+   * @param res
+   * @param a
+   * @param b
+   * @param mod
+   */
+  void cgbn_sub_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
+    // if b > a then a - b + mod
+    if (cgbn_compare(env, a, b) < 0) {
+      env_t::cgbn_accumulator_t acc;
+      cgbn_set(env, acc, a);
+      cgbn_add(env, acc, mod);
+      cgbn_sub(env, acc, b);
+      cgbn_resolve(env, res, acc);
+      cgbn_rem(env, res, res, mod);
+    } else{
+      cgbn_sub(env, res, a, b);
+    }
+  }
 
     /**
    * Get a uint64_t from a CGBN type.

@@ -13,7 +13,7 @@
 #include "message.cuh"
 #include "returndata.cuh"
 #include "sha256.cuh"
-
+#include "ecc.cuh"
 /**
  * The precompile contracts
  * 0x00 Invalid
@@ -125,6 +125,46 @@ namespace precompile_operations {
             error_code = ERR_RETURN;
         }
     }
+
+
+    __host__ __device__  static void operation_ecRecover(arith_t &arith,
+                                                            keccak::keccak_t &keccak,
+                                                            bn_t &gas_limit,
+                                                            bn_t &gas_used,
+                                                            uint32_t &error_code,
+                                                            return_data_t &return_data,
+                                                            message_t &message
+                                                            )
+  {
+
+    size_t size;
+    uint8_t *input;
+    size = message._content->data.size;
+    input = message._content->data.data;
+
+    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
+    ecc::signature_t signature;
+    bn_t msg_hash, v, r, s, signer;
+
+    arith.cgbn_from_memory(msg_hash, input);
+    arith.cgbn_from_memory(v, input + 32);
+    arith.cgbn_from_memory(r, input + 64);
+    arith.cgbn_from_memory(s, input + 96);
+    signature.v = cgbn_get_ui32(arith._env, v);
+    cgbn_store(arith._env, &signature.msg_hash, msg_hash);
+    cgbn_store(arith._env, &signature.r, r);
+    cgbn_store(arith._env, &signature.s, s);
+    evm_word_t scratch_pad;
+    if (arith.has_gas(gas_limit, gas_used, error_code)) {
+        uint8_t output[32];
+        ecc::ec_recover(arith, keccak, signature, signer);
+        cgbn_store(arith._env, &scratch_pad, signer);
+        arith.byte_array_from_cgbn_memory(return_data._content->data, size, scratch_pad);
+    //   ONE_THREAD_PER_INSTANCE(memcpy(output + 12, hash, 20);)
+    //   return_data.set(output, 32);
+      error_code = ERR_RETURN;
+    }
+  }
 }
 
 
