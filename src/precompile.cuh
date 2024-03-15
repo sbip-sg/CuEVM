@@ -108,7 +108,7 @@ __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit
     }
 
     int f = *(message._content->data.data + 4 + 64 + 128 + 16);
-    if ( f != 0 && f!= 1 ){ // final byte must be 1 or 0
+    if (f != 0 && f != 1) {  // final byte must be 1 or 0
         error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         return;
     }
@@ -116,9 +116,8 @@ __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit
     uint32_t rounds;
     uint8_t input[4];
 
-    ONE_THREAD_PER_INSTANCE( memcpy(message._content->data.data, &rounds, sizeof(rounds)); )
-
-    // rounds = ((uint32_t)input[0] << 24) | ((uint32_t)input[1] << 16) | ((uint32_t)input[2] << 8) | ((uint32_t)input[3]);
+    ONE_THREAD_PER_INSTANCE(memcpy(input, message._content->data.data, 4);)
+    rounds = ((uint32_t)input[0] << 24) | ((uint32_t)input[1] << 16) | ((uint32_t)input[2] << 8) | ((uint32_t)input[3]);
 
     arith.blake2_cost(gas_used, rounds);
 
@@ -134,6 +133,7 @@ __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit
         // blake2f(uint64_t rounds, uint64_t h[8], const uint64_t m[16], uint64_t t[2], int f)
         blake2f(rounds, h, m, t, f);
 
+        // todo_cl results differ from the geth implementation
         return_data.set((uint8_t *)h, 64);
         error_code = ERR_RETURN;
     }

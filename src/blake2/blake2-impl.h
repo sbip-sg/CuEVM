@@ -103,19 +103,7 @@ static BLAKE2_INLINE void store32( void *dst, uint32_t w )
 
 static BLAKE2_INLINE void store64( void *dst, uint64_t w )
 {
-#if defined(NATIVE_LITTLE_ENDIAN)
   memcpy(dst, &w, sizeof w);
-#else
-  uint8_t *p = ( uint8_t * )dst;
-  p[0] = (uint8_t)(w >>  0);
-  p[1] = (uint8_t)(w >>  8);
-  p[2] = (uint8_t)(w >> 16);
-  p[3] = (uint8_t)(w >> 24);
-  p[4] = (uint8_t)(w >> 32);
-  p[5] = (uint8_t)(w >> 40);
-  p[6] = (uint8_t)(w >> 48);
-  p[7] = (uint8_t)(w >> 56);
-#endif
 }
 
 static BLAKE2_INLINE uint64_t load48( const void *src )
