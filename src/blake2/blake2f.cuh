@@ -28,7 +28,7 @@ static const uint64_t blake2b_IV[8] =
   0x1f83d9abfb41bd6bULL, 0x5be0cd19137e2179ULL
 };
 
-static const uint8_t blake2b_sigma[12][16] =
+static const uint8_t sigma[10][16] =
 {
   {  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15 } ,
   { 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 } ,
@@ -39,9 +39,7 @@ static const uint8_t blake2b_sigma[12][16] =
   { 12,  5,  1, 15, 14, 13,  4, 10,  0,  7,  6,  3,  9,  2,  8, 11 } ,
   { 13, 11,  7, 14, 12,  1,  3,  9,  5,  0, 15,  4,  8,  6,  2, 10 } ,
   {  6, 15, 14,  9, 11,  3,  0,  8, 12,  2, 13,  7,  1,  4, 10,  5 } ,
-  { 10,  2,  8,  4,  7,  6,  1,  5, 15, 11,  9, 14,  3, 12, 13 , 0 } ,
-  {  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15 } ,
-  { 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 }
+  { 10,  2,  8,  4,  7,  6,  1,  5, 15, 11,  9, 14,  3, 12, 13 , 0 }
 };
 
 
@@ -93,30 +91,29 @@ int blake2b_init_param( blake2b_state *S, const blake2b_param *P )
   return 0;
 }
 
-
-
-#define G(r,i,a,b,c,d)                      \
+/// G function: <https://tools.ietf.org/html/rfc7693#section-3.1>
+#define G(i,a,b,c,d,x,y)                   \
   do {                                      \
-    a = a + b + m[blake2b_sigma[r][2*i+0]]; \
+    a = a + b + x; \
     d = rotr64(d ^ a, 32);                  \
     c = c + d;                              \
     b = rotr64(b ^ c, 24);                  \
-    a = a + b + m[blake2b_sigma[r][2*i+1]]; \
+    a = a + b + y; \
     d = rotr64(d ^ a, 16);                  \
     c = c + d;                              \
     b = rotr64(b ^ c, 63);                  \
   } while(0)
 
-#define ROUND(r)                    \
+#define ROUND(i, m)                   \
   do {                              \
-    G(r,0,v[ 0],v[ 4],v[ 8],v[12]); \
-    G(r,1,v[ 1],v[ 5],v[ 9],v[13]); \
-    G(r,2,v[ 2],v[ 6],v[10],v[14]); \
-    G(r,3,v[ 3],v[ 7],v[11],v[15]); \
-    G(r,4,v[ 0],v[ 5],v[10],v[15]); \
-    G(r,5,v[ 1],v[ 6],v[11],v[12]); \
-    G(r,6,v[ 2],v[ 7],v[ 8],v[13]); \
-    G(r,7,v[ 3],v[ 4],v[ 9],v[14]); \
+    G(0,v[ 0],v[ 4],v[ 8],v[12],m[sigma[i][0]], m[sigma[i][1]]); \
+    G(1,v[ 1],v[ 5],v[ 9],v[13],m[sigma[i][2]], m[sigma[i][3]]); \
+    G(2,v[ 2],v[ 6],v[10],v[14],m[sigma[i][4]], m[sigma[i][5]]); \
+    G(3,v[ 3],v[ 7],v[11],v[15],m[sigma[i][6]], m[sigma[i][7]]); \
+    G(4,v[ 0],v[ 5],v[10],v[15],m[sigma[i][8]], m[sigma[i][9]]); \
+    G(5,v[ 1],v[ 6],v[11],v[12],m[sigma[i][10]],m[sigma[i][11]]); \
+    G(6,v[ 2],v[ 7],v[ 8],v[13],m[sigma[i][12]],m[sigma[i][13]]); \
+    G(7,v[ 3],v[ 4],v[ 9],v[14],m[sigma[i][14]],m[sigma[i][15]]); \
   } while(0)
 
 static void blake2_compress(uint64_t rounds, blake2b_state *S, const uint8_t block[BLAKE2B_BLOCKBYTES] )
@@ -143,7 +140,8 @@ static void blake2_compress(uint64_t rounds, blake2b_state *S, const uint8_t blo
   v[15] = blake2b_IV[7] ^ S->f[1];
 
   for (uint64_t i = 0; i < rounds; i++){
-    ROUND( i );
+    uint64_t r = (i % 10);
+    ROUND( r, m );
   }
 
   for( i = 0; i < 8; ++i ) {
@@ -179,7 +177,3 @@ __host__ __device__ void blake2f(uint64_t rounds, uint64_t h[8], const uint64_t 
         h[i] = S.h[i];
     }
 }
-
-
-
-
