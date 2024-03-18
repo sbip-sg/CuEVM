@@ -526,7 +526,17 @@ public:
                         *_sha256
                     );
                     break;
-                
+                case 3:
+                    precompile_operations::operation_RIPEMD160(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+
                 case 4:
                     precompile_operations::operation_IDENTITY(
                         _arith,
@@ -537,7 +547,7 @@ public:
                         *_message_ptrs[_depth]
                     );
                     break;
-                
+
                 case 9:
                     precompile_operations::operation_BLAKE2(
                         _arith,
@@ -547,7 +557,7 @@ public:
                         *return_data,
                         *_message_ptrs[_depth]
                     );
-                    break;                    
+                    break;
 
                 default:
                     system_operations::operation_STOP(

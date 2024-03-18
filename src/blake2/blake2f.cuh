@@ -12,6 +12,9 @@
    More information about the BLAKE2 hash function can be found at
    https://blake2.net.
 */
+#ifndef BLAKE2F_H
+#define BLAKE2F_H
+
 
 #include <stdint.h>
 #include <string.h>
@@ -19,7 +22,6 @@
 
 #include "blake2.cuh"
 #include "blake2-impl.h"
-
 
 
 /// G function: <https://tools.ietf.org/html/rfc7693#section-3.1>
@@ -132,3 +134,4 @@ __host__ __device__ void blake2f(uint64_t rounds, uint64_t h[8], const uint64_t 
         h[i] = S.h[i];
     }
 }
+#endif
