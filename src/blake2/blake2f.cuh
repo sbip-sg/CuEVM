@@ -119,7 +119,7 @@ int blake2b_init_param( blake2b_state *S, const blake2b_param *P )
     G(r,7,v[ 3],v[ 4],v[ 9],v[14]); \
   } while(0)
 
-static void blake2b_compress( blake2b_state *S, const uint8_t block[BLAKE2B_BLOCKBYTES] )
+static void blake2_compress(uint64_t rounds, blake2b_state *S, const uint8_t block[BLAKE2B_BLOCKBYTES] )
 {
   uint64_t m[16];
   uint64_t v[16];
@@ -142,18 +142,9 @@ static void blake2b_compress( blake2b_state *S, const uint8_t block[BLAKE2B_BLOC
   v[14] = blake2b_IV[6] ^ S->f[0];
   v[15] = blake2b_IV[7] ^ S->f[1];
 
-  ROUND( 0 );
-  ROUND( 1 );
-  ROUND( 2 );
-  ROUND( 3 );
-  ROUND( 4 );
-  ROUND( 5 );
-  ROUND( 6 );
-  ROUND( 7 );
-  ROUND( 8 );
-  ROUND( 9 );
-  ROUND( 10 );
-  ROUND( 11 );
+  for (uint64_t i = 0; i < rounds; i++){
+    ROUND( i );
+  }
 
   for( i = 0; i < 8; ++i ) {
     S->h[i] = S->h[i] ^ v[i] ^ v[i + 8];
@@ -181,7 +172,7 @@ __host__ __device__ void blake2f(uint64_t rounds, uint64_t h[8], const uint64_t 
     }
 
     // Perform the compression
-    blake2b_compress(&S, block);
+    blake2_compress(rounds, &S, block);
 
     // Update the input state with the new state
     for (int i = 0; i < 8; i++) {
