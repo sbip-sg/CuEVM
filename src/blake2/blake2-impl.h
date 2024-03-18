@@ -18,9 +18,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define BLAKE2_INLINE inline
-
-__host__ __device__ static BLAKE2_INLINE uint64_t load64( const void *src )
+__host__ __device__ static inline uint64_t load64( const void *src )
 {
 #if defined(NATIVE_LITTLE_ENDIAN)
   uint64_t w;
@@ -39,12 +37,12 @@ __host__ __device__ static BLAKE2_INLINE uint64_t load64( const void *src )
 #endif
 }
 
-__host__ __device__ static BLAKE2_INLINE void store64( void *dst, uint64_t w )
+__host__ __device__ static inline void store64( void *dst, uint64_t w )
 {
   ONE_THREAD_PER_INSTANCE( memcpy(dst, &w, sizeof w); )
 }
 
-__host__ __device__ static BLAKE2_INLINE uint64_t rotr64( const uint64_t w, const unsigned c )
+__host__ __device__ static inline uint64_t rotr64( const uint64_t w, const unsigned c )
 {
   return ( w >> c ) | ( w << ( 64 - c ) );
 }
