@@ -130,10 +130,8 @@ __host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit
         ONE_THREAD_PER_INSTANCE(memcpy(m, message._content->data.data + 4 + 64, 128);)
         ONE_THREAD_PER_INSTANCE(memcpy(t, message._content->data.data + 4 + 64 + 128, 16);)
 
-        // blake2f(uint64_t rounds, uint64_t h[8], const uint64_t m[16], uint64_t t[2], int f)
         blake2f(rounds, h, m, t, f);
 
-        // todo_cl results differ from the geth implementation
         return_data.set((uint8_t *)h, 64);
         error_code = ERR_RETURN;
     }
