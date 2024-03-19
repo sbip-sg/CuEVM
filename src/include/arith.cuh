@@ -138,6 +138,20 @@ public:
   }
 
   /**
+   * Get evm_word_t from byte array.
+  */
+  __host__ __device__ __forceinline__ void word_from_memory(
+    evm_word_t &dst,
+    uint8_t *src
+  )
+  {
+    bn_t src_cgbn;
+    cgbn_from_memory(src_cgbn, src);
+    cgbn_store(_env, &dst, src_cgbn);
+
+  }
+
+  /**
    * Get a CGBN type from a size_t.
    * @param[out] dst The destination CGBN
    * @param[in] src The size_t

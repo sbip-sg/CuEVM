@@ -3338,13 +3338,11 @@ public:
         bool verbose = false)
     {
         printf("verbose mode %d\n", verbose);
+        world_state_t *cpu_world_state;
+        cpu_world_state = new world_state_t(arith, instances.world_state_data);
         if (verbose){
-            world_state_t *cpu_world_state;
-            cpu_world_state = new world_state_t(arith, instances.world_state_data);
-            printf("World state:\n");
+          printf("World state:\n");
             cpu_world_state->print();
-            delete cpu_world_state;
-            cpu_world_state = NULL;
 
             block_t *cpu_block = NULL;
             cpu_block = new block_t(arith, instances.block_data);
@@ -3373,7 +3371,13 @@ public:
 #ifdef TRACER
             tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx], &instances.return_data[idx]);
 #endif
-
+        }
+        #ifdef COMPLEX_TRACER
+            cpu_world_state->print_trie_accounts();
+        #endif
+        if (cpu_world_state != nullptr){
+            delete cpu_world_state;
+            cpu_world_state = NULL;
         }
     }
 

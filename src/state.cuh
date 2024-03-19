@@ -8,6 +8,8 @@
 #define _STATE_T_H_
 
 #include "include/utils.h"
+#include "keccak.cuh"
+#include <iostream>
 
 #define READ_NONE 0
 #define READ_BALANCE 1
@@ -195,6 +197,65 @@ public:
             _content = NULL;
         }
         #endif
+    }
+    /**
+     * Print global states to the stderr to be parsed by tests
+    */
+    __host__ __forceinline__ void print_trie_accounts()
+    {
+        // todo_cl
+        auto arith = _arith;
+        auto accounts = _content->accounts;
+        char *temp = new char[arith_t::BYTES * 2 + 3];
+        uint8_t hash[32];
+        evm_word_t t_word;
+        std::string out = "[";
+        keccak::keccak_t *k = new keccak::keccak_t();
+
+
+        for (size_t idx = 0; idx < _content->no_accounts; idx++) {
+            // output each account as a map: {nonce: hex, balance: hex, storage: [...], codehash: hex}
+            auto account = accounts[idx];
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.address);
+            out += "{\"address\": \"" ;
+            out += temp; // address
+            out += "\", \"nonce\": \"" ;
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.nonce);
+            out += temp; // nonce
+            out += "\", \"codehash\": \"" ;
+            auto bytecode = account.bytecode;
+            auto code_size = account.code_size;
+            k->sha3(bytecode, code_size, hash, 32);
+            arith.word_from_memory(t_word, hash);
+            arith.pretty_hex_string_from_cgbn_memory(temp, t_word);
+            out += temp; // codehash, better cache it and calculate only once
+            out += "\", \"storage\": [" ;
+
+            print_bytes(account.bytecode, account.code_size);
+
+            // printing storages as: `[[k, v], [k, v], ...]`
+            for (size_t idx = 0; idx < account.storage_size; idx++) {
+                out += "[\"";
+                arith.pretty_hex_string_from_cgbn_memory(temp, account.storage[idx].key);
+                out += temp;
+                arith.pretty_hex_string_from_cgbn_memory(temp, account.storage[idx].value);
+                out += "\", \"";
+                out += temp;
+                out += "\"]";
+                if (idx < account.storage_size - 1){
+                    out += ",";
+                }
+            }
+            out += "]}" ;
+            if (idx < _content->no_accounts - 1){
+                out += ",";
+            }
+
+        }
+        out += "]";
+        delete temp;
+        temp = nullptr;
+        std::cerr << out << std::endl;
     }
 
     /**
