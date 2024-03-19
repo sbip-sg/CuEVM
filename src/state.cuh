@@ -221,7 +221,10 @@ public:
             out += temp; // address
             out += "\", \"nonce\": \"" ;
             arith.pretty_hex_string_from_cgbn_memory(temp, account.nonce);
-            out += temp; // nonce
+            out += temp;  // nonce
+            out += "\", \"balance\": \"";
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.balance);
+            out += temp;  // balance
             out += "\", \"codehash\": \"" ;
             auto bytecode = account.bytecode;
             auto code_size = account.code_size;
@@ -234,15 +237,18 @@ public:
             print_bytes(account.bytecode, account.code_size);
 
             // printing storages as: `[[k, v], [k, v], ...]`
-            for (size_t idx = 0; idx < account.storage_size; idx++) {
+            for (size_t i = 0; i < account.storage_size; i++) {
+                // todo_cl should ignore zero values
+                auto key = account.storage[i].key;
+                auto value = account.storage[i].value;
                 out += "[\"";
-                arith.pretty_hex_string_from_cgbn_memory(temp, account.storage[idx].key);
+                arith.pretty_hex_string_from_cgbn_memory(temp, key);
                 out += temp;
-                arith.pretty_hex_string_from_cgbn_memory(temp, account.storage[idx].value);
+                arith.pretty_hex_string_from_cgbn_memory(temp, value);
                 out += "\", \"";
                 out += temp;
                 out += "\"]";
-                if (idx < account.storage_size - 1){
+                if (i < account.storage_size - 1){
                     out += ",";
                 }
             }
