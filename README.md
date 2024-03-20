@@ -41,12 +41,11 @@ Building without sudo is also possible with extra configuration and modification
 `{interpreter}` is `build/cuevm` for CMake build and one of the `out/cpu_interpreter` or `out/interpreter` 
 #### Demo of functionality for testing transaction sequences:
 Please refer to subfolder `samples/README.md` for testing and demo how to use this CuEVM.
+
 #### Testing of the EVM using ethtest:
-Please refer to `REVMI/` for usage.
+Please refer to `scripts/run-ethtest-by-fork`.
 
-For example, test all json files in VMTest:
-
-`cd REVMI; cargo install --path . ; evm-interpreter compare --executable {interpreter} --test-json dev-resources/ethtest/GeneralStateTests/VMTests/ --limit 10000`
+`python scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm`
 
 
 
