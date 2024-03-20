@@ -128,73 +128,103 @@ namespace precompile_operations {
         }
     }
 
-  __host__ __device__ __forceinline__ static void operation_RIPEMD160(arith_t &arith,
-                                                                      bn_t &gas_limit,
-                                                                      bn_t &gas_used,
-                                                                      uint32_t &error_code,
-                                                                      return_data_t &return_data,
-                                                                      message_t &message
-                                                                      )
-  {
-    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
+    __host__ __device__ __forceinline__ static void operation_RIPEMD160(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        return_data_t &return_data,
+        message_t &message) {
 
-    size_t size;
-    uint8_t *input;
-    size = message._content->data.size;
-    input = message._content->data.data;
+        // static gas
+        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
 
-    uint8_t output[32] = {0};
-    uint8_t *hash;
-    hash = output+12;
-    bn_t length;
-    arith.cgbn_from_size_t(length, size);
-    arith.ripemd160_cost(gas_used, length);
+        size_t size;
+        size = message.get_data_size();
+        
+        bn_t length;
+        arith.cgbn_from_size_t(length, size);
+        
+        arith.ripemd160_cost(gas_used, length);
 
-    if (arith.has_gas(gas_limit, gas_used, error_code)) {
-      ripemd160(input, size, hash);
-      ONE_THREAD_PER_INSTANCE(memcpy(output + 12, hash, 20);)
-      return_data.set(output, 32);
-      error_code = ERR_RETURN;
-    }
-  }
-
-
-__host__ __device__ static void operation_BLAKE2(arith_t &arith, bn_t &gas_limit, bn_t &gas_used, uint32_t &error_code,
-                                                 return_data_t &return_data, message_t &message) {
-    if (message.get_data_size() != 213) {  // expecting 213 bytes inputs
-        error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT_LENGTH;
-        return;
-    }
-
-    int f = *(message._content->data.data + 4 + 64 + 128 + 16);
-    if (f != 0 && f != 1) {  // final byte must be 1 or 0
-        error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
-        return;
+        if (arith.has_gas(gas_limit, gas_used, error_code)) {
+            // get the input
+            bn_t index;
+            cgbn_set_ui32(arith._env, index, 0);
+            SHARED_MEMORY uint8_t *input;
+            input = message.get_data(index, length, size);
+            
+            // output allocation
+            SHARED_MEMORY uint8_t output[32];
+            ONE_THREAD_PER_INSTANCE(
+                memset(&(output[0]), 0, 32);
+            )
+            SHARED_MEMORY uint8_t *hash;
+            hash = output+12;
+            ripemd160(input, size, hash);
+            ONE_THREAD_PER_INSTANCE(
+                memcpy(output + 12, hash, 20);)
+            return_data.set(output, 32);
+            error_code = ERR_RETURN;
+        }
     }
 
-    uint32_t rounds;
-    uint8_t input[4];
 
-    ONE_THREAD_PER_INSTANCE(memcpy(input, message._content->data.data, 4);)
-    rounds = ((uint32_t)input[0] << 24) | ((uint32_t)input[1] << 16) | ((uint32_t)input[2] << 8) | ((uint32_t)input[3]);
+    __host__ __device__ static void operation_BLAKE2(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        return_data_t &return_data,
+        message_t &message) {
+        
+        // expecting 213 bytes inputs
+        size_t size = message.get_data_size();
+        if (size != 213) {
+            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT_LENGTH;
+            return;
+        }
 
-    arith.blake2_cost(gas_used, rounds);
+        bn_t index;
+        cgbn_set_ui32(arith._env, index, 0);
+        bn_t length;
+        arith.cgbn_from_size_t(length, size);
 
-    if (arith.has_gas(gas_limit, gas_used, error_code)) {
-        uint64_t h[8];
-        uint64_t m[16];
-        uint64_t t[2];
+        SHARED_MEMORY uint8_t *input;
+        input = message.get_data(index, length, size);
+        uint8_t f = input[212];
+        
+        // final byte must be 1 or 0
+        if ((f>>1) != 0) {  
+            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+            return;
+        }
 
-        ONE_THREAD_PER_INSTANCE(memcpy(h, message._content->data.data + 4, 64);)
-        ONE_THREAD_PER_INSTANCE(memcpy(m, message._content->data.data + 4 + 64, 128);)
-        ONE_THREAD_PER_INSTANCE(memcpy(t, message._content->data.data + 4 + 64 + 128, 16);)
+        uint32_t rounds;
+        rounds = (
+            ((uint32_t)input[0] << 24) |
+            ((uint32_t)input[1] << 16) |
+            ((uint32_t)input[2] << 8) |
+            ((uint32_t)input[3])
+        );
 
-        blake2f(rounds, h, m, t, f);
+        arith.blake2_cost(gas_used, rounds);
 
-        return_data.set((uint8_t *)h, 64);
-        error_code = ERR_RETURN;
+        if (arith.has_gas(gas_limit, gas_used, error_code)) {
+            uint64_t h[8];
+            uint64_t m[16];
+            uint64_t t[2];
+
+            ONE_THREAD_PER_INSTANCE(memcpy(h, &(input[4]), 64);)
+            ONE_THREAD_PER_INSTANCE(memcpy(m, &(input[68]), 128);)
+            ONE_THREAD_PER_INSTANCE(memcpy(t, &(input[196]), 16);)
+
+            blake2f(rounds, h, m, t, f);
+
+            return_data.set((uint8_t *)h, 64);
+            error_code = ERR_RETURN;
+        }
     }
-}
 
 }
 
