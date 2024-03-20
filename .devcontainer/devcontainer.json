@@ -1,8 +1,8 @@
 {
 	"name": "QLE dev container",
-	"image": "cuda-cuevm:latest",
+	"build": { "dockerfile": "Dockerfile" },
 	"runArgs": [
-		"--rm"
+		"--rm", "--gpus=all"
 	],
 	//"remoteEnv": {
 	//	"ENV_VAR": "ENV_VAL"
