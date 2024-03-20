@@ -510,9 +510,11 @@ public:
                 return_data = _last_return_data_ptrs[_depth - 1];
             }
 
+            bn_t contract_address;
+            _message_ptrs[_depth]->get_contract_address(contract_address);
             // test for precompiled contract
-            if (cgbn_compare_ui32(_arith._env, receiver, 10) == -1) {
-                uint32_t precompiled_no = cgbn_get_ui32(_arith._env, receiver);
+            if (cgbn_compare_ui32(_arith._env, contract_address, 10) == -1) {
+                uint32_t precompiled_no = cgbn_get_ui32(_arith._env, contract_address);
                 switch (precompiled_no)
                 {
                 case 2:
@@ -539,6 +541,17 @@ public:
 
                 case 4:
                     precompile_operations::operation_IDENTITY(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+
+                case 9:
+                    precompile_operations::operation_BLAKE2(
                         _arith,
                         _gas_limit,
                         _gas_useds[_depth],
@@ -1197,6 +1210,7 @@ public:
             evm_t &evm,
             return_data_t &return_data)
         {
+            printf("MAKES a CALLCODE\n");
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
             stack.pop(address, error_code);

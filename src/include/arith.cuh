@@ -545,6 +545,18 @@ public:
     evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
   }
 
+  /**
+   * Add the dynamics cost for blake2 hashing.
+   * @param[inout] gas_used The gas used
+   * @param[in] rounds Number of rounds (big-endian unsigned integer)
+   */
+  __host__ __device__ __forceinline__ void blake2_cost(bn_t &gas_used, uint32_t rounds) {
+      // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
+      bn_t temp;
+      cgbn_set_ui32(_env, temp, rounds);
+      cgbn_mul_ui32(_env, temp, temp, GAS_PRECOMPILE_BLAKE2_ROUND);
+      cgbn_add(_env, gas_used, gas_used, temp);
+  }
 };
 
 /**

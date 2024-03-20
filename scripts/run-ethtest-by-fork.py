@@ -39,10 +39,12 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
     print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
 def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth', cuevm_bin='cuevm', ignore_errors=False, result={}):
-    result = result or {'n_total': 0, 'n_success': 0}
+    result = result or {'n_total': 0, 'n_success': 0, 'failed_files': []}
+    output_filepath = None
     for dirpath, dirnames, filenames in os.walk(input_directory):
         rel_path = os.path.relpath(dirpath, input_directory)
         for filename in filenames:
+            print("Processing", dirpath, filename)
             rootname = filename.split('.')[0]
             try:
                 if filename.endswith(".json"):
@@ -87,6 +89,7 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
             except Exception as e:
                 if result:
                     result['n_total'] += 1
+                    result['failed_files'].append(output_filepath)
                 if ignore_errors:
                     print(f"{str(e)}")
                 else:
@@ -109,12 +112,11 @@ def main():
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
         assert_command_in_path(cmd)
 
-    result = {'n_total': 0, 'n_success': 0}
+    result = {'n_total': 0, 'n_success': 0, 'failed_files': []}
     try:
         runtest_fork(args.input, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result)
     finally:
-        print(f"Total tests: {result['n_total']}, Passed: {result['n_success']}")
-
+        print(f"Total tests: {result['n_total']}, Passed: {result['n_success']}, Failed files: {result['failed_files']}")
 
 if __name__ == "__main__":
     main()
