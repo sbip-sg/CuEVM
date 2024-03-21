@@ -54,38 +54,51 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
                         data = json.load(file)
 
                     for rootname in list(data.keys()):
-                        transaction_data = data[rootname]['transaction']['data']
-                        transaction_gaslimit = data[rootname]['transaction']['gasLimit']
-                        transaction_value = data[rootname]['transaction']['value']
+                        print(f'rootname: {rootname}')
                         transaction = data[rootname]['transaction']
+                        transaction_data = transaction['data']
+                        transaction_gaslimit = transaction['gasLimit']
+                        transaction_value = transaction['value']
 
-                        data_len = len(transaction_data)
-                        gaslimit_len = len(transaction_gaslimit)
-                        value_len = len(transaction_value)
 
-                        for data_index in range(data_len):
-                            for gas_index in range(gaslimit_len):
-                                for value_index in range(value_len):
-                                    data = copy.deepcopy(data)
-                                    data[rootname]['post'] = {fork: [{}]}
-                                    new_transaction = copy.deepcopy(transaction)
-                                    new_transaction['data'] = [transaction_data[data_index]]
-                                    new_transaction['gasLimit'] = [transaction_gaslimit[gas_index]]
-                                    new_transaction['value'] = [transaction_value[value_index]]
+                        # data_len = len(transaction_data)
+                        # gaslimit_len = len(transaction_gaslimit)
+                        # value_len = len(transaction_value)
 
-                                    output_filepath = os.path.join(output_directory, rel_path, f'{rootname}-{data_index}-{gas_index}-{value_index}', filename)
-                                    os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+                        post_by_fork = data[rootname]['post'].get(fork)
 
-                                    data[rootname]['transaction'] = new_transaction
+                        if not post_by_fork:
+                            print(f"Skipping {rootname} as it does not have a `:post` for {fork}")
+                            continue
 
-                                    with open(output_filepath, 'w', encoding='utf-8') as file:
-                                        json.dump(data, file, ensure_ascii=False, indent=2)
+                        for tx in post_by_fork:
+                            indexes = tx['indexes']
+                            data_index = indexes['data']
+                            gas_index = indexes['gas']
+                            value_index = indexes['value']
 
-                                    print(f"Processed and saved {output_filepath} successfully.")
-                                    run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin)
-                                    if result:
-                                        result['n_success'] += 1
-                                        result['n_total'] += 1
+                            tx = copy.deepcopy(tx)
+                            tx['indexes'] = dict(data=0, gas=0, value=0)
+                            data = copy.deepcopy(data)
+                            data[rootname]['post'] = {fork: [tx]}
+                            new_transaction = copy.deepcopy(transaction)
+                            new_transaction['data'] = [transaction_data[data_index]]
+                            new_transaction['gasLimit'] = [transaction_gaslimit[gas_index]]
+                            new_transaction['value'] = [transaction_value[value_index]]
+
+                            output_filepath = os.path.join(output_directory, rel_path, f'{rootname}-{data_index}-{gas_index}-{value_index}', filename)
+                            os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+
+                            data[rootname]['transaction'] = new_transaction
+
+                            with open(output_filepath, 'w', encoding='utf-8') as file:
+                                json.dump(data, file, ensure_ascii=False, indent=2)
+
+                            print(f"Processed and saved {output_filepath} successfully.")
+                            run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin)
+                            if result:
+                                result['n_success'] += 1
+                                result['n_total'] += 1
             except Exception as e:
                 if result:
                     result['n_total'] += 1
