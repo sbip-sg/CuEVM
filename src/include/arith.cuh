@@ -153,10 +153,10 @@ public:
   )
   {
     cgbn_set_ui32(_env, dst, 0);
-    for (uint8_t idx = (BYTES - size); idx < x; idx++)
+    for (uint8_t idx = (BYTES - size); idx < BYTES; idx++)
     {
       cgbn_insert_bits_ui32(
-          _arith._env,
+          _env,
           dst,
           dst,
           idx * 8,

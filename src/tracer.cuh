@@ -177,6 +177,7 @@ public:
                 #endif
                 delete[] _content->addresses;
                 delete[] _content->pcs;
+                delete[] _content->depths;
                 delete[] _content->opcodes;
                 delete[] _content->stacks;
                 #ifdef COMPLEX_TRACER
@@ -394,8 +395,9 @@ public:
         arith.pretty_hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
         if (return_data != nullptr) {
-            char* return_data_str =  hex_from_bytes(return_data->data, return_data->size);
+            char* return_data_str = hex_from_bytes(return_data->data, return_data->size);
             fprintf(stderr, "{\"output\":\"%s\",\"gasUsed\":\"%s\"}\n", return_data_str+2, gas_left_str);
+            delete[] return_data_str;
         }
         #endif
         delete[] gas_left_str;
@@ -442,6 +444,7 @@ public:
                 5);
             cJSON_AddStringToObject(item, "address", hex_string_ptr);
             cJSON_AddNumberToObject(item, "pc", tracer_data.pcs[idx]);
+            cJSON_AddNumberToObject(item, "depth", tracer_data.depths[idx]);
             cJSON_AddNumberToObject(item, "opcode", tracer_data.opcodes[idx]);
             stack_json = stack_t::json_from_stack_data_t(
                 arith,
@@ -514,6 +517,7 @@ public:
             {
                 delete[] cpu_instances[idx].addresses;
                 delete[] cpu_instances[idx].pcs;
+                delete[] cpu_instances[idx].depths;
                 delete[] cpu_instances[idx].opcodes;
                 stack_t::free_cpu_instances(cpu_instances[idx].stacks, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].stacks;
@@ -531,6 +535,7 @@ public:
                 cpu_instances[idx].size = 0;
                 cpu_instances[idx].addresses = NULL;
                 cpu_instances[idx].pcs = NULL;
+                cpu_instances[idx].depths = NULL;
                 cpu_instances[idx].opcodes = NULL;
                 cpu_instances[idx].stacks = NULL;
                 #ifdef COMPLEX_TRACER
@@ -647,6 +652,7 @@ public:
                 tmp_cpu_instances[idx].size = 0;
                 tmp_cpu_instances[idx].addresses = NULL;
                 tmp_cpu_instances[idx].pcs = NULL;
+                tmp_cpu_instances[idx].depths = NULL;
                 tmp_cpu_instances[idx].opcodes = NULL;
                 tmp_cpu_instances[idx].stacks = NULL;
                 #ifdef COMPLEX_TRACER
@@ -689,6 +695,7 @@ public:
             {
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].addresses));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].pcs));
+                CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].depths));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].opcodes));
                 stack_t::free_gpu_instances(tmp_cpu_instances[idx].stacks, tmp_cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER
@@ -798,6 +805,7 @@ public:
                 tmp_cpu_instances[idx].size = 0;
                 tmp_cpu_instances[idx].addresses = NULL;
                 tmp_cpu_instances[idx].pcs = NULL;
+                tmp_cpu_instances[idx].depths = NULL;
                 tmp_cpu_instances[idx].opcodes = NULL;
                 tmp_cpu_instances[idx].stacks = NULL;
                 #ifdef COMPLEX_TRACER
@@ -862,6 +870,13 @@ public:
                     sizeof(uint32_t) * cpu_instances[idx].size,
                     cudaMemcpyDeviceToHost));
                 CUDA_CHECK(cudaFree(cpu_instances[idx].pcs));
+                tmp_cpu_instances[idx].depths = new uint32_t[cpu_instances[idx].size];
+                CUDA_CHECK(cudaMemcpy(
+                    tmp_cpu_instances[idx].depths,
+                    cpu_instances[idx].depths,
+                    sizeof(uint32_t) * cpu_instances[idx].size,
+                    cudaMemcpyDeviceToHost));
+                CUDA_CHECK(cudaFree(cpu_instances[idx].depths));
                 tmp_cpu_instances[idx].opcodes = new uint8_t[cpu_instances[idx].size];
                 CUDA_CHECK(cudaMemcpy(
                     tmp_cpu_instances[idx].opcodes,
@@ -915,6 +930,7 @@ public:
                 tmp_cpu_instances[idx].size = 0;
                 tmp_cpu_instances[idx].addresses = NULL;
                 tmp_cpu_instances[idx].pcs = NULL;
+                tmp_cpu_instances[idx].depths = NULL;
                 tmp_cpu_instances[idx].opcodes = NULL;
                 tmp_cpu_instances[idx].stacks = NULL;
                 #ifdef COMPLEX_TRACER
@@ -963,6 +979,10 @@ __global__ void kernel_tracers(
             src_instances[instance].pcs,
             src_instances[instance].size * sizeof(uint32_t));
         memcpy(
+            dst_instances[instance].depths,
+            src_instances[instance].depths,
+            src_instances[instance].size * sizeof(uint32_t));
+        memcpy(
             dst_instances[instance].opcodes,
             src_instances[instance].opcodes,
             src_instances[instance].size * sizeof(uint8_t));
@@ -998,6 +1018,7 @@ __global__ void kernel_tracers(
         #endif
         delete[] src_instances[instance].addresses;
         delete[] src_instances[instance].pcs;
+        delete[] src_instances[instance].depths;
         delete[] src_instances[instance].opcodes;
         delete[] src_instances[instance].stacks;
         #ifdef COMPLEX_TRACER
@@ -1012,6 +1033,7 @@ __global__ void kernel_tracers(
         src_instances[instance].capacity = 0;
         src_instances[instance].addresses = NULL;
         src_instances[instance].pcs = NULL;
+        src_instances[instance].depths = NULL;
         src_instances[instance].opcodes = NULL;
         src_instances[instance].stacks = NULL;
         #ifdef COMPLEX_TRACER

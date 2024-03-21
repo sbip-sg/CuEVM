@@ -253,6 +253,7 @@ public:
         delete _world_state;
         delete _block;
         delete _keccak;
+        delete _sha256;
         delete _transaction;
         delete _accessed_state;
         delete _transaction_touch_state;
@@ -263,7 +264,14 @@ public:
         delete[] _touch_state_ptrs;
         delete[] _log_state_ptrs;
         delete[] _last_return_data_ptrs;
-        // delete _final_return_data;
+
+        ONE_THREAD_PER_INSTANCE(
+            _final_return_data->_content = new data_content_t;
+            _final_return_data->_content->size = 0;
+            _final_return_data->_content->data = NULL;
+        )
+
+        delete _final_return_data;
         delete[] _message_ptrs;
         delete[] _memory_ptrs;
         delete[] _stack_ptrs;
@@ -541,6 +549,17 @@ public:
 
                 case 4:
                     precompile_operations::operation_IDENTITY(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+                
+                case 5:
+                    precompile_operations::operation_MODEXP(
                         _arith,
                         _gas_limit,
                         _gas_useds[_depth],
@@ -1210,7 +1229,6 @@ public:
             evm_t &evm,
             return_data_t &return_data)
         {
-            printf("MAKES a CALLCODE\n");
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
             stack.pop(address, error_code);
@@ -3307,6 +3325,9 @@ public:
 
         transaction_t::free_instances(cpu_instances.transactions_data, cpu_instances.count);
         cpu_instances.transactions_data = NULL;
+
+        return_data_t::free_cpu_instances(cpu_instances.return_data, cpu_instances.count);
+        cpu_instances.return_data = NULL;
 
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
         cpu_instances.accessed_states_data = NULL;

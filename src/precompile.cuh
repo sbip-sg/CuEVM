@@ -180,6 +180,7 @@ namespace precompile_operations {
         return_data_t &return_data,
         message_t &message) {
         
+        printf("MODEXP\n");
         // get the size of the base, exponent and modulus
         // from the call data
         bn_t base_size, exponent_size, modulus_size;
@@ -206,55 +207,17 @@ namespace precompile_operations {
             size_bytearray,
             size_bytearray_len);
         cgbn_add(arith._env, index, index, length);
+        bn_t data_index;
+        cgbn_set(arith._env, data_index, index);
 
 
-        // get the base, exponent and modulus
-        SHARED_MEMORY uint8_t *base, *exponent, *modulus;
-        size_t base_len, exponent_len, modulus_len;
-
-        int32_t overflow = 0;
-        overflow = arith.size_t_from_cgbn(base_len, base_size);
-        overflow = (
-            overflow |
-            arith.size_t_from_cgbn(exponent_len, exponent_size)
-        );
-        overflow = (
-            overflow |
-            arith.size_t_from_cgbn(modulus_len, modulus_size)
-        );
-        if (overflow) {
-            error_code = ERROR_PRECOMPILE_MODEXP_OVERFLOW;
-            return;
-        }
-
-        ONE_THREAD_PER_INSTANCE(
-            base = new uint8_t[base_len];
-            exponent = new uint8_t[exponent_len];
-            modulus = new uint8_t[modulus_len];
-        )
-        
-        size_t tmp_size;
-        uint8_t *tmp;
-        tmp = message.get_data(index, base_size, tmp_size);
-        for (size_t i = 0; i < tmp_size; i++) {
-            base[base_len - i] = tmp[tmp_size - i];
-        }
-        cgbn_add(arith._env, index, index, base_size);
-        tmp = message.get_data(index, exponent_size, tmp_size);
-        for (size_t i = 0; i < tmp_size; i++) {
-            exponent[exponent_len - i] = tmp[tmp_size - i];
-        }
-        cgbn_add(arith._env, index, index, exponent_size);
-        tmp = message.get_data(index, modulus_size, tmp_size);
-        for (size_t i = 0; i < tmp_size; i++) {
-            modulus[modulus_len - i] = tmp[tmp_size - i];
-        }
-
+        // first compute the gas cost follow by special casses
         bn_t max_length;
         cgbn_set(arith._env, max_length, base_size);
-        if (cgbn_compare(arith._env, max_length, exponent_size) < 0) {
-            cgbn_set(arith._env, max_length, exponent_size);
+        if (cgbn_compare(arith._env, max_length, modulus_size) < 0) {
+            cgbn_set(arith._env, max_length, modulus_size);
         }
+        printf("max_length: %u\n", cgbn_get_ui32(arith._env, max_length));
         // words = (max_length + 7) / 8
         // add 7
         cgbn_add_ui32(arith._env, max_length, max_length, 7);
@@ -263,31 +226,53 @@ namespace precompile_operations {
         bn_t multiplication_complexity;
         cgbn_mul(arith._env, multiplication_complexity, max_length, max_length);
         
-        size_t exponent_bit_length;
-        
-        size_t exponent_byte_length;
-        arith.size_t_from_cgbn(exponent_byte_length, exponent_size);
+        printf("multiplication_complexity: %u\n", cgbn_get_ui32(arith._env, multiplication_complexity));
 
-        exponent_byte_length = exponent_len;
-        while (
-            (exponent_byte_length > 0) && 
-            (exponent[exponent_byte_length - 1] == 0)
-        ) {
-            exponent_byte_length--;
-        }
-        exponent_bit_length = exponent_byte_length * 8;
-        if (exponent_bit_length != 0) {
-            uint8_t exponent_byte;
-            exponent_byte = exponent[exponent_byte_length - 1];
+        size_t tmp_size;
+        uint8_t *tmp;
+        cgbn_set(arith._env, index, data_index);
+        cgbn_add(arith._env, index, index, base_size);
+        tmp = message.get_data(index, exponent_size, tmp_size);
+
+        size_t exponent_bit_length;
+        if (tmp_size > 0) {
+            size_t exponent_byte_length;
+            exponent_byte_length = tmp_size - 1;
             while (
-                (exponent_byte & 0x80) == 0
-             ) {
-                exponent_bit_length--;
-                exponent_byte <<= 1;
+                (exponent_byte_length > 0) && 
+                (tmp[tmp_size - exponent_byte_length - 1] == 0)
+            ) {
+                exponent_byte_length--;
             }
+            uint8_t exponent_byte;
+            exponent_byte = tmp[tmp_size - exponent_byte_length - 1];
+            if (exponent_byte == 0)
+                exponent_bit_length = 0;
+            else
+                exponent_bit_length = (exponent_byte_length + 1) * 8;
+            if (exponent_bit_length != 0) {
+                while (
+                    (exponent_byte & 0x80) == 0
+                ) {
+                    exponent_bit_length--;
+                    exponent_byte <<= 1;
+                }
+            }
+        } else {
+            exponent_bit_length = 0;
         }
         bn_t exponent_bit_length_bn;
-        arith.cgbn_from_size_t(exponent_bit_length_bn, exponent_bit_length);
+        bn_t tmp_size_bn;
+        arith.cgbn_from_size_t(tmp_size_bn, tmp_size);
+        if (exponent_bit_length > 0) {
+            arith.cgbn_from_size_t(exponent_bit_length_bn, exponent_bit_length);
+            cgbn_sub(arith._env, tmp_size_bn, exponent_size, tmp_size_bn);
+            cgbn_mul_ui32(arith._env, tmp_size_bn, tmp_size_bn, 8);
+            cgbn_add(arith._env, exponent_bit_length_bn, exponent_bit_length_bn, tmp_size_bn);
+        } else {
+            cgbn_set_ui32(arith._env, exponent_bit_length_bn, 0);
+        }
+        printf("exponent_bit_length: %u\n", cgbn_get_ui32(arith._env, exponent_bit_length_bn));
         bn_t iteration_count;
         cgbn_set_ui32(arith._env, iteration_count, 0);
         if (cgbn_compare_ui32(arith._env, exponent_size, 32) <= 0) {
@@ -302,10 +287,12 @@ namespace precompile_operations {
             cgbn_add(arith._env, iteration_count, iteration_count, exponent_bit_length_bn);
             cgbn_sub_ui32(arith._env, iteration_count, iteration_count, 1);
         }
+        printf("iteration_count: %u\n", cgbn_get_ui32(arith._env, iteration_count));
         // iteration_count = max(iteration_count, 1)
         if (cgbn_compare_ui32(arith._env, iteration_count, 1) < 0) {
             cgbn_set_ui32(arith._env, iteration_count, 1);
         }
+        printf("iteration_count: %u\n", cgbn_get_ui32(arith._env, iteration_count));
 
         bn_t dynamic_gas;
         // dynamic_gas = max(200, multiplication_complexity * iteration_count / 3)
@@ -314,27 +301,213 @@ namespace precompile_operations {
         if (cgbn_compare_ui32(arith._env, dynamic_gas, 200) < 0) {
             cgbn_set_ui32(arith._env, dynamic_gas, 200);
         }
+        printf("dynamic_gas: %u\n", cgbn_get_ui32(arith._env, dynamic_gas));
         cgbn_add(arith._env, gas_used, gas_used, dynamic_gas);
+
+
         if (arith.has_gas(gas_limit, gas_used, error_code)) {
-            // perform the modular exponentiation
-            SHARED_MEMORY uint8_t *result;
-            size_t result_len;
+            // special cases
+            if (cgbn_compare_ui32(arith._env, modulus_size, 0) == 0) {
+                return_data.set(NULL, 0);
+                error_code = ERR_RETURN;
+                return;
+            }
+
+            // prepare result
+            size_t modulus_len;
+            if (arith.size_t_from_cgbn(modulus_len, modulus_size)) {
+                error_code = ERROR_PRECOMPILE_MODEXP_OVERFLOW;
+                return;
+            }
+            SHARED_MEMORY uint8_t *result, *modulus;
             ONE_THREAD_PER_INSTANCE(
-            result = new uint8_t[modulus_len];
+                result = new uint8_t[modulus_len];
+                memset(result, 0, modulus_len);
+                modulus = new uint8_t[modulus_len];
+                memset(modulus, 0, modulus_len);
             )
-            // result = pow(base, exponent, modulus)
-            // need to do the bigint math
-            return_data.set(result, result_len);
-            error_code = ERR_RETURN;
-            ONE_THREAD_PER_INSTANCE(
-                delete[] result;
-            )
+            cgbn_set(arith._env, index, data_index);
+            cgbn_add(arith._env, index, index, base_size);
+            cgbn_add(arith._env, index, index, exponent_size);
+            tmp = message.get_data(index, modulus_size, tmp_size);
+            for (size_t i = 0; i < tmp_size; i++) {
+                modulus[i] = tmp[i];
+            }
+            bigint modulus_bigint[1];
+            bigint_init(modulus_bigint);
+            bigint_from_bytes(modulus_bigint, modulus, modulus_len);
+            // 0 modulus
+            if (bigint_cmp_abs_word(modulus_bigint, 0) == 0) {
+                return_data.set(result, modulus_len);
+                error_code = ERR_RETURN;
+                ONE_THREAD_PER_INSTANCE(
+                    delete[] result;
+                    delete[] modulus;
+                )
+                bigint_free(modulus_bigint);
+                return;
+            }
+            // 0 exponent
+            bigint result_bigint[1];
+            bigint_init(result_bigint);
+            bigint tmp_bigint[1];
+            bigint_init(result_bigint);
+            if (cgbn_compare_ui32(arith._env, exponent_bit_length_bn, 0) == 0) {
+            
+                bigint_from_word(tmp_bigint, 1);
+                bigint_mod(result_bigint, tmp_bigint, modulus_bigint);
+                bigint_to_bytes(result, result_bigint, modulus_len);
+                return_data.set(result, modulus_len);
+                error_code = ERR_RETURN;
+                ONE_THREAD_PER_INSTANCE(
+                    delete[] result;
+                    delete[] modulus;
+                )
+                bigint_free(modulus_bigint);
+                bigint_free(result_bigint);
+                bigint_free(tmp_bigint);
+                return;
+            }
+            // 0 base and not zero exponent
+            
+            // get the base, exponent and modulus
+            SHARED_MEMORY uint8_t *base, *exponent;
+            size_t base_len, exponent_len, modulus_len;
+
+            overflow = arith.size_t_from_cgbn(base_len, base_size);
+            overflow = (
+                overflow |
+                arith.size_t_from_cgbn(exponent_len, exponent_size)
+            );
+            overflow = (
+                overflow |
+                arith.size_t_from_cgbn(modulus_len, modulus_size)
+            );
+            if (overflow) {
+                error_code = ERROR_PRECOMPILE_MODEXP_OVERFLOW;
+                return;
+            }
+
         }
-        ONE_THREAD_PER_INSTANCE(
-            delete[] base;
-            delete[] exponent;
-            delete[] modulus;
-        )
+
+
+
+
+        printf("base_len: %lu\n", base_len);
+        printf("exponent_len: %lu\n", exponent_len);
+        printf("modulus_len: %lu\n", modulus_len);
+
+
+        if (arith.has_gas(gas_limit, partial_gas, error_code)) {
+
+            ONE_THREAD_PER_INSTANCE(
+                exponent = new uint8_t[exponent_len];
+                memset(exponent, 0, exponent_len);
+            )
+
+            size_t tmp_size;
+            uint8_t *tmp;
+            cgbn_set(arith._env, index, data_index);
+            cgbn_add(arith._env, index, index, base_size);
+            tmp = message.get_data(index, exponent_size, tmp_size);
+            for (size_t i = 0; i < tmp_size; i++) {
+                exponent[i] = tmp[i];
+            }
+
+
+
+            
+            if (arith.has_gas(gas_limit, gas_used, error_code)) {
+                ONE_THREAD_PER_INSTANCE(
+                    base = new uint8_t[base_len];
+                    memset(base, 0, base_len);
+                )
+
+                size_t tmp_size;
+                uint8_t *tmp;
+                cgbn_set(arith._env, index, data_index);
+                tmp = message.get_data(index, base_size, tmp_size);
+                for (size_t i = 0; i < tmp_size; i++) {
+                    base[i] = tmp[i];
+                }
+                cgbn_add(arith._env, index, index, base_size);
+                cgbn_add(arith._env, index, index, exponent_size);
+                tmp = message.get_data(index, modulus_size, tmp_size);
+                for (size_t i = 0; i < tmp_size; i++) {
+                    modulus[i] = tmp[i];
+                }
+
+                // print the base, exponent and modulus
+                printf("base: ");
+                for (size_t i = 0; i < base_len; i++) {
+                    printf("%02x", base[i]);
+                }
+                printf("\n");
+                printf("exponent: ");
+                for (size_t i = 0; i < exponent_len; i++) {
+                    printf("%02x", exponent[i]);
+                }
+                printf("\n");
+                printf("modulus: ");
+                for (size_t i = 0; i < modulus_len; i++) {
+                    printf("%02x", modulus[i]);
+                }
+                printf("\n");
+                // perform the modular exponentiation
+                SHARED_MEMORY uint8_t *result;
+                size_t result_len;
+                result_len = modulus_len;
+                ONE_THREAD_PER_INSTANCE(
+                    result = new uint8_t[modulus_len];
+                    memset(result, 0, modulus_len);
+                )
+                char buf[65536];
+                bigint a[1], b[1], c[1], d[1];
+                bigint_init(a);
+                bigint_init(b);
+                bigint_init(c);
+                bigint_init(d);
+                bigint_from_bytes(a, base, base_len);
+                bigint_from_bytes(b, exponent, exponent_len);
+                bigint_from_bytes(c, modulus, modulus_len);
+                printf("a: %s\n", bigint_write(buf, sizeof(buf), a));
+                printf("b: %s\n", bigint_write(buf, sizeof(buf), b));
+                printf("c: %s\n", bigint_write(buf, sizeof(buf), c));
+                if (bigint_cmp_abs_word(c, 0) == 0) {
+                    bigint_from_word(d, 0);
+                } else if (
+                    // (bigint_cmp_abs_word(a, 0) == 0) &&
+                    (bigint_cmp_abs_word(b, 0) == 0)
+                ) {
+                    bigint_from_word(a, 1);
+                    bigint_from_word(b, 1);
+                    bigint_pow_mod(d, a, b, c);
+                } else {
+                    bigint_pow_mod(d, a, b, c);
+                }
+                printf("d: %s\n", bigint_write(buf, sizeof(buf), d));
+                //bigint_mul(c, a, b);
+                bigint_to_bytes(result, d, result_len);
+                bigint_free(a);
+                bigint_free(b);
+                bigint_free(c);
+                bigint_free(d);
+
+                return_data.set(result, result_len);
+                error_code = ERR_RETURN;
+                ONE_THREAD_PER_INSTANCE(
+                    delete[] result;
+                    delete[] base;
+                    delete[] modulus;
+                )
+            }
+            ONE_THREAD_PER_INSTANCE(
+                delete[] exponent;
+            )
+
+        }
+
+
     }
 
 

@@ -390,6 +390,7 @@ public:
     _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->base_fee);
     cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string_ptr);
 
+  /*
     previous_blocks_json = cJSON_CreateArray();
     bn_t number;
     for (idx = 0; idx < 256; idx++)
@@ -418,6 +419,7 @@ public:
     }
 
     cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
+    */
     delete[] hex_string_ptr;
     hex_string_ptr = NULL;
     return block_json;
