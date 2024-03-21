@@ -1794,16 +1794,25 @@ public:
         // process the transaction
         bn_t intrsinc_gas_used;
         start_TRANSACTION(intrsinc_gas_used, error_code);
-        start_CALL(error_code);
-        // if it is a invalid transaction or not enough gas to start the call
         if (error_code != ERR_NONE)
         {
+            finish_TRANSACTION(error_code);
+            return;
+        }
+        start_CALL(error_code);
+        // add the transaction cost
+        cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], intrsinc_gas_used);
+        // if it is a invalid transaction or not enough gas to start the call
+        //if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS)
+        if (error_code != ERR_NONE)
+        {
+            #ifdef TRACER
+                    cgbn_store(_arith._env, &_tracer->_content->last_gas_used, _gas_useds[_depth]);
+            #endif
             finish_TRANSACTION(error_code);
             free_CALL();
             return;
         }
-        // add the transaction cost
-        cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], intrsinc_gas_used);
         // run the message call
         uint32_t execution_step = 0;
         while (

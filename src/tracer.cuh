@@ -388,7 +388,10 @@ public:
           #endif
         }
         #ifdef COMPLEX_TRACER
-        cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[0]);
+        if (tracer_data.size > 0)
+            cgbn_load(arith._env, prev_gas_used, &tracer_data.gas_useds[0]);
+        else
+            cgbn_set_ui32(arith._env, prev_gas_used, 0);
         cgbn_load(arith._env, gas_limit, &tracer_data.last_gas_used);
         cgbn_sub(arith._env, gas_used, gas_used, prev_gas_used);
         cgbn_store(arith._env, evm_word, gas_used);

@@ -33,7 +33,7 @@ Building without sudo is also possible with extra configuration and modification
 #### CMake 
 
 * `mkdir build`
-* `cmake -S . -B build ` (to build only CPU version : `-DONLY_CPU=ON)
+* `cmake -S . -B build ` (to build only CPU version : `-DONLY_CPU=ON for debug -DCMAKE_BUILD_TYPE=Debug)
 * `cmake --build build`
 
 
