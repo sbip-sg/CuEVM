@@ -1,6 +1,6 @@
 # Compiler
 NVCC = nvcc
-NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo
+NVCC_FLAGS = -I./CGBN/include -I./bigint -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -lcudadevrt -lineinfo
 GCC = gcc
 GCC_FLAGS = -lm -lgmp -lcjson
 GPP = g++

@@ -1,4 +1,6 @@
-#pragma once
+#ifndef RIPEMD160_H
+#define RIPEMD160_H
+
 #include "include/utils.h"
 
 #define ROTL32(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
@@ -310,3 +312,6 @@ __host__ __device__ void ripemd160(const uint8_t* msg, uint32_t msg_len, uint8_t
         *(hash++) = digest[i] >> 24;
     }
 }
+
+#undef G
+#endif

@@ -432,7 +432,7 @@ namespace arithmetic_operations {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
         if (arith.has_gas(gas_limit, gas_used, error_code))
         {
-            bn_t a, b, c, N, r;
+            bn_t a, b, N, r;
             stack.pop(a, error_code);
             stack.pop(b, error_code);
             stack.pop(N, error_code);

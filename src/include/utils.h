@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <cuda.h>
 #include <cjson/cJSON.h>
+#include <bigint.h>
 
 #include "cgbn_wrapper.h"
 #include "data_content.h"

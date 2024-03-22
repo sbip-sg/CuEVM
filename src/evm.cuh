@@ -253,6 +253,7 @@ public:
         delete _world_state;
         delete _block;
         delete _keccak;
+        delete _sha256;
         delete _transaction;
         delete _accessed_state;
         delete _transaction_touch_state;
@@ -263,7 +264,14 @@ public:
         delete[] _touch_state_ptrs;
         delete[] _log_state_ptrs;
         delete[] _last_return_data_ptrs;
-        // delete _final_return_data;
+
+        ONE_THREAD_PER_INSTANCE(
+            _final_return_data->_content = new data_content_t;
+            _final_return_data->_content->size = 0;
+            _final_return_data->_content->data = NULL;
+        )
+
+        delete _final_return_data;
         delete[] _message_ptrs;
         delete[] _memory_ptrs;
         delete[] _stack_ptrs;
@@ -489,10 +497,8 @@ public:
             _touch_state_ptrs[_depth]->set_account_balance(receiver, receiver_balance);
         }
         // warm up the accounts
-        account_t *account;
-        account = _touch_state_ptrs[_depth]->get_account(sender, READ_NONE);
-        account = _touch_state_ptrs[_depth]->get_account(receiver, READ_NONE);
-        account = NULL;
+        _touch_state_ptrs[_depth]->get_account(sender, READ_NONE);
+        _touch_state_ptrs[_depth]->get_account(receiver, READ_NONE);
         // if is a call to a non-contract account
         // if code size is zero. TODO: verify if is consider a last return data
         // only for calls not for create
@@ -510,9 +516,11 @@ public:
                 return_data = _last_return_data_ptrs[_depth - 1];
             }
 
+            bn_t contract_address;
+            _message_ptrs[_depth]->get_contract_address(contract_address);
             // test for precompiled contract
-            if (cgbn_compare_ui32(_arith._env, receiver, 10) == -1) {
-                uint32_t precompiled_no = cgbn_get_ui32(_arith._env, receiver);
+            if (cgbn_compare_ui32(_arith._env, contract_address, 10) == -1) {
+                uint32_t precompiled_no = cgbn_get_ui32(_arith._env, contract_address);
                 switch (precompiled_no)
                 {
                 case 1:
@@ -558,6 +566,17 @@ public:
                         *_message_ptrs[_depth]
                     );
                     break;
+                case 5:
+                    precompile_operations::operation_MODEXP(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+
                 case 6:
                     precompile_operations::operation_ecAdd(
                         _arith,
@@ -578,6 +597,18 @@ public:
                         *_message_ptrs[_depth]
                     );
                     break;
+
+                case 9:
+                    precompile_operations::operation_BLAKE2(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+
                 default:
                     system_operations::operation_STOP(
                         *return_data,
@@ -624,8 +655,9 @@ public:
             message_t &message,
             touch_state_t &touch_state)
         {
-            bn_t sender, receiver, value;
+            bn_t sender, value;
             bn_t sender_balance;
+            // bn_t receiver
             // bn_t receiver_balance;
             uint8_t call_type;
             uint32_t depth;
@@ -644,8 +676,9 @@ public:
 
             // verify if the value can be transfered
             // if the sender has enough balance
-            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) && // value>0
-                                                                 //(cgbn_compare(arith._env, sender, receiver) != 0) &&   // sender != receiver matter only on transfer
+            // value>0
+            //(cgbn_compare(arith._env, sender, receiver) != 0) &&   // sender != receiver matter only on transfer
+            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) &&
                 (call_type != OP_DELEGATECALL) // no delegatecall
             )
             {
@@ -1792,16 +1825,25 @@ public:
         // process the transaction
         bn_t intrsinc_gas_used;
         start_TRANSACTION(intrsinc_gas_used, error_code);
-        start_CALL(error_code);
-        // if it is a invalid transaction or not enough gas to start the call
         if (error_code != ERR_NONE)
         {
+            finish_TRANSACTION(error_code);
+            return;
+        }
+        start_CALL(error_code);
+        // add the transaction cost
+        cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], intrsinc_gas_used);
+        // if it is a invalid transaction or not enough gas to start the call
+        //if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS)
+        if (error_code != ERR_NONE)
+        {
+            #ifdef TRACER
+                    cgbn_store(_arith._env, &_tracer->_content->last_gas_used, _gas_useds[_depth]);
+            #endif
             finish_TRANSACTION(error_code);
             free_CALL();
             return;
         }
-        // add the transaction cost
-        cgbn_add(_arith._env, _gas_useds[_depth], _gas_useds[_depth], intrsinc_gas_used);
         // run the message call
         uint32_t execution_step = 0;
         while (
@@ -3323,6 +3365,9 @@ public:
 
         transaction_t::free_instances(cpu_instances.transactions_data, cpu_instances.count);
         cpu_instances.transactions_data = NULL;
+
+        return_data_t::free_cpu_instances(cpu_instances.return_data, cpu_instances.count);
+        cpu_instances.return_data = NULL;
 
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
         cpu_instances.accessed_states_data = NULL;

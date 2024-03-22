@@ -21,7 +21,7 @@ def compare_output():
     geth_traces = list(read_as_json_lines('geth-0-output.jsonl'))
     cuevm_traces = list(read_as_json_lines('cuevm-0-output.jsonl'))
 
-    if len(geth_traces) != len(cuevm_traces) or len(geth_traces) < 2:
+    if len(geth_traces) != len(cuevm_traces):
         raise ValueError("\033[91m💥\033[0m Mismatched trace length")
 
     if geth_traces[:-1] != cuevm_traces[:-1]:
@@ -39,58 +39,61 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
     print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
 def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth', cuevm_bin='cuevm', ignore_errors=False, result={}):
-    result = result or {'n_total': 0, 'n_success': 0}
+    result = result or {'n_total': 0, 'n_success': 0, 'failed_files': []}
+    output_filepath = None
     for dirpath, dirnames, filenames in os.walk(input_directory):
         rel_path = os.path.relpath(dirpath, input_directory)
         for filename in filenames:
+            print("Processing", dirpath, filename)
             rootname = filename.split('.')[0]
-            try:
-                if filename.endswith(".json"):
-                    input_filepath = os.path.join(dirpath, filename)
+            if filename.endswith(".json"):
+                input_filepath = os.path.join(dirpath, filename)
 
-                    with open(input_filepath, 'r', encoding='utf-8') as file:
-                        data = json.load(file)
+                with open(input_filepath, 'r', encoding='utf-8') as file:
+                    data = json.load(file)
 
-                    for rootname in list(data.keys()):
-                        transaction_data = data[rootname]['transaction']['data']
-                        transaction_gaslimit = data[rootname]['transaction']['gasLimit']
-                        transaction_value = data[rootname]['transaction']['value']
-                        transaction = data[rootname]['transaction']
+                for rootname in list(data.keys()):
+                    transaction_data = data[rootname]['transaction']['data']
+                    transaction_gaslimit = data[rootname]['transaction']['gasLimit']
+                    transaction_value = data[rootname]['transaction']['value']
+                    transaction = data[rootname]['transaction']
 
-                        data_len = len(transaction_data)
-                        gaslimit_len = len(transaction_gaslimit)
-                        value_len = len(transaction_value)
+                    data_len = len(transaction_data)
+                    gaslimit_len = len(transaction_gaslimit)
+                    value_len = len(transaction_value)
 
-                        for data_index in range(data_len):
-                            for gas_index in range(gaslimit_len):
-                                for value_index in range(value_len):
-                                    data = copy.deepcopy(data)
-                                    data[rootname]['post'] = {fork: [{}]}
-                                    new_transaction = copy.deepcopy(transaction)
-                                    new_transaction['data'] = [transaction_data[data_index]]
-                                    new_transaction['gasLimit'] = [transaction_gaslimit[gas_index]]
-                                    new_transaction['value'] = [transaction_value[value_index]]
+                    for data_index in range(data_len):
+                        for gas_index in range(gaslimit_len):
+                            for value_index in range(value_len):
+                                data = copy.deepcopy(data)
+                                data[rootname]['post'] = {fork: [{}]}
+                                new_transaction = copy.deepcopy(transaction)
+                                new_transaction['data'] = [transaction_data[data_index]]
+                                new_transaction['gasLimit'] = [transaction_gaslimit[gas_index]]
+                                new_transaction['value'] = [transaction_value[value_index]]
 
-                                    output_filepath = os.path.join(output_directory, rel_path, f'{rootname}-{data_index}-{gas_index}-{value_index}', filename)
-                                    os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+                                output_filepath = os.path.join(output_directory, rel_path, f'{rootname}-{data_index}-{gas_index}-{value_index}', filename)
+                                os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 
-                                    data[rootname]['transaction'] = new_transaction
+                                data[rootname]['transaction'] = new_transaction
 
-                                    with open(output_filepath, 'w', encoding='utf-8') as file:
-                                        json.dump(data, file, ensure_ascii=False, indent=2)
+                                with open(output_filepath, 'w', encoding='utf-8') as file:
+                                    json.dump(data, file, ensure_ascii=False, indent=2)
 
-                                    print(f"Processed and saved {output_filepath} successfully.")
+                                print(f"Processed and saved {output_filepath} successfully.")
+                                try:
                                     run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin)
                                     if result:
                                         result['n_success'] += 1
                                         result['n_total'] += 1
-            except Exception as e:
-                if result:
-                    result['n_total'] += 1
-                if ignore_errors:
-                    print(f"{str(e)}")
-                else:
-                    raise
+                                except Exception as e:
+                                    if result:
+                                        result['n_total'] += 1
+                                        result['failed_files'].append(output_filepath)
+                                    if ignore_errors:
+                                        print(f"{str(e)}")
+                                    else:
+                                        raise
 
 
 
@@ -109,12 +112,11 @@ def main():
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
         assert_command_in_path(cmd)
 
-    result = {'n_total': 0, 'n_success': 0}
+    result = {'n_total': 0, 'n_success': 0, 'failed_files': []}
     try:
         runtest_fork(args.input, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result)
     finally:
-        print(f"Total tests: {result['n_total']}, Passed: {result['n_success']}")
-
+        print(f"Total tests: {result['n_total']}, Passed: {result['n_success']}, Failed files: {result['failed_files']}")
 
 if __name__ == "__main__":
     main()

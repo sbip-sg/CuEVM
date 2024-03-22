@@ -138,6 +138,34 @@ public:
   }
 
   /**
+   * Get a CGBN type from memory byte array.
+   * The memory byte array is in Big Endian format.
+   * If the memory byte array is smaller than the CGBN, it fills the
+   * remaining bytes with zeros.
+   * @param[out] dst The destination CGBN
+   * @param[in] src The memory byte array
+   * @param[in] size The size of the memory byte array
+  */
+  __host__ __device__ __forceinline__ void cgbn_from_fixed_memory(
+    bn_t &dst,
+    uint8_t *src,
+    size_t size
+  )
+  {
+    cgbn_set_ui32(_env, dst, 0);
+    for (uint8_t idx = (BYTES - size); idx < BYTES; idx++)
+    {
+      cgbn_insert_bits_ui32(
+          _env,
+          dst,
+          dst,
+          idx * 8,
+          8,
+          src[BYTES - 1 - idx]);
+    }
+  }
+
+  /**
    * Get a CGBN type from a size_t.
    * @param[out] dst The destination CGBN
    * @param[in] src The size_t
@@ -666,6 +694,18 @@ public:
     evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
   }
 
+  /**
+   * Add the dynamics cost for blake2 hashing.
+   * @param[inout] gas_used The gas used
+   * @param[in] rounds Number of rounds (big-endian unsigned integer)
+   */
+  __host__ __device__ __forceinline__ void blake2_cost(bn_t &gas_used, uint32_t rounds) {
+      // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
+      bn_t temp;
+      cgbn_set_ui32(_env, temp, rounds);
+      cgbn_mul_ui32(_env, temp, temp, GAS_PRECOMPILE_BLAKE2_ROUND);
+      cgbn_add(_env, gas_used, gas_used, temp);
+  }
 };
 
 /**

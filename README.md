@@ -33,7 +33,7 @@ Building without sudo is also possible with extra configuration and modification
 #### CMake 
 
 * `mkdir build`
-* `cmake -S . -B build ` (to build only CPU version : `-DONLY_CPU=ON)
+* `cmake -S . -B build ` (to build only CPU version : `-DONLY_CPU=ON for debug -DCMAKE_BUILD_TYPE=Debug)
 * `cmake --build build`
 
 
@@ -41,20 +41,20 @@ Building without sudo is also possible with extra configuration and modification
 `{interpreter}` is `build/cuevm` for CMake build and one of the `out/cpu_interpreter` or `out/interpreter` 
 #### Demo of functionality for testing transaction sequences:
 Please refer to subfolder `samples/README.md` for testing and demo how to use this CuEVM.
+
 #### Testing of the EVM using ethtest:
-Please refer to `REVMI/` for usage.
+Please refer to `scripts/run-ethtest-by-fork`.
 
-For example, test all json files in VMTest:
-
-`cd REVMI; cargo install --path . ; evm-interpreter compare --executable {interpreter} --test-json dev-resources/ethtest/GeneralStateTests/VMTests/ --limit 10000`
+`python scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors`
 
 
 
 ## Tool usage [TODO after completion]
-* `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [inpot_json_file] --output [output_json_file]`
-* `clear && valgrind --leak-check=full --show-leak-kinds=all {cpu_interpreter}  --input [inpot_json_file] --output [output_json_file]`
+* `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [input_json_file] --output [output_json_file]`
+* `clear && valgrind --leak-check=full --show-leak-kinds=all {cpu_interpreter}  --input [input_json_file] --output [output_json_file]`
+* `clear && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/cuevm  --input [input_json_file] --output [output_json_file]`
 Or for running with cpu
-* `{interpreter} --input [inpot_json_file] --output [output_json_file]`
+* `{interpreter} --input [input_json_file] --output [output_json_file]`
 Easy test:
 * `{interpreter} --input ./input/evm_arith.json --output ./output/evm_test.json`
 
