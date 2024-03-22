@@ -174,6 +174,8 @@ public:
 
       if (element_json != NULL){
         _arith.cgbn_memory_from_hex_string(_content->previous_blocks[0].hash, element_json->valuestring);
+      } else {
+        _arith.cgbn_memory_from_size_t(_content->previous_blocks[0].hash, 0);
       }
 
       idx++;
@@ -390,7 +392,6 @@ public:
     _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->base_fee);
     cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string_ptr);
 
-  /*
     previous_blocks_json = cJSON_CreateArray();
     bn_t number;
     for (idx = 0; idx < 256; idx++)
@@ -419,7 +420,7 @@ public:
     }
 
     cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
-    */
+    
     delete[] hex_string_ptr;
     hex_string_ptr = NULL;
     return block_json;

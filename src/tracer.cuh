@@ -298,8 +298,8 @@ public:
         arith_t &arith,
         tracer_data_t &tracer_data, data_content_t* return_data)
     {
-        printf("Tracer data:\n");
-        printf("Size: %lu\n", tracer_data.size);
+        //printf("Tracer data:\n");
+        //printf("Size: %lu\n", tracer_data.size);
         char *gas_left_str = new char[arith_t::BYTES * 2 + 3];
         char *gas_cost_str = new char[arith_t::BYTES * 2 + 3];
         char *temp = new char[arith_t::BYTES * 2 + 3];

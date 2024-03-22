@@ -497,10 +497,8 @@ public:
             _touch_state_ptrs[_depth]->set_account_balance(receiver, receiver_balance);
         }
         // warm up the accounts
-        account_t *account;
-        account = _touch_state_ptrs[_depth]->get_account(sender, READ_NONE);
-        account = _touch_state_ptrs[_depth]->get_account(receiver, READ_NONE);
-        account = NULL;
+        _touch_state_ptrs[_depth]->get_account(sender, READ_NONE);
+        _touch_state_ptrs[_depth]->get_account(receiver, READ_NONE);
         // if is a call to a non-contract account
         // if code size is zero. TODO: verify if is consider a last return data
         // only for calls not for create
@@ -626,8 +624,9 @@ public:
             message_t &message,
             touch_state_t &touch_state)
         {
-            bn_t sender, receiver, value;
+            bn_t sender, value;
             bn_t sender_balance;
+            // bn_t receiver
             // bn_t receiver_balance;
             uint8_t call_type;
             uint32_t depth;
@@ -646,8 +645,9 @@ public:
 
             // verify if the value can be transfered
             // if the sender has enough balance
-            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) && // value>0
-                                                                 //(cgbn_compare(arith._env, sender, receiver) != 0) &&   // sender != receiver matter only on transfer
+            // value>0
+            //(cgbn_compare(arith._env, sender, receiver) != 0) &&   // sender != receiver matter only on transfer
+            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) && 
                 (call_type != OP_DELEGATECALL) // no delegatecall
             )
             {

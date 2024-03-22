@@ -45,15 +45,16 @@ Please refer to subfolder `samples/README.md` for testing and demo how to use th
 #### Testing of the EVM using ethtest:
 Please refer to `scripts/run-ethtest-by-fork`.
 
-`python scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm`
+`python scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors`
 
 
 
 ## Tool usage [TODO after completion]
-* `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [inpot_json_file] --output [output_json_file]`
-* `clear && valgrind --leak-check=full --show-leak-kinds=all {cpu_interpreter}  --input [inpot_json_file] --output [output_json_file]`
+* `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [input_json_file] --output [output_json_file]`
+* `clear && valgrind --leak-check=full --show-leak-kinds=all {cpu_interpreter}  --input [input_json_file] --output [output_json_file]`
+* `clear && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/cuevm  --input [input_json_file] --output [output_json_file]`
 Or for running with cpu
-* `{interpreter} --input [inpot_json_file] --output [output_json_file]`
+* `{interpreter} --input [input_json_file] --output [output_json_file]`
 Easy test:
 * `{interpreter} --input ./input/evm_arith.json --output ./output/evm_test.json`
 

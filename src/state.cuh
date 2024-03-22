@@ -2549,9 +2549,8 @@ public:
     )
     {
         uint32_t tmp_error_code = ERR_SUCCESS;
-        size_t account_idx = 0;
         // get the index of the account
-        account_idx = get_account_index(address, tmp_error_code);
+        get_account_index(address, tmp_error_code);
         // if the account exist in the current touch state
         if (tmp_error_code == ERR_SUCCESS)
         {
@@ -2566,7 +2565,7 @@ public:
             while (tmp_parent_state != NULL)
             {
                 tmp_error_code = ERR_SUCCESS;
-                account_idx = tmp_parent_state->get_account_index(address, tmp_error_code);
+                tmp_parent_state->get_account_index(address, tmp_error_code);
                 if (tmp_error_code == ERR_SUCCESS)
                 {
                     return 1;
@@ -2578,13 +2577,17 @@ public:
             // if the account does not exist in the tree of touch states
             // search it in the accessed state/global state
             tmp_error_code = ERR_SUCCESS;
-            account_idx = _accessed_state->get_account_index(address, tmp_error_code);
+            _accessed_state->get_account_index(
+                address,
+                tmp_error_code);
             if (tmp_error_code == ERR_SUCCESS)
             {
                 return 1;
             }
             tmp_error_code = ERR_SUCCESS;
-            account_idx = _accessed_state->_world_state->get_account_index(address, tmp_error_code);
+            _accessed_state->_world_state->get_account_index(
+                address,
+                tmp_error_code);
             if (tmp_error_code == ERR_SUCCESS)
             {
                 return 1;
