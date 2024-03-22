@@ -597,7 +597,16 @@ public:
                         *_message_ptrs[_depth]
                     );
                     break;
-
+                case 8:
+                    precompile_operations::operation_ecPairing(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
                 case 9:
                     precompile_operations::operation_BLAKE2(
                         _arith,

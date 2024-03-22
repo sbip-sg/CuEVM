@@ -823,6 +823,38 @@ namespace precompile_operations {
         }
     }
   }
+
+   __host__ __device__  static void operation_ecPairing(arith_t &arith,
+                                                            bn_t &gas_limit,
+                                                            bn_t &gas_used,
+                                                            uint32_t &error_code,
+                                                            return_data_t &return_data,
+                                                            message_t &message
+                                                            )
+  {
+
+    size_t size;
+    uint8_t *input;
+    size = message._content->data.size;
+    input = message._content->data.data;
+    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECPAIRING);
+    // bn_t x, y, k;
+    // evm_word_t scratch_pad;
+
+    if (arith.has_gas(gas_limit, gas_used, error_code)) {
+        uint8_t output[64];
+        int res = ecc::pairing_multiple(arith._env, input, size);
+        printf("res: %d", res);
+        if (res!= -1){
+            printf("consume all gas\n");
+        } else{
+            uint8_t output[1];
+            output[0] = res == 1;
+            return_data.set(output, 1);
+        }
+    }
+  }
+
 }
 
 #endif
