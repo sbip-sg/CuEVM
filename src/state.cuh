@@ -209,9 +209,10 @@ public:
         char *temp = new char[arith_t::BYTES * 2 + 3];
         uint8_t hash[32];
         evm_word_t t_word;
-        std::string out = "[";
+        std::string out = "{";
         keccak::keccak_t *k = new keccak::keccak_t();
 
+        out += "\"accounts\": [";
 
         for (size_t idx = 0; idx < _content->no_accounts; idx++) {
             // output each account as a map: {nonce: hex, balance: hex, storage: [...], codehash: hex}
@@ -258,7 +259,7 @@ public:
             }
 
         }
-        out += "]";
+        out += "]}";
         delete temp;
         temp = nullptr;
         std::cerr << out << std::endl;
