@@ -4,6 +4,7 @@ find_package(GMP REQUIRED)
 find_package(cJSON REQUIRED) # Assuming cJSON is available as a find package
 
 include_directories(${PROJECT_SOURCE_DIR}/CGBN/include)
+include_directories(${PROJECT_SOURCE_DIR}/bigint)
 include_directories(${GMP_INCLUDE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
