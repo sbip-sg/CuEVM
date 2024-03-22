@@ -372,7 +372,7 @@ public:
             storage_json = cJSON_GetObjectItemCaseSensitive(account_json, "storage");
             _content->accounts[idx].storage_size = cJSON_GetArraySize(storage_json);
             // round to the next multiple of STORAGE_CHUNK
-            _content->accounts[idx].storage_size = ((_content->accounts[idx].storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
+            // _content->accounts[idx].storage_size = ((_content->accounts[idx].storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
             if (_content->accounts[idx].storage_size > 0)
             {
                 // allocate the storage
