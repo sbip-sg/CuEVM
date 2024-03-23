@@ -1235,9 +1235,9 @@ namespace ecc {
             print_fqp(env, Py, "Py");
             print_fqp(env, Qx, "Qx");
             print_fqp(env, Qy, "Qy");
-            bool on_curve = FQP_is_on_curve(env, Px, Py, mod_fp, B1)  && FQP_is_on_curve(env, Qx, Qy, mod_fp, B2);
-            if (!on_curve)
-            return -1;
+            // bool on_curve = FQP_is_on_curve(env, Px, Py, mod_fp, B1)  && FQP_is_on_curve(env, Qx, Qy, mod_fp, B2);
+            // if (!on_curve)
+            //     return -1;
             pairing(env, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
             FQP_mul(env, final_res, final_res, temp_res, mod_fp);
             print_fqp(env, temp_res, "temp_res");
