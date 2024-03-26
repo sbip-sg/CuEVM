@@ -3056,8 +3056,8 @@ public:
     {
         // sent the gas value to the block beneficiary
         bn_t gas_value;
-        bn_t beneficiary;
-        _block->get_coin_base(beneficiary);
+        // bn_t beneficiary;
+        // _block->get_coin_base(beneficiary);
         if (error_code == ERR_RETURN)
         {
             bn_t gas_left;
@@ -3065,7 +3065,7 @@ public:
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
             bn_t capped_refund_gas;
             // \f$g/5\f$
-            cgbn_div_ui32(_arith._env, capped_refund_gas, gas_left, 5);
+            cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
             // min ( \f$g/5\f$, \f$R_{g}\f$)
             if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
             {
@@ -3073,6 +3073,7 @@ public:
             }
             // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
             cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
+            cgbn_mul(_arith._env, gas_value, gas_value, _gas_price);
             // add to sender balance g^{*}
             bn_t sender_balance;
             bn_t sender_address;
@@ -3083,7 +3084,7 @@ public:
             _transaction_touch_state->set_account_balance(sender_address, sender_balance);
 
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
-            cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
+            // cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
 
             // update the transaction state
             _transaction_touch_state->update_with_child_state(
@@ -3100,10 +3101,10 @@ public:
             _error_code = error_code;
         }
         // send the gas value to the beneficiary
-        bn_t beneficiary_balance;
-        _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
-        cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
-        _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
+        // bn_t beneficiary_balance;
+        // _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
+        // cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
+        // _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
 
         // update the final state modification done by the transaction
         _transaction_touch_state->to_touch_state_data_t(
@@ -3375,13 +3376,80 @@ public:
             tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx], &instances.return_data[idx]);
 #endif
         }
+        print_touched_trie_accounts(arith, instances.touch_states_data);
         #ifdef COMPLEX_TRACER
-            cpu_world_state->print_trie_accounts();
+        // cpu_world_state->print_trie_accounts();
+
+
         #endif
         if (cpu_world_state != nullptr){
             delete cpu_world_state;
             cpu_world_state = NULL;
         }
+    }
+
+    __host__ static void print_touched_trie_accounts(arith_t &arith, touch_state_data_t *evm_instances)    {
+        auto accounts = evm_instances->touch_accounts.accounts;
+        auto num_accounts = evm_instances->touch_accounts.no_accounts;
+
+
+        char *temp = new char[arith_t::BYTES * 2 + 3];
+        uint8_t hash[32];
+        evm_word_t t_word;
+        std::string out = "{";
+        keccak::keccak_t *k = new keccak::keccak_t();
+
+        out += "\"accounts\": [";
+
+        for (size_t idx = 0; idx < num_accounts; idx++) {
+            // output each account as a map: {nonce: hex, balance: hex, storage: [...], codehash: hex}
+            auto account = accounts[idx];
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.address);
+            out += "{\"address\": \"" ;
+            out += temp; // address
+            out += "\", \"nonce\": \"" ;
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.nonce);
+            out += temp;  // nonce
+            out += "\", \"balance\": \"";
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.balance);
+            out += temp;  // balance
+            out += "\", \"codehash\": \"" ;
+            auto bytecode = account.bytecode;
+            auto code_size = account.code_size;
+            k->sha3(bytecode, code_size, hash, 32);
+            arith.word_from_memory(t_word, hash);
+            arith.pretty_hex_string_from_cgbn_memory(temp, t_word);
+            out += temp; // codehash, better cache it and calculate only once
+            out += "\", \"storage\": [" ;
+
+            print_bytes(account.bytecode, account.code_size);
+
+            // printing storages as: `[[k, v], [k, v], ...]`
+            for (size_t i = 0; i < account.storage_size; i++) {
+                // todo_cl should ignore zero values
+                auto key = account.storage[i].key;
+                auto value = account.storage[i].value;
+                out += "[\"";
+                arith.pretty_hex_string_from_cgbn_memory(temp, key);
+                out += temp;
+                arith.pretty_hex_string_from_cgbn_memory(temp, value);
+                out += "\", \"";
+                out += temp;
+                out += "\"]";
+                if (i < account.storage_size - 1){
+                    out += ",";
+                }
+            }
+            out += "]}" ;
+            if (idx < num_accounts - 1){
+                out += ",";
+            }
+
+        }
+        out += "]}";
+        delete temp;
+        temp = nullptr;
+        std::cerr << out << std::endl;
     }
 
     /**
