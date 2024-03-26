@@ -644,7 +644,6 @@ namespace ecc {
         bn_t b[2 * Degree - 1];
 
         bn_t temp; // Temporary variable for intermediate results
-        evm_word_t scratch_pad;
 
         // set val
         // Polynomial multiplication
@@ -1072,7 +1071,6 @@ namespace ecc {
     template <size_t Degree>
     void FQP_final_exponentiation(env_t env, FQ<Degree> &res, FQ<Degree> &p, bn_t &mod) {
         evm_word_t temp_mem;
-        bn_t temp_exp;
         size_t final_exp_len = 11;
         const char* final_exp[11] = {
             "0000002f4b6dc97020fddadf107d20bc842d43bf6369b1ff6a1c71015f3f7be2",
@@ -1237,15 +1235,13 @@ namespace ecc {
         cgbn_load(env, B2.coeffs[1],&scratch_pad);
 
         FQ<12> final_res = get_one<12>(env);
-        size_t num_words = data_len / 32;
-        // printf("numwords %d\n", num_words);
+
         size_t num_pairs = data_len / 192; // 2 for G1, 4 for G2
-        // printf("num_pairs %d\n", num_pairs);
 
         for (int i = 0; i<num_pairs; i++){
             FQ<12> temp_res;
             points_data += i*192;
-            // printf("pair %d\n", i);
+
             cgbn_from_memory(env, Px.coeffs[0], points_data );
             cgbn_from_memory(env, Py.coeffs[0], points_data + 32);
             // Important!!! X2 first then X1 for G2
@@ -1253,21 +1249,17 @@ namespace ecc {
             cgbn_from_memory(env, Qx.coeffs[0], points_data + 96);
             cgbn_from_memory(env, Qy.coeffs[1], points_data + 128);
             cgbn_from_memory(env, Qy.coeffs[0], points_data + 160);
-            // printf("pair %d", i);
-            // print_fqp(env, Px, "Px");
-            // print_fqp(env, Py, "Py");
-            // print_fqp(env, Qx, "Qx");
-            // print_fqp(env, Qy, "Qy");
+
             bool on_curve = FQP_is_on_curve(env, Px, Py, mod_fp, B1)  && FQP_is_on_curve(env, Qx, Qy, mod_fp, B2);
             if (!on_curve)
                 return -1;
             pairing(env, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
             FQP_mul(env, final_res, final_res, temp_res, mod_fp);
-            // print_fqp(env, temp_res, "temp_res");
+
         }
         // final exp
         FQP_final_exponentiation(env, final_res, final_res, mod_fp);
-        // print_fqp(env, final_res, "final_res");
+
         FQ<12> one_fq12 = get_one<12>(env);
         return FQP_equals(env, final_res, one_fq12);
     }

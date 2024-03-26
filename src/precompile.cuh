@@ -848,7 +848,6 @@ namespace precompile_operations {
         return;
     }
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
-        uint8_t output[64];
         int res = ecc::pairing_multiple(arith._env, input, size);
         printf("res: %d", res);
         if (res== -1){
