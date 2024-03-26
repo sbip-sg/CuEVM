@@ -706,6 +706,11 @@ public:
       cgbn_mul_ui32(_env, temp, temp, GAS_PRECOMPILE_BLAKE2_ROUND);
       cgbn_add(_env, gas_used, gas_used, temp);
   }
+
+  __host__ __device__ __forceinline__ size_t pairing_cost(size_t data_size) {
+      return GAS_PRECOMPILE_ECPAIRING + data_size/192 * GAS_PRECOMPILE_ECPAIRING_PAIR;
+  }
+
 };
 
 /**

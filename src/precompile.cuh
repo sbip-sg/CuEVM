@@ -779,8 +779,8 @@ namespace precompile_operations {
             return_data.set(output, 64);
             error_code = ERR_RETURN;
         } else{
-            // consumes all gas
-            // TODO
+            cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
+            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         }
     }
   }
@@ -799,7 +799,7 @@ namespace precompile_operations {
     size = message._content->data.size;
     input = message._content->data.data;
     ecc::Curve curve = ecc::get_curve(arith,128);
-    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECMUL);
+
     bn_t x, y, k;
     evm_word_t scratch_pad;
 
@@ -816,10 +816,11 @@ namespace precompile_operations {
             cgbn_store(arith._env, &scratch_pad, y);
             arith.byte_array_from_cgbn_memory(output + 32, size, scratch_pad);
             return_data.set(output, 64);
+            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECMUL);
             error_code = ERR_RETURN;
         } else{
-            // consumes all gas
-            // TODO
+            cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
+            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         }
     }
   }
@@ -837,20 +838,26 @@ namespace precompile_operations {
     uint8_t *input;
     size = message._content->data.size;
     input = message._content->data.data;
-    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECPAIRING);
-    // bn_t x, y, k;
-    // evm_word_t scratch_pad;
 
+    size_t gas_cost = arith.pairing_cost(size);
+    if (size % 192 != 0) {
+        cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
+        error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+        return;
+    }
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
         uint8_t output[64];
         int res = ecc::pairing_multiple(arith._env, input, size);
         printf("res: %d", res);
-        if (res!= -1){
-            printf("consume all gas\n");
+        if (res== -1){
+            cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
+            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         } else{
             uint8_t output[1];
             output[0] = res == 1;
             return_data.set(output, 1);
+            error_code = ERR_RETURN;
+            cgbn_add_ui32(arith._env, gas_used, gas_used, gas_cost); // normal gas
         }
     }
   }

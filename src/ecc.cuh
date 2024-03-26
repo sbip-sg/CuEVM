@@ -169,8 +169,9 @@ namespace ecc {
         cgbn_mul_mod(env, temp2, Py, Py, mod); // temp2 = Py^2
         return cgbn_equals(env, temp, temp2);
         }
-        template <size_t Degree>
-        bool FQP_equals(env_t env, FQ<Degree> &P1, FQ<Degree> &P2){
+
+    template <size_t Degree>
+    bool FQP_equals(env_t env, FQ<Degree> &P1, FQ<Degree> &P2){
         for (size_t i = 0; i < Degree; i++) {
             if (!cgbn_equals(env, P1.coeffs[i], P2.coeffs[i])){
             return false;
@@ -185,7 +186,9 @@ namespace ecc {
         bn_t lambda, numerator, denominator, temp, x_r, y_r;
         evm_word_t scratch_pad;
         cgbn_load(arith._env, mod_fp, &curve.FP);
-
+        if (!is_on_cuve_simple(arith._env, Px, Py, mod_fp, curve.B) || !is_on_cuve_simple(arith._env, Qx, Qy, mod_fp, curve.B)) {
+            return -1;
+        }
         if (cgbn_equals(arith._env, Px, Qx) && cgbn_equals(arith._env, Py, Qy)) {
             // Special case for doubling P == Q
             // printf("Doubling\n");
@@ -229,9 +232,13 @@ namespace ecc {
         bn_t mod_fp;
         evm_word_t scratch_pad;
         cgbn_load(arith._env, mod_fp, &curve.FP);
+
+        if(!is_on_cuve_simple(arith._env, Gx, Gy, mod_fp, curve.B)){
+            return -1;
+        }
+
         uint8_t bitArray[evm_params::BITS];
         uint32_t bit_array_length = 0;
-
         cgbn_store(arith._env, &scratch_pad, n);
         arith.bit_array_from_cgbn_memory(bitArray, bit_array_length, scratch_pad);
         // // there is a bug if calling The result RES == G, need to copy to temps
@@ -1223,28 +1230,29 @@ namespace ecc {
         for (int i = 0; i<num_pairs; i++){
             FQ<12> temp_res;
             points_data += i*192;
-            printf("pair %d\n", i);
+            // printf("pair %d\n", i);
             cgbn_from_memory(env, Px.coeffs[0], points_data );
             cgbn_from_memory(env, Py.coeffs[0], points_data + 32);
-            cgbn_from_memory(env, Qx.coeffs[0], points_data + 64);
-            cgbn_from_memory(env, Qx.coeffs[1], points_data + 96);
-            cgbn_from_memory(env, Qy.coeffs[0], points_data + 128);
-            cgbn_from_memory(env, Qy.coeffs[1], points_data + 160);
-            printf("pair %d", i);
-            print_fqp(env, Px, "Px");
-            print_fqp(env, Py, "Py");
-            print_fqp(env, Qx, "Qx");
-            print_fqp(env, Qy, "Qy");
-            // bool on_curve = FQP_is_on_curve(env, Px, Py, mod_fp, B1)  && FQP_is_on_curve(env, Qx, Qy, mod_fp, B2);
-            // if (!on_curve)
-            //     return -1;
+            // Important!!! X2 first then X1 for G2
+            cgbn_from_memory(env, Qx.coeffs[1], points_data + 64);
+            cgbn_from_memory(env, Qx.coeffs[0], points_data + 96);
+            cgbn_from_memory(env, Qy.coeffs[1], points_data + 128);
+            cgbn_from_memory(env, Qy.coeffs[0], points_data + 160);
+            // printf("pair %d", i);
+            // print_fqp(env, Px, "Px");
+            // print_fqp(env, Py, "Py");
+            // print_fqp(env, Qx, "Qx");
+            // print_fqp(env, Qy, "Qy");
+            bool on_curve = FQP_is_on_curve(env, Px, Py, mod_fp, B1)  && FQP_is_on_curve(env, Qx, Qy, mod_fp, B2);
+            if (!on_curve)
+                return -1;
             pairing(env, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
             FQP_mul(env, final_res, final_res, temp_res, mod_fp);
-            print_fqp(env, temp_res, "temp_res");
+            // print_fqp(env, temp_res, "temp_res");
         }
         // final exp
         FQP_final_exponentiation(env, final_res, final_res, mod_fp);
-        print_fqp(env, final_res, "final_res");
+        // print_fqp(env, final_res, "final_res");
         FQ<12> one_fq12 = get_one<12>(env);
         return FQP_equals(env, final_res, one_fq12);
     }
