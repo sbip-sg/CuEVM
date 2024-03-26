@@ -736,12 +736,14 @@ namespace precompile_operations {
     cgbn_store(arith._env, &signature.s, s);
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
         uint8_t output[32];
-        ecc::ec_recover(arith, _keccak, signature, signer);
-        cgbn_store(arith._env, &scratch_pad, signer);
-        arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
-        return_data.set(output, 32);
-
-      error_code = ERR_RETURN;
+        size_t res = ecc::ec_recover(arith, _keccak, signature, signer);
+        if (res==0){
+            cgbn_store(arith._env, &scratch_pad, signer);
+            arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
+            return_data.set(output, 32);
+            error_code = ERR_RETURN;
+        } else
+            error_code = ERR_RETURN;
     }
   }
 

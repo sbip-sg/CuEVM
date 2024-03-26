@@ -297,7 +297,7 @@ namespace ecc {
      * @param sig
      * @param signer
      */
-    void ec_recover(arith_t &arith, keccak::keccak_t* _keccak, signature_t sig,  bn_t &signer){
+    int ec_recover(arith_t &arith, keccak::keccak_t* _keccak, signature_t sig,  bn_t &signer){
 
         Curve  curve;
         arith.cgbn_memory_from_hex_string(curve.FP, secp256k1_FieldPrime);
@@ -305,15 +305,21 @@ namespace ecc {
         arith.cgbn_memory_from_hex_string(curve.GX, secp256k1_GX);
         arith.cgbn_memory_from_hex_string(curve.GY, secp256k1_GY);
         curve.B = 7;
+        if (sig.v < 27 || sig.v > 28) {
+            return -1;
+        }
 
-        bn_t  r, r_y, r_inv, temp_cgbn, mod_order, mod_fp;
-        evm_word_t scratch_pad;
+        bn_t  r, r_y, r_inv, temp_cgbn, mod_order, mod_fp, temp_compare;
         bn_t Gx, Gy, ResX, ResY, XY_x, XY_y; // for the point multiplication
 
         // calculate R_invert
         cgbn_load(arith._env, r, &sig.r);
         cgbn_load(arith._env, mod_order, &curve.Order);
         cgbn_load(arith._env, mod_fp, &curve.FP);
+
+        cgbn_rem(arith._env, temp_compare, r, mod_order);
+        if (cgbn_equals_ui32(arith._env, temp_compare, 0))
+            return -1;
 
         // calculate r_y
         arith.cgbn_mul_mod(arith._env, temp_cgbn, r, r, mod_fp);
@@ -334,6 +340,10 @@ namespace ecc {
         if (beta_mod2 == v_mod2)
             cgbn_sub(arith._env, r_y, mod_fp, r_y);
 
+        // invalid point check
+        if (!is_on_cuve_simple(arith._env, r, r_y, mod_fp, curve.B))
+            return -1;
+
         // calculate n_z = (N-msg_hash) mod N
         cgbn_load(arith._env, temp_cgbn, &sig.msg_hash);
         cgbn_sub(arith._env, temp_cgbn, mod_order, temp_cgbn);
@@ -345,6 +355,11 @@ namespace ecc {
 
         // calculate XY = (r, r_y) * s
         cgbn_load(arith._env, temp_cgbn , &sig.s);
+        // check invalid s
+        cgbn_rem(arith._env, temp_compare, temp_cgbn, mod_order);
+        if (cgbn_equals_ui32(arith._env, temp_compare, 0))
+            return -1;
+
         ec_mul(arith, curve, XY_x, XY_y, r, r_y, temp_cgbn);
 
         // calculate QR = (ResX, ResY) + (XY_x, XY_y)
@@ -356,7 +371,7 @@ namespace ecc {
         ec_mul(arith, curve, ResX, ResY, ResX, ResY, r_inv);
 
         convert_point_to_address(arith, _keccak, signer, ResX, ResY);
-
+        return 0;
     }
 
     __host__ void cgbn_from_memory(env_t env,
