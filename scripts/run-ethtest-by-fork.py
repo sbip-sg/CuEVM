@@ -27,6 +27,9 @@ def compare_output():
     if geth_traces[:-1] != cuevm_traces[:-1]:
         raise ValueError("\033[91m💥\033[0m Mismatched traces")
 
+    if geth_traces[-1] != cuevm_traces[-1]:
+        raise ValueError("\033[91m💥\033[0m Mismatched stateRoot")
+
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
     command = [runtest_bin, f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 
