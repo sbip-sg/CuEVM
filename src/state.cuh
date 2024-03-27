@@ -2385,78 +2385,6 @@ public:
         }
     }
 
-  __host__ __device__ __forceinline__ void update_sstore_gas_cost(
-        bn_t &address,
-        bn_t &key,
-        bn_t &new_value,
-        bn_t &gas_cost) {
-
-        bn_t original_value;
-        _accessed_state->get_value(address, key, original_value);
-
-        bn_t current_value;
-        get_value(address, key, current_value);
-
-        if (cgbn_compare(_arith._env, current_value, new_value) == 0){ // new == current
-          cgbn_set_ui32(_arith._env, gas_cost, GAS_SLOAD);
-        }else if (cgbn_compare(_arith._env, original_value, current_value) == 0
-            && cgbn_compare_ui32(_arith._env, original_value, 0) == 0){ // original == current && original == 0
-          cgbn_set_ui32(_arith._env, gas_cost, GAS_STORAGE_SET);
-        }else if (cgbn_compare(_arith._env, original_value, current_value) == 0){ // original == current
-          cgbn_set_ui32(_arith._env, gas_cost, GAS_WARM_SSOTRE_RESET);
-        } else {
-          cgbn_set_ui32(_arith._env, gas_cost, GAS_SLOAD);
-        }
-
-        if (!_accessed_state->is_warm(address, key)){
-            cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_COLD_SLOAD);
-        }
-      }
-
-      __host__ __device__ __forceinline__ void update_sstore_gas_refund(
-        bn_t &address,
-        bn_t &key,
-        bn_t &new_value,
-        bn_t &gas_refund){
-
-        bn_t original_value;
-        _accessed_state->get_value(address, key, original_value);
-
-        bn_t current_value;
-        get_value(address, key, current_value);
-
-        if (cgbn_compare(_arith._env, current_value, new_value) == 0){ // new == current, no refund
-          cgbn_set_ui32(_arith._env, gas_refund, 0);
-          return;
-        }
-
-        if (cgbn_compare(_arith._env, original_value, current_value) == 0 && cgbn_compare_ui32(_arith._env, new_value, 0) == 0){ // original == current && new == 0
-          cgbn_set_ui32(_arith._env, gas_refund, GAS_SSTORE_CLEARS_SCHEDULE);
-          return;
-        }
-
-        int refund = 0;
-
-        if (cgbn_compare_ui32(_arith._env, original_value, 0) != 0){ // origin != 0
-          if (cgbn_compare_ui32(_arith._env, current_value, 0) == 0){ // current == 0
-            refund -= GAS_SSTORE_CLEARS_SCHEDULE;
-          }else if (cgbn_compare_ui32(_arith._env, new_value, 0) == 0){ // new == 0
-            refund += GAS_SSTORE_CLEARS_SCHEDULE;
-          }
-        }
-
-        if (cgbn_compare(_arith._env, original_value, new_value) == 0){ // origin == new
-          if (cgbn_compare_ui32(_arith._env, original_value, 0) == 0){
-            refund += (GAS_STORAGE_SET - GAS_WARM_SLOAD);
-          }else{
-            refund += (GAS_SSTORE_RESET - GAS_COLD_SLOAD - GAS_WARM_SLOAD);
-          }
-        }
-
-        cgbn_set_ui32(_arith._env, gas_refund, ((uint32_t) refund));
-        return;
-      }
-
     /**
      * Get the gas cost and gas refund for the storage set operation.
      *
@@ -2563,10 +2491,8 @@ public:
     {
         bn_t gas_cost, set_gas_refund;
 
+        // todo missing check for eip-1706?
         get_storage_set_gas_cost_gas_refund(address, key, value, gas_cost, set_gas_refund);
-        // todo eip-1706 should be checked
-        // update_sstore_gas_cost(address, key, value, gas_cost);
-        // update_sstore_gas_refund(address, key, value, set_gas_refund);
         cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
         cgbn_add(_arith._env, gas_refund, gas_refund, set_gas_refund);
     }
