@@ -3058,20 +3058,34 @@ public:
         bn_t gas_value;
         // bn_t beneficiary;
         // _block->get_coin_base(beneficiary);
+        char *temp = new char[arith_t::BYTES * 2 + 3];
+        evm_word_t *evm_word = new evm_word_t;
         if (error_code == ERR_RETURN)
         {
-            bn_t gas_left;
+            bn_t gas_left, tx_value;
             // \f$T_{g} - g\f$
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
+            cgbn_store(_arith._env, evm_word, gas_left);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("gas_left: %s\n", temp);
             bn_t capped_refund_gas;
             // \f$g/5\f$
             cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
             // min ( \f$g/5\f$, \f$R_{g}\f$)
+            cgbn_store(_arith._env, evm_word, _gas_refunds[_depth]);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("gas_refunds by depth: %s\n", temp);
+            cgbn_store(_arith._env, evm_word, capped_refund_gas);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("gas_refunds cap: %s\n", temp);
             if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
             {
                 cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
             }
             // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
+            cgbn_store(_arith._env, evm_word, gas_left);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("gas left: %s\n", temp);
             cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
             cgbn_mul(_arith._env, gas_value, gas_value, _gas_price);
             // add to sender balance g^{*}
@@ -3080,8 +3094,26 @@ public:
             // send back the gas left and gas refund to the sender
             _transaction->get_sender(sender_address);
             _transaction_touch_state->get_account_balance(sender_address, sender_balance);
+            cgbn_store(_arith._env, evm_word, sender_balance);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("sender balance before refund: %s\n", temp);
             cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
-            _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+            cgbn_store(_arith._env, evm_word, sender_balance);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("sender balance after refund: %s\n", temp);
+
+            // deduct transaction value; todo this probably should be done at some other place
+            _transaction->get_value(tx_value);
+            cgbn_store(_arith._env, evm_word, tx_value);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("transaction value: %s\n", temp);
+
+
+            cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
+
+            cgbn_store(_arith._env, evm_word, sender_balance);
+            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
+            printf("final sender balance : %s\n", temp);
 
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
             // cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
@@ -3091,6 +3123,8 @@ public:
                 *_touch_state_ptrs[_depth]);
             _transaction_log_state->update_with_child_state(
                 *_log_state_ptrs[_depth]);
+            _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+
             // set the eror code for a succesfull transaction
             _error_code = ERR_NONE;
         }
@@ -3426,7 +3460,7 @@ public:
 
             // printing storages as: `[[k, v], [k, v], ...]`
             for (size_t i = 0; i < account.storage_size; i++) {
-                // todo_cl should ignore zero values
+                // todo should ignore zero values
                 auto key = account.storage[i].key;
                 auto value = account.storage[i].value;
                 out += "[\"";

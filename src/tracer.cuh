@@ -398,8 +398,6 @@ public:
             fprintf(stderr, "{\"output\":\"%s\",\"gasUsed\":\"%s\"}\n", return_data_str+2, gas_left_str);
         }
 
-        // todo_cl print states to stderr
-
         #endif
         delete[] gas_left_str;
         delete[] gas_cost_str;
