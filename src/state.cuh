@@ -110,6 +110,8 @@ public:
         contract_storage_t *storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
     } account_t;
 
+    bool nodestruct = false; // skip freeing internal memory if true
+
     /**
      * The state data type.
     */
@@ -148,6 +150,9 @@ public:
     */
     __host__ void free_content()
     {
+        if (nodestruct){ // assuming internal data is borrowed
+            return;
+        }
         #ifndef ONLY_CPU
         if (_content != NULL)
         {
@@ -693,6 +698,7 @@ public:
     accessed_state_data_t *_content; /**< The content of the accessed state */
     arith_t _arith; /**< The arithmetical environment */
     world_state_t *_world_state; /**< The world state */
+    bool nodestruct = false;
 
     /**
      * The constructor of the accessed state given the content.
@@ -731,6 +737,9 @@ public:
     */
     __host__ __device__ __forceinline__ ~accessed_state_t()
     {
+        if (nodestruct){
+            return;
+        }
         ONE_THREAD_PER_INSTANCE(
             if (_content != NULL)
             {
@@ -1844,6 +1853,7 @@ public:
     arith_t _arith;              /**< The arithmetical environment */
     accessed_state_t *_accessed_state; /**< The accessed state */
     touch_state_t *_parent_state;  /**< The parent touch state */
+    bool nodestruct = false;
 
 
     /**
@@ -1870,7 +1880,8 @@ public:
     ) : _arith(arith),
         _content(content),
         _accessed_state(access_state),
-        _parent_state(nullptr)
+        _parent_state(nullptr),
+        nodestruct(true)
     {
     }
 
@@ -1904,6 +1915,9 @@ public:
     */
     __host__ __device__ __forceinline__ ~touch_state_t()
     {
+        if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
+            return;
+        };
         ONE_THREAD_PER_INSTANCE(
             if (_content != NULL)
             {

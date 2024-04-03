@@ -3414,10 +3414,13 @@ public:
         touch_state_data_t prev_state, updated_state;
         accessed_state_data_t accessed_state_data;
         world_state_t world_state(arith, instances.world_state_data);
+        world_state.nodestruct = true;
         accessed_state_t accessed_state(&world_state);
+        accessed_state.nodestruct = true;
         prev_state.touch = new uint8_t[instances.world_state_data->no_accounts];
         prev_state.touch_accounts.no_accounts = instances.world_state_data->no_accounts;
         prev_state.touch_accounts.accounts = instances.world_state_data->accounts;
+
 
         touch_state_t final_state(&prev_state, &accessed_state, arith);
 
@@ -3477,10 +3480,19 @@ public:
             print_bytes(account.bytecode, account.code_size);
 
             // printing storages as: `[[k, v], [k, v], ...]`
+            bn_t temp_bn ;
+            bool has_storage = false;
             for (size_t i = 0; i < account.storage_size; i++) {
                 // todo should ignore zero values
                 auto key = account.storage[i].key;
                 auto value = account.storage[i].value;
+                cgbn_load(arith._env, temp_bn, &value);
+
+                if (cgbn_compare_ui32(arith._env, temp_bn, 0) == 0){
+                    continue;
+                }
+
+                if (has_storage) out+= ",";
                 out += "[\"";
                 arith.pretty_hex_string_from_cgbn_memory(temp, key);
                 out += temp;
@@ -3488,10 +3500,9 @@ public:
                 out += "\", \"";
                 out += temp;
                 out += "\"]";
-                if (i < account.storage_size - 1){
-                    out += ",";
-                }
+                has_storage = true;
             }
+
             out += "]}" ;
             if (idx < num_accounts - 1){
                 out += ",";
