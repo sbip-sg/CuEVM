@@ -3410,7 +3410,25 @@ public:
             tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx], &instances.return_data[idx]);
 #endif
         }
-        print_touched_trie_accounts(arith, instances.touch_states_data);
+
+        touch_state_data_t prev_state, updated_state;
+        accessed_state_data_t accessed_state_data;
+        world_state_t world_state(arith, instances.world_state_data);
+        accessed_state_t accessed_state(&world_state);
+        prev_state.touch = new uint8_t[instances.world_state_data->no_accounts];
+        prev_state.touch_accounts.no_accounts = instances.world_state_data->no_accounts;
+        prev_state.touch_accounts.accounts = instances.world_state_data->accounts;
+
+        touch_state_t final_state(&prev_state, &accessed_state, arith);
+
+        updated_state.touch = new uint8_t[instances.touch_states_data->touch_accounts.no_accounts];;
+        updated_state.touch_accounts.no_accounts = instances.touch_states_data->touch_accounts.no_accounts;
+        updated_state.touch_accounts.accounts = instances.touch_states_data->touch_accounts.accounts;
+        touch_state_t state_from_updated(&updated_state, &accessed_state, arith);
+
+
+        final_state.update_with_child_state(state_from_updated);
+        print_touched_trie_accounts(arith, final_state._content);
         #ifdef COMPLEX_TRACER
         // cpu_world_state->print_trie_accounts();
 

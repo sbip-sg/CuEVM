@@ -1863,6 +1863,17 @@ public:
     {
     }
 
+    __host__ __device__ __forceinline__ touch_state_t(
+        touch_state_data_t *content,
+        accessed_state_t *access_state,
+        arith_t &arith
+    ) : _arith(arith),
+        _content(content),
+        _accessed_state(access_state),
+        _parent_state(nullptr)
+    {
+    }
+
     /**
      * Constructor with given accessed state and parent touch state.
      * @param[in] access_state The accessed state
@@ -2739,7 +2750,7 @@ public:
      * Update the current touch state with the touch state of a children
      * @param[in] child The touch state of the child
     */
-    __host__ __device__ __forceinline__ void update_with_child_state(
+    __host__ __device__  void update_with_child_state(
         touch_state_t &child
     )
     {
