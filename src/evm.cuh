@@ -472,6 +472,7 @@ public:
             // set the account nonce to 1
             bn_t contract_nonce;
             cgbn_set_ui32(_arith._env, contract_nonce, 1);
+            // printf("setting new contract nonce for address\n");// TODO nonce value not in the output state
             _touch_state_ptrs[_depth]->set_account_nonce(receiver, contract_nonce);
         }
 

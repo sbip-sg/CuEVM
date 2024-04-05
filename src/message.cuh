@@ -1123,12 +1123,20 @@ public:
       // nonce is -1 in YP but here is before validating the transaction
       // and increasing the nonce
       cgbn_load(_arith._env, sender_nonce, &(account->nonce));
+
       message_t::get_create_contract_address(
           _arith,
           to,
           sender,
           sender_nonce,
           keccak);
+
+      // evm_word_t evm_word;
+      // cgbn_store(_arith._env, &evm_word, to);
+      // char *temp = new char[arith_t::BYTES * 2 + 3];
+      // _arith.pretty_hex_string_from_cgbn_memory(temp, evm_word);
+      // printf("Contract will be created at %s\n", temp);
+
     }
     else
     {
