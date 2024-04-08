@@ -17,9 +17,9 @@ def read_as_json_lines(filepath):
         for line in f:
             yield json.loads(line)
 
-def check_output(output):
-    if 'error' in output:
-        raise ValueError("\033[91m💥\033[0m Mismatch found in output:")
+def check_output(output, error):
+    if 'error' in (output + error):
+        raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
     command = [runtest_bin, f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
@@ -28,8 +28,7 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
 
     clean_test_out()
     result = subprocess.run(command, capture_output=True, text=True)
-    output = result.stdout + result.stderr
-    check_output(output)
+    check_output(result.stdout, result.stderr)
 
     print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
@@ -58,11 +57,6 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
                         transaction_data = transaction['data']
                         transaction_gaslimit = transaction['gasLimit']
                         transaction_value = transaction['value']
-
-
-                        # data_len = len(transaction_data)
-                        # gaslimit_len = len(transaction_gaslimit)
-                        # value_len = len(transaction_value)
 
                         post_by_fork = data[rootname]['post'].get(fork)
 

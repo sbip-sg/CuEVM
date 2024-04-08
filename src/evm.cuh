@@ -472,7 +472,6 @@ public:
             // set the account nonce to 1
             bn_t contract_nonce;
             cgbn_set_ui32(_arith._env, contract_nonce, 1);
-            // printf("setting new contract nonce for address\n");// TODO nonce value not in the output state
             _touch_state_ptrs[_depth]->set_account_nonce(receiver, contract_nonce);
         }
 
@@ -3060,33 +3059,23 @@ public:
         // bn_t beneficiary;
         // _block->get_coin_base(beneficiary);
         char *temp = new char[arith_t::BYTES * 2 + 3];
-        evm_word_t *evm_word = new evm_word_t;
+
         if (error_code == ERR_RETURN)
         {
             bn_t gas_left, tx_value;
             // \f$T_{g} - g\f$
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
-            cgbn_store(_arith._env, evm_word, gas_left);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("gas_left: %s\n", temp);
+
             bn_t capped_refund_gas;
             // \f$g/5\f$
             cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
             // min ( \f$g/5\f$, \f$R_{g}\f$)
-            cgbn_store(_arith._env, evm_word, _gas_refunds[_depth]);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("gas_refunds by depth: %s\n", temp);
-            cgbn_store(_arith._env, evm_word, capped_refund_gas);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("gas_refunds cap: %s\n", temp);
+
             if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
             {
                 cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
             }
             // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
-            cgbn_store(_arith._env, evm_word, gas_left);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("gas left: %s\n", temp);
             cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
             cgbn_mul(_arith._env, gas_value, gas_value, _gas_price);
             // add to sender balance g^{*}
@@ -3095,27 +3084,10 @@ public:
             // send back the gas left and gas refund to the sender
             _transaction->get_sender(sender_address);
             _transaction_touch_state->get_account_balance(sender_address, sender_balance);
-            cgbn_store(_arith._env, evm_word, sender_balance);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("sender balance before refund: %s\n", temp);
             cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
-            cgbn_store(_arith._env, evm_word, sender_balance);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("sender balance after refund: %s\n", temp);
-
             // deduct transaction value; todo this probably should be done at some other place
             _transaction->get_value(tx_value);
-            cgbn_store(_arith._env, evm_word, tx_value);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("transaction value: %s\n", temp);
-
-
             cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
-
-            cgbn_store(_arith._env, evm_word, sender_balance);
-            _arith.pretty_hex_string_from_cgbn_memory(temp, *evm_word);
-            printf("final sender balance : %s\n", temp);
-
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
             // cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
 
@@ -3412,6 +3384,9 @@ public:
 #endif
         }
 
+
+        #ifdef COMPLEX_TRACER
+        // TODO help wanted, this data are the direct cause of the double free bug
         touch_state_data_t prev_state, updated_state;
         accessed_state_data_t accessed_state_data;
         world_state_t world_state(arith, instances.world_state_data);
@@ -3437,8 +3412,6 @@ public:
 
         final_state.update_with_child_state(state_from_updated);
         print_touched_trie_accounts(arith, final_state._content);
-        #ifdef COMPLEX_TRACER
-        // cpu_world_state->print_trie_accounts();
 
 
         #endif
