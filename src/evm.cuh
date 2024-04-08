@@ -3425,7 +3425,11 @@ public:
 
         touch_state_t final_state(&prev_state, &accessed_state, arith);
 
-        updated_state.touch = new uint8_t[instances.touch_states_data->touch_accounts.no_accounts];;
+        updated_state.touch = new uint8_t[instances.touch_states_data->touch_accounts.no_accounts];
+        for (size_t idx = 0; idx < instances.touch_states_data->touch_accounts.no_accounts; idx++)
+        {
+            updated_state.touch[idx] = instances.touch_states_data->touch[idx];
+        }
         updated_state.touch_accounts.no_accounts = instances.touch_states_data->touch_accounts.no_accounts;
         updated_state.touch_accounts.accounts = instances.touch_states_data->touch_accounts.accounts;
         touch_state_t state_from_updated(&updated_state, &accessed_state, arith);

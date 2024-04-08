@@ -37,7 +37,7 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
 
     clean_test_out()
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    compare_output()
+    # compare_output() # goevmlab does this comparison internally, traces are saved only when there is a mismatch
 
     print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
@@ -58,6 +58,9 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
 
                     for rootname in list(data.keys()):
                         print(f'rootname: {rootname}')
+                        if 'transaction' not in data[rootname]:
+                            print(f"Skipping {rootname} as it does not have a `transaction`")
+                            continue
                         transaction = data[rootname]['transaction']
                         transaction_data = transaction['data']
                         transaction_gaslimit = transaction['gasLimit']
