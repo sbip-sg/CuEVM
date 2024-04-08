@@ -17,27 +17,19 @@ def read_as_json_lines(filepath):
         for line in f:
             yield json.loads(line)
 
-def compare_output():
-    geth_traces = list(read_as_json_lines('geth-0-output.jsonl'))
-    cuevm_traces = list(read_as_json_lines('cuevm-0-output.jsonl'))
-
-    if len(geth_traces) != len(cuevm_traces) or len(geth_traces) < 2:
-        raise ValueError("\033[91m💥\033[0m Mismatched trace length")
-
-    if geth_traces[:-1] != cuevm_traces[:-1]:
-        raise ValueError("\033[91m💥\033[0m Mismatched traces")
-
-    if geth_traces[-1] != cuevm_traces[-1]:
-        raise ValueError("\033[91m💥\033[0m Mismatched stateRoot")
+def check_output(output):
+    if 'error' in output:
+        raise ValueError(f"\033[91m💥\033[0m Mismatch found in output: {output}")
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
-    command = [runtest_bin, f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
+    command = [runtest_bin, f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 
     print(' '.join(command))
 
     clean_test_out()
-    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # compare_output() # goevmlab does this comparison internally, traces are saved only when there is a mismatch
+    result = subprocess.run(command, capture_output=True, text=True)
+    output = result.stdout + result.stderr
+    check_output(output)
 
     print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
@@ -60,6 +52,7 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
                         print(f'rootname: {rootname}')
                         if 'transaction' not in data[rootname]:
                             print(f"Skipping {rootname} as it does not have a `transaction`")
+                            if result: result['skip_files'].append(input_filepath)
                             continue
                         transaction = data[rootname]['transaction']
                         transaction_data = transaction['data']
@@ -75,6 +68,7 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
 
                         if not post_by_fork:
                             print(f"Skipping {rootname} as it does not have a `:post` for {fork}")
+                            if result: result['skip_files'].append(input_filepath)
                             continue
 
                         for tx in post_by_fork:
@@ -131,11 +125,19 @@ def main():
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
         assert_command_in_path(cmd)
 
-    result = {'n_total': 0, 'n_success': 0, 'failed_files': []}
+    result = {'n_total': 0, 'n_success': 0, 'failed_files': [], 'skip_files': []}
     try:
         runtest_fork(args.input, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result)
     finally:
-        print(f"Total tests: {result['n_total']}, Passed: {result['n_success']}, Failed files: {result['failed_files']}")
+        skipped = result['skip_files']
+        n_skipped = len(skipped)
+
+        print(f"Total tests: {result['n_total']}, Passed: {result['n_success']}, Skipped: {n_skipped}")
+        from pprint import pprint
+        print("Skipped files:")
+        pprint(skipped)
+        print("Failed files:")
+        pprint(result['failed_files'])
 
 if __name__ == "__main__":
     main()
