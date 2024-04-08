@@ -1,5 +1,5 @@
 {
-	"name": "QLE dev container",
+	"name": "CuEVM dev container",
 	"build": { "dockerfile": "Dockerfile" },
 	"runArgs": [
 		"--rm", "--gpus=all"
