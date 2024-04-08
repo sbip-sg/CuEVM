@@ -19,7 +19,7 @@ def read_as_json_lines(filepath):
 
 def check_output(output):
     if 'error' in output:
-        raise ValueError(f"\033[91m💥\033[0m Mismatch found in output: {output}")
+        raise ValueError("\033[91m💥\033[0m Mismatch found in output:")
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
     command = [runtest_bin, f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
