@@ -555,7 +555,7 @@ public:
                         *_message_ptrs[_depth]
                     );
                     break;
-                
+
                 case 5:
                     precompile_operations::operation_MODEXP(
                         _arith,
@@ -647,7 +647,7 @@ public:
             // if the sender has enough balance
             // value>0
             //(cgbn_compare(arith._env, sender, receiver) != 0) &&   // sender != receiver matter only on transfer
-            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) && 
+            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) &&
                 (call_type != OP_DELEGATECALL) // no delegatecall
             )
             {

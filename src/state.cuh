@@ -141,6 +141,9 @@ public:
     */
     __host__ __device__ __forceinline__ ~world_state_t()
     {
+        if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
+            return;
+        };
         _content = NULL;
     }
     /**
@@ -2704,7 +2707,7 @@ public:
      * @param[in] child The touch state of the child
     */
     __host__ __device__ __forceinline__ void update_with_child_state(
-        touch_state_t &child
+        const touch_state_t &child
     )
     {
         size_t idx, jdx;
@@ -2745,6 +2748,7 @@ public:
                     if (account->bytecode != NULL)
                     {
                         delete[] account->bytecode;
+                        account->bytecode = nullptr;
                     }
                     account->bytecode = new uint8_t[child._content->touch_accounts.accounts[idx].code_size * sizeof(uint8_t)];
                     memcpy(
