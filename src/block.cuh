@@ -174,6 +174,8 @@ public:
 
       if (element_json != NULL){
         _arith.cgbn_memory_from_hex_string(_content->previous_blocks[0].hash, element_json->valuestring);
+      } else {
+        _arith.cgbn_memory_from_size_t(_content->previous_blocks[0].hash, 0);
       }
 
       idx++;
@@ -418,6 +420,7 @@ public:
     }
 
     cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
+    
     delete[] hex_string_ptr;
     hex_string_ptr = NULL;
     return block_json;

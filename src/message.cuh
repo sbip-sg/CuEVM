@@ -1017,7 +1017,8 @@ public:
     bn_t sender_address;
     account_t *sender_account;
     get_sender(sender_address);
-    error_code = ERR_NONE;
+    // TODO: came back for this
+    // error_code = ERR_NONE;
     // get the world state account
     sender_account = touch_state._accessed_state->_world_state->get_account(
       sender_address,
