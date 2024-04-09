@@ -3416,12 +3416,9 @@ public:
 
 
         #ifdef COMPLEX_TRACER
-        // TODO help wanted, this data are the direct cause of the double free bug
         touch_state_data_t prev_state, updated_state;
         world_state_t world_state(arith, instances.world_state_data);
-        world_state.nodestruct = true;
         accessed_state_t accessed_state(&world_state);
-        accessed_state.nodestruct = true;
         prev_state.touch = new uint8_t[instances.world_state_data->no_accounts];
         prev_state.touch_accounts.no_accounts = instances.world_state_data->no_accounts;
         prev_state.touch_accounts.accounts = instances.world_state_data->accounts;
@@ -3441,6 +3438,11 @@ public:
 
         final_state.update_with_child_state(state_from_updated);
         print_touched_trie_accounts(arith, final_state._content);
+
+        delete[] prev_state.touch;
+        delete[] updated_state.touch;
+        prev_state.touch = nullptr;
+        updated_state.touch = nullptr;
 
 
         #endif

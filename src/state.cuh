@@ -110,8 +110,6 @@ public:
         contract_storage_t *storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
     } account_t;
 
-    bool nodestruct = false; // skip freeing internal memory if true
-
     /**
      * The state data type.
     */
@@ -141,9 +139,6 @@ public:
     */
     __host__ __device__ __forceinline__ ~world_state_t()
     {
-        if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
-            return;
-        };
         _content = NULL;
     }
     /**
@@ -153,9 +148,6 @@ public:
     */
     __host__ void free_content()
     {
-        if (nodestruct){ // assuming internal data is borrowed
-            return;
-        }
         #ifndef ONLY_CPU
         if (_content != NULL)
         {
@@ -638,7 +630,6 @@ public:
     accessed_state_data_t *_content; /**< The content of the accessed state */
     arith_t _arith; /**< The arithmetical environment */
     world_state_t *_world_state; /**< The world state */
-    bool nodestruct = false;
 
     /**
      * The constructor of the accessed state given the content.
@@ -677,9 +668,6 @@ public:
     */
     __host__ __device__ __forceinline__ ~accessed_state_t()
     {
-        if (nodestruct){
-            return;
-        }
         ONE_THREAD_PER_INSTANCE(
             if (_content != NULL)
             {
@@ -2163,6 +2151,7 @@ public:
                     );
                     dup_account->code_size = account->code_size;
                 } else {
+                    delete[] dup_account->bytecode;
                     dup_account->bytecode = NULL;
                     dup_account->code_size = 0;
                 }
@@ -2198,10 +2187,11 @@ public:
                 );
                 _content->touch = tmp_touch;
                 _content->touch[account_idx] = 0;
-                if (!nodestruct){
-                  delete dup_account;
-                }
             )
+
+            delete dup_account;
+            dup_account = nullptr;
+
             // set the touch
             _content->touch[account_idx] = touch;
         }
