@@ -1844,6 +1844,7 @@ public:
     __host__ __device__ __forceinline__ ~touch_state_t()
     {
         if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
+            _content = nullptr;
             return;
         };
         ONE_THREAD_PER_INSTANCE(
