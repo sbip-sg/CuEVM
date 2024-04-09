@@ -3418,7 +3418,6 @@ public:
         #ifdef COMPLEX_TRACER
         // TODO help wanted, this data are the direct cause of the double free bug
         touch_state_data_t prev_state, updated_state;
-        accessed_state_data_t accessed_state_data;
         world_state_t world_state(arith, instances.world_state_data);
         world_state.nodestruct = true;
         accessed_state_t accessed_state(&world_state);
@@ -3518,8 +3517,11 @@ public:
 
         }
         out += "]}";
-        delete temp;
+        delete[] temp;
         temp = nullptr;
+        k->free_parameters();
+        delete k;
+        k = nullptr;
         std::cerr << out << std::endl;
     }
 

@@ -198,6 +198,7 @@ public:
                         _content->accounts[idx].storage = NULL;
                     }
                 }
+
                 delete[] _content->accounts;
                 _content->accounts = NULL;
             }
@@ -2100,7 +2101,7 @@ public:
      *
      * @param[in] address The address of the account
     */
-    __host__ __device__ __forceinline__ size_t set_account(
+    __host__ __device__  size_t set_account(
         bn_t &address
     )
     {
@@ -2182,8 +2183,11 @@ public:
                         _content->touch,
                         _content->touch_accounts.no_accounts * sizeof(uint8_t)
                     );
-                    delete[] _content->touch_accounts.accounts;
-                    delete[] _content->touch;
+
+                    if (!nodestruct){
+                      delete[] _content->touch_accounts.accounts;
+                      delete[] _content->touch;
+                    }
                 }
                 _content->touch_accounts.accounts = tmp_accounts;
                 _content->touch_accounts.no_accounts++;
@@ -2194,7 +2198,9 @@ public:
                 );
                 _content->touch = tmp_touch;
                 _content->touch[account_idx] = 0;
-                delete dup_account;
+                if (!nodestruct){
+                  delete dup_account;
+                }
             )
             // set the touch
             _content->touch[account_idx] = touch;
@@ -2501,8 +2507,8 @@ public:
                             account->storage,
                             (new_storage_size-1) * sizeof(contract_storage_t)
                         );
-                        delete[] account->storage;
                     }
+                    delete[] account->storage;
                     account->storage = tmp_storage;
                 }
             )
