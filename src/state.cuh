@@ -110,8 +110,6 @@ public:
         contract_storage_t *storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
     } account_t;
 
-    bool nodestruct = false; // skip freeing internal memory if true
-
     /**
      * The state data type.
     */
@@ -150,9 +148,6 @@ public:
     */
     __host__ void free_content()
     {
-        if (nodestruct){ // assuming internal data is borrowed
-            return;
-        }
         #ifndef ONLY_CPU
         if (_content != NULL)
         {
@@ -195,6 +190,7 @@ public:
                         _content->accounts[idx].storage = NULL;
                     }
                 }
+
                 delete[] _content->accounts;
                 _content->accounts = NULL;
             }
@@ -634,7 +630,6 @@ public:
     accessed_state_data_t *_content; /**< The content of the accessed state */
     arith_t _arith; /**< The arithmetical environment */
     world_state_t *_world_state; /**< The world state */
-    bool nodestruct = false;
 
     /**
      * The constructor of the accessed state given the content.
@@ -673,9 +668,6 @@ public:
     */
     __host__ __device__ __forceinline__ ~accessed_state_t()
     {
-        if (nodestruct){
-            return;
-        }
         ONE_THREAD_PER_INSTANCE(
             if (_content != NULL)
             {
@@ -1852,6 +1844,7 @@ public:
     __host__ __device__ __forceinline__ ~touch_state_t()
     {
         if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
+            _content = nullptr;
             return;
         };
         ONE_THREAD_PER_INSTANCE(
@@ -2097,7 +2090,7 @@ public:
      *
      * @param[in] address The address of the account
     */
-    __host__ __device__ __forceinline__ size_t set_account(
+    __host__ __device__  size_t set_account(
         bn_t &address
     )
     {
@@ -2159,6 +2152,7 @@ public:
                     );
                     dup_account->code_size = account->code_size;
                 } else {
+                    delete[] dup_account->bytecode;
                     dup_account->bytecode = NULL;
                     dup_account->code_size = 0;
                 }
@@ -2179,8 +2173,11 @@ public:
                         _content->touch,
                         _content->touch_accounts.no_accounts * sizeof(uint8_t)
                     );
-                    delete[] _content->touch_accounts.accounts;
-                    delete[] _content->touch;
+
+                    if (!nodestruct){
+                      delete[] _content->touch_accounts.accounts;
+                      delete[] _content->touch;
+                    }
                 }
                 _content->touch_accounts.accounts = tmp_accounts;
                 _content->touch_accounts.no_accounts++;
@@ -2191,8 +2188,11 @@ public:
                 );
                 _content->touch = tmp_touch;
                 _content->touch[account_idx] = 0;
-                delete dup_account;
             )
+
+            delete dup_account;
+            dup_account = nullptr;
+
             // set the touch
             _content->touch[account_idx] = touch;
         }
@@ -2498,8 +2498,8 @@ public:
                             account->storage,
                             (new_storage_size-1) * sizeof(contract_storage_t)
                         );
-                        delete[] account->storage;
                     }
+                    delete[] account->storage;
                     account->storage = tmp_storage;
                 }
             )
@@ -2704,7 +2704,7 @@ public:
      * @param[in] child The touch state of the child
     */
     __host__ __device__ __forceinline__ void update_with_child_state(
-        touch_state_t &child
+        const touch_state_t &child
     )
     {
         size_t idx, jdx;
@@ -2745,6 +2745,7 @@ public:
                     if (account->bytecode != NULL)
                     {
                         delete[] account->bytecode;
+                        account->bytecode = nullptr;
                     }
                     account->bytecode = new uint8_t[child._content->touch_accounts.accounts[idx].code_size * sizeof(uint8_t)];
                     memcpy(

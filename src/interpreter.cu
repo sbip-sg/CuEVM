@@ -128,9 +128,9 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     //   evm_t::json_from_evm_instances_t(arith, cpu_instances));
     // printf("Json files printed\n");
 
-    // free the memory // todo double free issue because data used in print_evm_instances_t
-    // printf("Freeing the memory ...\n");
-    // evm_t::free_instances(cpu_instances);
+    // free the memory
+    printf("Freeing the memory ...\n");
+    evm_t::free_instances(cpu_instances);
     #ifndef ONLY_CPU
     CUDA_CHECK(cudaFree(gpu_instances));
     CUDA_CHECK(cgbn_error_report_free(report));
