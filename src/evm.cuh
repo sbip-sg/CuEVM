@@ -2740,6 +2740,9 @@ public:
                         *this,
                         *_last_return_data_ptrs[_depth]);
                 }
+                // printf("CALL memory\n");
+                // _memory_ptrs[0]->print();
+                // printf("\n");
                 break;
                 case OP_CALLCODE: // CALLCODE
                 {

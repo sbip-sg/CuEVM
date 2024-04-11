@@ -161,6 +161,8 @@ namespace ecc {
      * @return true if on curve
      */
     bool is_on_cuve_simple(env_t env, bn_t& Px, bn_t &Py, bn_t& mod, uint32_t B){
+        if (cgbn_equals_ui32(env, Px, 0) && cgbn_equals_ui32(env, Py, 0))
+            return true;
         bn_t temp, temp2;
         cgbn_mul_mod(env, temp, Px, Px, mod); // temp = Px^2
         cgbn_mul_mod(env, temp, temp, Px, mod); // temp = Px^3
@@ -186,6 +188,22 @@ namespace ecc {
         bn_t lambda, numerator, denominator, temp, x_r, y_r;
         evm_word_t scratch_pad;
         cgbn_load(arith._env, mod_fp, &curve.FP);
+        // point at infinity
+        if (cgbn_equals_ui32(arith._env, Px, 0) && cgbn_equals_ui32(arith._env, Py, 0)) {
+            if (is_on_cuve_simple(arith._env, Qx, Qy, mod_fp, curve.B) ){
+                cgbn_set(arith._env, ResX, Qx);
+                cgbn_set(arith._env, ResY, Qy);
+                return 0;
+            } else
+                return -1;
+        } else if (cgbn_equals_ui32(arith._env, Qx, 0) && cgbn_equals_ui32(arith._env, Qy, 0)) {
+            if (is_on_cuve_simple(arith._env, Px, Py, mod_fp, curve.B) ){
+                cgbn_set(arith._env, ResX, Px);
+                cgbn_set(arith._env, ResY, Py);
+                return 0;
+            } else
+                return -1;
+        }
         if (!is_on_cuve_simple(arith._env, Px, Py, mod_fp, curve.B) || !is_on_cuve_simple(arith._env, Qx, Qy, mod_fp, curve.B)) {
             return -1;
         }
@@ -205,6 +223,13 @@ namespace ecc {
             // print lambda
             cgbn_store(arith._env, &scratch_pad, lambda);
 
+        } else if (cgbn_equals(arith._env, Px, Qx) ){
+            // printf("Doubling\n");
+            // Special case for P != Q and Px == Qx
+            // The result is the point at infinity
+            cgbn_set_ui32(arith._env, ResX, 0);
+            cgbn_set_ui32(arith._env, ResY, 0);
+            return 0;
         } else {
             // printf("Adding\n");
             // General case for P != Q
@@ -234,8 +259,16 @@ namespace ecc {
         cgbn_load(arith._env, mod_fp, &curve.FP);
 
         if(!is_on_cuve_simple(arith._env, Gx, Gy, mod_fp, curve.B)){
+            printf("Point not on curve\n");
             return -1;
         }
+        // check point at infinity
+        if (cgbn_equals_ui32(arith._env, Gx, 0) && cgbn_equals_ui32(arith._env, Gy, 0) || cgbn_equals_ui32(arith._env, n, 0)) {
+            cgbn_set_ui32(arith._env, ResX, 0);
+            cgbn_set_ui32(arith._env, ResY, 0);
+            return 0;
+        }
+
 
         uint8_t bitArray[evm_params::BITS];
         uint32_t bit_array_length = 0;
@@ -318,7 +351,7 @@ namespace ecc {
         cgbn_load(arith._env, mod_fp, &curve.FP);
 
         cgbn_rem(arith._env, temp_compare, r, mod_order);
-        if (cgbn_equals_ui32(arith._env, temp_compare, 0))
+        if (cgbn_equals_ui32(arith._env, temp_compare, 0) || cgbn_compare(arith._env, r, mod_order) >= 0)
             return -1;
 
         // calculate r_y
@@ -357,7 +390,7 @@ namespace ecc {
         cgbn_load(arith._env, temp_cgbn , &sig.s);
         // check invalid s
         cgbn_rem(arith._env, temp_compare, temp_cgbn, mod_order);
-        if (cgbn_equals_ui32(arith._env, temp_compare, 0))
+        if (cgbn_equals_ui32(arith._env, temp_compare, 0) || cgbn_compare(arith._env, temp_cgbn, mod_order) >= 0)
             return -1;
 
         ec_mul(arith, curve, XY_x, XY_y, r, r_y, temp_cgbn);
@@ -875,6 +908,14 @@ namespace ecc {
         return FQP_equals(env, temp, temp2);
     }
 
+    template <size_t Degree>
+    bool FQP_is_inf(env_t env, FQ<Degree> &Px, FQ<Degree> &Py){
+        bool res = true;
+        for (size_t i = 0; i < Degree; i++) {
+            res = res && cgbn_equals_ui32(env, Px.coeffs[i], 0) && cgbn_equals_ui32(env, Py.coeffs[i], 0);
+        }
+        return res;
+    }
     /**
      * @brief Point Addition in field extension with Degree
      *  Res = P + Q
@@ -894,13 +935,30 @@ namespace ecc {
         bn_t two, three;
         cgbn_set_ui32(env, two, 2);
         cgbn_set_ui32(env, three, 3);
+        // check infinity
+        if (FQP_is_inf(env, Px, Py)){
+            FQP_copy(env, ResX, Qx);
+            FQP_copy(env, ResY, Qy);
+            return;
+        } else if (FQP_is_inf(env, Qx, Qy)){
+            FQP_copy(env, ResX, Px);
+            FQP_copy(env, ResY, Py);
+            return;
+        }
+
         if (FQP_equals(env, Px, Qx) && FQP_equals(env, Py, Qy)) {
             FQP_mul(env, temp, Px, Px, mod_fp); // temp = Px^2
             FQP_mul_scalar(env, numerator, temp, three, mod_fp); // numerator = 3*Px^2
             FQP_mul_scalar(env, denominator, Py, two, mod_fp); // denominator = 2*Py
             FQP_div(env, lambda, numerator, denominator, mod_fp); // lambda = (3*Px^2) / (2*Py)
 
-        } else {
+        } else if (FQP_equals(env, Px, Qx)){
+            // special case, return inf
+            for (size_t i = 0; i < Degree; i++) {
+                cgbn_set_ui32(env, ResX.coeffs[i], 0);
+                cgbn_set_ui32(env, ResY.coeffs[i], 0);
+            }
+        } else{
 
             FQP_sub(env, numerator, Qy, Py, mod_fp); // temp = Qy - Py
             FQP_sub(env, denominator, Qx, Px, mod_fp); // numerator = Qx - Px
@@ -940,6 +998,22 @@ namespace ecc {
         evm_word_t scratch_pad;
         cgbn_store(env, &scratch_pad, n);
         bit_array_from_cgbn_memory(bitArray, bit_array_length, scratch_pad);
+
+        // check point at infinity
+        if (FQP_is_inf(env, Gx, Gy)){
+            FQP_copy(env, ResX, Gx);
+            FQP_copy(env, ResY, Gy);
+            return;
+        }
+        // mul zero
+        if (cgbn_equals_ui32(env, n, 0)){
+            // return inf
+            for (size_t i = 0; i < Degree; i++) {
+                cgbn_set_ui32(env, ResX.coeffs[i], 0);
+                cgbn_set_ui32(env, ResY.coeffs[i], 0);
+            }
+            return;
+        }
 
         FQ<Degree> temp_ResX, temp_ResY;
         // Double-and-add algorithm
@@ -1202,7 +1276,6 @@ namespace ecc {
         // assert is_on_curve(Q, b2) assert is_on_curve(P, b)
         // return miller_loop(twist(Q), cast_point_to_fq12(P))
         FQ<12> Qx_tw, Qy_tw, Px_fp12, Py_fp12;
-
         FQP_twist(env, Qx_tw, Qy_tw, Qx, Qy, mod_fp);
         cgbn_set(env,Px_fp12.coeffs[0], Px.coeffs[0]);
         cgbn_set(env,Py_fp12.coeffs[0], Py.coeffs[0]);
@@ -1249,19 +1322,31 @@ namespace ecc {
             cgbn_from_memory(env, Qx.coeffs[0], points_data + 96);
             cgbn_from_memory(env, Qy.coeffs[1], points_data + 128);
             cgbn_from_memory(env, Qy.coeffs[0], points_data + 160);
-
+            //print point for debugging
+            print_fqp(env, Px, "Px");
+            print_fqp(env, Py, "Py");
+            print_fqp(env, Qx, "Qx");
+            print_fqp(env, Qy, "Qy");
             bool on_curve = FQP_is_on_curve(env, Px, Py, mod_fp, B1)  && FQP_is_on_curve(env, Qx, Qy, mod_fp, B2);
-            if (!on_curve)
-                return -1;
-            pairing(env, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
-            FQP_mul(env, final_res, final_res, temp_res, mod_fp);
+            if (!on_curve){
+                if (FQP_is_inf(env, Qx, Qy) || FQP_is_inf(env, Px, Py)){
+                    FQ<12> one_fq12 = get_one<12>(env);
+                    FQP_copy(env, temp_res, one_fq12);
+                } else {
+                    return -1;
+                }
+            } else {
+                pairing(env, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
+            }
+                FQP_mul(env, final_res, final_res, temp_res, mod_fp);
 
         }
         // final exp
         FQP_final_exponentiation(env, final_res, final_res, mod_fp);
-
+        printf("Final result: \n");
+        print_fqp(env, final_res, "Final");
         FQ<12> one_fq12 = get_one<12>(env);
-        return FQP_equals(env, final_res, one_fq12);
+        return FQP_equals(env, final_res, one_fq12) ? 1 : 0;
     }
 }  // namespace ecc
 
