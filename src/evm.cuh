@@ -523,6 +523,17 @@ public:
                 uint32_t precompiled_no = cgbn_get_ui32(_arith._env, contract_address);
                 switch (precompiled_no)
                 {
+                case 1:
+                    precompile_operations::operation_ecRecover(
+                        _arith,
+                        _keccak,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
                 case 2:
                     precompile_operations::operation_SHA256(
                         _arith,
@@ -567,6 +578,36 @@ public:
                     );
                     break;
 
+                case 6:
+                    precompile_operations::operation_ecAdd(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+                case 7:
+                    precompile_operations::operation_ecMul(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+                case 8:
+                    precompile_operations::operation_ecPairing(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
                 case 9:
                     precompile_operations::operation_BLAKE2(
                         _arith,
@@ -2700,6 +2741,9 @@ public:
                         *this,
                         *_last_return_data_ptrs[_depth]);
                 }
+                // printf("CALL memory\n");
+                // _memory_ptrs[0]->print();
+                // printf("\n");
                 break;
                 case OP_CALLCODE: // CALLCODE
                 {
