@@ -823,6 +823,7 @@ namespace precompile_operations {
     bn_t x, y, k;
     evm_word_t scratch_pad;
     uint8_t new_input[96];
+    if (size > 96) size = 96;
     memcpy(new_input, input, size);
     for(int i = size; i < 96; i++){
         new_input[i] = 0;
@@ -847,7 +848,7 @@ namespace precompile_operations {
             cgbn_store(arith._env, &scratch_pad, y);
             arith.byte_array_from_cgbn_memory(output + 32, size, scratch_pad);
             return_data.set(output, 64);
-            print_data_content_t(*return_data._content);
+            // print_data_content_t(*return_data._content);
             cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECMUL);
             error_code = ERR_RETURN;
         } else{
@@ -885,7 +886,7 @@ namespace precompile_operations {
         if (res== -1){
             cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
-        } else{
+        } else {
             uint8_t output[32];
             for (int i = 0; i < 31; i++)
                 output[i] = 0;
