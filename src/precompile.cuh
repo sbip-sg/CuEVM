@@ -872,7 +872,7 @@ namespace precompile_operations {
     size = message._content->data.size;
     input = message._content->data.data;
 
-    size_t gas_cost = arith.pairing_cost(size);
+    arith.pairing_cost(gas_used, size);
 
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
         if (size % 192 != 0 || size == 0) {
@@ -893,7 +893,6 @@ namespace precompile_operations {
             output[31] = res == 1;
             return_data.set(output, 32);
             error_code = ERR_RETURN;
-            cgbn_add_ui32(arith._env, gas_used, gas_used, gas_cost); // normal gas
         }
     } else{
 
