@@ -3159,6 +3159,9 @@ public:
         // allocated the memory for logs
         instances.logs_data = log_state_t::get_cpu_instances(instances.count);
 
+        // allocated the memory for return data
+        instances.return_data = return_data_t::get_cpu_instances(instances.count);
+
 #ifdef TRACER
         // allocated the memory for tracers
         instances.tracers_data = tracer_t::get_cpu_instances(instances.count);

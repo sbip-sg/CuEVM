@@ -1,6 +1,6 @@
 #include <getopt.h>
 #include <fstream>
-
+#include <chrono>
 #include <Python.h>
 #include "include/python_utils.h"
 #include "utils.cu"
@@ -47,6 +47,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
         evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
         CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
         CUDA_CHECK(cudaMemcpy(gpu_instances, &tmp_gpu_instances, sizeof(evm_instances_t), cudaMemcpyHostToDevice));
+
         size_t heap_size, stack_size;
         CUDA_CHECK(cgbn_error_report_alloc(&report));
         cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
@@ -54,13 +55,12 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
         CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
         // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 256*1024));
         CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
-        printf("Heap size: %zu\n", heap_size);
         cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
         printf("Heap size: %zu\n", heap_size);
         printf("Running GPU kernel ...\n");
-        CUDA_CHECK(cudaDeviceSynchronize());
+        // CUDA_CHECK(cudaDeviceSynchronize());
         kernel_evm<evm_params><<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
-        //CUDA_CHECK(cudaPeekAtLastError());
+        // CUDA_CHECK(cudaPeekAtLastError());
         // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
         CUDA_CHECK(cudaDeviceSynchronize());
         printf("GPU kernel finished\n");
@@ -70,21 +70,16 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
         printf("Copying results back to CPU\n");
         CUDA_CHECK(cudaMemcpy(&tmp_gpu_instances, gpu_instances, sizeof(evm_instances_t), cudaMemcpyDeviceToHost));
         evm_t::get_cpu_instances_from_gpu_instances(cpu_instances, tmp_gpu_instances);
+
         printf("Results copied\n");
-    #else
+        #else
         printf("Running CPU EVM\n");
         // run the evm
         evm_t *evm = NULL;
         uint32_t tmp_error;
+        auto cpu_start = std::chrono::high_resolution_clock::now();
         for(uint32_t instance = 0; instance < cpu_instances.count; instance++) {
         // printf("Running instance %d\n", instance);
-        // print some test accounts
-        // size_t no_accounts = cpu_instances.world_state_data->no_accounts > 2 ? 2 : cpu_instances.world_state_data->no_accounts;
-        // printf(" print directly from world_state_data\n");
-        // state_data_t *state_data_1 = cpu_instances.world_state_data;
-        // for (size_t i = 0; i < state_data_1->no_accounts; i++) {
-        //     world_state_t::print_account_t(arith, state_data_1->accounts[i]);
-        // }
         evm = new evm_t(
             arith,
             cpu_instances.world_state_data,
@@ -94,6 +89,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
             &(cpu_instances.accessed_states_data[instance]),
             &(cpu_instances.touch_states_data[instance]),
             &(cpu_instances.logs_data[instance]),
+            &(cpu_instances.return_data[instance]),
             #ifdef TRACER
             &(cpu_instances.tracers_data[instance]),
             #endif
@@ -102,10 +98,13 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
         evm->run(tmp_error);
         delete evm;
         evm = NULL;
+
         }
         printf("CPU EVM finished\n");
+        auto cpu_end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> cpu_duration = cpu_end - cpu_start;
+        printf("CPU EVM execution took %f ms\n", cpu_duration.count());
     #endif
-
 
     // free the memory
     // printf("Freeing the memory ...\n");
