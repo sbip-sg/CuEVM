@@ -21,6 +21,7 @@
 #define WRITE_STORAGE 8
 #define WRITE_DELETE 16
 
+#define STORAGE_CHUNK 32 // allocate storage in chunks of 32
 
 /**
  * Kernel to copy the accounts details and read operations
@@ -302,6 +303,8 @@ public:
             // set the storage
             storage_json = cJSON_GetObjectItemCaseSensitive(account_json, "storage");
             _content->accounts[idx].storage_size = cJSON_GetArraySize(storage_json);
+            // round to the next multiple of STORAGE_CHUNK
+            _content->accounts[idx].storage_size = ((_content->accounts[idx].storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
             if (_content->accounts[idx].storage_size > 0)
             {
                 // allocate the storage
@@ -2439,18 +2442,22 @@ public:
         {
             storage_idx = account->storage_size;
             ONE_THREAD_PER_INSTANCE(
-                contract_storage_t *tmp_storage = new contract_storage_t[account->storage_size + 1];
-                if (account->storage_size > 0)
-                {
-                    memcpy(
-                        tmp_storage,
-                        account->storage,
-                        account->storage_size * sizeof(contract_storage_t)
-                    );
-                    delete[] account->storage;
+                size_t new_storage_size = ++account->storage_size;
+                if (new_storage_size % STORAGE_CHUNK == 1) {
+                    // Round up to the next multiple of STORAGE_CHUNK
+                    size_t new_capacity = ((new_storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
+                    contract_storage_t *tmp_storage = new contract_storage_t[new_capacity];
+                    if (account->storage_size > 0)
+                    {
+                        memcpy(
+                            tmp_storage,
+                            account->storage,
+                            (new_storage_size-1) * sizeof(contract_storage_t)
+                        );
+                        delete[] account->storage;
+                    }
+                    account->storage = tmp_storage;
                 }
-                account->storage = tmp_storage;
-                account->storage_size++;
             )
             // set the key
             cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);

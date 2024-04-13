@@ -8,7 +8,7 @@ GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson  -I/usr/include/python3.10 -I/usr
 OUT_DIRECTORY = ./build
 
 ENABLE_TRACING ?= 0
-
+SM_ARCH ?= sm_89
 ifeq ($(ENABLE_TRACING),1)
     TRACER_FLAG = -D TRACER
 else
@@ -29,19 +29,19 @@ test_cgbn: src/test/test_cgbn.cu
 	$(NVCC) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/test_cgbn src/test/test_cgbn.cu
 
 interpreter:
-	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
+	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -arch=$(SM_ARCH) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
 library:
 	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -D BUILD_LIB --shared -Xcompiler '-fPIC' -o $(OUT_DIRECTORY)/libcuevm.so src/interpreter.cu
 
 debug_interpreter:
-	$(NVCC) -D TRACER -D COMPLEX_TRACER -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
+	$(NVCC) -D TRACER -D COMPLEX_TRACER -D GAS $(NVCC_FLAGS) -arch=$(SM_ARCH) -g -lineinfo -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
 cpu_interpreter:
-	$(NVCC) -D ONLY_CPU $(TRACER_FLAG) -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
+	$(NVCC) -D ONLY_CPU $(TRACER_FLAG) $(NVCC_FLAGS) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
 cpu_debug_interpreter:
-	$(NVCC) -D TRACER -D COMPLEX_TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
+	$(NVCC) -D TRACER -D COMPLEX_TRACER -D ONLY_CPU -D GAS $(NVCC_FLAGS) -O0 -g -G -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
 
 % :: src/test/%.cu
 	$(NVCC) $(NVCC_FLAGS) -g -G -o $(OUT_DIRECTORY)/$@ $<

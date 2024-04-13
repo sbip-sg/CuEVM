@@ -630,7 +630,7 @@ public:
   /**
    * The maximum number of transactions per test.
    */
-  static const size_t MAX_TRANSACTION_COUNT = 2000;
+  static const size_t MAX_TRANSACTION_COUNT = 10000;
 
   /**
    * The access list account.
@@ -1346,7 +1346,8 @@ public:
       transaction_data_t *&transactions,
       const cJSON *test,
       size_t &count,
-      size_t start_index = 0)
+      size_t start_index = 0,
+      size_t clones=1)
   {
     const cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(test, "transaction");
     arith_t arith(cgbn_report_monitor, 0);
@@ -1358,8 +1359,10 @@ public:
       transactions = NULL;
       return;
     }
+    size_t original_count;
     // set the number of transactions
-    count = available_no_transactions - start_index;
+    original_count = available_no_transactions - start_index;
+    count = (original_count > clones) ? original_count : original_count*(clones/original_count);
     count = (count > MAX_TRANSACTION_COUNT) ? MAX_TRANSACTION_COUNT : count;
 #ifndef ONLY_CPU
     CUDA_CHECK(cudaMallocManaged(
@@ -1490,7 +1493,7 @@ public:
     char *bytes_string = NULL;
     for (idx = 0; idx < count; idx++)
     {
-      index = start_index + idx;
+      index = (start_index + idx)%original_count;
       data_index = index % data_counts;
       gas_limit_index = (index / data_counts) % gas_limit_counts;
       value_index = (index / (data_counts * gas_limit_counts)) % value_counts;

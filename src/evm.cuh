@@ -783,6 +783,10 @@ public:
             bn_t &args_size,
             return_data_t &return_data)
         {
+
+            #ifdef ONLY_CPU
+            printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+            #endif
             if (message.get_static_env())
             {
                 error_code = ERROR_STATIC_CALL_CONTEXT_CREATE;
@@ -796,6 +800,9 @@ public:
             }
             else
             {
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
                 // set the init code
                 SHARED_MEMORY data_content_t initialisation_code;
                 arith.size_t_from_cgbn(initialisation_code.size, args_size);
@@ -807,13 +814,19 @@ public:
                     initialisation_code.data,
                     initialisation_code.size);
 
-                // set the gas limit
+                // // set the gas limit
                 bn_t gas_capped;
                 arith.max_gas_call(gas_capped, gas_limit, gas_used);
                 new_message.set_gas_limit(gas_capped);
 
-                // add to gas used
+                // // add to gas used
                 cgbn_add(arith._env, gas_used, gas_used, gas_capped);
+
+                #ifdef ONLY_CPU
+                bn_t pr_gas;
+                cgbn_sub(arith._env, pr_gas, gas_limit, gas_used);
+                printf("GENERIC_CREATE parent unused gas: %d\n", cgbn_get_ui32(arith._env, pr_gas));
+                #endif
 
                 // warm up the contract address
                 bn_t contract_address;
@@ -834,6 +847,9 @@ public:
                     // why in the parent and not in the child the nonce
                     // if the contract deployment fails the nonce is still
                     // increased?
+                    #ifdef ONLY_CPU
+                    printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                    #endif
                     bn_t sender;
                     new_message.get_sender(sender);
                     if (touch_state.is_contract(sender))
@@ -854,7 +870,7 @@ public:
                     bn_t child_success;
                     cgbn_set_ui32(arith._env, child_success, 0);
                     stack.push(child_success, error_code);
-                    cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
+                    // cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
                     return_data.set(
                         NULL,
                         0);
@@ -914,8 +930,14 @@ public:
             stack.pop(memory_offset, error_code);
             stack.pop(length, error_code);
 
-            // create cost
+            // // create cost
             cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
+
+            #ifdef ONLY_CPU
+            printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+            printf("CREATE: memory_offset: %d\n", cgbn_get_ui32(arith._env, memory_offset));
+            printf("CREATE: length: %d\n", cgbn_get_ui32(arith._env, length));
+            #endif
 
             // compute the memory cost
             memory.grow_cost(
@@ -924,13 +946,22 @@ public:
                 gas_used,
                 error_code);
 
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
             // compute the initcode gas cost
             arith.initcode_cost(
-                gas_used,
-                length);
+               gas_used,
+               length);
 
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
             if (arith.has_gas(gas_limit, gas_used, error_code))
             {
+                #ifdef ONLY_CPU
+                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
+                #endif
                 bn_t sender_address;
                 message.get_recipient(sender_address); // I_{a}
                 bn_t sender_nonce;
@@ -1180,6 +1211,8 @@ public:
             bn_t memory_offset, length;
             stack.pop(memory_offset, error_code);
             stack.pop(length, error_code);
+
+            // TODO addback dynamic cost from sub execution
 
             if (error_code == ERR_NONE)
             {
@@ -1688,14 +1721,14 @@ public:
             {
                 _opcode = _bytecode[_pcs[_depth]];
             }
-            ONE_THREAD_PER_INSTANCE(
-               /* printf("pc: %d opcode: %02x\n", _pcs[_depth], _opcode);*/)
+            // ONE_THREAD_PER_INSTANCE(printf("pc: %d opcode: %d\n", _pcs[_depth], _opcode);)
 #ifdef TRACER
             _trace_pc = _pcs[_depth];
             _trace_opcode = _opcode;
             _tracer->push(
                 _trace_address,
                 _trace_pc,
+                _depth,
                 _trace_opcode,
                 *_stack_ptrs[_depth],
                 *_memory_ptrs[_depth],
@@ -2728,7 +2761,7 @@ public:
                 }
             }
 #ifdef TRACER
-        cgbn_set(_arith._env, _tracer->_content->last_gas_used, _gas_useds[_depth]);
+        cgbn_store(_arith._env, &_tracer->_content->last_gas_used, _gas_useds[_depth]);
 #endif
             // If the operation ended with halting
             // can be normal or exceptional
@@ -3028,7 +3061,8 @@ public:
     */
     __host__ static void get_cpu_instances(
         evm_instances_t &instances,
-        const cJSON *test)
+        const cJSON *test,
+        size_t clones=1)
     {
         //setup the arithmetic environment
         arith_t arith(cgbn_report_monitor, 0);
@@ -3055,7 +3089,7 @@ public:
         keccak = NULL;
 
         // get the transactions
-        transaction_t::get_transactions(instances.transactions_data, test, instances.count);
+        transaction_t::get_transactions(instances.transactions_data, test, instances.count, 0, clones);
 
         // allocated the memory for accessed states
         instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
@@ -3166,6 +3200,8 @@ public:
 
         gpu_instances.logs_data = log_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.logs_data, cpu_instances.count);
 
+        gpu_instances.return_data = return_data_t::get_gpu_instances_from_cpu_instances(cpu_instances.return_data, cpu_instances.count);
+
 #ifdef TRACER
         gpu_instances.tracers_data = tracer_t::get_gpu_instances_from_cpu_instances(cpu_instances.tracers_data, cpu_instances.count);
 #endif
@@ -3261,39 +3297,46 @@ public:
     */
     __host__ static void print_evm_instances_t(
         arith_t &arith,
-        evm_instances_t instances)
+        evm_instances_t instances,
+        bool verbose = false)
     {
-        world_state_t *cpu_world_state;
-        cpu_world_state = new world_state_t(arith, instances.world_state_data);
-        printf("World state:\n");
-        cpu_world_state->print();
-        delete cpu_world_state;
-        cpu_world_state = NULL;
+        printf("verbose mode %d\n", verbose);
+        if (verbose){
+            world_state_t *cpu_world_state;
+            cpu_world_state = new world_state_t(arith, instances.world_state_data);
+            printf("World state:\n");
+            cpu_world_state->print();
+            delete cpu_world_state;
+            cpu_world_state = NULL;
 
-        block_t *cpu_block = NULL;
-        cpu_block = new block_t(arith, instances.block_data);
-        printf("Block:\n");
-        cpu_block->print();
-        delete cpu_block;
-        cpu_block = NULL;
-        printf("return data count %lu\n", instances.return_data[0].size);
-        printf("Instances:\n");
+            block_t *cpu_block = NULL;
+            cpu_block = new block_t(arith, instances.block_data);
+            printf("Block:\n");
+            cpu_block->print();
+            delete cpu_block;
+            cpu_block = NULL;
+            printf("return data count %lu\n", instances.return_data[0].size);
+            printf("Instances:\n");
+        }
         for (size_t idx = 0; idx < instances.count; idx++)
         {
-            printf("Instance %lu\n", idx);
-            transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
+            if (verbose){
+                printf("Instance %lu\n", idx);
+                transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
 
-            accessed_state_t::print_accessed_state_data_t(arith, instances.accessed_states_data[idx]);
+                accessed_state_t::print_accessed_state_data_t(arith, instances.accessed_states_data[idx]);
 
-            touch_state_t::print_touch_state_data_t(arith, instances.touch_states_data[idx]);
+                touch_state_t::print_touch_state_data_t(arith, instances.touch_states_data[idx]);
 
-            log_state_t::print_log_state_data_t(arith, instances.logs_data[idx]);
+                log_state_t::print_log_state_data_t(arith, instances.logs_data[idx]);
+
+                printf("Error: %u\n", instances.errors[idx]);
+            }
 
 #ifdef TRACER
             tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx], &instances.return_data[idx]);
 #endif
 
-            printf("Error: %u\n", instances.errors[idx]);
         }
     }
 

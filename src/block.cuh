@@ -45,6 +45,7 @@ public:
   {
     evm_word_t coin_base; /**< The address of the block miner (YP: \f$H_{c}\f$) */
     evm_word_t difficulty; /**< The difficulty of the block (YP: \f$H_{d}\f$) */
+    evm_word_t prevrandao; /**< The prevrandao EIP-4399 */
     evm_word_t number; /**< The number of the block (YP: \f$H_{i}\f$) */
     evm_word_t gas_limit; /**< The gas limit of the block (YP: \f$H_{l}\f$) */
     evm_word_t time_stamp; /**< The timestamp of the block (YP: \f$H_{s}\f$) */
@@ -118,6 +119,15 @@ public:
       element_json->valuestring
     );
 
+    element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentRandom");
+    if (element_json != NULL)
+    {
+      _arith.cgbn_memory_from_hex_string(
+        _content->prevrandao,
+        element_json->valuestring
+      );
+    }
+
     element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentGasLimit");
     _arith.cgbn_memory_from_hex_string(
       _content->gas_limit,
@@ -161,10 +171,11 @@ public:
       _arith.cgbn_memory_from_size_t(_content->previous_blocks[0].number, 0);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");
-      _arith.cgbn_memory_from_hex_string(
-        _content->previous_blocks[0].hash,
-        element_json->valuestring
-      );
+
+      if (element_json != NULL){
+        _arith.cgbn_memory_from_hex_string(_content->previous_blocks[0].hash, element_json->valuestring);
+      }
+
       idx++;
     }
 
@@ -235,6 +246,12 @@ public:
     bn_t &difficulty)
   {
     cgbn_load(_arith._env, difficulty, &(_content->difficulty));
+  }
+
+  __host__ __device__ __forceinline__ void get_prevrandao(
+    bn_t &val)
+  {
+    cgbn_load(_arith._env, val, &(_content->prevrandao));
   }
 
   /**
