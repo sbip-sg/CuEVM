@@ -75,14 +75,15 @@ docygen+sphinx+breathe+exhale
 ## GeneralStateTests without stateRoot comparison
 
 We use the test files in
-[ethereum/GeneralStateTests](https://github.com/ethereum/tests/tree/develop/GeneralStateTests)
+[ethereum/tests/GeneralStateTests](https://github.com/ethereum/tests/tree/develop/GeneralStateTests)
 to test whether we can get the same results with the go-ethereum. To run the tests,
 
-- build the binary with the debug flag on: `cpu_debug_interpreter`
-- either download or build the geth binary, in this test the version `v1.13.14` is used, later version will probably produce the same result
-- we take the test json files from `tests/GeneralStateTests`
-- extract the tests which targeted at the Shanghai fork
-- build `runtest` binary from [cassc/goevmlab](https://github.com/cassc/goevmlab) which contains the CuEVM driver, to compare the results between `geth` and `cuevm`
+- build the binary with the debug flag on: `make cpu_debug_interpreter`
+- either download or build the geth binary, in this test the version [v1.13.14](https://github.com/ethereum/go-ethereum/releases/tag/v1.13.14) is used, later version will probably produce the same result
+- get the test json files from [ethereum/tests](https://github.com/ethereum/tests)
+- extract and keep the tests which targeted at the Shanghai fork
+- build the `runtest` binary from [cassc/goevmlab](https://github.com/cassc/goevmlab) which adds support for CuEVM
+- run `goevmlab/runtest` to compare the results between `geth` and `cuevm`
 
 These tests are ignored, they contain some stress tests which could crash the EVM as well as the test script itself:
 
