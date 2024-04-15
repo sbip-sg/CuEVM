@@ -82,18 +82,19 @@ to test whether we can get the same results with the go-ethereum. To run the tes
 - extract the tests which targeted at the Shanghai fork
 - use [cassc/goevmlab](https://github.com/cassc/goevmlab) `runtest` to compare the results between `geth` and `cuevm`
 
-
-### Test results by comparing the traces without stateRoot comparison
-
-> Note that there can be multiple tests in one input json, the number of tests
-> shown below can be larger than number of input files.
-
 These tests are ignored, they contain some stress tests which could crash the EVM:
 
 - stCreateTest
 - stQuadraticComplexityTest
 - stStaticCall
 - stTimeConsuming
+
+
+### Test results by comparing the traces without stateRoot comparison
+
+> Note that there can be multiple tests in one input json, the number of tests
+> shown below can be larger than number of input files.
+
 
 ``` text
 Cancun.log:Test result, Passed: 0, Failed: 0, Skipped: 37
