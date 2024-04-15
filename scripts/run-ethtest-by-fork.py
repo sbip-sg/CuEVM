@@ -1,17 +1,14 @@
-# python ~/projects/sbip-sg/CuEVM/scripts/run-ethtest-by-fork.py   -t /tmp/out --runtest-bin runtest --geth geth --cuevm ~/projects/sbip-sg/CuEVM/out/cpu_debug_interpreter  --ignore-errors --excludes stTimeConsuming  -i GeneralStateTests/
+# python ~/projects/sbip-sg/CuEVM/scripts/run-ethtest-by-fork.py   -t /tmp/out --runtest-bin runtest --geth geth --cuevm ~/projects/sbip-sg/CuEVM/out/cpu_debug_interpreter  --ignore-errors  -i GeneralStateTests/
 import copy
 import json
 import subprocess
 import shutil
 import os
 
-
-ignore_state_root = True
-log_file = open('run-ethtest-by-fork.log', 'w')
+log_file = open('run-ethtest-by-fork.log', 'a')
 
 def debug_print(*args, **kwargs):
-    # print(*args, **kwargs)
-    print(*args, **kwargs, file=log_file, flush=True)
+    print(*args, **kwargs)
 
 def assert_command_in_path(cmd):
     if not shutil.which(cmd):
@@ -27,9 +24,8 @@ def read_as_json_lines(filepath):
 
 def check_output(output, error):
     has_str = lambda s: s in (output + error)
-    if has_str('error'):
-        if (not ignore_state_root) or (has_str('stateRoot')):
-            raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
+    if has_str('error'): # and not has_str('stateRoot')
+        raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
     command = [runtest_bin, f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
@@ -42,12 +38,10 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
 
     debug_print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
-def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth', cuevm_bin='cuevm', ignore_errors=False, result={}, excludes=[]):
-    result = result or {'n_total': 0, 'n_success': 0, 'failed_files': []}
+def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth', cuevm_bin='cuevm', ignore_errors=False, result={}):
+    result = result or {'n_success': 0, 'failed_files': []}
     output_filepath = None
     for dirpath, dirnames, filenames in os.walk(input_directory):
-        if any(exclude in dirpath for exclude in excludes):
-            continue
         rel_path = os.path.relpath(dirpath, input_directory)
         for filename in filenames:
             debug_print("Processing", dirpath, filename)
@@ -101,20 +95,15 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
                                 json.dump(data, file, ensure_ascii=False, indent=2)
 
                             debug_print(f"Processed and saved {output_filepath} successfully.")
+
                             run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin)
-                            if result:
-                                result['n_success'] += 1
-                                result['n_total'] += 1
+                            result['n_success'] += 1
             except Exception as e:
-                if result:
-                    result['n_total'] += 1
-                    result['failed_files'].append(output_filepath)
+                result['failed_files'].append(output_filepath)
                 if ignore_errors:
                     debug_print(f"{str(e)}")
                 else:
                     raise
-
-
 
 def main():
     import argparse
@@ -125,22 +114,25 @@ def main():
     parser.add_argument('--geth', type=str, required=True, help='geth binary path')
     parser.add_argument('--cuevm', type=str, required=True, help='cuevm binary path')
     parser.add_argument('--ignore-errors', action='store_true', help='Continue testing even when test errors occur')
-    parser.add_argument('--excludes', help='Path which contains this string will be excluded from the test')
 
     args = parser.parse_args()
 
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
         assert_command_in_path(cmd)
 
-    result = {'n_total': 0, 'n_success': 0, 'failed_files': [], 'skip_files': []}
-    excludes = args.excludes.split(',') if args.excludes else []
+    result = {'n_success': 0, 'failed_files': [], 'skip_files': []}
     try:
-        runtest_fork(args.input, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result, excludes=excludes)
+        test_root = args.input
+        print(f"Running tests for {test_root}")
+        runtest_fork(test_root, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result)
+    except Exception:
+        pass
     finally:
         skipped = result['skip_files']
         n_skipped = len(skipped)
+        n_failed = len(result['failed_files'])
 
-        debug_print(f"Total tests: {result['n_total']}, Passed: {result['n_success']}, Skipped: {n_skipped}")
+        debug_print(f"Test result, Passed: {result['n_success']}, Failed: {n_failed}, Skipped: {n_skipped}")
         debug_print("Skipped files:")
         debug_print(skipped)
         debug_print("Failed files:")
