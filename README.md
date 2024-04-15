@@ -103,65 +103,65 @@ python ./run-ethtest-without-stateroot-comparison.py -t /tmp/out --runtest-bin r
 
 > Note that there can be multiple tests in one input json, the number of tests shown below can be larger than number of input files.
 
-| Test folder                          | Passed       | Failed      | Skipped       |
-|--------------------------------------|--------------|-------------|---------------|
-| Cancun                               | Passed: 0    | Failed: 0   | Skipped: 37   |
-| Pyspecs                              | Passed: 201  | Failed: 2   | Skipped: 1233 |
-| Python                               | Passed: 1    | Failed: 0   | Skipped: 4    |
-| Shanghai                             | Passed: 20   | Failed: 3   | Skipped: 0    |
-| stArgsZeroOneBalance                 | Passed: 95   | Failed: 1   | Skipped: 0    |
-| stAttackTest                         | Passed: 0    | Failed: 2   | Skipped: 0    |
-| stBadOpcode                          | Passed: 3542 | Failed: 118 | Skipped: 1    |
-| stBugs                               | Passed: 9    | Failed: 0   | Skipped: 0    |
-| stCallCodes                          | Passed: 75   | Failed: 10  | Skipped: 1    |
-| stCallCreateCallCodeTest             | Passed: 39   | Failed: 9   | Skipped: 0    |
-| stCallDelegateCodesCallCodeHomestead | Passed: 51   | Failed: 7   | Skipped: 0    |
-| stCallDelegateCodesHomestead         | Passed: 51   | Failed: 7   | Skipped: 0    |
-| stChainId                            | Passed: 2    | Failed: 0   | Skipped: 0    |
-| stCodeCopyTest                       | Passed: 1    | Failed: 1   | Skipped: 1    |
-| stCodeSizeLimit                      | Passed: 7    | Failed: 0   | Skipped: 0    |
-| stCreate2                            | Passed: 124  | Failed: 16  | Skipped: 3    |
-| stDelegatecallTestHomestead          | Passed: 23   | Failed: 6   | Skipped: 0    |
-| stEIP150singleCodeGasPrices          | Passed: 115  | Failed: 5   | Skipped: 1    |
-| stEIP150Specific                     | Passed: 24   | Failed: 1   | Skipped: 0    |
-| stEIP158Specific                     | Passed: 6    | Failed: 2   | Skipped: 3    |
-| stEIP1559                            | Passed: 1817 | Failed: 2   | Skipped: 1    |
-| stEIP2930                            | Passed: 15   | Failed: 5   | Skipped: 0    |
-| stEIP3607                            | Passed: 12   | Failed: 0   | Skipped: 2    |
-| stExample                            | Passed: 34   | Failed: 4   | Skipped: 0    |
-| stExtCodeHash                        | Passed: 23   | Failed: 21  | Skipped: 3    |
-| stHomesteadSpecific                  | Passed: 5    | Failed: 0   | Skipped: 0    |
-| stInitCodeTest                       | Passed: 20   | Failed: 2   | Skipped: 0    |
-| stLogTests                           | Passed: 46   | Failed: 0   | Skipped: 0    |
-| stMemExpandingEIP150Calls            | Passed: 9    | Failed: 1   | Skipped: 0    |
-| stMemoryStressTest                   | Passed: 82   | Failed: 0   | Skipped: 0    |
-| stMemoryTest                         | Passed: 386  | Failed: 7   | Skipped: 0    |
-| stNonZeroCallsTest                   | Passed: 23   | Failed: 1   | Skipped: 12   |
-| stPreCompiledContracts               | Passed: 564  | Failed: 1   | Skipped: 1    |
-| stPreCompiledContracts2              | Passed: 189  | Failed: 17  | Skipped: 0    |
-| stRandom                             | Passed: 305  | Failed: 9   | Skipped: 0    |
-| stRandom2                            | Passed: 221  | Failed: 5   | Skipped: 0    |
-| stRecursiveCreate                    | Passed: 2    | Failed: 0   | Skipped: 0    |
-| stRefundTest                         | Passed: 10   | Failed: 12  | Skipped: 1    |
-| stReturnDataTest                     | Passed: 57   | Failed: 10  | Skipped: 0    |
-| stRevertTest                         | Passed: 185  | Failed: 10  | Skipped: 11   |
-| stSelfBalance                        | Passed: 26   | Failed: 2   | Skipped: 0    |
-| stShift                              | Passed: 42   | Failed: 0   | Skipped: 0    |
-| stSLoadTest                          | Passed: 1    | Failed: 0   | Skipped: 0    |
-| stSolidityTest                       | Passed: 23   | Failed: 0   | Skipped: 0    |
-| stSpecialTest                        | Passed: 20   | Failed: 2   | Skipped: 3    |
-| stSStoreTest                         | Passed: 205  | Failed: 17  | Skipped: 1    |
-| stStackTests                         | Passed: 185  | Failed: 3   | Skipped: 0    |
-| stStaticFlagEnabled                  | Passed: 1    | Failed: 12  | Skipped: 0    |
-| stSystemOperationsTest               | Passed: 71   | Failed: 8   | Skipped: 1    |
-| stTransactionTest                    | Passed: 159  | Failed: 7   | Skipped: 2    |
-| stTransitionTest                     | Passed: 6    | Failed: 0   | Skipped: 0    |
-| stWalletTest                         | Passed: 20   | Failed: 26  | Skipped: 0    |
-| stZeroCallsRevert                    | Passed: 16   | Failed: 0   | Skipped: 8    |
-| stZeroCallsTest                      | Passed: 24   | Failed: 0   | Skipped: 12   |
-| stZeroKnowledge                      | Passed: 681  | Failed: 29  | Skipped: 1    |
-| stZeroKnowledge2                     | Passed: 485  | Failed: 10  | Skipped: 3    |
-| VMTests                              | Passed: 567  | Failed: 10  | Skipped: 0    |
+| Test folder                          | Passed | Failed | Skipped |
+|--------------------------------------|--------|--------|---------|
+| Cancun                               | 0      | 0      | 37      |
+| Pyspecs                              | 201    | 2      | 1233    |
+| Python                               | 1      | 0      | 4       |
+| Shanghai                             | 20     | 3      | 0       |
+| stArgsZeroOneBalance                 | 95     | 1      | 0       |
+| stAttackTest                         | 0      | 2      | 0       |
+| stBadOpcode                          | 3542   | 118    | 1       |
+| stBugs                               | 9      | 0      | 0       |
+| stCallCodes                          | 75     | 10     | 1       |
+| stCallCreateCallCodeTest             | 39     | 9      | 0       |
+| stCallDelegateCodesCallCodeHomestead | 51     | 7      | 0       |
+| stCallDelegateCodesHomestead         | 51     | 7      | 0       |
+| stChainId                            | 2      | 0      | 0       |
+| stCodeCopyTest                       | 1      | 1      | 1       |
+| stCodeSizeLimit                      | 7      | 0      | 0       |
+| stCreate2                            | 124    | 16     | 3       |
+| stDelegatecallTestHomestead          | 23     | 6      | 0       |
+| stEIP150singleCodeGasPrices          | 115    | 5      | 1       |
+| stEIP150Specific                     | 24     | 1      | 0       |
+| stEIP158Specific                     | 6      | 2      | 3       |
+| stEIP1559                            | 1817   | 2      | 1       |
+| stEIP2930                            | 15     | 5      | 0       |
+| stEIP3607                            | 12     | 0      | 2       |
+| stExample                            | 34     | 4      | 0       |
+| stExtCodeHash                        | 23     | 21     | 3       |
+| stHomesteadSpecific                  | 5      | 0      | 0       |
+| stInitCodeTest                       | 20     | 2      | 0       |
+| stLogTests                           | 46     | 0      | 0       |
+| stMemExpandingEIP150Calls            | 9      | 1      | 0       |
+| stMemoryStressTest                   | 82     | 0      | 0       |
+| stMemoryTest                         | 386    | 7      | 0       |
+| stNonZeroCallsTest                   | 23     | 1      | 12      |
+| stPreCompiledContracts               | 564    | 1      | 1       |
+| stPreCompiledContracts2              | 189    | 17     | 0       |
+| stRandom                             | 305    | 9      | 0       |
+| stRandom2                            | 221    | 5      | 0       |
+| stRecursiveCreate                    | 2      | 0      | 0       |
+| stRefundTest                         | 10     | 12     | 1       |
+| stReturnDataTest                     | 57     | 10     | 0       |
+| stRevertTest                         | 185    | 10     | 11      |
+| stSelfBalance                        | 26     | 2      | 0       |
+| stShift                              | 42     | 0      | 0       |
+| stSLoadTest                          | 1      | 0      | 0       |
+| stSolidityTest                       | 23     | 0      | 0       |
+| stSpecialTest                        | 20     | 2      | 3       |
+| stSStoreTest                         | 205    | 17     | 1       |
+| stStackTests                         | 185    | 3      | 0       |
+| stStaticFlagEnabled                  | 1      | 12     | 0       |
+| stSystemOperationsTest               | 71     | 8      | 1       |
+| stTransactionTest                    | 159    | 7      | 2       |
+| stTransitionTest                     | 6      | 0      | 0       |
+| stWalletTest                         | 20     | 26     | 0       |
+| stZeroCallsRevert                    | 16     | 0      | 8       |
+| stZeroCallsTest                      | 24     | 0      | 12      |
+| stZeroKnowledge                      | 681    | 29     | 1       |
+| stZeroKnowledge2                     | 485    | 10     | 3       |
+| VMTests                              | 567    | 10     | 0       |
 
 
 
@@ -174,62 +174,62 @@ python ./run-ethtest-with-stateroot-comparison.py -t /tmp/out --runtest-bin runt
 ```
 
 
-| Test folder                          | Passed       | Failed      | Skipped       |
-|--------------------------------------|--------------|-------------|---------------|
-| Cancun                               | Passed: 0    | Failed: 0   | Skipped: 37   |
-| Pyspecs                              | Passed: 201  | Failed: 2   | Skipped: 1233 |
-| Python                               | Passed: 1    | Failed: 0   | Skipped: 4    |
-| Shanghai                             | Passed: 1    | Failed: 8   | Skipped: 0    |
-| stArgsZeroOneBalance                 | Passed: 72   | Failed: 16  | Skipped: 0    |
-| stAttackTest                         | Passed: 0    | Failed: 2   | Skipped: 0    |
-| stBadOpcode                          | Passed: 27   | Failed: 119 | Skipped: 1    |
-| stBugs                               | Passed: 1    | Failed: 4   | Skipped: 0    |
-| stCallCodes                          | Passed: 3    | Failed: 77  | Skipped: 1    |
-| stCallCreateCallCodeTest             | Passed: 17   | Failed: 29  | Skipped: 0    |
-| stCallDelegateCodesCallCodeHomestead | Passed: 0    | Failed: 58  | Skipped: 0    |
-| stCallDelegateCodesHomestead         | Passed: 0    | Failed: 58  | Skipped: 0    |
-| stChainId                            | Passed: 0    | Failed: 2   | Skipped: 0    |
-| stCodeCopyTest                       | Passed: 0    | Failed: 2   | Skipped: 1    |
-| stCodeSizeLimit                      | Passed: 4    | Failed: 3   | Skipped: 0    |
-| stCreate2                            | Passed: 13   | Failed: 46  | Skipped: 3    |
-| stDelegatecallTestHomestead          | Passed: 6    | Failed: 22  | Skipped: 0    |
-| stEIP150singleCodeGasPrices          | Passed: 0    | Failed: 39  | Skipped: 1    |
-| stEIP150Specific                     | Passed: 1    | Failed: 13  | Skipped: 0    |
-| stEIP158Specific                     | Passed: 1    | Failed: 7   | Skipped: 3    |
-| stEIP1559                            | Passed: 1751 | Failed: 8   | Skipped: 1    |
-| stEIP2930                            | Passed: 12   | Failed: 6   | Skipped: 0    |
-| stEIP3607                            | Passed: 12   | Failed: 0   | Skipped: 2    |
-| stExample                            | Passed: 29   | Failed: 9   | Skipped: 0    |
-| stExtCodeHash                        | Passed: 0    | Failed: 36  | Skipped: 3    |
-| stHomesteadSpecific                  | Passed: 3    | Failed: 2   | Skipped: 0    |
-| stInitCodeTest                       | Passed: 6    | Failed: 12  | Skipped: 0    |
-| stLogTests                           | Passed: 11   | Failed: 35  | Skipped: 0    |
-| stMemExpandingEIP150Calls            | Passed: 1    | Failed: 8   | Skipped: 0    |
-| stMemoryStressTest                   | Passed: 78   | Failed: 2   | Skipped: 0    |
-| stMemoryTest                         | Passed: 24   | Failed: 47  | Skipped: 0    |
-| stNonZeroCallsTest                   | Passed: 6    | Failed: 18  | Skipped: 12   |
-| stPreCompiledContracts               | Passed: 13   | Failed: 9   | Skipped: 1    |
-| stPreCompiledContracts2              | Passed: 76   | Failed: 84  | Skipped: 0    |
-| stRandom                             | Passed: 121  | Failed: 193 | Skipped: 0    |
-| stRandom2                            | Passed: 89   | Failed: 137 | Skipped: 0    |
-| stRecursiveCreate                    | Passed: 0    | Failed: 2   | Skipped: 0    |
-| stRefundTest                         | Passed: 0    | Failed: 22  | Skipped: 1    |
-| stReturnDataTest                     | Passed: 3    | Failed: 38  | Skipped: 0    |
-| stRevertTest                         | Passed: 47   | Failed: 37  | Skipped: 11   |
-| stSelfBalance                        | Passed: 0    | Failed: 6   | Skipped: 0    |
-| stShift                              | Passed: 0    | Failed: 42  | Skipped: 0    |
-| stSLoadTest                          | Passed: 0    | Failed: 1   | Skipped: 0    |
-| stSolidityTest                       | Passed: 4    | Failed: 14  | Skipped: 0    |
-| stSpecialTest                        | Passed: 5    | Failed: 10  | Skipped: 3    |
-| stSStoreTest                         | Passed: 0    | Failed: 28  | Skipped: 1    |
-| stStackTests                         | Passed: 185  | Failed: 3   | Skipped: 0    |
-| stStaticFlagEnabled                  | Passed: 0    | Failed: 13  | Skipped: 0    |
-| stSystemOperationsTest               | Passed: 26   | Failed: 43  | Skipped: 1    |
-| stTransactionTest                    | Passed: 110  | Failed: 21  | Skipped: 2    |
-| stTransitionTest                     | Passed: 0    | Failed: 6   | Skipped: 0    |
-| stWalletTest                         | Passed: 4    | Failed: 40  | Skipped: 0    |
-| stZeroCallsRevert                    | Passed: 12   | Failed: 4   | Skipped: 8    |
-| stZeroCallsTest                      | Passed: 6    | Failed: 18  | Skipped: 12   |
-| stZeroKnowledge                      | Passed: 410  | Failed: 33  | Skipped: 1    |
-| stZeroKnowledge2                     | Passed: 485  | Failed: 10  | Skipped: 3    |
-| VMTests                              | Passed: 232  | Failed: 58  | Skipped: 0    |
+| Test folder                          | Passed | Failed | Skipped |
+|--------------------------------------|--------|--------|---------|
+| Cancun                               | 0      | 0      | 37      |
+| Pyspecs                              | 201    | 2      | 1233    |
+| Python                               | 1      | 0      | 4       |
+| Shanghai                             | 1      | 8      | 0       |
+| stArgsZeroOneBalance                 | 72     | 16     | 0       |
+| stAttackTest                         | 0      | 2      | 0       |
+| stBadOpcode                          | 27     | 119    | 1       |
+| stBugs                               | 1      | 4      | 0       |
+| stCallCodes                          | 3      | 77     | 1       |
+| stCallCreateCallCodeTest             | 17     | 29     | 0       |
+| stCallDelegateCodesCallCodeHomestead | 0      | 58     | 0       |
+| stCallDelegateCodesHomestead         | 0      | 58     | 0       |
+| stChainId                            | 0      | 2      | 0       |
+| stCodeCopyTest                       | 0      | 2      | 1       |
+| stCodeSizeLimit                      | 4      | 3      | 0       |
+| stCreate2                            | 13     | 46     | 3       |
+| stDelegatecallTestHomestead          | 6      | 22     | 0       |
+| stEIP150singleCodeGasPrices          | 0      | 39     | 1       |
+| stEIP150Specific                     | 1      | 13     | 0       |
+| stEIP158Specific                     | 1      | 7      | 3       |
+| stEIP1559                            | 1751   | 8      | 1       |
+| stEIP2930                            | 12     | 6      | 0       |
+| stEIP3607                            | 12     | 0      | 2       |
+| stExample                            | 29     | 9      | 0       |
+| stExtCodeHash                        | 0      | 36     | 3       |
+| stHomesteadSpecific                  | 3      | 2      | 0       |
+| stInitCodeTest                       | 6      | 12     | 0       |
+| stLogTests                           | 11     | 35     | 0       |
+| stMemExpandingEIP150Calls            | 1      | 8      | 0       |
+| stMemoryStressTest                   | 78     | 2      | 0       |
+| stMemoryTest                         | 24     | 47     | 0       |
+| stNonZeroCallsTest                   | 6      | 18     | 12      |
+| stPreCompiledContracts               | 13     | 9      | 1       |
+| stPreCompiledContracts2              | 76     | 84     | 0       |
+| stRandom                             | 121    | 193    | 0       |
+| stRandom2                            | 89     | 137    | 0       |
+| stRecursiveCreate                    | 0      | 2      | 0       |
+| stRefundTest                         | 0      | 22     | 1       |
+| stReturnDataTest                     | 3      | 38     | 0       |
+| stRevertTest                         | 47     | 37     | 11      |
+| stSelfBalance                        | 0      | 6      | 0       |
+| stShift                              | 0      | 42     | 0       |
+| stSLoadTest                          | 0      | 1      | 0       |
+| stSolidityTest                       | 4      | 14     | 0       |
+| stSpecialTest                        | 5      | 10     | 3       |
+| stSStoreTest                         | 0      | 28     | 1       |
+| stStackTests                         | 185    | 3      | 0       |
+| stStaticFlagEnabled                  | 0      | 13     | 0       |
+| stSystemOperationsTest               | 26     | 43     | 1       |
+| stTransactionTest                    | 110    | 21     | 2       |
+| stTransitionTest                     | 0      | 6      | 0       |
+| stWalletTest                         | 4      | 40     | 0       |
+| stZeroCallsRevert                    | 12     | 4      | 8       |
+| stZeroCallsTest                      | 6      | 18     | 12      |
+| stZeroKnowledge                      | 410    | 33     | 1       |
+| stZeroKnowledge2                     | 485    | 10     | 3       |
+| VMTests                              | 232    | 58     | 0       |
