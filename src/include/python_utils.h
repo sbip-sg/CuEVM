@@ -499,15 +499,17 @@ namespace python_utils{
     */
     __host__ __forceinline__ static PyObject* pyobject_from_evm_instances_t(arith_t &arith, evm_instances_t instances) {
         PyObject* root = PyDict_New();
-        PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
-        PyDict_SetItemString(root, "pre", world_state_json);
-        Py_DECREF(world_state_json);
+        // PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
+        // PyDict_SetItemString(root, "pre", world_state_json);
+        // Py_DECREF(world_state_json);
 
-        PyObject* instances_json = PyList_New(0);
-        PyDict_SetItemString(root, "post", instances_json);
-        Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
 
         for (uint32_t idx = 0; idx < instances.count; idx++) {
+            // TODO: Print resultant state. to check with state_root branch
+            // PyObject* instances_json = pyobject_from_state_data_t(arith,instances[i].touch_state_data_t);//PyList_New(0);
+            // PyDict_SetItemString(root, "post", instances_json);
+            // Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
+
             PyObject* instance_json = PyDict_New();
             PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
             PyObject* transaction_json = pyobject_from_transaction_content(arith, &instances.transactions_data[idx]);

@@ -1,0 +1,105 @@
+'''
+library wrapper to maintain state of EVM instances and run tx on them
+'''
+import sys
+import ctypes
+import json
+import copy
+from pprint import pprint
+from utils import *
+
+# Add the directory containing your .so file to the Python path
+sys.path.append('../build/')
+
+import libcuevm  # Now you can import your module as usual
+
+class CuEVMLib:
+    def __init__(self, source_file, num_instances, config = None, detect_bug=False):
+        self.initiate_instance_data(source_file, num_instances, config, detect_bug)
+
+
+    def update_persistent_state(self, json_result):
+        trace_values = list(json_result.values())
+        print ("trace value result")
+        pprint(json_result)
+        for i in range(len(trace_values)):
+            post_state = trace_values[0].get("post")[0]
+            touch_state = post_state.get("touch_state")
+            next_config = self.instances[i]
+            next_config["pre"].update(touch_state)
+            sender = next_config["transaction"]["sender"]
+            next_config["transaction"]["nonce"] = touch_state.get(sender).get(
+                "nonce"
+            )
+
+    ## 1. run transactions on the EVM instances
+    ## 2. update the persistent state of the EVM instances
+    ## 3. return the simplified trace during execution
+    def run_transactions(self, tx_data):
+        self.build_instance_data(tx_data)
+        result_json = libcuevm.run_dict(self.instances[0])
+        self.update_persistent_state(result_json)
+
+    ## initiate num_instances clones of the initial state
+    def initiate_instance_data(self, source_file, num_instances, config = None, detect_bug=False):
+        default_config = json.loads(open("configurations/default.json").read())
+        print(default_config)
+        # tx_sequence_list
+        tx_sequence_config = json.loads(open(config).read())
+        self.contract_name = tx_sequence_config.get("contract_name")
+        self.contract_instance, self.ast_parser = compile_file(source_file, self.contract_name)
+        contract_bin_runtime = self.contract_instance.get("binary_runtime")
+        # the merged config fields : "env", "pre" (populated with code), "transaction" (populated with tx data and value)
+        pre_env = tx_sequence_config.get("pre", {})
+
+        new_test = {}
+        new_test["env"] = default_config["env"].copy()
+        new_test["pre"] = default_config["pre"].copy()
+        target_address = default_config["target_address"]
+        new_test["pre"][target_address]["code"] = contract_bin_runtime
+        new_test["pre"][target_address]["storage"] = tx_sequence_config.get(
+            "storage", {}
+        )
+        new_test["pre"].update(pre_env)
+        new_test["transaction"] = default_config["transaction"].copy()
+
+        new_test["transaction"]["to"] = target_address
+        new_test["transaction"]["data"] = ["0x00"]
+        new_test["transaction"]["value"] = [0]
+        new_test["transaction"]["nonce"] = "0x00"
+
+        self.instances = [copy.deepcopy(new_test) for _ in range(num_instances)]
+
+    def print_instance_data(self):
+        for instance in self.instances:
+            pprint(instance)
+
+
+
+    ## build instances data from new tx data
+    ## tx_data is a list of tx data
+    def build_instance_data(self, tx_data):
+        assert len(tx_data) == len(self.instances)
+        for i in range(len(tx_data)):
+            self.instances[i]["transaction"]["data"] = tx_data[i]["data"]
+            self.instances[i]["transaction"]["value"] = tx_data[i]["value"]
+            if (tx_data[i].get("sender")):
+                self.instances[i]["transaction"]["sender"] = tx_data[i]["sender"]
+            # TODO: add other fuzz-able fields
+
+
+if __name__ == "__main__":
+    my_lib = CuEVMLib("contracts/state_change.sol", 1, "configurations/state_change.json", False)
+    test_case = {
+                    "function": "increase",
+                    "type": "exec",
+                    "input_types": [],
+                    "input": [],
+                    "sender": 0
+                }
+    tx_1 = {
+        "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
+        "value" : [hex(0)]
+    }
+    my_lib.run_transactions([tx_1])
+    my_lib.print_instance_data()

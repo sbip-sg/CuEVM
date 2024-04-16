@@ -72,7 +72,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
         evm_t::get_cpu_instances_from_gpu_instances(cpu_instances, tmp_gpu_instances);
 
         printf("Results copied\n");
-        #else
+    #else
         printf("Running CPU EVM\n");
         // run the evm
         evm_t *evm = NULL;
