@@ -725,12 +725,18 @@ public:
    * Add the pairing cost to the gas used.
    * @param[inout] gas_used The gas used
    * @param[in] data_size The size of the data in bytes
-   * @return The cost of the pairing
   */
-  __host__ __device__ __forceinline__ size_t pairing_cost(bn_t &gas_used, size_t data_size) {
-      auto cost = GAS_PRECOMPILE_ECPAIRING + data_size/192 * GAS_PRECOMPILE_ECPAIRING_PAIR;
-      cgbn_add_ui32(_env, gas_used, gas_used, cost);
-      return cost;
+  __host__ __device__ __forceinline__ void ecpairing_cost(
+    bn_t &gas_used,
+    size_t data_size
+  ) {
+      // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 * GAS_PRECOMPILE_ECPAIRING_PAIR
+      cgbn_add_ui32(_env, gas_used, gas_used, GAS_PRECOMPILE_ECPAIRING);
+      bn_t temp;
+      cgbn_from_size_t(temp, data_size);
+      cgbn_div_ui32(_env, temp, temp, 192);
+      cgbn_mul_ui32(_env, temp, temp, GAS_PRECOMPILE_ECPAIRING_PAIR);
+      cgbn_add(_env, gas_used, gas_used, temp);
   }
 
 };

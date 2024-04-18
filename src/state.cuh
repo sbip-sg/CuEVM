@@ -2188,10 +2188,10 @@ public:
                 );
                 _content->touch = tmp_touch;
                 _content->touch[account_idx] = 0;
+                delete dup_account;
+                dup_account = nullptr;
             )
 
-            delete dup_account;
-            dup_account = nullptr;
 
             // set the touch
             _content->touch[account_idx] = touch;
@@ -2395,7 +2395,7 @@ public:
                 {
                     cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_SSTORE_RESET);
                     if (cgbn_compare_ui32(_arith._env, value, 0)==0){
-                        cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 4800);
+                        cgbn_add_ui32(_arith._env, gas_refund, gas_refund, GAS_SSTORE_CLEARS_SCHEDULE);
                     }
                 }
             }
@@ -2421,11 +2421,11 @@ public:
                     }
                     else
                     {
-                        if (_accessed_state->is_warm(address, key)){
+                        //if (_accessed_state->is_warm(address, key)){
                             cgbn_add_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_RESET - GAS_SLOAD);
-                        }else{
-                            cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 4900);
-                        }
+                        //}else{
+                        //    cgbn_add_ui32(_arith._env, gas_refund, gas_refund, 4900);
+                        //}
                     }
                 }
             }
@@ -2452,7 +2452,6 @@ public:
     {
         bn_t gas_cost, set_gas_refund;
 
-        // todo missing check for eip-1706?
         get_storage_set_gas_cost_gas_refund(address, key, value, gas_cost, set_gas_refund);
         cgbn_add(_arith._env, gas_used, gas_used, gas_cost);
         cgbn_add(_arith._env, gas_refund, gas_refund, set_gas_refund);

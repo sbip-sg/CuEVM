@@ -35,6 +35,10 @@ namespace precompile_operations {
      * The sha256 class.
      */
     using sha256::sha256_t;
+    /**
+     * The keccak class.
+     */
+    using keccak::keccak_t;
 
     /**
      * The Identity precompile contract
@@ -706,52 +710,74 @@ namespace precompile_operations {
     }
 
 
-   __host__ __device__  static void operation_ecRecover(arith_t &arith,
-                                                            keccak::keccak_t* _keccak,
-                                                            bn_t &gas_limit,
-                                                            bn_t &gas_used,
-                                                            uint32_t &error_code,
-                                                            return_data_t &return_data,
-                                                            message_t &message
-                                                            )
-  {
+   __host__ __device__  static void operation_ecRecover(
+        arith_t &arith,
+        keccak_t &keccak,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        return_data_t &return_data,
+        message_t &message
+    ) {
+        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
+        if ( arith.has_gas(gas_limit, gas_used, error_code) ) {
+            size_t size;
+            SHARED_MEMORY uint8_t *input, *tmp_input;
+            size = message.get_data_size();
+            bn_t length;
+            arith.cgbn_from_size_t(length, size);
+            bn_t index;
+            cgbn_set_ui32(arith._env, index, 0);
+            tmp_input = message.get_data(index, length, size);
+            // complete with zeroes the remaing bytes
+            ONE_THREAD_PER_INSTANCE(
+                input = new uint8_t[128];
+                memset(input, 0, 128);
+                memcpy(input, tmp_input, size);
+            )
+            //size = message._content->data.size;
+            //input = message._content->data.data;
 
-    size_t size;
-    uint8_t *input;
-    size = message._content->data.size;
-    input = message._content->data.data;
+            ecc::signature_t signature;
+            bn_t msg_hash, v, r, s, signer;
 
-    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
-    ecc::signature_t signature;
-    bn_t msg_hash, v, r, s, signer;
-    evm_word_t scratch_pad;
+            arith.cgbn_from_memory(msg_hash, input);
+            arith.cgbn_from_memory(v, input + 32);
+            arith.cgbn_from_memory(r, input + 64);
+            arith.cgbn_from_memory(s, input + 96);
+            signature.v = cgbn_get_ui32(arith._env, v);
+            cgbn_store(arith._env, &signature.msg_hash, msg_hash);
+            cgbn_store(arith._env, &signature.r, r);
+            cgbn_store(arith._env, &signature.s, s);
+            //printf("\n v %d\n", signature.v);
+            //printf("r : %s\n", ecc::bnt_to_string(arith._env, r));
+            //printf("s : %s\n", ecc::bnt_to_string(arith._env, s));
+            //printf("msgh: %s\n", ecc::bnt_to_string(arith._env, msg_hash));
 
-    arith.cgbn_from_memory(msg_hash, input);
-    arith.cgbn_from_memory(v, input + 32);
-    arith.cgbn_from_memory(r, input + 64);
-    arith.cgbn_from_memory(s, input + 96);
-    signature.v = cgbn_get_ui32(arith._env, v);
-    cgbn_store(arith._env, &signature.msg_hash, msg_hash);
-    cgbn_store(arith._env, &signature.r, r);
-    cgbn_store(arith._env, &signature.s, s);
-    printf("\n v %d\n", signature.v);
-    printf("r : %s\n", ecc::bnt_to_string(arith._env, r));
-    printf("s : %s\n", ecc::bnt_to_string(arith._env, s));
-    printf("msgh: %s\n", ecc::bnt_to_string(arith._env, msg_hash));
-    if (arith.has_gas(gas_limit, gas_used, error_code) && cgbn_compare_ui32(arith._env, v, 28) <= 0) {
-        uint8_t output[32];
-        size_t res = ecc::ec_recover(arith, _keccak, signature, signer);
-        if (res==0){
-            cgbn_store(arith._env, &scratch_pad, signer);
-            arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
-            return_data.set(output, 32);
-            error_code = ERR_RETURN;
-        } else
-            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
-    } else {
+            // TODO: is not 27 and 28, only?
+            if (cgbn_compare_ui32(arith._env, v, 28) <= 0) {
+                uint8_t output[32];
+                size_t res = ecc::ec_recover(arith, keccak, signature, signer);
+                if (res==0){
+                    arith.memory_from_cgbn(
+                        output,
+                        signer
+                    );
+                    return_data.set(output, 32);
+                    error_code = ERR_RETURN;
+                } else {
+                    // TODO: do we consume all gas?
+                    // it happens by default because of the error code
+                    return_data.set(NULL, 0);
+                    error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+                }
 
+            }
+            ONE_THREAD_PER_INSTANCE(
+                delete[] input;
+            )
+        }
     }
-  }
 
    __host__ __device__  static void operation_ecAdd(arith_t &arith,
                                                             bn_t &gas_limit,
@@ -781,10 +807,10 @@ namespace precompile_operations {
     arith.cgbn_from_memory(x2, new_input + 64);
     arith.cgbn_from_memory(y2, new_input + 96);
     // print
-    printf("x1: %s\n", ecc::bnt_to_string(arith._env, x1));
-    printf("y1: %s\n", ecc::bnt_to_string(arith._env, y1));
-    printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
-    printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
+    //printf("x1: %s\n", ecc::bnt_to_string(arith._env, x1));
+    //printf("y1: %s\n", ecc::bnt_to_string(arith._env, y1));
+    //printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
+    //printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
         uint8_t output[64];
         int res = ecc::ec_add(arith, curve, x1, y1, x1, y1, x2, y2);
@@ -800,12 +826,12 @@ namespace precompile_operations {
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         }
         //print res
-        printf("xres: %s\n", ecc::bnt_to_string(arith._env, x1));
-        printf("yres: %s\n", ecc::bnt_to_string(arith._env, y1));
+        //printf("xres: %s\n", ecc::bnt_to_string(arith._env, x1));
+        //printf("yres: %s\n", ecc::bnt_to_string(arith._env, y1));
     }
   }
 
-   __host__ __device__  static void operation_ecMul(arith_t &arith,
+   __host__ __device__ static void operation_ecMul(arith_t &arith,
                                                             bn_t &gas_limit,
                                                             bn_t &gas_used,
                                                             uint32_t &error_code,
@@ -832,16 +858,16 @@ namespace precompile_operations {
     arith.cgbn_from_memory(y, new_input + 32);
     arith.cgbn_from_memory(k, new_input + 64);
     // print
-    printf("mul x: %s\n", ecc::bnt_to_string(arith._env, x));
-    printf("mul y: %s\n", ecc::bnt_to_string(arith._env, y));
-    printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
+    //printf("mul x: %s\n", ecc::bnt_to_string(arith._env, x));
+    //printf("mul y: %s\n", ecc::bnt_to_string(arith._env, y));
+    //printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
 
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
         uint8_t output[64];
         int res = ecc::ec_mul(arith, curve, x, y, x, y, k);
         // print result
-        printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
-        printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
+        //printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
+        //printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
         if (res==0){
             cgbn_store(arith._env, &scratch_pad, x);
             arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
@@ -872,7 +898,7 @@ namespace precompile_operations {
     size = message._content->data.size;
     input = message._content->data.data;
 
-    arith.pairing_cost(gas_used, size);
+    arith.ecpairing_cost(gas_used, size);
 
     if (arith.has_gas(gas_limit, gas_used, error_code)) {
         if (size % 192 != 0 || size == 0) {
