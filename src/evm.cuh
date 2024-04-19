@@ -526,7 +526,7 @@ public:
                 case 1:
                     precompile_operations::operation_ecRecover(
                         _arith,
-                        _keccak,
+                        *_keccak,
                         _gas_limit,
                         _gas_useds[_depth],
                         error_code,
@@ -3129,7 +3129,7 @@ public:
         bn_t gas_value;
         // bn_t beneficiary;
         // _block->get_coin_base(beneficiary);
-        char *temp = new char[arith_t::BYTES * 2 + 3];
+        // char *temp = new char[arith_t::BYTES * 2 + 3];
 
         if (error_code == ERR_RETURN)
         {
@@ -3460,6 +3460,7 @@ public:
 
 
         #ifdef COMPLEX_TRACER
+        /*
         touch_state_data_t prev_state, updated_state;
         world_state_t world_state(arith, instances.world_state_data);
         accessed_state_t accessed_state(&world_state);
@@ -3487,6 +3488,7 @@ public:
         delete[] updated_state.touch;
         prev_state.touch = nullptr;
         updated_state.touch = nullptr;
+        */
 
 
         #endif

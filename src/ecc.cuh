@@ -173,9 +173,9 @@ namespace ecc {
         }
 
     template <size_t Degree>
-    __host__ __device__ bool FQP_equals(env_t env, FQ<Degree> &P1, FQ<Degree> &P2){
+    __host__ __device__ bool FQP_equals(arith_t& arith, FQ<Degree> &P1, FQ<Degree> &P2){
         for (size_t i = 0; i < Degree; i++) {
-            if (!cgbn_equals(env, P1.coeffs[i], P2.coeffs[i])){
+            if (!cgbn_equals(arith._env, P1.coeffs[i], P2.coeffs[i])){
             return false;
             }
         }
@@ -211,15 +211,15 @@ namespace ecc {
             // Special case for doubling P == Q
             // printf("Doubling\n");
             // lambda = (3*Px^2) / (2*Py)
-            arith.cgbn_mul_mod(arith._env, temp, Px, Px, mod_fp);  // temp = Px^2
+            cgbn_mul_mod(arith._env, temp, Px, Px, mod_fp);  // temp = Px^2
             cgbn_set_ui32(arith._env, numerator, 3);
-            arith.cgbn_mul_mod(arith._env, numerator, numerator, temp, mod_fp);  // numerator = 3*Px^2
+            cgbn_mul_mod(arith._env, numerator, numerator, temp, mod_fp);  // numerator = 3*Px^2
 
             cgbn_set_ui32(arith._env, denominator, 2);
-            arith.cgbn_mul_mod(arith._env, denominator, denominator, Py, mod_fp);  // denominator = 2*Py
+            cgbn_mul_mod(arith._env, denominator, denominator, Py, mod_fp);  // denominator = 2*Py
             cgbn_modular_inverse(arith._env, denominator, denominator, mod_fp);
 
-            arith.cgbn_mul_mod(arith._env, lambda, numerator, denominator, mod_fp);  // lambda = (3*Px^2) / (2*Py)
+            cgbn_mul_mod(arith._env, lambda, numerator, denominator, mod_fp);  // lambda = (3*Px^2) / (2*Py)
             // print lambda
             cgbn_store(arith._env, &scratch_pad, lambda);
 
@@ -234,19 +234,19 @@ namespace ecc {
             // printf("Adding\n");
             // General case for P != Q
             // lambda = (Qy - Py) / (Qx - Px)
-            arith.cgbn_sub_mod(arith._env, temp, Qy, Py, mod_fp);       // temp = Qy - Py
-            arith.cgbn_sub_mod(arith._env, numerator, Qx, Px, mod_fp);  // numerator = Qx - Px
+            cgbn_sub_mod(arith._env, temp, Qy, Py, mod_fp);       // temp = Qy - Py
+            cgbn_sub_mod(arith._env, numerator, Qx, Px, mod_fp);  // numerator = Qx - Px
             cgbn_modular_inverse(arith._env, numerator, numerator, mod_fp);
-            arith.cgbn_mul_mod(arith._env, lambda, temp, numerator, mod_fp);  // lambda = (Qy - Py) / (Qx - Px)
+            cgbn_mul_mod(arith._env, lambda, temp, numerator, mod_fp);  // lambda = (Qy - Py) / (Qx - Px)
         }
 
-        arith.cgbn_mul_mod(arith._env, x_r, lambda, lambda, mod_fp);  // x_r = lambda^2
-        arith.cgbn_add_mod(arith._env, temp, Px, Qx, mod_fp);         // temp = Px + Qx
-        arith.cgbn_sub_mod(arith._env, x_r, x_r, temp, mod_fp);       // x_r = lambda^2 - (Px + Qx)
+        cgbn_mul_mod(arith._env, x_r, lambda, lambda, mod_fp);  // x_r = lambda^2
+        cgbn_add_mod(arith._env, temp, Px, Qx, mod_fp);         // temp = Px + Qx
+        cgbn_sub_mod(arith._env, x_r, x_r, temp, mod_fp);       // x_r = lambda^2 - (Px + Qx)
         // y_r = lambda * (Px - x_r) - Py
-        arith.cgbn_sub_mod(arith._env, temp, Px, x_r, mod_fp);      // temp = Px - x_r
-        arith.cgbn_mul_mod(arith._env, y_r, lambda, temp, mod_fp);  // y_r = lambda * (Px - x_r)
-        arith.cgbn_sub_mod(arith._env, y_r, y_r, Py, mod_fp);       // y_r = lambda * (Px - x_r) - Py
+        cgbn_sub_mod(arith._env, temp, Px, x_r, mod_fp);      // temp = Px - x_r
+        cgbn_mul_mod(arith._env, y_r, lambda, temp, mod_fp);  // y_r = lambda * (Px - x_r)
+        cgbn_sub_mod(arith._env, y_r, y_r, Py, mod_fp);       // y_r = lambda * (Px - x_r) - Py
         // Set the result
         cgbn_set(arith._env, ResX, x_r);
         cgbn_set(arith._env, ResY, y_r);
@@ -317,8 +317,8 @@ namespace ecc {
         keccak.sha3(input, in_length, (uint8_t*)temp_array, out_length);
 
         arith.cgbn_from_memory( address, temp_array);
-        cgbn_bitwise_mask_and(arith._env, address, address, 160);
-
+        //cgbn_bitwise_mask_and(arith._env, address, address, 160);
+        arith.address_conversion(address);
     }
 
 
@@ -355,8 +355,8 @@ namespace ecc {
             return -1;
 
         // calculate r_y
-        arith.cgbn_mul_mod(arith._env, temp_cgbn, r, r, mod_fp);
-        arith.cgbn_mul_mod(arith._env,temp_cgbn, temp_cgbn, r, mod_fp);
+        cgbn_mul_mod(arith._env, temp_cgbn, r, r, mod_fp);
+        cgbn_mul_mod(arith._env,temp_cgbn, temp_cgbn, r, mod_fp);
         cgbn_add_ui32(arith._env, r_y, temp_cgbn, curve.B);
         cgbn_rem(arith._env, r_y, r_y, mod_fp);
 
@@ -407,123 +407,6 @@ namespace ecc {
         return 0;
     }
 
-    __host__ __device__  void cgbn_from_memory(env_t env,
-    bn_t &dst,
-    uint8_t *src
-    )
-    {
-    for (uint32_t idx = 0; idx < 32; idx++)
-    {
-        cgbn_insert_bits_ui32(env, dst, dst, 256 - (idx + 1) * 8, 8, src[idx]);
-    }
-    }
-    __host__  int32_t cgbn_memory_from_hex_string(
-        evm_word_t &dst_cgbn_memory,
-        const char *src_hex_string
-    )
-    {
-        mpz_t value;
-        size_t written;
-        mpz_init(value);
-        if (
-        (src_hex_string[0] == '0') &&
-        ((src_hex_string[1] == 'x') || (src_hex_string[1] == 'X'))
-        )
-        {
-        mpz_set_str(value, src_hex_string + 2, 16);
-        }
-        else
-        {
-        mpz_set_str(value, src_hex_string, 16);
-        }
-        if (mpz_sizeinbase(value, 2) > evm_params::BITS)
-        {
-        return 1;
-        }
-        mpz_export(
-        dst_cgbn_memory._limbs,
-        &written,
-        -1,
-        sizeof(uint32_t),
-        0,
-        0,
-        value
-        );
-        while (written < 8)
-        {
-        dst_cgbn_memory._limbs[written++] = 0;
-        }
-        mpz_clear(value);
-        return 0;
-    }
-    __host__ __device__ void bit_array_from_cgbn_memory(uint8_t *dst_array, uint32_t &array_length, evm_word_t &src_cgbn_mem, uint32_t limb_count = 8) {
-        uint32_t current_limb;
-        uint32_t bitIndex = 0; // Index for each bit in dst_array
-        array_length = 0;
-        for (uint32_t idx = 0; idx < limb_count; idx++) {
-            current_limb = src_cgbn_mem._limbs[limb_count - 1 - idx];
-            // printf("current_limb: %x\n", current_limb);
-            for (int bit = 31; bit >=0; --bit) { //hardcoded 32 bits per limb
-                // Extract each bit from the current limb and store '0' or '1' in dst_array
-                dst_array[bitIndex++] = (current_limb & (1U << bit)) ? 1 : 0;
-                if (dst_array[bitIndex-1] == 1 && array_length ==0){
-                array_length = 256 - (bitIndex - 1);
-                }
-            }
-        }
-    }
-
-    __host__ __device__  void pretty_hex_string_from_cgbn_memory(
-        char *dst_hex_string,
-        evm_word_t &src_cgbn_mem,
-        uint32_t count = 8
-    )
-    {
-        dst_hex_string[0] = '0';
-        dst_hex_string[1] = 'x';
-        int offset = 2; // Start after "0x"
-
-        for (uint32_t idx = 0, first = 1; idx < count; ++idx)
-        {
-        uint32_t value = src_cgbn_mem._limbs[count - 1 - idx];
-        if (value != 0 || !first)
-        {
-            if (first)
-            {
-            first = 0; // No longer at the first non-zero value
-            offset += sprintf(dst_hex_string + offset, "%x", value);
-            }
-            else
-            {
-            offset += sprintf(dst_hex_string + offset, "%08x", value);
-            }
-        }
-        }
-
-        if (offset == 2) // Handle the case where all values are zero
-        {
-        strcpy(dst_hex_string + offset, "0");
-        offset += 1;
-        }
-
-        dst_hex_string[offset] = '\0'; // Null-terminate the string
-    }
-    /**
-     * @brief Helper conversion to string for bn_t
-     *
-     * @param env
-     * @param val
-     * @return char*
-     */
-    __host__ __device__ char* bnt_to_string(env_t env, bn_t& val){
-        cgbn_mem_t<evm_params::BITS> scratch_pad;
-        char *temp = new char[evm_params::BITS/8 * 2 + 3];
-        cgbn_store(env, &scratch_pad, val);
-        pretty_hex_string_from_cgbn_memory(temp, scratch_pad);
-        return temp;
-    }
-
-
     /**
      * @brief Get the FQ12 from bn_t
      *
@@ -532,9 +415,9 @@ namespace ecc {
      * @param res
      */
     template <size_t Degree>
-    __host__ __device__ void getFQ12_from_cgbn_t(env_t env, FQ<Degree> &res, bn_t (&coeffs)[Degree]){
+    __host__ __device__ void getFQ12_from_cgbn_t(arith_t &arith, FQ<Degree> &res, bn_t (&coeffs)[Degree]){
     for (uint32_t i = 0; i < Degree; i++) {
-        cgbn_set(env, res.coeffs[i], coeffs[i]);
+        cgbn_set(arith._env, res.coeffs[i], coeffs[i]);
     }
     }
 
@@ -549,9 +432,9 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_add(env_t env, FQ<Degree>& Res, FQ<Degree>& P1, FQ<Degree>& P2, bn_t& mod) {
+    __host__ __device__ void FQP_add(arith_t &arith, FQ<Degree>& Res, FQ<Degree>& P1, FQ<Degree>& P2, bn_t& mod) {
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_add_mod(env, Res.coeffs[i], P1.coeffs[i], P2.coeffs[i], mod);
+            cgbn_add_mod(arith._env, Res.coeffs[i], P1.coeffs[i], P2.coeffs[i], mod);
         }
     }
 
@@ -566,13 +449,13 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_sub(env_t env, FQ<Degree>& Res, FQ<Degree>& P1, FQ<Degree>& P2, bn_t& mod) {
+    __host__ __device__ void FQP_sub(arith_t &arith, FQ<Degree>& Res, FQ<Degree>& P1, FQ<Degree>& P2, bn_t& mod) {
         for (size_t i = 0; i < Degree; i++) {
             // printf("P1[%d]: %s\n", i, bnt_to_string(env, P1.coeffs[i]));
             // printf("P2[%d]: %s\n", i, bnt_to_string(env, P2.coeffs[i]));
             // printf("mod: %s\n", bnt_to_string(env, mod));
             // printf("compare %d\n", cgbn_compare(env, P1.coeffs[i], P2.coeffs[i]));
-            cgbn_sub_mod(env, Res.coeffs[i], P1.coeffs[i], P2.coeffs[i], mod);
+            cgbn_sub_mod(arith._env, Res.coeffs[i], P1.coeffs[i], P2.coeffs[i], mod);
         }
     }
 
@@ -585,9 +468,9 @@ namespace ecc {
      * @return uint
      */
     template <size_t Degree>
-    __host__ __device__ uint deg(env_t env, const FQ<Degree>& P){
+    __host__ __device__ uint deg(arith_t &arith, const FQ<Degree>& P){
         uint res = Degree - 1;
-        while (cgbn_equals_ui32(env, P.coeffs[res],0) && res)
+        while (cgbn_equals_ui32(arith._env, P.coeffs[res],0) && res)
             res -= 1;
         return res;
     }
@@ -600,9 +483,9 @@ namespace ecc {
      * @return FQ<Degree>
      */
     template <size_t Degree>
-    __host__ __device__ FQ<Degree> get_one(env_t env){
+    __host__ __device__ FQ<Degree> get_one(arith_t &arith){
         FQ<Degree> res;
-        cgbn_set_ui32(env, res.coeffs[0], 1);
+        cgbn_set_ui32(arith._env, res.coeffs[0], 1);
         return res;
     }
 
@@ -617,28 +500,28 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void poly_rounded_div(env_t env, FQ<Degree>& Res, FQ<Degree>& A, FQ<Degree>& B, bn_t& mod) {
-        uint dega = deg(env, A);
-        uint degb = deg(env, B);
+    __host__ __device__ void poly_rounded_div(arith_t &arith, FQ<Degree>& Res, FQ<Degree>& A, FQ<Degree>& B, bn_t& mod) {
+        uint dega = deg(arith, A);
+        uint degb = deg(arith, B);
         FQ<Degree> temp;
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_set(env, temp.coeffs[i], A.coeffs[i]);
-            cgbn_set_ui32(env, Res.coeffs[i], 0);
+            cgbn_set(arith._env, temp.coeffs[i], A.coeffs[i]);
+            cgbn_set_ui32(arith._env, Res.coeffs[i], 0);
         }
 
         FQ<Degree> o;
         bn_t temp_res;
         for (int32_t i = dega - degb; i >= 0; i--) {
             // o[i] += temp[degb + i] / b[degb]
-            cgbn_div_mod(env, temp_res, temp.coeffs[degb + i], B.coeffs[degb], mod);
-            cgbn_add_mod(env, o.coeffs[i], o.coeffs[i], temp_res, mod);
+            cgbn_div_mod(arith._env, temp_res, temp.coeffs[degb + i], B.coeffs[degb], mod);
+            cgbn_add_mod(arith._env, o.coeffs[i], o.coeffs[i], temp_res, mod);
             for (size_t c = 0; c <= degb; c++) {
-                cgbn_sub_mod(env, temp.coeffs[c + i], temp.coeffs[c + i], o.coeffs[c], mod);
+                cgbn_sub_mod(arith._env, temp.coeffs[c + i], temp.coeffs[c + i], o.coeffs[c], mod);
             }
         }
         // return o[:deg(o)+1]
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_set(env, Res.coeffs[i], o.coeffs[i]);
+            cgbn_set(arith._env, Res.coeffs[i], o.coeffs[i]);
         }
     }
 
@@ -651,9 +534,9 @@ namespace ecc {
      * @param P
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_copy(env_t env, FQ<Degree>& Res, FQ<Degree>& P){
+    __host__ __device__ void FQP_copy(arith_t &arith, FQ<Degree>& Res, FQ<Degree>& P){
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_set(env, Res.coeffs[i], P.coeffs[i]);
+            cgbn_set(arith._env, Res.coeffs[i], P.coeffs[i]);
         }
     }
 
@@ -669,9 +552,9 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_mul(env_t env, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t& mod) {
+    __host__ __device__ void FQP_mul(arith_t &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t& mod) {
         if (Degree == 1) {
-            cgbn_mul_mod(env, Res.coeffs[0], P1.coeffs[0], P2.coeffs[0], mod);
+            cgbn_mul_mod(arith._env, Res.coeffs[0], P1.coeffs[0], P2.coeffs[0], mod);
             return;
         }
         bn_t b[2 * Degree - 1];
@@ -682,8 +565,8 @@ namespace ecc {
         // Polynomial multiplication
         for (size_t i = 0; i < Degree; i++) {
             for (size_t j = 0; j < Degree; j++) {
-                cgbn_mul_mod(env, temp, P1.coeffs[i], P2.coeffs[j], mod); // Multiply coefficients
-                cgbn_add_mod(env, b[i + j], b[i + j], temp, mod); // Add to the corresponding position and mod
+                cgbn_mul_mod(arith._env, temp, P1.coeffs[i], P2.coeffs[j], mod); // Multiply coefficients
+                cgbn_add_mod(arith._env, b[i + j], b[i + j], temp, mod); // Add to the corresponding position and mod
             }
         }
 
@@ -692,9 +575,9 @@ namespace ecc {
         for (size_t i = 0; i < Degree; i++) {
             if (mod_coeffs_array[i] < 0) {
                 // printf("negative mod coeffs\n");
-                cgbn_sub_ui32(env, mod_coeffs[i], mod, 0 - mod_coeffs_array[i]);
+                cgbn_sub_ui32(arith._env, mod_coeffs[i], mod, 0 - mod_coeffs_array[i]);
             } else {
-                cgbn_set_ui32(env, mod_coeffs[i], mod_coeffs_array[i]);
+                cgbn_set_ui32(arith._env, mod_coeffs[i], mod_coeffs_array[i]);
             }
         }
         for (size_t len_b = 2 * Degree - 1; len_b > Degree; len_b--) {
@@ -702,30 +585,14 @@ namespace ecc {
             for (size_t i = 0; i < Degree; i++) {
                 // Assuming FQ is a function that takes an int and returns a bn_t type and modulus_coeffs is accessible
                 // b[exp + i] -= top * FQ(modulus_coeffs[i]);
-                cgbn_mul_mod(env, temp, b[len_b - 1], mod_coeffs[i], mod);
-                cgbn_sub_mod(env, b[exp + i], b[exp + i], temp, mod);
+                cgbn_mul_mod(arith._env, temp, b[len_b - 1], mod_coeffs[i], mod);
+                cgbn_sub_mod(arith._env, b[exp + i], b[exp + i], temp, mod);
             }
         }
         // Copy the result back to Res, adjusting to the actual degree
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_set(env, Res.coeffs[i], b[i]);
+            cgbn_set(arith._env, Res.coeffs[i], b[i]);
         }
-    }
-
-    /***
-     * @brief helper function to print FQP in hex
-    */
-    template <size_t Degree>
-    __host__ __device__ void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
-        evm_word_t scratch_pad;
-        char *temp_str = new char[evm_params::BITS/8 * 2 + 3];
-        printf("%s: \n", name);
-        for (size_t i = 0; i < Degree; i++) {
-            cgbn_store(env, &scratch_pad, P.coeffs[i]);
-            pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
-            printf("%s[%d] : %s\n", name, i, temp_str);
-        }
-
     }
 
     /**
@@ -738,64 +605,64 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_inv(env_t env, FQ<Degree>& Res, FQ<Degree>& P, bn_t& mod) {
+    __host__ __device__ void FQP_inv(arith_t &arith, FQ<Degree>& Res, FQ<Degree>& P, bn_t& mod) {
         if (Degree == 1){
-            cgbn_modular_inverse(env, Res.coeffs[0], P.coeffs[0], mod);
+            cgbn_modular_inverse(arith._env, Res.coeffs[0], P.coeffs[0], mod);
             return;
         }
         FQ<Degree+1> lm, hm, low, high;
         bn_t temp;
         // lm[0] = 1;
-        cgbn_set_ui32(env, lm.coeffs[0], 1);
+        cgbn_set_ui32(arith._env, lm.coeffs[0], 1);
         // set low,high
         // Initialize high with modulus coefficients + [1]
         const int32_t* mod_coeffs = get_modulus_coeffs<Degree>();
 
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_set(env, low.coeffs[i], P.coeffs[i]);
+            cgbn_set(arith._env, low.coeffs[i], P.coeffs[i]);
             if (mod_coeffs[i] < 0) {
-                cgbn_sub_ui32(env, high.coeffs[i], mod, 0 - mod_coeffs[i]);
+                cgbn_sub_ui32(arith._env, high.coeffs[i], mod, 0 - mod_coeffs[i]);
             } else {
-            cgbn_set_ui32(env, high.coeffs[i], mod_coeffs[i]);
+            cgbn_set_ui32(arith._env, high.coeffs[i], mod_coeffs[i]);
             }
         }
-        cgbn_set_ui32(env, high.coeffs[Degree], 1);
+        cgbn_set_ui32(arith._env, high.coeffs[Degree], 1);
 
-        while (deg(env, low) > 0) { // Assuming a function `deg` to find the polynomial's degree
+        while (deg(arith, low) > 0) { // Assuming a function `deg` to find the polynomial's degree
             FQ<Degree+1> r;
-            poly_rounded_div(env, r, high, low, mod); // Needs to return FQ<Degree+1> or similar
+            poly_rounded_div(arith, r, high, low, mod); // Needs to return FQ<Degree+1> or similar
 
             FQ<Degree+1> nm, new_h;
-            FQP_copy(env, nm, hm);
-            FQP_copy(env, new_h, high);
+            FQP_copy(arith, nm, hm);
+            FQP_copy(arith, new_h, high);
             for (size_t i = 0; i <= Degree; ++i) {
                 for (size_t j = 0; j <= Degree - i; ++j) {
 
                     // nm[i+j] -= lm[i] * r[j]
-                    cgbn_mul_mod(env, temp, lm.coeffs[i], r.coeffs[j], mod);
-                    cgbn_sub_mod(env, nm.coeffs[i+j], nm.coeffs[i+j], temp, mod);
+                    cgbn_mul_mod(arith._env, temp, lm.coeffs[i], r.coeffs[j], mod);
+                    cgbn_sub_mod(arith._env, nm.coeffs[i+j], nm.coeffs[i+j], temp, mod);
 
                     // new[i+j] -= low[i] * r[j]
-                    cgbn_mul_mod(env, temp, low.coeffs[i], r.coeffs[j], mod);
-                    cgbn_sub_mod(env, new_h.coeffs[i+j], new_h.coeffs[i+j], temp, mod);
+                    cgbn_mul_mod(arith._env, temp, low.coeffs[i], r.coeffs[j], mod);
+                    cgbn_sub_mod(arith._env, new_h.coeffs[i+j], new_h.coeffs[i+j], temp, mod);
 
                 }
             }
             // lm, low, hm, high = nm, new, lm, low
-            FQP_copy(env, high, low);
-            FQP_copy(env, hm, lm);
-            FQP_copy(env, low, new_h);
-            FQP_copy(env, lm, nm);
+            FQP_copy(arith, high, low);
+            FQP_copy(arith, hm, lm);
+            FQP_copy(arith, low, new_h);
+            FQP_copy(arith, lm, nm);
 
         }
 
         // // self.__class__(lm[:self.degree]) / low[0]
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_set(env, Res.coeffs[i], lm.coeffs[i]);
+            cgbn_set(arith._env, Res.coeffs[i], lm.coeffs[i]);
         }
-        cgbn_modular_inverse(env, temp, low.coeffs[0], mod);
+        cgbn_modular_inverse(arith._env, temp, low.coeffs[0], mod);
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_mul_mod(env, Res.coeffs[i], Res.coeffs[i], temp, mod);
+            cgbn_mul_mod(arith._env, Res.coeffs[i], Res.coeffs[i], temp, mod);
         }
     }
 
@@ -810,9 +677,9 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_div(env_t env, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t& mod){ // P1/P2
-        FQP_inv(env, Res, P2, mod);
-        FQP_mul(env, Res, P1, Res, mod);
+    __host__ __device__ void FQP_div(arith_t &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t& mod){ // P1/P2
+        FQP_inv(arith, Res, P2, mod);
+        FQP_mul(arith, Res, P1, Res, mod);
     }
 
     /**
@@ -825,9 +692,9 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_neg(env_t env, FQ<Degree> &Res, FQ<Degree> &P, bn_t& mod){
+    __host__ __device__ void FQP_neg(arith_t &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t& mod){
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_sub_mod(env, Res.coeffs[i], mod, P.coeffs[i], mod);
+            cgbn_sub_mod(arith._env, Res.coeffs[i], mod, P.coeffs[i], mod);
         }
     }
 
@@ -842,27 +709,27 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_pow(env_t env, FQ<Degree> &Res, FQ<Degree> &P, bn_t &n, bn_t &mod) {
+    __host__ __device__ void FQP_pow(arith_t &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &n, bn_t &mod) {
         if (Degree == 1){
-            cgbn_modular_power(env, Res.coeffs[0], P.coeffs[0], n, mod);
+            cgbn_modular_power(arith._env, Res.coeffs[0], P.coeffs[0], n, mod);
             return;
         }
         bn_t temp_n;
         FQ<Degree> temp;
-        FQP_copy(env, temp, P);
-        cgbn_set(env, temp_n, n);
+        FQP_copy(arith, temp, P);
+        cgbn_set(arith._env, temp_n, n);
         // TODO, may not be necessary
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_set_ui32(env, Res.coeffs[i], 0);
+            cgbn_set_ui32(arith._env, Res.coeffs[i], 0);
         }
-        cgbn_set_ui32(env, Res.coeffs[0], 1);
-        while(cgbn_get_ui32(env, temp_n) != 0) {
+        cgbn_set_ui32(arith._env, Res.coeffs[0], 1);
+        while(cgbn_get_ui32(arith._env, temp_n) != 0) {
             // printf("%d \n", cgbn_extract_bits_ui32(env, temp_n, 0, 1));
-            if (cgbn_extract_bits_ui32(env, temp_n, 0, 1) == 1) {
-            FQP_mul(env, Res, Res, temp, mod);
+            if (cgbn_extract_bits_ui32(arith._env, temp_n, 0, 1) == 1) {
+                FQP_mul(arith, Res, Res, temp, mod);
             }
-            FQP_mul(env, temp, temp, temp, mod);
-            cgbn_shift_right(env, temp_n, temp_n, 1);
+            FQP_mul(arith, temp, temp, temp, mod);
+            cgbn_shift_right(arith._env, temp_n, temp_n, 1);
         }
     }
 
@@ -877,9 +744,9 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_mul_scalar(env_t env, FQ<Degree> &Res, FQ<Degree> &P, bn_t &n, bn_t &mod) {
+    __host__ __device__ void FQP_mul_scalar(arith_t &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &n, bn_t &mod) {
         for (size_t i = 0; i < Degree; i++) {
-            cgbn_mul_mod(env, Res.coeffs[i], P.coeffs[i], n, mod);
+            cgbn_mul_mod(arith._env, Res.coeffs[i], P.coeffs[i], n, mod);
         }
     }
 
@@ -897,22 +764,22 @@ namespace ecc {
      * @return false
      */
     template <size_t Degree>
-    __host__ __device__ bool FQP_is_on_curve(env_t env, FQ<Degree> &Px, FQ<Degree> &Py, bn_t& mod, FQ<Degree> &B){
+    __host__ __device__ bool FQP_is_on_curve(arith_t &arith, FQ<Degree> &Px, FQ<Degree> &Py, bn_t& mod, FQ<Degree> &B){
         // y^2 = x^3 + B
         FQ<Degree> temp, temp2;
-        FQP_mul(env, temp, Px, Px, mod);
-        FQP_mul(env, temp, temp, Px, mod);
-        FQP_add(env, temp, temp, B, mod);
-        FQP_mul(env, temp2, Py, Py, mod);
+        FQP_mul(arith, temp, Px, Px, mod);
+        FQP_mul(arith, temp, temp, Px, mod);
+        FQP_add(arith, temp, temp, B, mod);
+        FQP_mul(arith, temp2, Py, Py, mod);
 
-        return FQP_equals(env, temp, temp2);
+        return FQP_equals(arith, temp, temp2);
     }
 
     template <size_t Degree>
-    bool FQP_is_inf(env_t env, FQ<Degree> &Px, FQ<Degree> &Py){
+    __host__ __device__ bool FQP_is_inf(arith_t &arith, FQ<Degree> &Px, FQ<Degree> &Py){
         bool res = true;
         for (size_t i = 0; i < Degree; i++) {
-            res = res && cgbn_equals_ui32(env, Px.coeffs[i], 0) && cgbn_equals_ui32(env, Py.coeffs[i], 0);
+            res = res && cgbn_equals_ui32(arith._env, Px.coeffs[i], 0) && cgbn_equals_ui32(arith._env, Py.coeffs[i], 0);
         }
         return res;
     }
@@ -930,52 +797,52 @@ namespace ecc {
      * @param mod_fp
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_ec_add(env_t env, FQ<Degree> &ResX, FQ<Degree> &ResY, FQ<Degree> &Px, FQ<Degree> &Py, FQ<Degree> &Qx, FQ<Degree> &Qy, bn_t &mod_fp) {
+    __host__ __device__ void FQP_ec_add(arith_t &arith, FQ<Degree> &ResX, FQ<Degree> &ResY, FQ<Degree> &Px, FQ<Degree> &Py, FQ<Degree> &Qx, FQ<Degree> &Qy, bn_t &mod_fp) {
         FQ<Degree> lambda, numerator, denominator, temp, x_r, y_r;
         bn_t two, three;
-        cgbn_set_ui32(env, two, 2);
-        cgbn_set_ui32(env, three, 3);
+        cgbn_set_ui32(arith._env, two, 2);
+        cgbn_set_ui32(arith._env, three, 3);
         // check infinity
-        if (FQP_is_inf(env, Px, Py)){
-            FQP_copy(env, ResX, Qx);
-            FQP_copy(env, ResY, Qy);
+        if (FQP_is_inf(arith, Px, Py)){
+            FQP_copy(arith, ResX, Qx);
+            FQP_copy(arith, ResY, Qy);
             return;
-        } else if (FQP_is_inf(env, Qx, Qy)){
-            FQP_copy(env, ResX, Px);
-            FQP_copy(env, ResY, Py);
+        } else if (FQP_is_inf(arith, Qx, Qy)){
+            FQP_copy(arith, ResX, Px);
+            FQP_copy(arith, ResY, Py);
             return;
         }
 
-        if (FQP_equals(env, Px, Qx) && FQP_equals(env, Py, Qy)) {
-            FQP_mul(env, temp, Px, Px, mod_fp); // temp = Px^2
-            FQP_mul_scalar(env, numerator, temp, three, mod_fp); // numerator = 3*Px^2
-            FQP_mul_scalar(env, denominator, Py, two, mod_fp); // denominator = 2*Py
-            FQP_div(env, lambda, numerator, denominator, mod_fp); // lambda = (3*Px^2) / (2*Py)
+        if (FQP_equals(arith, Px, Qx) && FQP_equals(arith, Py, Qy)) {
+            FQP_mul(arith, temp, Px, Px, mod_fp); // temp = Px^2
+            FQP_mul_scalar(arith, numerator, temp, three, mod_fp); // numerator = 3*Px^2
+            FQP_mul_scalar(arith, denominator, Py, two, mod_fp); // denominator = 2*Py
+            FQP_div(arith, lambda, numerator, denominator, mod_fp); // lambda = (3*Px^2) / (2*Py)
 
-        } else if (FQP_equals(env, Px, Qx)){
+        } else if (FQP_equals(arith, Px, Qx)){
             // special case, return inf
             for (size_t i = 0; i < Degree; i++) {
-                cgbn_set_ui32(env, ResX.coeffs[i], 0);
-                cgbn_set_ui32(env, ResY.coeffs[i], 0);
+                cgbn_set_ui32(arith._env, ResX.coeffs[i], 0);
+                cgbn_set_ui32(arith._env, ResY.coeffs[i], 0);
             }
         } else{
 
-            FQP_sub(env, numerator, Qy, Py, mod_fp); // temp = Qy - Py
-            FQP_sub(env, denominator, Qx, Px, mod_fp); // numerator = Qx - Px
-            FQP_div(env, lambda, numerator, denominator, mod_fp); // lambda = (Qy - Py) / (Qx - Px)
+            FQP_sub(arith, numerator, Qy, Py, mod_fp); // temp = Qy - Py
+            FQP_sub(arith, denominator, Qx, Px, mod_fp); // numerator = Qx - Px
+            FQP_div(arith, lambda, numerator, denominator, mod_fp); // lambda = (Qy - Py) / (Qx - Px)
         }
 
-        FQP_mul(env, x_r, lambda, lambda, mod_fp); // x_r = lambda^2
-        FQP_add(env, temp, Px, Qx, mod_fp); // temp = Px + Qx
-        FQP_sub(env, x_r, x_r, temp, mod_fp); // x_r = lambda^2 - (Px + Qx)
+        FQP_mul(arith, x_r, lambda, lambda, mod_fp); // x_r = lambda^2
+        FQP_add(arith, temp, Px, Qx, mod_fp); // temp = Px + Qx
+        FQP_sub(arith, x_r, x_r, temp, mod_fp); // x_r = lambda^2 - (Px + Qx)
 
-        FQP_sub(env, temp, Px, x_r, mod_fp); // temp = Px - x_r
-        FQP_mul(env, y_r, lambda, temp, mod_fp); // y_r = lambda * (Px - x_r)
-        FQP_sub(env, y_r, y_r, Py, mod_fp); // y_r = lambda * (Px - x_r) - Py
+        FQP_sub(arith, temp, Px, x_r, mod_fp); // temp = Px - x_r
+        FQP_mul(arith, y_r, lambda, temp, mod_fp); // y_r = lambda * (Px - x_r)
+        FQP_sub(arith, y_r, y_r, Py, mod_fp); // y_r = lambda * (Px - x_r) - Py
 
         // Set the result
-        FQP_copy(env, ResX, x_r);
-        FQP_copy(env, ResY, y_r);
+        FQP_copy(arith, ResX, x_r);
+        FQP_copy(arith, ResY, y_r);
     }
 
     /**
@@ -991,48 +858,48 @@ namespace ecc {
      * @param mod_fp
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_ec_mul(env_t env, FQ<Degree> &ResX, FQ<Degree> &ResY, FQ<Degree> &Gx, FQ<Degree> &Gy, bn_t &n, bn_t &mod_fp) {
+    __host__ __device__ void FQP_ec_mul(arith_t &arith, FQ<Degree> &ResX, FQ<Degree> &ResY, FQ<Degree> &Gx, FQ<Degree> &Gy, bn_t &n, bn_t &mod_fp) {
         uint8_t bitArray[evm_params::BITS];
         uint32_t bit_array_length = 0;
 
         evm_word_t scratch_pad;
-        cgbn_store(env, &scratch_pad, n);
-        bit_array_from_cgbn_memory(bitArray, bit_array_length, scratch_pad);
+        cgbn_store(arith._env, &scratch_pad, n);
+        arith.bit_array_from_cgbn_memory(bitArray, bit_array_length, scratch_pad);
 
         // check point at infinity
-        if (FQP_is_inf(env, Gx, Gy)){
-            FQP_copy(env, ResX, Gx);
-            FQP_copy(env, ResY, Gy);
+        if (FQP_is_inf(arith, Gx, Gy)){
+            FQP_copy(arith, ResX, Gx);
+            FQP_copy(arith, ResY, Gy);
             return;
         }
         // mul zero
-        if (cgbn_equals_ui32(env, n, 0)){
+        if (cgbn_equals_ui32(arith._env, n, 0)){
             // return inf
             for (size_t i = 0; i < Degree; i++) {
-                cgbn_set_ui32(env, ResX.coeffs[i], 0);
-                cgbn_set_ui32(env, ResY.coeffs[i], 0);
+                cgbn_set_ui32(arith._env, ResX.coeffs[i], 0);
+                cgbn_set_ui32(arith._env, ResY.coeffs[i], 0);
             }
             return;
         }
 
         FQ<Degree> temp_ResX, temp_ResY;
         // Double-and-add algorithm
-        FQP_copy(env, temp_ResX, Gx);
-        FQP_copy(env, temp_ResY, Gy);
+        FQP_copy(arith, temp_ResX, Gx);
+        FQP_copy(arith, temp_ResY, Gy);
 
         for (int i = bit_array_length - 2; i >= 0; --i)
         {
             // Gz = 2 * Gz
-            FQP_ec_add(env, temp_ResX, temp_ResY, temp_ResX, temp_ResY, temp_ResX, temp_ResY, mod_fp);
+            FQP_ec_add(arith, temp_ResX, temp_ResY, temp_ResX, temp_ResY, temp_ResX, temp_ResY, mod_fp);
             if (bitArray[evm_params::BITS-1-i])
             {
             // printf("bit1 add i %d\n", i);
             // Gz = Gz + P
-            FQP_ec_add(env, temp_ResX, temp_ResY, temp_ResX, temp_ResY, Gx, Gy, mod_fp);
+            FQP_ec_add(arith, temp_ResX, temp_ResY, temp_ResX, temp_ResY, Gx, Gy, mod_fp);
             }
         }
-        FQP_copy(env, ResX, temp_ResX);
-        FQP_copy(env, ResY, temp_ResY);
+        FQP_copy(arith, ResX, temp_ResX);
+        FQP_copy(arith, ResY, temp_ResY);
     }
 
 
@@ -1051,39 +918,39 @@ namespace ecc {
      * @param mod
      */
     template <size_t Degree>
-    __host__ __device__ void FQP_linefunc(env_t env, FQ<Degree> &Res, FQ<Degree> &P1x, FQ<Degree> &P1y, FQ<Degree> &P2x, FQ<Degree> &P2y, FQ<Degree> &Tx, FQ<Degree> &Ty, bn_t& mod){
+    __host__ __device__ void FQP_linefunc(arith_t &arith, FQ<Degree> &Res, FQ<Degree> &P1x, FQ<Degree> &P1y, FQ<Degree> &P2x, FQ<Degree> &P2y, FQ<Degree> &Tx, FQ<Degree> &Ty, bn_t& mod){
         FQ<Degree> m, temp, temp2;
         bn_t three, two;
-        cgbn_set_ui32(env, three, 3);
-        cgbn_set_ui32(env, two, 2);
+        cgbn_set_ui32(arith._env, three, 3);
+        cgbn_set_ui32(arith._env, two, 2);
 
-        if (!FQP_equals(env, P1x, P2x)){
-            FQP_sub(env, temp, P2y, P1y, mod);
-            FQP_sub(env, temp2, P2x, P1x, mod);
-            FQP_div(env, m, temp, temp2, mod);
+        if (!FQP_equals(arith, P1x, P2x)){
+            FQP_sub(arith, temp, P2y, P1y, mod);
+            FQP_sub(arith, temp2, P2x, P1x, mod);
+            FQP_div(arith, m, temp, temp2, mod);
 
-            FQP_sub(env, temp, Tx, P1x, mod);
-            FQP_mul(env, Res, m, temp, mod);
-            FQP_sub(env, temp, Ty, P1y, mod);
-            FQP_sub(env, Res, Res, temp, mod);
+            FQP_sub(arith, temp, Tx, P1x, mod);
+            FQP_mul(arith, Res, m, temp, mod);
+            FQP_sub(arith, temp, Ty, P1y, mod);
+            FQP_sub(arith, Res, Res, temp, mod);
             return;
         }
-        else if (FQP_equals(env, P1y, P2y)){
+        else if (FQP_equals(arith, P1y, P2y)){
 
-            FQP_mul(env, temp, P1x, P1x, mod);
-            FQP_mul_scalar(env, temp, temp, three, mod);
-            FQP_mul_scalar(env, temp2, P1y, two, mod);
+            FQP_mul(arith, temp, P1x, P1x, mod);
+            FQP_mul_scalar(arith, temp, temp, three, mod);
+            FQP_mul_scalar(arith, temp2, P1y, two, mod);
 
-            FQP_div(env, m, temp, temp2, mod);
+            FQP_div(arith, m, temp, temp2, mod);
 
-            FQP_sub(env, temp, Tx, P1x, mod);
-            FQP_mul(env, Res, m, temp, mod);
-            FQP_sub(env, temp, Ty, P1y, mod);
-            FQP_sub(env, Res, Res, temp, mod);
+            FQP_sub(arith, temp, Tx, P1x, mod);
+            FQP_mul(arith, Res, m, temp, mod);
+            FQP_sub(arith, temp, Ty, P1y, mod);
+            FQP_sub(arith, Res, Res, temp, mod);
             return;
         }
         else {
-            FQP_sub(env, Res, Tx, P1x, mod);
+            FQP_sub(arith, Res, Tx, P1x, mod);
             return;
         }
 
@@ -1099,40 +966,40 @@ namespace ecc {
      * @param Py FQ<2> type (2 FQ elements)
      * @param mod_fp
      */
-    __host__ __device__ void FQP_twist(env_t env, FQ<12> &Rx, FQ<12> &Ry, FQ<2> &Px, FQ<2> &Py, bn_t &mod_fp){
+    __host__ __device__ void FQP_twist(arith_t &arith, FQ<12> &Rx, FQ<12> &Ry, FQ<2> &Px, FQ<2> &Py, bn_t &mod_fp){
         // # "Twist" a point in E(FQ2) into a point in E(FQ12)
         FQ<12> w;
-        cgbn_set_ui32(env, w.coeffs[1], 1);
+        cgbn_set_ui32(arith._env, w.coeffs[1], 1);
 
         bn_t X[2];
         bn_t Y[2];
         bn_t temp;
         // xcoeffs = [_x.coeffs[0] - _x.coeffs[1] * 9, _x.coeffs[1]]
-        cgbn_set_ui32(env, temp, 9);
-        cgbn_mul_mod(env, X[0], Px.coeffs[1], temp, mod_fp);
-        cgbn_sub_mod(env, X[0], Px.coeffs[0], X[0], mod_fp);
-        cgbn_set(env, X[1], Px.coeffs[1]);
+        cgbn_set_ui32(arith._env, temp, 9);
+        cgbn_mul_mod(arith._env, X[0], Px.coeffs[1], temp, mod_fp);
+        cgbn_sub_mod(arith._env, X[0], Px.coeffs[0], X[0], mod_fp);
+        cgbn_set(arith._env, X[1], Px.coeffs[1]);
 
         // ycoeffs = [_y.coeffs[0] - _y.coeffs[1] * 9, _y.coeffs[1]]
-        cgbn_mul_mod(env, Y[0], Py.coeffs[1], temp, mod_fp);
-        cgbn_sub_mod(env, Y[0], Py.coeffs[0], Y[0], mod_fp);
-        cgbn_set(env, Y[1], Py.coeffs[1]);
+        cgbn_mul_mod(arith._env, Y[0], Py.coeffs[1], temp, mod_fp);
+        cgbn_sub_mod(arith._env, Y[0], Py.coeffs[0], Y[0], mod_fp);
+        cgbn_set(arith._env, Y[1], Py.coeffs[1]);
 
         FQ<12> nx, ny, temp_fqp;
         //     nx = FQ12([xcoeffs[0]] + [0] * 5 + [xcoeffs[1]] + [0] * 5)
         //     ny = FQ12([ycoeffs[0]] + [0] * 5 + [ycoeffs[1]] + [0] * 5)
-        cgbn_set(env, nx.coeffs[0], X[0]);
-        cgbn_set(env, nx.coeffs[6], X[1]);
-        cgbn_set(env, ny.coeffs[0], Y[0]);
-        cgbn_set(env, ny.coeffs[6], Y[1]);
+        cgbn_set(arith._env, nx.coeffs[0], X[0]);
+        cgbn_set(arith._env, nx.coeffs[6], X[1]);
+        cgbn_set(arith._env, ny.coeffs[0], Y[0]);
+        cgbn_set(arith._env, ny.coeffs[6], Y[1]);
 
         //    return (nx * w **2, ny * w**3)
         // w**2
-        FQP_mul(env, temp_fqp, w, w, mod_fp);
-        FQP_mul(env, Rx, nx, temp_fqp, mod_fp);
+        FQP_mul(arith, temp_fqp, w, w, mod_fp);
+        FQP_mul(arith, Rx, nx, temp_fqp, mod_fp);
         // w**3
-        FQP_mul(env, temp_fqp, temp_fqp, w, mod_fp);
-        FQP_mul(env, Ry, ny, temp_fqp, mod_fp);
+        FQP_mul(arith, temp_fqp, temp_fqp, w, mod_fp);
+        FQP_mul(arith, Ry, ny, temp_fqp, mod_fp);
     }
 
     /**
@@ -1143,7 +1010,7 @@ namespace ecc {
     * @param mod
     */
     template <size_t Degree>
-    __host__ __device__ void FQP_final_exponentiation(env_t env, FQ<Degree> &res, FQ<Degree> &p, bn_t &mod) {
+    __host__ __device__ void FQP_final_exponentiation(arith_t &arith, FQ<Degree> &res, FQ<Degree> &p, bn_t &mod) {
         evm_word_t temp_mem;
         size_t final_exp_len = 11;
         const char* final_exp[11] = {
@@ -1159,29 +1026,29 @@ namespace ecc {
             "c230974d83561841d766f9c9d570bb7fbe04c7e8a6c3c760c0de81def35692da",
             "361102b6b9b2b918837fa97896e84abb40a4efb7e54523a486964b64ca86f120"};
 
-        cgbn_set_ui32(env, res.coeffs[0], 1);
+        cgbn_set_ui32(arith._env, res.coeffs[0], 1);
         for (int i = 1 ; i < Degree; i++){
-            cgbn_set_ui32(env, res.coeffs[i], 0);
+            cgbn_set_ui32(arith._env, res.coeffs[i], 0);
         }
         FQ<Degree> temp;
 
-        FQP_copy(env, temp, p);
+        FQP_copy(arith, temp, p);
 
         for (int i = final_exp_len - 1; i >= 0; i--) {
             bn_t temp_n;
 
-            cgbn_memory_from_hex_string(temp_mem, final_exp[i]);
-            cgbn_load(env, temp_n, &temp_mem);
+            arith.cgbn_memory_from_hex_string(temp_mem, final_exp[i]);
+            cgbn_load(arith._env, temp_n, &temp_mem);
 
             for (int j =0 ; j<256; j++){
 
-            if (cgbn_extract_bits_ui32(env, temp_n, 0, 1) == 1) {
-                // cgbn_mul_mod(env, res, res, temp, mod);
-                FQP_mul(env, res, res, temp, mod);
-            }
-            // cgbn_mul_mod(env, temp, temp, temp, mod);
-            FQP_mul(env, temp, temp, temp, mod);
-            cgbn_shift_right(env, temp_n, temp_n, 1);
+                if (cgbn_extract_bits_ui32(arith._env, temp_n, 0, 1) == 1) {
+                    // cgbn_mul_mod(env, res, res, temp, mod);
+                    FQP_mul(arith, res, res, temp, mod);
+                }
+                // cgbn_mul_mod(env, temp, temp, temp, mod);
+                FQP_mul(arith, temp, temp, temp, mod);
+                cgbn_shift_right(arith._env, temp_n, temp_n, 1);
             }
 
         }
@@ -1197,36 +1064,36 @@ namespace ecc {
     * @param final_exp if true, do the final exponentiation
     */
     template<size_t Degree>
-    __host__ __device__ void miller_loop(env_t env, FQ<Degree> &Result, FQ<Degree> &Qx, FQ<Degree> &Qy, FQ<Degree> &Px, FQ<Degree> &Py, bn_t &mod_fp, bn_t& curve_order, bool final_exp = true) {
+    __host__ __device__ void miller_loop(arith_t &arith, FQ<Degree> &Result, FQ<Degree> &Qx, FQ<Degree> &Qy, FQ<Degree> &Px, FQ<Degree> &Py, bn_t &mod_fp, bn_t& curve_order, bool final_exp = true) {
         //  if Q is None or P is None: return FQ12.one()
         FQ<Degree> R_x, R_y, temp1, temp2;
         evm_word_t scratch_pad;
         bn_t ate_loop_count;
-        cgbn_memory_from_hex_string(scratch_pad, ate_loop_count_hex);
-        cgbn_load(env, ate_loop_count, &scratch_pad);
+        arith.cgbn_memory_from_hex_string(scratch_pad, ate_loop_count_hex);
+        cgbn_load(arith._env, ate_loop_count, &scratch_pad);
         // f = FQ12.one()
-        FQ<Degree> f = get_one<Degree>(env);
+        FQ<Degree> f = get_one<Degree>(arith);
         // R = Q
-        FQP_copy(env, R_x, Qx);
-        FQP_copy(env, R_y, Qy);
+        FQP_copy(arith, R_x, Qx);
+        FQP_copy(arith, R_y, Qy);
 
         for (int i = log_ate_loop_count; i >= 0; i--) {
             // f = f * f * linefunc(R, R, P)
-            FQP_mul(env, temp1, f, f, mod_fp);
+            FQP_mul(arith, temp1, f, f, mod_fp);
             // temp 2 = linefunc(R, R, P)
-            FQP_linefunc(env, temp2, R_x, R_y, R_x, R_y, Px, Py, mod_fp);
+            FQP_linefunc(arith, temp2, R_x, R_y, R_x, R_y, Px, Py, mod_fp);
             // print_fqp(env, temp2, "linefunc");
-            FQP_mul(env, f, temp1, temp2, mod_fp);
+            FQP_mul(arith, f, temp1, temp2, mod_fp);
             // // R = double(R)
-            FQP_ec_add(env, R_x, R_y, R_x, R_y, R_x, R_y, mod_fp);
+            FQP_ec_add(arith, R_x, R_y, R_x, R_y, R_x, R_y, mod_fp);
 
             // // if ate_loop_count & (2**i):
-            if (cgbn_extract_bits_ui32(env, ate_loop_count, i, 1)) {
+            if (cgbn_extract_bits_ui32(arith._env, ate_loop_count, i, 1)) {
                 // f = f * linefunc(R, Q, P)
-                FQP_linefunc(env, temp2, R_x, R_y, Qx, Qy, Px, Py, mod_fp);
-                FQP_mul(env, f, f, temp2, mod_fp);
+                FQP_linefunc(arith, temp2, R_x, R_y, Qx, Qy, Px, Py, mod_fp);
+                FQP_mul(arith, f, f, temp2, mod_fp);
                 // R = add(R, Q)
-                FQP_ec_add(env, R_x, R_y, R_x, R_y, Qx, Qy, mod_fp);
+                FQP_ec_add(arith, R_x, R_y, R_x, R_y, Qx, Qy, mod_fp);
             }
 
         }
@@ -1234,29 +1101,29 @@ namespace ecc {
         // Compute Q1 and nQ2, adapt for your representation of points
         FQ<Degree> Q1_x, Q1_y, nQ2_x, nQ2_y;
         // Q1 = (Q[0] ** field_modulus, Q[1] ** field_modulus)
-        FQP_pow(env, Q1_x, Qx, mod_fp, mod_fp);
-        FQP_pow(env, Q1_y, Qy, mod_fp, mod_fp);
+        FQP_pow(arith, Q1_x, Qx, mod_fp, mod_fp);
+        FQP_pow(arith, Q1_y, Qy, mod_fp, mod_fp);
 
         // nQ2 = (Q1[0] ** field_modulus, -Q1[1] ** field_modulus)
-        FQP_pow(env, nQ2_x, Q1_x, mod_fp, mod_fp);
-        FQP_neg(env, nQ2_y, Q1_y, mod_fp);
-        FQP_pow(env, nQ2_y, nQ2_y, mod_fp, mod_fp);
+        FQP_pow(arith, nQ2_x, Q1_x, mod_fp, mod_fp);
+        FQP_neg(arith, nQ2_y, Q1_y, mod_fp);
+        FQP_pow(arith, nQ2_y, nQ2_y, mod_fp, mod_fp);
 
         // f = f * linefunc(R, Q1, P)
-        FQP_linefunc(env, temp1, R_x, R_y, Q1_x, Q1_y, Px, Py, mod_fp);
-        FQP_mul(env, f, f, temp1, mod_fp);
+        FQP_linefunc(arith, temp1, R_x, R_y, Q1_x, Q1_y, Px, Py, mod_fp);
+        FQP_mul(arith, f, f, temp1, mod_fp);
 
         // R = add(R, Q1)
-        FQP_ec_add(env, R_x, R_y, R_x, R_y, Q1_x, Q1_y, mod_fp);
+        FQP_ec_add(arith, R_x, R_y, R_x, R_y, Q1_x, Q1_y, mod_fp);
 
         // f = f * linefunc(R, nQ2, P)
-        FQP_linefunc(env, temp1, R_x, R_y, nQ2_x, nQ2_y, Px, Py, mod_fp);
-        FQP_mul(env, f, f, temp1, mod_fp);
+        FQP_linefunc(arith, temp1, R_x, R_y, nQ2_x, nQ2_y, Px, Py, mod_fp);
+        FQP_mul(arith, f, f, temp1, mod_fp);
 
         if (final_exp)
-            FQP_final_exponentiation(env, Result, f, mod_fp);
+            FQP_final_exponentiation(arith, Result, f, mod_fp);
         else
-            FQP_copy(env, Result, f);
+            FQP_copy(arith, Result, f);
 
     }
 
@@ -1272,14 +1139,14 @@ namespace ecc {
      * @param curve_order
      * @param final_exp if true, do the final exponentiation
     */
-    __host__ __device__ void pairing(env_t env, FQ<12> &Res, FQ<2> &Qx, FQ<2> &Qy, FQ<1> &Px, FQ<1> &Py, bn_t &mod_fp, bn_t &curve_order, bool final_exp = true){
+    __host__ __device__ void pairing(arith_t &arith, FQ<12> &Res, FQ<2> &Qx, FQ<2> &Qy, FQ<1> &Px, FQ<1> &Py, bn_t &mod_fp, bn_t &curve_order, bool final_exp = true){
         // assert is_on_curve(Q, b2) assert is_on_curve(P, b)
         // return miller_loop(twist(Q), cast_point_to_fq12(P))
         FQ<12> Qx_tw, Qy_tw, Px_fp12, Py_fp12;
-        FQP_twist(env, Qx_tw, Qy_tw, Qx, Qy, mod_fp);
-        cgbn_set(env,Px_fp12.coeffs[0], Px.coeffs[0]);
-        cgbn_set(env,Py_fp12.coeffs[0], Py.coeffs[0]);
-        miller_loop(env, Res, Qx_tw, Qy_tw, Px_fp12, Py_fp12, mod_fp, curve_order, final_exp);
+        FQP_twist(arith, Qx_tw, Qy_tw, Qx, Qy, mod_fp);
+        cgbn_set(arith._env,Px_fp12.coeffs[0], Px.coeffs[0]);
+        cgbn_set(arith._env,Py_fp12.coeffs[0], Py.coeffs[0]);
+        miller_loop(arith, Res, Qx_tw, Qy_tw, Px_fp12, Py_fp12, mod_fp, curve_order, final_exp);
     }
 
     /*
@@ -1289,25 +1156,29 @@ namespace ecc {
     * @return 1 if the pairing result is 1, -1 if invalid inputs, 0 if failed.
     *
     */
-    __host__ __device__ int pairing_multiple(env_t env,  uint8_t* points_data, size_t data_len){
+    __host__ __device__ int pairing_multiple(
+        arith_t &arith,
+        uint8_t* points_data,
+        size_t data_len
+    ) {
         bn_t curve_order, mod_fp;
         evm_word_t scratch_pad;
         // load curve order and mod_fp
-        cgbn_memory_from_hex_string(scratch_pad, alt_BN128_Order);
-        cgbn_load(env, curve_order, &scratch_pad);
-        cgbn_memory_from_hex_string(scratch_pad, alt_BN128_FieldPrime);
-        cgbn_load(env, mod_fp, &scratch_pad);
+        arith.cgbn_memory_from_hex_string(scratch_pad, alt_BN128_Order);
+        cgbn_load(arith._env, curve_order, &scratch_pad);
+        arith.cgbn_memory_from_hex_string(scratch_pad, alt_BN128_FieldPrime);
+        cgbn_load(arith._env, mod_fp, &scratch_pad);
         FQ<2> Qx, Qy, B2;
         FQ<1> Px, Py, B1;
 
         // setup B1, B2
-        cgbn_set_ui32(env, B1.coeffs[0], 3);
-        cgbn_memory_from_hex_string(scratch_pad, alt_BN128_G2_B_0);
-        cgbn_load(env, B2.coeffs[0],&scratch_pad);
-        cgbn_memory_from_hex_string(scratch_pad, alt_BN128_G2_B_1);
-        cgbn_load(env, B2.coeffs[1],&scratch_pad);
+        cgbn_set_ui32(arith._env, B1.coeffs[0], 3);
+        arith.cgbn_memory_from_hex_string(scratch_pad, alt_BN128_G2_B_0);
+        cgbn_load(arith._env, B2.coeffs[0],&scratch_pad);
+        arith.cgbn_memory_from_hex_string(scratch_pad, alt_BN128_G2_B_1);
+        cgbn_load(arith._env, B2.coeffs[1],&scratch_pad);
 
-        FQ<12> final_res = get_one<12>(env);
+        FQ<12> final_res = get_one<12>(arith);
 
         size_t num_pairs = data_len / 192; // 2 for G1, 4 for G2
 
@@ -1315,38 +1186,38 @@ namespace ecc {
             FQ<12> temp_res;
             points_data += i*192;
 
-            cgbn_from_memory(env, Px.coeffs[0], points_data );
-            cgbn_from_memory(env, Py.coeffs[0], points_data + 32);
+            arith.cgbn_from_memory(Px.coeffs[0], points_data );
+            arith.cgbn_from_memory(Py.coeffs[0], points_data + 32);
             // Important!!! X2 first then X1 for G2
-            cgbn_from_memory(env, Qx.coeffs[1], points_data + 64);
-            cgbn_from_memory(env, Qx.coeffs[0], points_data + 96);
-            cgbn_from_memory(env, Qy.coeffs[1], points_data + 128);
-            cgbn_from_memory(env, Qy.coeffs[0], points_data + 160);
+            arith.cgbn_from_memory(Qx.coeffs[1], points_data + 64);
+            arith.cgbn_from_memory(Qx.coeffs[0], points_data + 96);
+            arith.cgbn_from_memory(Qy.coeffs[1], points_data + 128);
+            arith.cgbn_from_memory(Qy.coeffs[0], points_data + 160);
             //print point for debugging
-            print_fqp(env, Px, "Px");
-            print_fqp(env, Py, "Py");
-            print_fqp(env, Qx, "Qx");
-            print_fqp(env, Qy, "Qy");
-            bool on_curve = FQP_is_on_curve(env, Px, Py, mod_fp, B1)  && FQP_is_on_curve(env, Qx, Qy, mod_fp, B2);
+            //print_fqp(env, Px, "Px");
+            //print_fqp(env, Py, "Py");
+            //print_fqp(env, Qx, "Qx");
+            //print_fqp(env, Qy, "Qy");
+            bool on_curve = FQP_is_on_curve(arith, Px, Py, mod_fp, B1)  && FQP_is_on_curve(arith, Qx, Qy, mod_fp, B2);
             if (!on_curve){
-                if (FQP_is_inf(env, Qx, Qy) || FQP_is_inf(env, Px, Py)){
-                    FQ<12> one_fq12 = get_one<12>(env);
-                    FQP_copy(env, temp_res, one_fq12);
+                if (FQP_is_inf(arith, Qx, Qy) || FQP_is_inf(arith, Px, Py)){
+                    FQ<12> one_fq12 = get_one<12>(arith);
+                    FQP_copy(arith, temp_res, one_fq12);
                 } else {
                     return -1;
                 }
             } else {
-                pairing(env, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
+                pairing(arith, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
             }
-                FQP_mul(env, final_res, final_res, temp_res, mod_fp);
+                FQP_mul(arith, final_res, final_res, temp_res, mod_fp);
 
         }
         // final exp
-        FQP_final_exponentiation(env, final_res, final_res, mod_fp);
+        FQP_final_exponentiation(arith, final_res, final_res, mod_fp);
         printf("Final result: \n");
-        print_fqp(env, final_res, "Final");
-        FQ<12> one_fq12 = get_one<12>(env);
-        return FQP_equals(env, final_res, one_fq12) ? 1 : 0;
+        //print_fqp(arith._env, final_res, "Final");
+        FQ<12> one_fq12 = get_one<12>(arith);
+        return FQP_equals(arith, final_res, one_fq12) ? 1 : 0;
     }
 }  // namespace ecc
 

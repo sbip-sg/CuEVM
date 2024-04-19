@@ -1781,7 +1781,7 @@ public:
     arith_t _arith;              /**< The arithmetical environment */
     accessed_state_t *_accessed_state; /**< The accessed state */
     touch_state_t *_parent_state;  /**< The parent touch state */
-    bool nodestruct = false;
+    //bool nodestruct = false;
 
 
     /**
@@ -1801,7 +1801,7 @@ public:
     {
     }
 
-    __host__ __device__ __forceinline__ touch_state_t(
+    /*__host__ __device__ __forceinline__ touch_state_t(
         touch_state_data_t *content,
         accessed_state_t *access_state,
         arith_t &arith
@@ -1811,7 +1811,7 @@ public:
         _parent_state(nullptr),
         nodestruct(true)
     {
-    }
+    }*/
 
     /**
      * Constructor with given accessed state and parent touch state.
@@ -1843,10 +1843,10 @@ public:
     */
     __host__ __device__ __forceinline__ ~touch_state_t()
     {
-        if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
+        /*if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
             _content = nullptr;
             return;
-        };
+        };*/
         ONE_THREAD_PER_INSTANCE(
             if (_content != NULL)
             {
@@ -2152,7 +2152,7 @@ public:
                     );
                     dup_account->code_size = account->code_size;
                 } else {
-                    delete[] dup_account->bytecode;
+                    // delete[] dup_account->bytecode;
                     dup_account->bytecode = NULL;
                     dup_account->code_size = 0;
                 }
@@ -2174,10 +2174,10 @@ public:
                         _content->touch_accounts.no_accounts * sizeof(uint8_t)
                     );
 
-                    if (!nodestruct){
+                    /*if (!nodestruct){*/
                       delete[] _content->touch_accounts.accounts;
                       delete[] _content->touch;
-                    }
+                    /*}*/
                 }
                 _content->touch_accounts.accounts = tmp_accounts;
                 _content->touch_accounts.no_accounts++;
@@ -2485,6 +2485,7 @@ public:
         {
             storage_idx = account->storage_size;
             ONE_THREAD_PER_INSTANCE(
+                /* PERFORMENCE OPTION
                 size_t new_storage_size = ++account->storage_size;
                 if (new_storage_size % STORAGE_CHUNK == 1) {
                     // Round up to the next multiple of STORAGE_CHUNK
@@ -2501,6 +2502,19 @@ public:
                     delete[] account->storage;
                     account->storage = tmp_storage;
                 }
+                */
+                size_t new_storage_size = ++account->storage_size;
+                contract_storage_t *tmp_storage = new contract_storage_t[new_storage_size];
+                if (account->storage_size > 0)
+                {
+                    memcpy(
+                        tmp_storage,
+                        account->storage,
+                        (new_storage_size-1) * sizeof(contract_storage_t)
+                    );
+                    delete[] account->storage;
+                }
+                account->storage = tmp_storage;
             )
             // set the key
             cgbn_store(_arith._env, &(account->storage[storage_idx].key), key);
@@ -3436,6 +3450,116 @@ public:
     __host__ __forceinline__ cJSON *json()
     {
         return json_from_touch_state_data_t(_arith, *_content);
+    }
+
+    /**
+     * Get the state root json
+     * @return The state root json
+    */
+    __host__ cJSON *state_root_json(
+        keccak::keccak_t &keccak
+    ) {
+        cJSON *state_json = NULL;
+        cJSON *account_json = NULL;
+        cJSON *accounts_json = NULL;
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        cJSON *storage_json = NULL;
+        cJSON *key_value_json = NULL;
+        state_data_t *world_accounts = _accessed_state->_world_state->_content;
+        bn_t address;
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        size_t account_idx = 0;
+        size_t idx = 0;
+        uint8_t hash[32];
+        uint8_t *code;
+        size_t code_size;
+        evm_word_t code_hash;
+
+        state_json = cJSON_CreateObject();
+        accounts_json = cJSON_CreateArray();
+        cJSON_AddItemToObject(state_json, "accounts", accounts_json);
+        uint8_t *writen_accounts;
+        writen_accounts = new uint8_t[_content->touch_accounts.no_accounts];
+        memset(writen_accounts, 0, _content->touch_accounts.no_accounts);
+        for (idx = 0; idx < world_accounts->no_accounts; idx++)
+        {
+            cgbn_load(_arith._env, address, &(world_accounts->accounts[idx].address));
+            tmp_error_code = ERR_SUCCESS;
+            account_idx = get_account_index(address, tmp_error_code);
+            account_t *world_account = &(world_accounts->accounts[idx]);
+            account_t *touch_account = NULL;
+            uint8_t touch = 0;
+            if (tmp_error_code == ERR_SUCCESS) {
+                touch_account = &(_content->touch_accounts.accounts[account_idx]);
+                touch = _content->touch[account_idx];
+                writen_accounts[account_idx] = 1;
+            }
+            size_t jdx = 0;
+            account_json = cJSON_CreateObject();
+
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->address, 5);
+            cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
+
+            // set the balance
+            if (touch & WRITE_BALANCE) {
+                _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->balance);
+            } else {
+                _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->balance);
+            }
+            cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
+            
+            // set the nonce
+            if (touch & WRITE_NONCE) {
+                _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->nonce);
+            } else {
+                _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->nonce);
+            }
+            cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
+
+            // set the code hash
+
+            if (touch & WRITE_CODE) {
+                code = touch_account->bytecode;
+                code_size = touch_account->code_size;
+            } else {
+                code = world_account->bytecode;
+                code_size = world_account->code_size;
+            }
+            keccak.sha3(code, code_size, hash, 32);
+            _arith.word_from_memory(code_hash, hash);
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, code_hash);
+            cJSON_AddStringToObject(account_json, "codeHash", hex_string_ptr);
+
+            // set the storage
+            storage_json = cJSON_CreateArray();
+            cJSON_AddItemToObject(account_json, "storage", storage_json);
+            if (touch & WRITE_STORAGE) {
+                uint8_t *writen_storage;
+                writen_storage = new uint8_t[touch_account->storage_size];
+
+
+                delete [] writen_storage;
+            } else {
+                if (world_account->storage_size > 0)
+                {
+                    for (jdx = 0; jdx < world_account->storage_size; jdx++)
+                    {
+                        key_value_json = cJSON_CreateArray();
+                        _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].key);
+                        cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                        _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].value);
+                        cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                    }
+                }
+            }
+
+            
+        }
+
+        delete[] hex_string_ptr;
+        hex_string_ptr = NULL;
+        return state_json;
+    
     }
 
 

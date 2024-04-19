@@ -730,13 +730,7 @@ namespace precompile_operations {
             cgbn_set_ui32(arith._env, index, 0);
             tmp_input = message.get_data(index, length, size);
             // complete with zeroes the remaing bytes
-            ONE_THREAD_PER_INSTANCE(
-                input = new uint8_t[128];
-                memset(input, 0, 128);
-                memcpy(input, tmp_input, size);
-            )
-            //size = message._content->data.size;
-            //input = message._content->data.data;
+            input = arith.padded_malloc_byte_array(tmp_input, size, 128);
 
             ecc::signature_t signature;
             bn_t msg_hash, v, r, s, signer;
@@ -756,7 +750,7 @@ namespace precompile_operations {
 
             // TODO: is not 27 and 28, only?
             if (cgbn_compare_ui32(arith._env, v, 28) <= 0) {
-                uint8_t output[32];
+                SHARED_MEMORY uint8_t output[32];
                 size_t res = ecc::ec_recover(arith, keccak, signature, signer);
                 if (res==0){
                     arith.memory_from_cgbn(
@@ -768,7 +762,6 @@ namespace precompile_operations {
                 } else {
                     // TODO: do we consume all gas?
                     // it happens by default because of the error code
-                    return_data.set(NULL, 0);
                     error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
                 }
 
@@ -779,151 +772,167 @@ namespace precompile_operations {
         }
     }
 
-   __host__ __device__  static void operation_ecAdd(arith_t &arith,
-                                                            bn_t &gas_limit,
-                                                            bn_t &gas_used,
-                                                            uint32_t &error_code,
-                                                            return_data_t &return_data,
-                                                            message_t &message
-                                                            )
-  {
+    __host__ __device__  static void operation_ecAdd(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        return_data_t &return_data,
+        message_t &message
+    ) {
+        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECADD);
+        if (arith.has_gas(gas_limit, gas_used, error_code)) {
+            size_t size;
+            SHARED_MEMORY uint8_t *input, *tmp_input;
+            size = message.get_data_size();
+            if (size > 128) size = 128;
+            bn_t length;
+            arith.cgbn_from_size_t(length, size);
+            bn_t index;
+            cgbn_set_ui32(arith._env, index, 0);
+            tmp_input = message.get_data(index, length, size);
+            // complete with zeroes the remaing bytes
+            input = arith.padded_malloc_byte_array(tmp_input, size, 128);
 
-    size_t size;
-    uint8_t *input;
-    size = message._content->data.size;
-    if (size > 128) size = 128;
-    input = message._content->data.data;
-    ecc::Curve curve = ecc::get_curve(arith,128);
-    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECADD);
-    bn_t x1, y1, x2, y2;
-    evm_word_t scratch_pad;
-    uint8_t new_input[128];
-    memcpy(new_input, input, size);
-    for(int i = size; i < 128; i++){
-        new_input[i] = 0;
-    }
-    arith.cgbn_from_memory(x1, new_input);
-    arith.cgbn_from_memory(y1, new_input + 32);
-    arith.cgbn_from_memory(x2, new_input + 64);
-    arith.cgbn_from_memory(y2, new_input + 96);
-    // print
-    //printf("x1: %s\n", ecc::bnt_to_string(arith._env, x1));
-    //printf("y1: %s\n", ecc::bnt_to_string(arith._env, y1));
-    //printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
-    //printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
-    if (arith.has_gas(gas_limit, gas_used, error_code)) {
-        uint8_t output[64];
-        int res = ecc::ec_add(arith, curve, x1, y1, x1, y1, x2, y2);
-        if (res==0){
-            cgbn_store(arith._env, &scratch_pad, x1);
-            arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
-            cgbn_store(arith._env, &scratch_pad, y1);
-            arith.byte_array_from_cgbn_memory(output + 32, size, scratch_pad);
-            return_data.set(output, 64);
-            error_code = ERR_RETURN;
-        } else{
-            cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
-            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+
+            ecc::Curve curve = ecc::get_curve(arith,128);
+            
+            bn_t x1, y1, x2, y2;
+            arith.cgbn_from_memory(x1, input);
+            arith.cgbn_from_memory(y1, input + 32);
+            arith.cgbn_from_memory(x2, input + 64);
+            arith.cgbn_from_memory(y2, input + 96);
+            // print
+            //printf("x1: %s\n", ecc::bnt_to_string(arith._env, x1));
+            //printf("y1: %s\n", ecc::bnt_to_string(arith._env, y1));
+            //printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
+            //printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
+            SHARED_MEMORY uint8_t output[64];
+            int res = ecc::ec_add(arith, curve, x1, y1, x1, y1, x2, y2);
+            if (res==0){
+                arith.memory_from_cgbn(
+                    output,
+                    x1
+                );
+                arith.memory_from_cgbn(
+                    output + 32,
+                    y1
+                );
+                return_data.set(output, 64);
+                error_code = ERR_RETURN;
+            } else{
+                // consume all gas because it is an error
+                error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+            }
+            ONE_THREAD_PER_INSTANCE(
+                delete[] input;
+            )
+            //print res
+            //printf("xres: %s\n", ecc::bnt_to_string(arith._env, x1));
+            //printf("yres: %s\n", ecc::bnt_to_string(arith._env, y1));
         }
-        //print res
-        //printf("xres: %s\n", ecc::bnt_to_string(arith._env, x1));
-        //printf("yres: %s\n", ecc::bnt_to_string(arith._env, y1));
-    }
   }
 
-   __host__ __device__ static void operation_ecMul(arith_t &arith,
-                                                            bn_t &gas_limit,
-                                                            bn_t &gas_used,
-                                                            uint32_t &error_code,
-                                                            return_data_t &return_data,
-                                                            message_t &message
-                                                            )
-  {
+    __host__ __device__ static void operation_ecMul(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        return_data_t &return_data,
+        message_t &message
+    ) {
 
-    size_t size;
-    uint8_t *input;
-    size = message._content->data.size;
-    input = message._content->data.data;
-    ecc::Curve curve = ecc::get_curve(arith,128);
+        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECMUL);
+        if (arith.has_gas(gas_limit, gas_used, error_code)) {
+            size_t size;
+            SHARED_MEMORY uint8_t *input, *tmp_input;
+            size = message.get_data_size();
+            if (size > 96) size = 96;
+            bn_t length;
+            arith.cgbn_from_size_t(length, size);
+            bn_t index;
+            cgbn_set_ui32(arith._env, index, 0);
+            tmp_input = message.get_data(index, length, size);
+            // complete with zeroes the remaing bytes
+            input = arith.padded_malloc_byte_array(tmp_input, size, 96);
+            ecc::Curve curve = ecc::get_curve(arith,128);
 
-    bn_t x, y, k;
-    evm_word_t scratch_pad;
-    uint8_t new_input[96];
-    if (size > 96) size = 96;
-    memcpy(new_input, input, size);
-    for(int i = size; i < 96; i++){
-        new_input[i] = 0;
-    }
-    arith.cgbn_from_memory(x, new_input);
-    arith.cgbn_from_memory(y, new_input + 32);
-    arith.cgbn_from_memory(k, new_input + 64);
-    // print
-    //printf("mul x: %s\n", ecc::bnt_to_string(arith._env, x));
-    //printf("mul y: %s\n", ecc::bnt_to_string(arith._env, y));
-    //printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
+            bn_t x, y, k;
+            arith.cgbn_from_memory(x, input);
+            arith.cgbn_from_memory(y, input + 32);
+            arith.cgbn_from_memory(k, input + 64);
+            // print
+            //printf("mul x: %s\n", ecc::bnt_to_string(arith._env, x));
+            //printf("mul y: %s\n", ecc::bnt_to_string(arith._env, y));
+            //printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
 
-    if (arith.has_gas(gas_limit, gas_used, error_code)) {
-        uint8_t output[64];
-        int res = ecc::ec_mul(arith, curve, x, y, x, y, k);
-        // print result
-        //printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
-        //printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
-        if (res==0){
-            cgbn_store(arith._env, &scratch_pad, x);
-            arith.byte_array_from_cgbn_memory(output, size, scratch_pad);
-            cgbn_store(arith._env, &scratch_pad, y);
-            arith.byte_array_from_cgbn_memory(output + 32, size, scratch_pad);
-            return_data.set(output, 64);
-            // print_data_content_t(*return_data._content);
-            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECMUL);
-            error_code = ERR_RETURN;
-        } else{
-            cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
-            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+            SHARED_MEMORY uint8_t output[64];
+            int res = ecc::ec_mul(arith, curve, x, y, x, y, k);
+            // print result
+            //printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
+            //printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
+            if (res==0) {
+                arith.memory_from_cgbn(
+                    output,
+                    x
+                );
+                arith.memory_from_cgbn(
+                    output + 32,
+                    y
+                );
+                return_data.set(output, 64);
+                // print_data_content_t(*return_data._content);
+                error_code = ERR_RETURN;
+            } else {
+                // consume all the gas because it is an error
+                error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+            }
+            ONE_THREAD_PER_INSTANCE(
+                delete[] input;
+            )
         }
     }
-  }
 
-   __host__ __device__  static void operation_ecPairing(arith_t &arith,
-                                                            bn_t &gas_limit,
-                                                            bn_t &gas_used,
-                                                            uint32_t &error_code,
-                                                            return_data_t &return_data,
-                                                            message_t &message
-                                                            )
-  {
+    __host__ __device__  static void operation_ecPairing(
+        arith_t &arith,
+        bn_t &gas_limit,
+        bn_t &gas_used,
+        uint32_t &error_code,
+        return_data_t &return_data,
+        message_t &message
+    ) {
 
-    size_t size;
-    uint8_t *input;
-    size = message._content->data.size;
-    input = message._content->data.data;
+        size_t size;
+        SHARED_MEMORY uint8_t *input;
+        size = message.get_data_size();
+        bn_t length;
+        arith.cgbn_from_size_t(length, size);
+        bn_t index;
+        cgbn_set_ui32(arith._env, index, 0);
+        input = message.get_data(index, length, size);
+        arith.ecpairing_cost(gas_used, size);
 
-    arith.ecpairing_cost(gas_used, size);
-
-    if (arith.has_gas(gas_limit, gas_used, error_code)) {
-        if (size % 192 != 0 || size == 0) {
-            printf("size != 192x: %d", size);
-            cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
-            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
-            return;
+        if (arith.has_gas(gas_limit, gas_used, error_code)) {
+            if (size % 192 != 0 || size == 0) {
+                error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+            } else {
+                int res = ecc::pairing_multiple(arith, input, size);
+                // printf("res: %d", res);
+                if (res== -1) {
+                    error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+                } else {
+                    SHARED_MEMORY uint8_t output[32];
+                    ONE_THREAD_PER_INSTANCE(
+                        memset(output, 0, 32);
+                    )
+                    output[31] = (res == 1);
+                    return_data.set(output, 32);
+                    error_code = ERR_RETURN;
+                }
+            }
+            
         }
-        int res = ecc::pairing_multiple(arith._env, input, size);
-        printf("res: %d", res);
-        if (res== -1){
-            cgbn_add(arith._env, gas_used, gas_used, gas_limit); // consume all gas
-            error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
-        } else {
-            uint8_t output[32];
-            for (int i = 0; i < 31; i++)
-                output[i] = 0;
-            output[31] = res == 1;
-            return_data.set(output, 32);
-            error_code = ERR_RETURN;
-        }
-    } else{
-
     }
-  }
 
 }
 

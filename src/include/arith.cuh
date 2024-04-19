@@ -100,6 +100,45 @@ public:
     int32_t address_bits = int32_t(ADDRESS_BYTES) * 8;
     cgbn_bitwise_mask_and(_env, address, address, address_bits);
   }
+
+  /**
+   * Allocate a memory byte array with the content of the source byte array
+   * and the requested size. The memory byte array is in Big Endian format.
+   * NOTE: The memory byte array must be freed by the caller.
+   * The memory byte array is padded with zeros if the requested size is greater
+   * than the current size.
+   * @param[in] src The source byte array
+   * @param[in] current_size The current size of the byte array
+   * @param[in] request_size The requested size of the byte array
+   * @return The memory byte array pointer
+  */
+  __host__ __device__ __forceinline__ uint8_t* padded_malloc_byte_array(
+    const uint8_t *src,
+    size_t current_size,
+    size_t request_size
+  ) {
+    SHARED_MEMORY uint8_t *dst;
+    ONE_THREAD_PER_INSTANCE(
+      dst = new uint8_t[request_size];
+      size_t copy_size;
+      if (current_size < request_size)
+      {
+        copy_size = current_size;
+      }
+      else
+      {
+        copy_size = request_size;
+      }
+      if (dst != NULL)
+      {
+        memcpy(dst, src, copy_size);
+        memset(dst + copy_size, 0, request_size - copy_size);
+      }
+    )
+    return dst;
+  }
+
+
   /**
    * Get a memory byte array from CGBN base type.
    * The memory byte array is in Big Endian format.
@@ -148,7 +187,6 @@ public:
     bn_t src_cgbn;
     cgbn_from_memory(src_cgbn, src);
     cgbn_store(_env, &dst, src_cgbn);
-
   }
 
   /**
@@ -256,7 +294,7 @@ public:
    * @param[in] src_cgbn_mem
    * @param limb_count
    */
-  void bit_array_from_cgbn_memory(uint8_t *dst_array, uint32_t &array_length, evm_word_t &src_cgbn_mem, uint32_t limb_count = LIMBS) {
+  __host__ __device__ __forceinline__ void bit_array_from_cgbn_memory(uint8_t *dst_array, uint32_t &array_length, evm_word_t &src_cgbn_mem, uint32_t limb_count = LIMBS) {
     uint32_t current_limb;
     uint32_t bitIndex = 0; // Index for each bit in dst_array
     array_length = 0;
@@ -280,7 +318,7 @@ public:
    * @param[in] src_cgbn_mem
    * @param limb_count
    */
-  void byte_array_from_cgbn_memory(uint8_t *dst_array, size_t &array_length, evm_word_t &src_cgbn_mem, size_t limb_count = LIMBS) {
+  __host__ __device__ __forceinline__ void byte_array_from_cgbn_memory(uint8_t *dst_array, size_t &array_length, evm_word_t &src_cgbn_mem, size_t limb_count = LIMBS) {
     size_t current_limb;
     array_length = limb_count * 4; // Each limb has 4 bytes
 
@@ -300,74 +338,12 @@ public:
    * @param array_length
    * @param is_address
    */
-  void print_byte_array_as_hex(const uint8_t *byte_array, uint32_t array_length, bool is_address=false) {
+  __host__ __device__ __forceinline__ void print_byte_array_as_hex(const uint8_t *byte_array, uint32_t array_length, bool is_address=false) {
       printf("0x");
       for (uint32_t i = is_address? 12: 0; i < array_length; i++) {
           printf("%02x", byte_array[i]);
       }
       printf("\n");
-  }
-
-  /**
-   * Mul Mod function for CGBN
-   *
-   * @param env
-   * @param res
-   * @param a
-   * @param b
-   * @param mod
-   */
-  void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
-    env_t::cgbn_wide_t temp;
-    cgbn_mul_wide(env, temp, a, b);
-    cgbn_rem_wide(env, res, temp, mod);
-  }
-
-  /**
-   * Add Mod function for CGBN
-   *
-   * @param env
-   * @param res
-   * @param a
-   * @param b
-   * @param mod
-   */
-  void cgbn_add_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
-    int32_t carry = cgbn_add(env, res, a, b);
-    env_t::cgbn_wide_t d;
-    if (carry == 1)
-    {
-        cgbn_set_ui32(env, d._high, 1);
-        cgbn_set(env, d._low, res);
-        cgbn_rem_wide(env, res, d, mod);
-    }
-    else
-    {
-        cgbn_rem(env, res, res, mod);
-    }
-  }
-
-  /**
-   * Submod function for CGBN
-   *
-   * @param env
-   * @param res
-   * @param a
-   * @param b
-   * @param mod
-   */
-  void cgbn_sub_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
-    // if b > a then a - b + mod
-    if (cgbn_compare(env, a, b) < 0) {
-      env_t::cgbn_accumulator_t acc;
-      cgbn_set(env, acc, a);
-      cgbn_add(env, acc, mod);
-      cgbn_sub(env, acc, b);
-      cgbn_resolve(env, res, acc);
-      cgbn_rem(env, res, res, mod);
-    } else{
-      cgbn_sub(env, res, a, b);
-    }
   }
 
     /**
@@ -452,51 +428,89 @@ public:
     dst_hex_string[offset] = '\0'; // Null-terminate the string
   }
 
+  __host__ __device__ __forceinline__ uint8_t byte_from_two_hex(
+    char high,
+    char low
+  ) {
+    uint8_t byte = 0;
+    if (high >= '0' && high <= '9')
+    {
+      byte = (high - '0') << 4;
+    }
+    else if (high >= 'a' && high <= 'f')
+    {
+      byte = (high - 'a' + 10) << 4;
+    }
+    else if (high >= 'A' && high <= 'F')
+    {
+      byte = (high - 'A' + 10) << 4;
+    }
+    if (low >= '0' && low <= '9')
+    {
+      byte |= (low - '0');
+    }
+    else if (low >= 'a' && low <= 'f')
+    {
+      byte |= (low - 'a' + 10);
+    }
+    else if (low >= 'A' && low <= 'F')
+    {
+      byte |= (low - 'A' + 10);
+    }
+    return byte;
+  }
+
   /**
    * Get a CGBN memory from a hex string.
    * The hex string is in Big Endian format.
-   * It use the GMP library to convert the hex string to a mpz_t type.
    * @param[out] dst_cgbn_memory The destination CGBN memory
    * @param[in] src_hex_string The source hex string
    * @return 1 for overflow, 0 otherwiese
   */
-  __host__ int32_t cgbn_memory_from_hex_string(
+  __host__ __device__ int32_t cgbn_memory_from_hex_string(
     evm_word_t &dst_cgbn_memory,
     const char *src_hex_string
-  )
-  {
-    mpz_t value;
-    size_t written;
-    mpz_init(value);
+  ) {
+    size_t length;
+    char *current_char;
+    current_char = (char *)src_hex_string;
     if (
       (src_hex_string[0] == '0') &&
       ((src_hex_string[1] == 'x') || (src_hex_string[1] == 'X'))
-    )
-    {
-      mpz_set_str(value, src_hex_string + 2, 16);
+    ) {
+      current_char += 2; // Skip the "0x" prefix
     }
-    else
-    {
-      mpz_set_str(value, src_hex_string, 16);
-    }
-    if (mpz_sizeinbase(value, 2) > BITS)
-    {
+    for (length = 0; current_char[length] != '\0'; length++)
+      ;
+    if (length > BYTES) {
       return 1;
     }
-    mpz_export(
-      dst_cgbn_memory._limbs,
-      &written,
-      -1,
-      sizeof(uint32_t),
-      0,
-      0,
-      value
-    );
-    while (written < LIMBS)
+    SHARED_MEMORY uint8_t *byte_array;
+    ONE_THREAD_PER_INSTANCE(
+      byte_array = new uint8_t[BYTES];
+      memset(byte_array, 0, BYTES);
+    )
+
+    size_t idx;
+    for (idx = length; idx > 2; idx -= 2)
     {
-      dst_cgbn_memory._limbs[written++] = 0;
+      byte_array[BYTES - 1 - ((length - idx) / 2)] = byte_from_two_hex(
+        current_char[idx - 2],
+        current_char[idx - 1]
+      );
     }
-    mpz_clear(value);
+    if (idx == 1)
+    {
+      byte_array[BYTES - 1 - ((length-1) / 2)] = byte_from_two_hex('0', current_char[0]);
+    } else { //idx = 2
+      byte_array[BYTES - 1 - ((length-2) / 2)] = byte_from_two_hex(current_char[0], current_char[1]);
+    }
+    bn_t tmp;
+    cgbn_from_memory(tmp, byte_array);
+    cgbn_store(_env, &dst_cgbn_memory, tmp);
+    ONE_THREAD_PER_INSTANCE(
+      delete[] byte_array;
+    )
     return 0;
   }
 
