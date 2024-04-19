@@ -24,6 +24,7 @@ using account_t = world_state_t::account_t;
 using tracer_data_t = tracer_t::tracer_data_t;
 using evm_instances_t = evm_t::evm_instances_t;
 using contract_storage_t = world_state_t::contract_storage_t;
+using touch_state_data_t = touch_state_t::touch_state_data_t ;
 
 namespace python_utils{
 
@@ -110,6 +111,84 @@ namespace python_utils{
         }
     }
 
+    transaction_data_t* getTransactionDataFromListofPyObject(arith_t arith, PyObject* read_roots){
+        Py_ssize_t count = PyList_Size(read_roots);
+        transaction_data_t *transactions;
+        #ifndef ONLY_CPU
+            CUDA_CHECK(cudaMallocManaged((void **)&(transactions), count * sizeof(transaction_data_t)));
+        #else
+            transactions = new transaction_data_t[count];
+        #endif
+
+        for (Py_ssize_t idx = 0; idx < count; idx++) {
+
+            PyObject *read_root = PyList_GetItem(read_roots, idx);
+            if (!PyDict_Check(read_root)) {
+                PyErr_SetString(PyExc_TypeError, "Each item in the list must be a dictionary.");
+                return NULL;
+            }
+
+            PyObject* data = PyDict_GetItemString(read_root, "transaction");
+            // get data size
+            PyObject* tx_data =  PyDict_GetItemString(data, "data");
+            PyObject* tx_gas_limit = PyDict_GetItemString(data, "gasLimit");
+            PyObject* tx_value = PyDict_GetItemString(data, "value");
+            if (tx_data == NULL || !PyList_Check(tx_data)){
+                printf("Invalid transaction data\n");
+                return NULL;
+            }
+
+            printf("Transaction count: %d\n", count);
+
+            transaction_data_t *template_transaction = new transaction_data_t;
+            memset(template_transaction, 0, sizeof(transaction_data_t));
+
+            uint8_t type;
+
+            type = 0;
+            arith.cgbn_memory_from_hex_string(template_transaction->nonce, PyUnicode_AsUTF8(PyDict_GetItemString(data, "nonce")));
+            arith.cgbn_memory_from_hex_string(template_transaction->to, PyUnicode_AsUTF8(PyDict_GetItemString(data, "to")));
+            arith.cgbn_memory_from_hex_string(template_transaction->sender, PyUnicode_AsUTF8(PyDict_GetItemString(data, "sender")));
+
+            type = 0;
+            arith.cgbn_memory_from_size_t(template_transaction->max_fee_per_gas, 0);
+            arith.cgbn_memory_from_size_t(template_transaction->max_priority_fee_per_gas, 0);
+            arith.cgbn_memory_from_hex_string(template_transaction->gas_price,"0x0a");
+
+            template_transaction->type = type;
+
+            // char *bytes_string = NULL;
+            memcpy(&(transactions[idx]), template_transaction, sizeof(transaction_data_t));
+            arith.cgbn_memory_from_hex_string(transactions[idx].gas_limit, PyUnicode_AsUTF8(PyList_GetItem(tx_gas_limit, 0)));
+            arith.cgbn_memory_from_hex_string(transactions[idx].value, PyUnicode_AsUTF8(PyList_GetItem(tx_value, 0)));
+            const char* bytes_string = PyUnicode_AsUTF8(PyList_GetItem(tx_data, 0));
+
+            bytes_string = adjust_hex_string(bytes_string);
+            transactions[idx].data_init.size = strlen(bytes_string)/2;
+            if (transactions[idx].data_init.size > 0)
+            {
+        #ifndef ONLY_CPU
+                CUDA_CHECK(cudaMallocManaged(
+                    (void **)&(transactions[idx].data_init.data),
+                    transactions[idx].data_init.size * sizeof(uint8_t)));
+        #else
+                transactions[idx].data_init.data = new uint8_t[transactions[idx].data_init.size];
+        #endif
+                hex_to_bytes(
+                    bytes_string,
+                    transactions[idx].data_init.data,
+                    2 * transactions[idx].data_init.size);
+            }
+            else
+            {
+                transactions[idx].data_init.data = NULL;
+            }
+
+            delete template_transaction;
+        }
+
+        return transactions;
+    }
 
     transaction_data_t* getTransactionDataFromPyObject(arith_t arith, PyObject* data, size_t &instances_count){
         // get data size
@@ -479,7 +558,7 @@ namespace python_utils{
 
         // Set the data
         if (_content->data_init.size > 0) {
-            bytes_string = hex_from_data_content(_content->data_init);  // Assuming this function exists and converts data to hex string
+            bytes_string = hex_from_data_content(_content->data_init);
             PyDict_SetItemString(transaction_json, "data", PyUnicode_FromString(bytes_string));
             delete[] bytes_string;
         } else {
@@ -502,18 +581,56 @@ namespace python_utils{
         // PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
         // PyDict_SetItemString(root, "pre", world_state_json);
         // Py_DECREF(world_state_json);
+        PyObject* instances_json = PyList_New(0);
+        PyDict_SetItemString(root, "post", instances_json);
+        Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
 
+//   typedef struct
+//     {
+//         state_data_t touch_accounts; /**< The touch accounts */
+//         uint8_t *touch;             /**< The write operations */
+//     } touch_state_data_t;
 
         for (uint32_t idx = 0; idx < instances.count; idx++) {
-            // TODO: Print resultant state. to check with state_root branch
-            // PyObject* instances_json = pyobject_from_state_data_t(arith,instances[i].touch_state_data_t);//PyList_New(0);
-            // PyDict_SetItemString(root, "post", instances_json);
-            // Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
+
+            state_data_t* world_state_instance = instances.world_state_data[idx]; // update on this
+            touch_state_data_t prev_state, updated_state;
+            touch_state_data_t ref_touch_state = instances.touch_states_data[idx];
+            world_state_t world_state(arith, world_state_instance);
+            accessed_state_t accessed_state(&world_state);
+            updated_state.touch = new uint8_t[ref_touch_state.touch_accounts.no_accounts];
+
+            for (size_t idx = 0; idx < ref_touch_state.touch_accounts.no_accounts; idx++)
+            {
+                updated_state.touch[idx] = ref_touch_state.touch[idx];
+            }
+
+            prev_state.touch_accounts = *world_state_instance;
+            prev_state.touch = new uint8_t[world_state_instance->no_accounts];
+
+            updated_state.touch_accounts.no_accounts = ref_touch_state.touch_accounts.no_accounts;
+            updated_state.touch_accounts.accounts = ref_touch_state.touch_accounts.accounts;
+
+            touch_state_t original_state(&prev_state, &accessed_state, arith);
+            touch_state_t final_state(&prev_state, &accessed_state, arith);
+
+            final_state.update_with_child_state(original_state);
+
+            delete[] prev_state.touch;
+            delete[] updated_state.touch;
+            prev_state.touch = nullptr;
+            updated_state.touch = nullptr;
 
             PyObject* instance_json = PyDict_New();
-            PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
+
+            // TODO: Print resultant state. to check with state_root branch
+            PyObject* state_json = pyobject_from_state_data_t(arith, &updated_state.touch_accounts);//PyList_New(0);
+            // print_dict_recursive(state_json, 0);
             PyObject* transaction_json = pyobject_from_transaction_content(arith, &instances.transactions_data[idx]);
             PyDict_SetItemString(instance_json, "msg", transaction_json);
+
+            PyDict_SetItemString(instance_json, "state", state_json);
+
             #ifdef TRACER
             PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
             PyDict_SetItemString(instance_json, "traces", tracer_json);
@@ -522,6 +639,7 @@ namespace python_utils{
 
             PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances.errors[idx]));
             PyDict_SetItemString(instance_json, "success", PyBool_FromLong((instances.errors[idx] == ERR_NONE) || (instances.errors[idx] == ERR_RETURN) || (instances.errors[idx] == ERR_SUCCESS)));
+            PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
         }
 
         return root;

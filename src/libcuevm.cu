@@ -8,7 +8,7 @@
 
 using namespace python_utils;
 
-PyObject* run_interpreter_pyobject(PyObject *read_root) {
+PyObject* run_interpreter_pyobject(PyObject *read_roots) {
 
     typedef typename evm_t::evm_instances_t evm_instances_t;
     typedef arith_env_t<evm_params> arith_t;
@@ -22,27 +22,54 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
 
     arith_t arith(cgbn_report_monitor, 0);
 
-    if (!PyDict_Check(read_root)) {
-        PyErr_SetString(PyExc_TypeError, "Both arguments must be dictionaries.");
+    if (!PyList_Check(read_roots)) {
+        PyErr_SetString(PyExc_TypeError, "Argument must be a list of dictionaries.");
         return NULL;
     }
 
-    block_data_t* block_data = getBlockDataFromPyObject(arith, PyDict_GetItemString(read_root, "env"));
+    Py_ssize_t count = PyList_Size(read_roots);
 
-    state_data_t* state_data = getStateDataFromPyObject(arith, PyDict_GetItemString(read_root, "pre"));
+    block_data_t **all_block_data = (block_data_t**)malloc(sizeof(block_data_t*)*count);
+    state_data_t **all_state_data = (state_data_t**)malloc(sizeof(state_data_t*)*count);
+    // transaction_data_t* transactions = getTransactionDataFromPyObject(arith, PyDict_GetItemString(read_root, "transaction"));
+    transaction_data_t* all_transactions = getTransactionDataFromListofPyObject(arith, read_roots);
 
-    size_t count = 1;
-    transaction_data_t* transactions = getTransactionDataFromPyObject(arith, PyDict_GetItemString(read_root, "transaction"), count);
+    for (Py_ssize_t idx = 0; idx < count; idx++) {
 
+        PyObject *read_root = PyList_GetItem(read_roots, idx);
+        if (!PyDict_Check(read_root)) {
+            PyErr_SetString(PyExc_TypeError, "Each item in the list must be a dictionary.");
+            return NULL;
+        }
 
-    // get instaces to run
+        // block_data_t* block_data = getBlockDataFromPyObject(arith, PyDict_GetItemString(read_root, "env"));
+        all_block_data[idx] = getBlockDataFromPyObject(arith, PyDict_GetItemString(read_root, "env"));
+
+        // state_data_t* state_data = getStateDataFromPyObject(arith, PyDict_GetItemString(read_root, "pre"));
+        all_state_data[idx] = getStateDataFromPyObject(arith, PyDict_GetItemString(read_root, "pre"));
+
+    }
+
+    // get instances to run
     printf("Generating instances\n");
-    evm_t::get_cpu_instances_plain_data(cpu_instances, state_data, block_data, transactions, count);
+    evm_t::get_cpu_instances_plain_data(cpu_instances, all_state_data, all_block_data, all_transactions, count);
     printf("%d instances generated\n", cpu_instances.count);
     printf("\n print state data after get_cpu_instances_plain_data\n");
-    for (size_t i = 0; i < state_data->no_accounts; i++) {
-        world_state_t::print_account_t(arith, state_data->accounts[i]);
+
+    for (Py_ssize_t idx = 0; idx < count; idx++) {
+        printf("State data %d\n", idx);
+        for (size_t i = 0; i < all_state_data[idx]->no_accounts; i++) {
+            world_state_t::print_account_t(arith, all_state_data[idx]->accounts[i]);
+        }
     }
+    printf("\n print transaction data after get_cpu_instances_plain_data\n");
+    for (Py_ssize_t idx = 0; idx < count; idx++) {
+        printf("Transaction data %d\n", idx);
+        transaction_t::print_transaction_data_t(arith, all_transactions[idx]);
+
+    }
+
+
     #ifndef ONLY_CPU
         evm_t::get_gpu_instances(tmp_gpu_instances, cpu_instances);
         CUDA_CHECK(cudaMalloc(&gpu_instances, sizeof(evm_instances_t)));
@@ -82,8 +109,8 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
         // printf("Running instance %d\n", instance);
         evm = new evm_t(
             arith,
-            cpu_instances.world_state_data,
-            cpu_instances.block_data,
+            cpu_instances.world_state_data[instance],
+            cpu_instances.block_data[instance],
             cpu_instances.sha3_parameters,
             &(cpu_instances.transactions_data[instance]),
             &(cpu_instances.accessed_states_data[instance]),
@@ -108,6 +135,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_root) {
 
     // free the memory
     // printf("Freeing the memory ...\n");
+
     PyObject* write_root = python_utils::pyobject_from_evm_instances_t(arith, cpu_instances);
     evm_t::free_instances(cpu_instances);
     #ifndef ONLY_CPU
@@ -127,10 +155,6 @@ static PyObject* run_dict(PyObject* self, PyObject* args) {
         return NULL; // If parsing fails, return NULL
     }
 
-    if (!PyDict_Check(read_root)) {
-        PyErr_SetString(PyExc_TypeError, "Parameter must be a dictionary.");
-        return NULL;
-    }
 
     PyObject* write_root = run_interpreter_pyobject(read_root);
     // Return the resulting PyObject* (no need for manual memory management on Python side)

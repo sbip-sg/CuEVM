@@ -19,26 +19,28 @@ class CuEVMLib:
 
 
     def update_persistent_state(self, json_result):
-        trace_values = list(json_result.values())
+        trace_values = json_result
         print ("trace value result")
         pprint(json_result)
-        for i in range(len(trace_values)):
-            post_state = trace_values[0].get("post")[0]
-            touch_state = post_state.get("touch_state")
-            next_config = self.instances[i]
-            next_config["pre"].update(touch_state)
-            sender = next_config["transaction"]["sender"]
-            next_config["transaction"]["nonce"] = touch_state.get(sender).get(
-                "nonce"
-            )
+        for i in range(len(trace_values.get("post"))):
+            post_state = trace_values.get("post")[i].get("state")
+            print("\n\n post_state %d \n\n" % i)
+            pprint(post_state)
+            # touch_state = post_state.get("touch_state")
+            # next_config = self.instances[i]
+            # next_config["pre"].update(touch_state)
+            # sender = next_config["transaction"]["sender"]
+            # next_config["transaction"]["nonce"] = touch_state.get(sender).get(
+            #     "nonce"
+            # )
 
     ## 1. run transactions on the EVM instances
     ## 2. update the persistent state of the EVM instances
     ## 3. return the simplified trace during execution
     def run_transactions(self, tx_data):
         self.build_instance_data(tx_data)
-        result_json = libcuevm.run_dict(self.instances[0])
-        self.update_persistent_state(result_json)
+        result_state = libcuevm.run_dict(self.instances)
+        self.update_persistent_state(result_state)
 
     ## initiate num_instances clones of the initial state
     def initiate_instance_data(self, source_file, num_instances, config = None, detect_bug=False):
@@ -71,7 +73,8 @@ class CuEVMLib:
         self.instances = [copy.deepcopy(new_test) for _ in range(num_instances)]
 
     def print_instance_data(self):
-        for instance in self.instances:
+        for idx,instance in enumerate(self.instances):
+            print(f"\n\n Instance data {idx}\n\n")
             pprint(instance)
 
 
@@ -89,7 +92,7 @@ class CuEVMLib:
 
 
 if __name__ == "__main__":
-    my_lib = CuEVMLib("contracts/state_change.sol", 1, "configurations/state_change.json", False)
+    my_lib = CuEVMLib("contracts/state_change.sol", 2, "configurations/state_change.json", False)
     test_case = {
                     "function": "increase",
                     "type": "exec",
@@ -97,9 +100,23 @@ if __name__ == "__main__":
                     "input": [],
                     "sender": 0
                 }
+
+
     tx_1 = {
         "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
         "value" : [hex(0)]
     }
-    my_lib.run_transactions([tx_1])
+    tx_2 = {
+        "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
+        "value" : [hex(0)]
+    }
+
+    # for debugging, altering tx2 data
+    tx_2["data"] = ["0x22"]
+    tx_2["value"] = [hex(10)]
+    # for debugging, altering the state 2
+    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"]["0x00"] = "0x22"
+    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["balance"] = "0x00"
+    my_lib.run_transactions([tx_1 , tx_2])
+    print ("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()

@@ -18,6 +18,8 @@ set(CMAKE_CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 
 # Check if building as a library or an executable
 if(BUILD_LIBRARY)
+    # Add the BUILD_LIB flag
+    add_definitions(-DBUILD_LIB)
 
     # Build as a shared library
     add_library(${PROJECT_NAME} SHARED libcuevm.cu)

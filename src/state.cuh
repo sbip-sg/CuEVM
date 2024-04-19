@@ -1769,7 +1769,7 @@ public:
     arith_t _arith;              /**< The arithmetical environment */
     accessed_state_t *_accessed_state; /**< The accessed state */
     touch_state_t *_parent_state;  /**< The parent touch state */
-
+    bool nodestruct = false;
 
     /**
      * Constructor with given content.
@@ -1785,6 +1785,20 @@ public:
         _content(content),
         _accessed_state(access_state),
         _parent_state(parent_state)
+    {
+    }
+
+
+// from state-root-ecc branch
+    __host__ __device__ __forceinline__ touch_state_t(
+        touch_state_data_t *content,
+        accessed_state_t *access_state,
+        arith_t &arith
+    ) : _arith(arith),
+        _content(content),
+        _accessed_state(access_state),
+        _parent_state(nullptr),
+        nodestruct(true)
     {
     }
 
@@ -1818,6 +1832,10 @@ public:
     */
     __host__ __device__ __forceinline__ ~touch_state_t()
     {
+        if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
+            _content = nullptr;
+            return;
+        };
         ONE_THREAD_PER_INSTANCE(
             if (_content != NULL)
             {
