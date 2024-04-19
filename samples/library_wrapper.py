@@ -14,8 +14,10 @@ sys.path.append('../build/')
 import libcuevm  # Now you can import your module as usual
 
 class CuEVMLib:
-    def __init__(self, source_file, num_instances, config = None, detect_bug=False):
+    def __init__(self, source_file, num_instances, config = None,
+                 detect_bug=False, sender = "0x1111111111111111111111111111111111111111"):
         self.initiate_instance_data(source_file, num_instances, config, detect_bug)
+        self.sender = sender
 
 
     def update_persistent_state(self, json_result):
@@ -24,15 +26,13 @@ class CuEVMLib:
         pprint(json_result)
         for i in range(len(trace_values.get("post"))):
             post_state = trace_values.get("post")[i].get("state")
-            print("\n\n post_state %d \n\n" % i)
-            pprint(post_state)
-            # touch_state = post_state.get("touch_state")
-            # next_config = self.instances[i]
-            # next_config["pre"].update(touch_state)
+            # print("\n\n post_state %d \n\n" % i)
+            # pprint(post_state)
+            self.instances[i]["pre"] = copy.deepcopy(post_state)
             # sender = next_config["transaction"]["sender"]
-            # next_config["transaction"]["nonce"] = touch_state.get(sender).get(
-            #     "nonce"
-            # )
+            self.instances[i]["transaction"]["nonce"] = post_state.get(self.sender).get(
+                "nonce"
+            )
 
     ## 1. run transactions on the EVM instances
     ## 2. update the persistent state of the EVM instances
@@ -118,5 +118,9 @@ if __name__ == "__main__":
     my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"]["0x00"] = "0x22"
     my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["balance"] = "0x00"
     my_lib.run_transactions([tx_1 , tx_2])
+    print ("\n\n Updated instance data \n\n")
+    my_lib.print_instance_data()
+
+    my_lib.run_transactions([tx_1 , tx_1])
     print ("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()

@@ -2161,8 +2161,10 @@ public:
                         _content->touch,
                         _content->touch_accounts.no_accounts * sizeof(uint8_t)
                     );
-                    delete[] _content->touch_accounts.accounts;
-                    delete[] _content->touch;
+                    if (!nodestruct){
+                        delete[] _content->touch_accounts.accounts;
+                        delete[] _content->touch;
+                    }
                 }
                 _content->touch_accounts.accounts = tmp_accounts;
                 _content->touch_accounts.no_accounts++;
@@ -2683,7 +2685,6 @@ public:
         bn_t address, key, value;
         bn_t balance, nonce;
         size_t account_idx = 0;
-
         // go through all the accounts of the children
         for (idx = 0; idx < child._content->touch_accounts.no_accounts; idx++)
         {

@@ -419,11 +419,11 @@ namespace python_utils{
         PyDict_SetItemString(account_json, "address", PyUnicode_FromString(hex_string_ptr));
 
         // Set the balance
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.balance);
+        arith.pretty_hex_string_from_cgbn_memory(hex_string_ptr, account.balance);
         PyDict_SetItemString(account_json, "balance", PyUnicode_FromString(hex_string_ptr));
 
         // Set the nonce
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, account.nonce);
+        arith.pretty_hex_string_from_cgbn_memory(hex_string_ptr, account.nonce);
         PyDict_SetItemString(account_json, "nonce", PyUnicode_FromString(hex_string_ptr));
 
         // Set the code
@@ -439,8 +439,8 @@ namespace python_utils{
         PyDict_SetItemString(account_json, "storage", storage_json);
         if (account.storage_size > 0) {
             for (jdx = 0; jdx < account.storage_size; jdx++) {
-                arith.hex_string_from_cgbn_memory(hex_string_ptr, account.storage[jdx].key);
-                arith.hex_string_from_cgbn_memory(value_hex_string_ptr, account.storage[jdx].value);
+                arith.pretty_hex_string_from_cgbn_memory(hex_string_ptr, account.storage[jdx].key);
+                arith.pretty_hex_string_from_cgbn_memory(value_hex_string_ptr, account.storage[jdx].value);
                 PyDict_SetItemString(storage_json, hex_string_ptr, PyUnicode_FromString(value_hex_string_ptr));
             }
         }
@@ -585,36 +585,34 @@ namespace python_utils{
         PyDict_SetItemString(root, "post", instances_json);
         Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
 
-//   typedef struct
-//     {
-//         state_data_t touch_accounts; /**< The touch accounts */
-//         uint8_t *touch;             /**< The write operations */
-//     } touch_state_data_t;
-
         for (uint32_t idx = 0; idx < instances.count; idx++) {
 
             state_data_t* world_state_instance = instances.world_state_data[idx]; // update on this
             touch_state_data_t prev_state, updated_state;
             touch_state_data_t ref_touch_state = instances.touch_states_data[idx];
             world_state_t world_state(arith, world_state_instance);
-            accessed_state_t accessed_state(&world_state);
+            accessed_state_t accessed_state_1(&world_state);
+            accessed_state_t accessed_state_2(&world_state);
             updated_state.touch = new uint8_t[ref_touch_state.touch_accounts.no_accounts];
 
-            for (size_t idx = 0; idx < ref_touch_state.touch_accounts.no_accounts; idx++)
+            for (size_t j = 0; j < ref_touch_state.touch_accounts.no_accounts; j++)
             {
-                updated_state.touch[idx] = ref_touch_state.touch[idx];
+                updated_state.touch[j] = ref_touch_state.touch[j];
             }
-
-            prev_state.touch_accounts = *world_state_instance;
-            prev_state.touch = new uint8_t[world_state_instance->no_accounts];
 
             updated_state.touch_accounts.no_accounts = ref_touch_state.touch_accounts.no_accounts;
             updated_state.touch_accounts.accounts = ref_touch_state.touch_accounts.accounts;
 
-            touch_state_t original_state(&prev_state, &accessed_state, arith);
-            touch_state_t final_state(&prev_state, &accessed_state, arith);
+            prev_state.touch_accounts.no_accounts = world_state_instance->no_accounts;
+            prev_state.touch_accounts.accounts = world_state_instance->accounts;
+            prev_state.touch = new uint8_t[world_state_instance->no_accounts];
 
-            final_state.update_with_child_state(original_state);
+            touch_state_t tx_result_state(&updated_state, &accessed_state_1, arith);
+            touch_state_t final_state(&prev_state, &accessed_state_2, arith);
+
+            final_state.update_with_child_state(tx_result_state);
+
+            char* temp = new char[arith_t::BYTES * 2 + 3];
 
             delete[] prev_state.touch;
             delete[] updated_state.touch;
@@ -624,7 +622,7 @@ namespace python_utils{
             PyObject* instance_json = PyDict_New();
 
             // TODO: Print resultant state. to check with state_root branch
-            PyObject* state_json = pyobject_from_state_data_t(arith, &updated_state.touch_accounts);//PyList_New(0);
+            PyObject* state_json = pyobject_from_state_data_t(arith, &prev_state.touch_accounts);//PyList_New(0);
             // print_dict_recursive(state_json, 0);
             PyObject* transaction_json = pyobject_from_transaction_content(arith, &instances.transactions_data[idx]);
             PyDict_SetItemString(instance_json, "msg", transaction_json);
