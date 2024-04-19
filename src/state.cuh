@@ -354,9 +354,11 @@ public:
         printf("nonce: ");
         arith.print_cgbn_memory(account.nonce);
         printf("code_size: %lu\n", account.code_size);
-        printf("code: ");
-        print_bytes(account.bytecode, account.code_size);
-        printf("\n");
+        if (account.code_size > 0){
+            printf("code: ");
+            print_bytes(account.bytecode, account.code_size);
+            printf("\n");
+        }
         printf("storage_size: %lu\n", account.storage_size);
         for (size_t idx = 0; idx < account.storage_size; idx++)
         {
@@ -586,6 +588,7 @@ public:
     {
         return json_from_state_data_t(_arith, *_content);
     }
+
 };
 
 /**
@@ -1766,7 +1769,7 @@ public:
     arith_t _arith;              /**< The arithmetical environment */
     accessed_state_t *_accessed_state; /**< The accessed state */
     touch_state_t *_parent_state;  /**< The parent touch state */
-
+    bool nodestruct = false;
 
     /**
      * Constructor with given content.
@@ -1782,6 +1785,20 @@ public:
         _content(content),
         _accessed_state(access_state),
         _parent_state(parent_state)
+    {
+    }
+
+
+// from state-root-ecc branch
+    __host__ __device__ __forceinline__ touch_state_t(
+        touch_state_data_t *content,
+        accessed_state_t *access_state,
+        arith_t &arith
+    ) : _arith(arith),
+        _content(content),
+        _accessed_state(access_state),
+        _parent_state(nullptr),
+        nodestruct(true)
     {
     }
 
@@ -1815,6 +1832,10 @@ public:
     */
     __host__ __device__ __forceinline__ ~touch_state_t()
     {
+        if (nodestruct) { // skip freeing internal memory, assuming they're borrowed
+            _content = nullptr;
+            return;
+        };
         ONE_THREAD_PER_INSTANCE(
             if (_content != NULL)
             {
@@ -2140,8 +2161,10 @@ public:
                         _content->touch,
                         _content->touch_accounts.no_accounts * sizeof(uint8_t)
                     );
-                    delete[] _content->touch_accounts.accounts;
-                    delete[] _content->touch;
+                    if (!nodestruct){
+                        delete[] _content->touch_accounts.accounts;
+                        delete[] _content->touch;
+                    }
                 }
                 _content->touch_accounts.accounts = tmp_accounts;
                 _content->touch_accounts.no_accounts++;
@@ -2662,7 +2685,6 @@ public:
         bn_t address, key, value;
         bn_t balance, nonce;
         size_t account_idx = 0;
-
         // go through all the accounts of the children
         for (idx = 0; idx < child._content->touch_accounts.no_accounts; idx++)
         {

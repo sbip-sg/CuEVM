@@ -2,7 +2,7 @@
   "env": {
     "currentBaseFee": "0x0a",
     "currentBeaconRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "currentCoinbase": "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",
+    "currentCoinbase": "0x0000000000000000000000000000000000C0FFEE",
     "currentDifficulty": "0x020000",
     "currentGasLimit": "0x02540be400",
     "currentNumber": "0x01",
@@ -13,7 +13,7 @@
   },
   "target_address": "0xcccccccccccccccccccccccccccccccccccccccc",
   "pre": {
-    "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b": {
+    "0x1111111111111111111111111111111111111111": {
       "balance": "0x0ba1a9ce0ba1a9ce",
       "code": "0x",
       "nonce": "0x00",
@@ -32,7 +32,7 @@
     "gasPrice": "0x0a",
     "nonce": "0x00",
     "secretKey": "0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8",
-    "sender": "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b",
+    "sender": "0x1111111111111111111111111111111111111111",
     "to": "0xcccccccccccccccccccccccccccccccccccccccc",
     "value": ["0x00"]
   }

@@ -1,6 +1,6 @@
 #ifndef _EVM_H_
 #define _EVM_H_
-
+#include <Python.h>
 #include "include/utils.h"
 #include "stack.cuh"
 #include "message.cuh"
@@ -92,8 +92,13 @@ public:
     */
     typedef struct
     {
+#ifndef BUILD_LIB
         state_data_t *world_state_data; /**< The world state content*/
         block_data_t *block_data; /**< The current block infomation*/
+#else
+        state_data_t **world_state_data; /**< The world state content*/
+        block_data_t **block_data; /**< The current block infomation*/
+#endif
         sha3_parameters_t *sha3_parameters; /**< The constants for the KECCAK*/
         transaction_data_t *transactions_data; /**< The transactions information*/
         accessed_state_data_t *accessed_states_data; /**< The data cotaining the states access by the transactions execution*/
@@ -3054,6 +3059,7 @@ public:
         start_CALL(error_code);
     }
 
+#ifndef BUILD_LIB
     /**
      * Get the cpu instances from the json test.
      * @param[out] instances evm instances
@@ -3102,6 +3108,66 @@ public:
 
         // allocated the memory for return data
         instances.return_data = return_data_t::get_cpu_instances(instances.count);
+#ifdef TRACER
+        // allocated the memory for tracers
+        instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
+#endif
+
+        // alocate the memory for the result of the transactions
+#ifndef ONLY_CPU
+        CUDA_CHECK(cudaMallocManaged(
+            (void **)&(instances.errors),
+            sizeof(uint32_t) * instances.count));
+#else
+        instances.errors = new uint32_t[instances.count];
+#endif
+        memset(instances.errors, ERR_NONE, sizeof(uint32_t) * instances.count);
+    }
+#endif
+    /*
+        * Get the cpu instances from the plain data.
+        * @param[out] instances evm instances
+        * @param[in] state_data state data
+        * @param[in] block_data block data
+        * @param[in] transactions_data transactions data
+        * @param[in] count number of transactions
+    */
+    __host__ static void get_cpu_instances_plain_data(
+        evm_instances_t &instances,
+        state_data_t** state_data,
+        block_data_t** block_data,
+        transaction_data_t* transactions_data,
+        size_t count
+        )
+    {
+        //setup the arithmetic environment
+        arith_t arith(cgbn_report_monitor, 0);
+        instances.world_state_data = state_data;
+        instances.block_data = block_data;
+        // setup the keccak paramameters
+        keccak_t *keccak;
+        keccak = new keccak_t();
+        instances.sha3_parameters = keccak->_parameters;
+        delete keccak;
+        keccak = NULL;
+
+        // get the transactions
+        instances.transactions_data = transactions_data;
+
+        instances.count = count;
+
+        // allocated the memory for accessed states
+        instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
+
+        // allocated the memory for touch states
+        instances.touch_states_data = touch_state_t::get_cpu_instances(instances.count);
+
+        // allocated the memory for logs
+        instances.logs_data = log_state_t::get_cpu_instances(instances.count);
+
+        // allocated the memory for return data
+        instances.return_data = return_data_t::get_cpu_instances(instances.count);
+
 #ifdef TRACER
         // allocated the memory for tracers
         instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
@@ -3189,7 +3255,27 @@ public:
         evm_instances_t &cpu_instances)
     {
         arith_t arith(cgbn_report_monitor, 0);
+        printf("free instances\n");
+#ifdef BUILD_LIB
+        for (size_t idx = 0; idx < cpu_instances.count; idx++)
+        {
+            world_state_t *cpu_world_state;
+            printf("world state data pointer %d instance %p \n\n", idx, cpu_instances.world_state_data[idx]);
 
+            cpu_world_state = new world_state_t(arith, cpu_instances.world_state_data[idx]);
+            cpu_world_state->free_content();
+            cpu_instances.world_state_data[idx] = NULL;
+            delete cpu_world_state;
+            cpu_world_state = NULL;
+
+            block_t *cpu_block = NULL;
+            cpu_block = new block_t(arith, cpu_instances.block_data[idx]);
+            cpu_block->free_content();
+            cpu_instances.block_data[idx] = NULL;
+            delete cpu_block;
+            cpu_block = NULL;
+        }
+#else
         world_state_t *cpu_world_state;
         cpu_world_state = new world_state_t(arith, cpu_instances.world_state_data);
         cpu_world_state->free_content();
@@ -3201,7 +3287,7 @@ public:
         cpu_block->free_content();
         delete cpu_block;
         cpu_block = NULL;
-
+#endif
         keccak_t *keccak;
         keccak = new keccak_t(cpu_instances.sha3_parameters);
         keccak->free_parameters();
@@ -3244,6 +3330,8 @@ public:
         bool verbose = false)
     {
         printf("verbose mode %d\n", verbose);
+
+#ifndef BUILD_LIB
         if (verbose){
             world_state_t *cpu_world_state;
             cpu_world_state = new world_state_t(arith, instances.world_state_data);
@@ -3261,9 +3349,27 @@ public:
             printf("return data count %lu\n", instances.return_data[0].size);
             printf("Instances:\n");
         }
+#endif
         for (size_t idx = 0; idx < instances.count; idx++)
         {
             if (verbose){
+
+#ifdef BUILD_LIB
+            world_state_t *cpu_world_state;
+            cpu_world_state = new world_state_t(arith, instances.world_state_data[idx]);
+            printf("World state:\n");
+            cpu_world_state->print();
+            delete cpu_world_state;
+            cpu_world_state = NULL;
+
+            block_t *cpu_block = NULL;
+            cpu_block = new block_t(arith, instances.block_data[idx]);
+            printf("Block:\n");
+            cpu_block->print();
+            delete cpu_block;
+            cpu_block = NULL;
+            printf("return data count %lu\n", instances.return_data[0].size);
+#endif
                 printf("Instance %lu\n", idx);
                 transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
 
@@ -3283,6 +3389,7 @@ public:
         }
     }
 
+#ifndef BUILD_LIB
     /**
      * Get the json from the evm instances after the transaction execution.
      * @param[in] arith arithmetic environment
@@ -3342,7 +3449,11 @@ public:
         }
         return root;
     }
-};
+#endif
+
+}; // evm_t
+
+
 
 /**
  * The evm kernel running the transactions on the GPU.
@@ -3368,8 +3479,8 @@ __global__ void kernel_evm(
     // setup evm
     evm_t evm (
         arith,
-        instances->world_state_data,
-        instances->block_data,
+        instances->world_state_data[instance],
+        instances->block_data[instance],
         instances->sha3_parameters,
         &(instances->transactions_data[instance]),
         &(instances->accessed_states_data[instance]),

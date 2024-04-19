@@ -1,7 +1,7 @@
 
 #ifndef _UTILS_H_
 #define _UTILS_H_
-
+#include <Python.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -83,6 +83,7 @@ using evm_word_t =  cgbn_mem_t<evm_params::BITS>;
 
 
 __host__ size_t adjusted_length(char** hex_string);
+__host__ const char* adjust_hex_string(const char* hex_string);
 __host__ void hex_to_bytes(const char *hex_string, uint8_t *byte_array, size_t length);
 void cuda_check(cudaError_t status, const char *action=NULL, const char *file=NULL, int32_t line=0);
 void cgbn_check(cgbn_error_report_t *report, const char *file=NULL, int32_t line=0);

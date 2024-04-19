@@ -23,13 +23,11 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 
   arith_t arith(cgbn_report_monitor, 0);
 
-  //read the json file with the global state
-  cJSON *read_root = get_json_from_file(read_json_filename);
   if(read_root == NULL) {
     printf("Error: could not read the json file\n");
     exit(EXIT_FAILURE);
   }
-  cJSON *write_root = cJSON_CreateObject();
+
   const cJSON *test = NULL;
   cJSON_ArrayForEach(test, read_root) {
     // get instaces to run
@@ -120,12 +118,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("Results printed\n");
 
     // print to json files
-    printf("Printing to json files ...\n");
+    printf("Printing to json string ...\n");
     cJSON_AddItemToObject(
       write_root,
       test->string,
       evm_t::json_from_evm_instances_t(arith, cpu_instances));
-    printf("Json files printed\n");
+    printf("Json string printed\n");
 
     // free the memory
     printf("Freeing the memory ...\n");
@@ -136,6 +134,15 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     CUDA_CHECK(cudaDeviceReset());
     #endif
   }
+}
+
+void run_json_files(char* read_json_filename, char* write_json_filename, size_t clones, bool verbose=false){
+  //read the json file with the global state
+  cJSON *read_root = get_json_from_file(read_json_filename);
+  cJSON *write_root = cJSON_CreateObject();
+
+  run_interpreter(read_root, write_root, clones, verbose);
+
   cJSON_Delete(read_root);
   char *json_str=cJSON_Print(write_root);
   FILE *fp=fopen(write_json_filename, "w");
@@ -145,6 +152,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
   cJSON_Delete(write_root);
 }
 
+#ifndef BUILD_LIB
 int main(int argc, char *argv[]) {//getting the input
   char *read_json_filename = NULL;
   char *write_json_filename = NULL;
@@ -191,5 +199,6 @@ int main(int argc, char *argv[]) {//getting the input
     fprintf(stdout, "File '%s' does not exist\n", read_json_filename);
     exit(EXIT_FAILURE);
   }
-  run_interpreter(read_json_filename, write_json_filename, clones, verbose);
+  run_json_files(read_json_filename, write_json_filename, clones, verbose);
 }
+#endif

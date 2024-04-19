@@ -4,8 +4,8 @@ NVCC_FLAGS = -I./CGBN/include -lstdc++ -lm -lgmp -lcjson -rdc=true --std c++20 -
 GCC = gcc
 GCC_FLAGS = -lm -lgmp -lcjson
 GPP = g++
-GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson
-OUT_DIRECTORY = ./out
+GPP_FLAGS = -I./CGBN/include -lm -lgmp -lcjson  -I/usr/include/python3.10 -I/usr/include/python3.10 -lpython3.10
+OUT_DIRECTORY = ./build
 
 ENABLE_TRACING ?= 0
 SM_ARCH ?= sm_89
@@ -30,6 +30,9 @@ test_cgbn: src/test/test_cgbn.cu
 
 interpreter:
 	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -arch=$(SM_ARCH) -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
+
+library:
+	$(NVCC) $(TRACER_FLAG) $(NVCC_FLAGS) -D BUILD_LIB --shared -Xcompiler '-fPIC' -o $(OUT_DIRECTORY)/libcuevm.so src/interpreter.cu
 
 debug_interpreter:
 	$(NVCC) -D TRACER -D COMPLEX_TRACER -D GAS $(NVCC_FLAGS) -arch=$(SM_ARCH) -g -lineinfo -o $(OUT_DIRECTORY)/$@ src/interpreter.cu
