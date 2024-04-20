@@ -3452,6 +3452,115 @@ public:
         return json_from_touch_state_data_t(_arith, *_content);
     }
 
+
+    __host__ cJSON *account_root_json(
+        account_t *world_account,
+        account_t *touch_account,
+        keccak::keccak_t &keccak,
+        uint8_t touch
+    ) {
+        cJSON *account_json = NULL;
+        account_json = cJSON_CreateObject();
+        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        uint8_t hash[32];
+        uint8_t *code;
+        size_t code_size;
+        evm_word_t code_hash;
+        cJSON *storage_json = NULL;
+        cJSON *key_value_json = NULL;
+        size_t jdx = 0;
+        uint32_t tmp_error_code = ERR_SUCCESS;
+        size_t storage_idx = 0;
+
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->address, 5);
+        cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
+
+        // set the balance
+        if (touch & WRITE_BALANCE) {
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->balance);
+        } else {
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->balance);
+        }
+        cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
+        
+        // set the nonce
+        if (touch & WRITE_NONCE) {
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->nonce);
+        } else {
+            _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->nonce);
+        }
+        cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
+
+        // set the code hash
+
+        if (touch & WRITE_CODE) {
+            code = touch_account->bytecode;
+            code_size = touch_account->code_size;
+        } else {
+            code = world_account->bytecode;
+            code_size = world_account->code_size;
+        }
+        keccak.sha3(code, code_size, hash, 32);
+        _arith.word_from_memory(code_hash, hash);
+        _arith.hex_string_from_cgbn_memory(hex_string_ptr, code_hash);
+        cJSON_AddStringToObject(account_json, "codeHash", hex_string_ptr);
+
+        // set the storage
+        storage_json = cJSON_CreateArray();
+        cJSON_AddItemToObject(account_json, "storage", storage_json);
+        if (touch & WRITE_STORAGE) {
+            uint8_t *writen_storage;
+            writen_storage = new uint8_t[touch_account->storage_size];
+            memset(writen_storage, 0, touch_account->storage_size);
+            for (jdx = 0; jdx < world_account->storage_size; jdx++)
+            {
+                key_value_json = cJSON_CreateArray();
+                _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].key);
+                cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                tmp_error_code = ERR_SUCCESS;
+                bn_t key;
+                cgbn_load(_arith._env, key, &(world_account->storage[jdx].key));
+                storage_idx = get_storage_index(touch_account, key, tmp_error_code);
+                if (tmp_error_code == ERR_SUCCESS) {
+                    _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->storage[storage_idx].value);
+                    writen_storage[storage_idx] = 1;
+                } else {
+                    _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].value);
+                }
+                cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                cJSON_AddItemToArray(storage_json, key_value_json);
+            }
+            for (jdx = 0; jdx < touch_account->storage_size; jdx++)
+            {
+                if (writen_storage[jdx] == 0) {
+                    key_value_json = cJSON_CreateArray();
+                    _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->storage[jdx].key);
+                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                    _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->storage[jdx].value);
+                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                    cJSON_AddItemToArray(storage_json, key_value_json);
+                }
+            }
+            delete [] writen_storage;
+        } else {
+            if (world_account->storage_size > 0)
+            {
+                for (jdx = 0; jdx < world_account->storage_size; jdx++)
+                {
+                    key_value_json = cJSON_CreateArray();
+                    _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].key);
+                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                    _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].value);
+                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                    cJSON_AddItemToArray(storage_json, key_value_json);
+                }
+            }
+        }
+        delete [] hex_string_ptr;
+        hex_string_ptr = NULL;
+        return account_json;
+    }
+
     /**
      * Get the state root json
      * @return The state root json
@@ -3462,18 +3571,11 @@ public:
         cJSON *state_json = NULL;
         cJSON *account_json = NULL;
         cJSON *accounts_json = NULL;
-        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-        cJSON *storage_json = NULL;
-        cJSON *key_value_json = NULL;
         state_data_t *world_accounts = _accessed_state->_world_state->_content;
         bn_t address;
         uint32_t tmp_error_code = ERR_SUCCESS;
         size_t account_idx = 0;
         size_t idx = 0;
-        uint8_t hash[32];
-        uint8_t *code;
-        size_t code_size;
-        evm_word_t code_hash;
 
         state_json = cJSON_CreateObject();
         accounts_json = cJSON_CreateArray();
@@ -3494,72 +3596,24 @@ public:
                 touch = _content->touch[account_idx];
                 writen_accounts[account_idx] = 1;
             }
-            size_t jdx = 0;
-            account_json = cJSON_CreateObject();
-
-            _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->address, 5);
-            cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
-
-            // set the balance
-            if (touch & WRITE_BALANCE) {
-                _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->balance);
-            } else {
-                _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->balance);
-            }
-            cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
-            
-            // set the nonce
-            if (touch & WRITE_NONCE) {
-                _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->nonce);
-            } else {
-                _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->nonce);
-            }
-            cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
-
-            // set the code hash
-
-            if (touch & WRITE_CODE) {
-                code = touch_account->bytecode;
-                code_size = touch_account->code_size;
-            } else {
-                code = world_account->bytecode;
-                code_size = world_account->code_size;
-            }
-            keccak.sha3(code, code_size, hash, 32);
-            _arith.word_from_memory(code_hash, hash);
-            _arith.hex_string_from_cgbn_memory(hex_string_ptr, code_hash);
-            cJSON_AddStringToObject(account_json, "codeHash", hex_string_ptr);
-
-            // set the storage
-            storage_json = cJSON_CreateArray();
-            cJSON_AddItemToObject(account_json, "storage", storage_json);
-            if (touch & WRITE_STORAGE) {
-                uint8_t *writen_storage;
-                writen_storage = new uint8_t[touch_account->storage_size];
-
-
-                delete [] writen_storage;
-            } else {
-                if (world_account->storage_size > 0)
-                {
-                    for (jdx = 0; jdx < world_account->storage_size; jdx++)
-                    {
-                        key_value_json = cJSON_CreateArray();
-                        _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].key);
-                        cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
-                        _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].value);
-                        cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
-                    }
-                }
-            }
-
-            
+            account_json = account_root_json(world_account, touch_account, keccak, touch);
+            cJSON_AddItemToArray(accounts_json, account_json);
         }
-
-        delete[] hex_string_ptr;
-        hex_string_ptr = NULL;
+        for (idx = 0; idx < _content->touch_accounts.no_accounts; idx++)
+        {
+            if (writen_accounts[idx] == 0) {
+                account_json = account_root_json(
+                    &(_content->touch_accounts.accounts[idx]),
+                    NULL,
+                    keccak,
+                    0
+                );
+                cJSON_AddItemToArray(accounts_json, account_json);
+            }
+        }
+        delete [] writen_accounts;
+        writen_accounts = NULL;
         return state_json;
-    
     }
 
 

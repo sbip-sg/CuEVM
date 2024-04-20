@@ -3460,6 +3460,27 @@ public:
 
 
         #ifdef COMPLEX_TRACER
+        accessed_state_t *cpu_accessed_state;
+        cpu_accessed_state = new accessed_state_t(cpu_world_state);
+        touch_state_t *cpu_touch_state;
+        cpu_touch_state = new touch_state_t(&instances.touch_states_data[0], cpu_accessed_state, NULL);
+        cJSON *final_state_root_json = NULL;
+        
+        keccak_t *keccak;
+        keccak = new keccak_t(instances.sha3_parameters);
+        final_state_root_json = cpu_touch_state->state_root_json(*keccak);
+        delete keccak;
+        keccak = NULL;
+        char *final_state_root_json_str = cJSON_PrintUnformatted(final_state_root_json);
+        printf("Final state root: %s\n", final_state_root_json_str);
+        cJSON_Delete(final_state_root_json);
+        free(final_state_root_json_str);
+        cpu_touch_state->_content = NULL;
+        delete cpu_touch_state;
+        cpu_touch_state = NULL;
+        delete cpu_accessed_state;
+        cpu_accessed_state = NULL;
+
         /*
         touch_state_data_t prev_state, updated_state;
         world_state_t world_state(arith, instances.world_state_data);

@@ -482,7 +482,7 @@ public:
     }
     for (length = 0; current_char[length] != '\0'; length++)
       ;
-    if (length > BYTES) {
+    if (length > (2 * BYTES)) {
       return 1;
     }
     SHARED_MEMORY uint8_t *byte_array;
@@ -505,9 +505,18 @@ public:
     } else { //idx = 2
       byte_array[BYTES - 1 - ((length-2) / 2)] = byte_from_two_hex(current_char[0], current_char[1]);
     }
-    bn_t tmp;
+    /*bn_t tmp;
     cgbn_from_memory(tmp, byte_array);
+    printf("cgbn_memory_from_hex_string: ");
+    for (uint32_t i = 0; i < BYTES; i++)
+    {
+      printf("%02x ", byte_array[i]);
+    }
+    printf("\n");
     cgbn_store(_env, &dst_cgbn_memory, tmp);
+    print_cgbn_memory(dst_cgbn_memory);
+    */
+    word_from_memory(dst_cgbn_memory, byte_array);
     ONE_THREAD_PER_INSTANCE(
       delete[] byte_array;
     )
