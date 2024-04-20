@@ -3154,11 +3154,9 @@ public:
             bn_t sender_address;
             // send back the gas left and gas refund to the sender
             _transaction->get_sender(sender_address);
-            _transaction_touch_state->get_account_balance(sender_address, sender_balance);
-            cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
-            // deduct transaction value; todo this probably should be done at some other place
-            _transaction->get_value(tx_value);
-            cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
+            // deduct transaction value; TODO this probably should be done at some other place
+            // _transaction->get_value(tx_value);
+            // cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
             // cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
 
@@ -3167,6 +3165,8 @@ public:
                 *_touch_state_ptrs[_depth]);
             _transaction_log_state->update_with_child_state(
                 *_log_state_ptrs[_depth]);
+            _transaction_touch_state->get_account_balance(sender_address, sender_balance);
+            cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
             _transaction_touch_state->set_account_balance(sender_address, sender_balance);
 
             // set the eror code for a succesfull transaction
@@ -3472,7 +3472,8 @@ public:
         delete keccak;
         keccak = NULL;
         char *final_state_root_json_str = cJSON_PrintUnformatted(final_state_root_json);
-        printf("Final state root: %s\n", final_state_root_json_str);
+        //printf("%s\n", final_state_root_json_str);
+        fprintf(stderr, "%s\n", final_state_root_json_str);
         cJSON_Delete(final_state_root_json);
         free(final_state_root_json_str);
         cpu_touch_state->_content = NULL;

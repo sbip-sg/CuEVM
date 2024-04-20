@@ -3481,6 +3481,7 @@ public:
         } else {
             _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->balance);
         }
+        _arith.rm_leading_zero_hex_string(hex_string_ptr);
         cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
         
         // set the nonce
@@ -3489,6 +3490,7 @@ public:
         } else {
             _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->nonce);
         }
+        _arith.rm_leading_zero_hex_string(hex_string_ptr);
         cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
 
         // set the code hash
@@ -3516,6 +3518,7 @@ public:
             {
                 key_value_json = cJSON_CreateArray();
                 _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].key);
+                _arith.rm_leading_zero_hex_string(hex_string_ptr);
                 cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
                 tmp_error_code = ERR_SUCCESS;
                 bn_t key;
@@ -3527,18 +3530,27 @@ public:
                 } else {
                     _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].value);
                 }
-                cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
-                cJSON_AddItemToArray(storage_json, key_value_json);
+                _arith.rm_leading_zero_hex_string(hex_string_ptr);
+                // if value != 0
+                if (!(hex_string_ptr[2] == '0' && hex_string_ptr[3] == '\0')) {
+                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                    cJSON_AddItemToArray(storage_json, key_value_json);
+                }
             }
             for (jdx = 0; jdx < touch_account->storage_size; jdx++)
             {
                 if (writen_storage[jdx] == 0) {
                     key_value_json = cJSON_CreateArray();
                     _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->storage[jdx].key);
+                    _arith.rm_leading_zero_hex_string(hex_string_ptr);
                     cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
                     _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->storage[jdx].value);
-                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
-                    cJSON_AddItemToArray(storage_json, key_value_json);
+                    _arith.rm_leading_zero_hex_string(hex_string_ptr);
+                    // if value != 0
+                    if (!(hex_string_ptr[2] == '0' && hex_string_ptr[3] == '\0')) {
+                        cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                        cJSON_AddItemToArray(storage_json, key_value_json);
+                    }
                 }
             }
             delete [] writen_storage;
@@ -3549,10 +3561,15 @@ public:
                 {
                     key_value_json = cJSON_CreateArray();
                     _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].key);
+                    _arith.rm_leading_zero_hex_string(hex_string_ptr);
                     cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
                     _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->storage[jdx].value);
-                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
-                    cJSON_AddItemToArray(storage_json, key_value_json);
+                    _arith.rm_leading_zero_hex_string(hex_string_ptr);
+                    // if value != 0
+                    if (!(hex_string_ptr[2] == '0' && hex_string_ptr[3] == '\0')) {
+                        cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
+                        cJSON_AddItemToArray(storage_json, key_value_json);
+                    }
                 }
             }
         }

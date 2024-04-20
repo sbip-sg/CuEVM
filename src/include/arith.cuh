@@ -428,6 +428,46 @@ public:
     dst_hex_string[offset] = '\0'; // Null-terminate the string
   }
 
+/**
+ * Clean fo elading zeroes in hex string
+*/
+  __host__ void rm_leading_zero_hex_string(
+    char *src_hex_string
+  ) {
+    size_t length;
+    char *current_char;
+    current_char = (char *)src_hex_string;
+    if (
+      (src_hex_string[0] == '0') &&
+      ((src_hex_string[1] == 'x') || (src_hex_string[1] == 'X'))
+    ) {
+      current_char += 2; // Skip the "0x" prefix
+    }
+    for (length = 0; current_char[length] != '\0'; length++)
+      ;
+    size_t idx;
+    for (idx = 0; idx < length; idx++)
+    {
+      if (current_char[idx] != '0')
+      {
+        break;
+      }
+    }
+    if (idx == length)
+    {
+      src_hex_string[2] = '0';
+      src_hex_string[3] = '\0';
+    }
+    else
+    {
+      for (size_t i = 0; i < length - idx; i++)
+      {
+        current_char[i] = current_char[i + idx];
+      }
+      current_char[length - idx] = '\0';
+    }
+  }
+
   __host__ __device__ __forceinline__ uint8_t byte_from_two_hex(
     char high,
     char low
