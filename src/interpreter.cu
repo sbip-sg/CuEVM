@@ -121,12 +121,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("Results printed\n");
 
     // print to json files
-    printf("Printing to json files ...\n");
-    cJSON_AddItemToObject(
-      write_root,
-      test->string,
-      evm_t::json_from_evm_instances_t(arith, cpu_instances));
-    printf("Json files printed\n");
+     printf("Printing to json files ...\n");
+     cJSON_AddItemToObject(
+       write_root,
+       test->string,
+       evm_t::json_from_evm_instances_t(arith, cpu_instances));
+     printf("Json files printed\n");
 
     // free the memory
     printf("Freeing the memory ...\n");

@@ -100,6 +100,45 @@ public:
     int32_t address_bits = int32_t(ADDRESS_BYTES) * 8;
     cgbn_bitwise_mask_and(_env, address, address, address_bits);
   }
+
+  /**
+   * Allocate a memory byte array with the content of the source byte array
+   * and the requested size. The memory byte array is in Big Endian format.
+   * NOTE: The memory byte array must be freed by the caller.
+   * The memory byte array is padded with zeros if the requested size is greater
+   * than the current size.
+   * @param[in] src The source byte array
+   * @param[in] current_size The current size of the byte array
+   * @param[in] request_size The requested size of the byte array
+   * @return The memory byte array pointer
+  */
+  __host__ __device__ __forceinline__ uint8_t* padded_malloc_byte_array(
+    const uint8_t *src,
+    size_t current_size,
+    size_t request_size
+  ) {
+    SHARED_MEMORY uint8_t *dst;
+    ONE_THREAD_PER_INSTANCE(
+      dst = new uint8_t[request_size];
+      size_t copy_size;
+      if (current_size < request_size)
+      {
+        copy_size = current_size;
+      }
+      else
+      {
+        copy_size = request_size;
+      }
+      if (dst != NULL)
+      {
+        memcpy(dst, src, copy_size);
+        memset(dst + copy_size, 0, request_size - copy_size);
+      }
+    )
+    return dst;
+  }
+
+
   /**
    * Get a memory byte array from CGBN base type.
    * The memory byte array is in Big Endian format.
@@ -135,6 +174,19 @@ public:
     {
       cgbn_insert_bits_ui32(_env, dst, dst, BITS - (idx + 1) * 8, 8, src[idx]);
     }
+  }
+
+  /**
+   * Get evm_word_t from byte array.
+  */
+  __host__ __device__ __forceinline__ void word_from_memory(
+    evm_word_t &dst,
+    uint8_t *src
+  )
+  {
+    bn_t src_cgbn;
+    cgbn_from_memory(src_cgbn, src);
+    cgbn_store(_env, &dst, src_cgbn);
   }
 
   /**
@@ -234,6 +286,65 @@ public:
     }
   }
 
+  /**
+   * Get an array of maximum 256 bytes, each having value 1 or 0 indicating bit set or not.
+   * Use as utility for Elliptic curve point multiplication
+   * @param[out] dst_array
+   * @param[out] array_length
+   * @param[in] src_cgbn_mem
+   * @param limb_count
+   */
+  __host__ __device__ __forceinline__ void bit_array_from_cgbn_memory(uint8_t *dst_array, uint32_t &array_length, evm_word_t &src_cgbn_mem, uint32_t limb_count = LIMBS) {
+    uint32_t current_limb;
+    uint32_t bitIndex = 0; // Index for each bit in dst_array
+    array_length = 0;
+    for (uint32_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem._limbs[limb_count - 1 - idx];
+        for (int bit = 31; bit >=0; --bit) { //hardcoded 32 bits per limb
+            // Extract each bit from the current limb and store '0' or '1' in dst_array
+            dst_array[bitIndex++] = (current_limb & (1U << bit)) ? 1 : 0;
+            if (dst_array[bitIndex-1] == 1 && array_length ==0){
+              array_length = 256 - (bitIndex - 1);
+            }
+        }
+      }
+  }
+
+  /**
+   * Get an array of bytes from CGBN memory.
+   * Use as utility for address conversion from Public Key point
+   * @param[out] dst_array
+   * @param[out] array_length
+   * @param[in] src_cgbn_mem
+   * @param limb_count
+   */
+  __host__ __device__ __forceinline__ void byte_array_from_cgbn_memory(uint8_t *dst_array, size_t &array_length, evm_word_t &src_cgbn_mem, size_t limb_count = LIMBS) {
+    size_t current_limb;
+    array_length = limb_count * 4; // Each limb has 4 bytes
+
+    for (size_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem._limbs[limb_count - 1 - idx];
+        dst_array[idx * 4] = (current_limb >> 24) & 0xFF; // Extract the most significant byte
+        dst_array[idx * 4 + 1] = (current_limb >> 16) & 0xFF;
+        dst_array[idx * 4 + 2] = (current_limb >> 8) & 0xFF;
+        dst_array[idx * 4 + 3] = current_limb & 0xFF; // Extract the least significant byte
+    }
+  }
+
+  /**
+   * Print the byte array as hex. Utility for debugging
+   *
+   * @param byte_array
+   * @param array_length
+   * @param is_address
+   */
+  __host__ __device__ __forceinline__ void print_byte_array_as_hex(const uint8_t *byte_array, uint32_t array_length, bool is_address=false) {
+      printf("0x");
+      for (uint32_t i = is_address? 12: 0; i < array_length; i++) {
+          printf("%02x", byte_array[i]);
+      }
+      printf("\n");
+  }
 
     /**
    * Get a uint64_t from a CGBN type.
@@ -317,51 +428,138 @@ public:
     dst_hex_string[offset] = '\0'; // Null-terminate the string
   }
 
+/**
+ * Clean fo elading zeroes in hex string
+*/
+  __host__ void rm_leading_zero_hex_string(
+    char *src_hex_string
+  ) {
+    size_t length;
+    char *current_char;
+    current_char = (char *)src_hex_string;
+    if (
+      (src_hex_string[0] == '0') &&
+      ((src_hex_string[1] == 'x') || (src_hex_string[1] == 'X'))
+    ) {
+      current_char += 2; // Skip the "0x" prefix
+    }
+    for (length = 0; current_char[length] != '\0'; length++)
+      ;
+    size_t idx;
+    for (idx = 0; idx < length; idx++)
+    {
+      if (current_char[idx] != '0')
+      {
+        break;
+      }
+    }
+    if (idx == length)
+    {
+      src_hex_string[2] = '0';
+      src_hex_string[3] = '\0';
+    }
+    else
+    {
+      for (size_t i = 0; i < length - idx; i++)
+      {
+        current_char[i] = current_char[i + idx];
+      }
+      current_char[length - idx] = '\0';
+    }
+  }
+
+  __host__ __device__ __forceinline__ uint8_t byte_from_two_hex(
+    char high,
+    char low
+  ) {
+    uint8_t byte = 0;
+    if (high >= '0' && high <= '9')
+    {
+      byte = (high - '0') << 4;
+    }
+    else if (high >= 'a' && high <= 'f')
+    {
+      byte = (high - 'a' + 10) << 4;
+    }
+    else if (high >= 'A' && high <= 'F')
+    {
+      byte = (high - 'A' + 10) << 4;
+    }
+    if (low >= '0' && low <= '9')
+    {
+      byte |= (low - '0');
+    }
+    else if (low >= 'a' && low <= 'f')
+    {
+      byte |= (low - 'a' + 10);
+    }
+    else if (low >= 'A' && low <= 'F')
+    {
+      byte |= (low - 'A' + 10);
+    }
+    return byte;
+  }
+
   /**
    * Get a CGBN memory from a hex string.
    * The hex string is in Big Endian format.
-   * It use the GMP library to convert the hex string to a mpz_t type.
    * @param[out] dst_cgbn_memory The destination CGBN memory
    * @param[in] src_hex_string The source hex string
    * @return 1 for overflow, 0 otherwiese
   */
-  __host__ int32_t cgbn_memory_from_hex_string(
+  __host__ __device__ int32_t cgbn_memory_from_hex_string(
     evm_word_t &dst_cgbn_memory,
-    char *src_hex_string
-  )
-  {
-    mpz_t value;
-    size_t written;
-    mpz_init(value);
+    const char *src_hex_string
+  ) {
+    size_t length;
+    char *current_char;
+    current_char = (char *)src_hex_string;
     if (
       (src_hex_string[0] == '0') &&
       ((src_hex_string[1] == 'x') || (src_hex_string[1] == 'X'))
-    )
-    {
-      mpz_set_str(value, src_hex_string + 2, 16);
+    ) {
+      current_char += 2; // Skip the "0x" prefix
     }
-    else
-    {
-      mpz_set_str(value, src_hex_string, 16);
-    }
-    if (mpz_sizeinbase(value, 2) > BITS)
-    {
+    for (length = 0; current_char[length] != '\0'; length++)
+      ;
+    if (length > (2 * BYTES)) {
       return 1;
     }
-    mpz_export(
-      dst_cgbn_memory._limbs,
-      &written,
-      -1,
-      sizeof(uint32_t),
-      0,
-      0,
-      value
-    );
-    while (written < LIMBS)
+    SHARED_MEMORY uint8_t *byte_array;
+    ONE_THREAD_PER_INSTANCE(
+      byte_array = new uint8_t[BYTES];
+      memset(byte_array, 0, BYTES);
+    )
+
+    size_t idx;
+    for (idx = length; idx > 2; idx -= 2)
     {
-      dst_cgbn_memory._limbs[written++] = 0;
+      byte_array[BYTES - 1 - ((length - idx) / 2)] = byte_from_two_hex(
+        current_char[idx - 2],
+        current_char[idx - 1]
+      );
     }
-    mpz_clear(value);
+    if (idx == 1)
+    {
+      byte_array[BYTES - 1 - ((length-1) / 2)] = byte_from_two_hex('0', current_char[0]);
+    } else { //idx = 2
+      byte_array[BYTES - 1 - ((length-2) / 2)] = byte_from_two_hex(current_char[0], current_char[1]);
+    }
+    /*bn_t tmp;
+    cgbn_from_memory(tmp, byte_array);
+    printf("cgbn_memory_from_hex_string: ");
+    for (uint32_t i = 0; i < BYTES; i++)
+    {
+      printf("%02x ", byte_array[i]);
+    }
+    printf("\n");
+    cgbn_store(_env, &dst_cgbn_memory, tmp);
+    print_cgbn_memory(dst_cgbn_memory);
+    */
+    word_from_memory(dst_cgbn_memory, byte_array);
+    ONE_THREAD_PER_INSTANCE(
+      delete[] byte_array;
+    )
     return 0;
   }
 
@@ -585,6 +783,25 @@ public:
       cgbn_mul_ui32(_env, temp, temp, GAS_PRECOMPILE_BLAKE2_ROUND);
       cgbn_add(_env, gas_used, gas_used, temp);
   }
+
+  /**
+   * Add the pairing cost to the gas used.
+   * @param[inout] gas_used The gas used
+   * @param[in] data_size The size of the data in bytes
+  */
+  __host__ __device__ __forceinline__ void ecpairing_cost(
+    bn_t &gas_used,
+    size_t data_size
+  ) {
+      // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 * GAS_PRECOMPILE_ECPAIRING_PAIR
+      cgbn_add_ui32(_env, gas_used, gas_used, GAS_PRECOMPILE_ECPAIRING);
+      bn_t temp;
+      cgbn_from_size_t(temp, data_size);
+      cgbn_div_ui32(_env, temp, temp, 192);
+      cgbn_mul_ui32(_env, temp, temp, GAS_PRECOMPILE_ECPAIRING_PAIR);
+      cgbn_add(_env, gas_used, gas_used, temp);
+  }
+
 };
 
 /**

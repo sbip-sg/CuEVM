@@ -402,6 +402,7 @@ public:
             fprintf(stderr, "{\"output\":\"%s\",\"gasUsed\":\"%s\"}\n", return_data_str+2, gas_left_str);
             delete[] return_data_str;
         }
+
         #endif
         delete[] gas_left_str;
         delete[] gas_cost_str;

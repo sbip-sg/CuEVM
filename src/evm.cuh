@@ -523,6 +523,17 @@ public:
                 uint32_t precompiled_no = cgbn_get_ui32(_arith._env, contract_address);
                 switch (precompiled_no)
                 {
+                case 1:
+                    precompile_operations::operation_ecRecover(
+                        _arith,
+                        *_keccak,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
                 case 2:
                     precompile_operations::operation_SHA256(
                         _arith,
@@ -555,7 +566,7 @@ public:
                         *_message_ptrs[_depth]
                     );
                     break;
-                
+
                 case 5:
                     precompile_operations::operation_MODEXP(
                         _arith,
@@ -567,6 +578,36 @@ public:
                     );
                     break;
 
+                case 6:
+                    precompile_operations::operation_ecAdd(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+                case 7:
+                    precompile_operations::operation_ecMul(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
+                case 8:
+                    precompile_operations::operation_ecPairing(
+                        _arith,
+                        _gas_limit,
+                        _gas_useds[_depth],
+                        error_code,
+                        *return_data,
+                        *_message_ptrs[_depth]
+                    );
+                    break;
                 case 9:
                     precompile_operations::operation_BLAKE2(
                         _arith,
@@ -647,7 +688,7 @@ public:
             // if the sender has enough balance
             // value>0
             //(cgbn_compare(arith._env, sender, receiver) != 0) &&   // sender != receiver matter only on transfer
-            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) && 
+            if ((cgbn_compare_ui32(arith._env, value, 0) > 0) &&
                 (call_type != OP_DELEGATECALL) // no delegatecall
             )
             {
@@ -2700,6 +2741,9 @@ public:
                         *this,
                         *_last_return_data_ptrs[_depth]);
                 }
+                // printf("CALL memory\n");
+                // _memory_ptrs[0]->print();
+                // printf("\n");
                 break;
                 case OP_CALLCODE: // CALLCODE
                 {
@@ -3083,40 +3127,48 @@ public:
     {
         // sent the gas value to the block beneficiary
         bn_t gas_value;
-        bn_t beneficiary;
-        _block->get_coin_base(beneficiary);
+        // bn_t beneficiary;
+        // _block->get_coin_base(beneficiary);
+        // char *temp = new char[arith_t::BYTES * 2 + 3];
+
         if (error_code == ERR_RETURN)
         {
-            bn_t gas_left;
+            bn_t gas_left, tx_value;
             // \f$T_{g} - g\f$
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
+
             bn_t capped_refund_gas;
             // \f$g/5\f$
-            cgbn_div_ui32(_arith._env, capped_refund_gas, gas_left, 5);
+            cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
             // min ( \f$g/5\f$, \f$R_{g}\f$)
+
             if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
             {
                 cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
             }
             // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
             cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
+            cgbn_mul(_arith._env, gas_value, gas_value, _gas_price);
             // add to sender balance g^{*}
             bn_t sender_balance;
             bn_t sender_address;
             // send back the gas left and gas refund to the sender
             _transaction->get_sender(sender_address);
-            _transaction_touch_state->get_account_balance(sender_address, sender_balance);
-            cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
-            _transaction_touch_state->set_account_balance(sender_address, sender_balance);
-
+            // deduct transaction value; TODO this probably should be done at some other place
+            // _transaction->get_value(tx_value);
+            // cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
-            cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
+            // cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
 
             // update the transaction state
             _transaction_touch_state->update_with_child_state(
                 *_touch_state_ptrs[_depth]);
             _transaction_log_state->update_with_child_state(
                 *_log_state_ptrs[_depth]);
+            _transaction_touch_state->get_account_balance(sender_address, sender_balance);
+            cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
+            _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+
             // set the eror code for a succesfull transaction
             _error_code = ERR_NONE;
         }
@@ -3127,10 +3179,10 @@ public:
             _error_code = error_code;
         }
         // send the gas value to the beneficiary
-        bn_t beneficiary_balance;
-        _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
-        cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
-        _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
+        // bn_t beneficiary_balance;
+        // _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
+        // cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
+        // _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
 
         // update the final state modification done by the transaction
         _transaction_touch_state->to_touch_state_data_t(
@@ -3371,13 +3423,11 @@ public:
         bool verbose = false)
     {
         printf("verbose mode %d\n", verbose);
+        world_state_t *cpu_world_state;
+        cpu_world_state = new world_state_t(arith, instances.world_state_data);
         if (verbose){
-            world_state_t *cpu_world_state;
-            cpu_world_state = new world_state_t(arith, instances.world_state_data);
-            printf("World state:\n");
+          printf("World state:\n");
             cpu_world_state->print();
-            delete cpu_world_state;
-            cpu_world_state = NULL;
 
             block_t *cpu_block = NULL;
             cpu_block = new block_t(arith, instances.block_data);
@@ -3406,8 +3456,143 @@ public:
 #ifdef TRACER
             tracer_t::print_tracer_data_t(arith, instances.tracers_data[idx], &instances.return_data[idx]);
 #endif
+        }
+
+
+        #ifdef COMPLEX_TRACER
+        accessed_state_t *cpu_accessed_state;
+        cpu_accessed_state = new accessed_state_t(cpu_world_state);
+        touch_state_t *cpu_touch_state;
+        cpu_touch_state = new touch_state_t(&instances.touch_states_data[0], cpu_accessed_state, NULL);
+        cJSON *final_state_root_json = NULL;
+        
+        keccak_t *keccak;
+        keccak = new keccak_t(instances.sha3_parameters);
+        final_state_root_json = cpu_touch_state->state_root_json(*keccak);
+        delete keccak;
+        keccak = NULL;
+        char *final_state_root_json_str = cJSON_PrintUnformatted(final_state_root_json);
+        //printf("%s\n", final_state_root_json_str);
+        fprintf(stderr, "%s\n", final_state_root_json_str);
+        cJSON_Delete(final_state_root_json);
+        free(final_state_root_json_str);
+        cpu_touch_state->_content = NULL;
+        delete cpu_touch_state;
+        cpu_touch_state = NULL;
+        delete cpu_accessed_state;
+        cpu_accessed_state = NULL;
+
+        /*
+        touch_state_data_t prev_state, updated_state;
+        world_state_t world_state(arith, instances.world_state_data);
+        accessed_state_t accessed_state(&world_state);
+        prev_state.touch = new uint8_t[instances.world_state_data->no_accounts];
+        prev_state.touch_accounts.no_accounts = instances.world_state_data->no_accounts;
+        prev_state.touch_accounts.accounts = instances.world_state_data->accounts;
+
+
+        touch_state_t final_state(&prev_state, &accessed_state, arith);
+
+        updated_state.touch = new uint8_t[instances.touch_states_data->touch_accounts.no_accounts];
+        for (size_t idx = 0; idx < instances.touch_states_data->touch_accounts.no_accounts; idx++)
+        {
+            updated_state.touch[idx] = instances.touch_states_data->touch[idx];
+        }
+        updated_state.touch_accounts.no_accounts = instances.touch_states_data->touch_accounts.no_accounts;
+        updated_state.touch_accounts.accounts = instances.touch_states_data->touch_accounts.accounts;
+        touch_state_t state_from_updated(&updated_state, &accessed_state, arith);
+
+
+        final_state.update_with_child_state(state_from_updated);
+        print_touched_trie_accounts(arith, final_state._content);
+
+        delete[] prev_state.touch;
+        delete[] updated_state.touch;
+        prev_state.touch = nullptr;
+        updated_state.touch = nullptr;
+        */
+
+
+        #endif
+        if (cpu_world_state != nullptr){
+            delete cpu_world_state;
+            cpu_world_state = NULL;
+        }
+    }
+
+    __host__ static void print_touched_trie_accounts(arith_t &arith, touch_state_data_t *evm_instances)    {
+        auto accounts = evm_instances->touch_accounts.accounts;
+        auto num_accounts = evm_instances->touch_accounts.no_accounts;
+
+
+        char *temp = new char[arith_t::BYTES * 2 + 3];
+        uint8_t hash[32];
+        evm_word_t t_word;
+        std::string out = "{";
+        keccak::keccak_t *k = new keccak::keccak_t();
+
+        out += "\"accounts\": [";
+
+        for (size_t idx = 0; idx < num_accounts; idx++) {
+            // output each account as a map: {nonce: hex, balance: hex, storage: [...], codehash: hex}
+            auto account = accounts[idx];
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.address);
+            out += "{\"address\": \"" ;
+            out += temp; // address
+            out += "\", \"nonce\": \"" ;
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.nonce);
+            out += temp;  // nonce
+            out += "\", \"balance\": \"";
+            arith.pretty_hex_string_from_cgbn_memory(temp, account.balance);
+            out += temp;  // balance
+            out += "\", \"codehash\": \"" ;
+            auto bytecode = account.bytecode;
+            auto code_size = account.code_size;
+            k->sha3(bytecode, code_size, hash, 32);
+            arith.word_from_memory(t_word, hash);
+            arith.pretty_hex_string_from_cgbn_memory(temp, t_word);
+            out += temp; // codehash, better cache it and calculate only once
+            out += "\", \"storage\": [" ;
+
+            print_bytes(account.bytecode, account.code_size);
+
+            // printing storages as: `[[k, v], [k, v], ...]`
+            bn_t temp_bn ;
+            bool has_storage = false;
+            for (size_t i = 0; i < account.storage_size; i++) {
+                // todo should ignore zero values
+                auto key = account.storage[i].key;
+                auto value = account.storage[i].value;
+                cgbn_load(arith._env, temp_bn, &value);
+
+                if (cgbn_compare_ui32(arith._env, temp_bn, 0) == 0){
+                    continue;
+                }
+
+                if (has_storage) out+= ",";
+                out += "[\"";
+                arith.pretty_hex_string_from_cgbn_memory(temp, key);
+                out += temp;
+                arith.pretty_hex_string_from_cgbn_memory(temp, value);
+                out += "\", \"";
+                out += temp;
+                out += "\"]";
+                has_storage = true;
+            }
+
+            out += "]}" ;
+            if (idx < num_accounts - 1){
+                out += ",";
+            }
 
         }
+        out += "]}";
+        delete[] temp;
+        temp = nullptr;
+        k->free_parameters();
+        delete k;
+        k = nullptr;
+        std::cerr << out << std::endl;
     }
 
     /**

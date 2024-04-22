@@ -1124,12 +1124,14 @@ public:
       // nonce is -1 in YP but here is before validating the transaction
       // and increasing the nonce
       cgbn_load(_arith._env, sender_nonce, &(account->nonce));
+
       message_t::get_create_contract_address(
           _arith,
           to,
           sender,
           sender_nonce,
           keccak);
+
     }
     else
     {
