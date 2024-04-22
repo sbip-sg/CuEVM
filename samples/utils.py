@@ -1,4 +1,5 @@
 
+from dataclasses import dataclass
 import json
 import argparse
 import os
@@ -9,6 +10,37 @@ from eth_abi import encode
 from eth_utils import function_abi_to_4byte_selector
 
 SAMPLE_OPCODES = {1 : "+", 2 : "*", 3 : "-"} # samples for testing of overflow, underflow
+
+OPADD = 0x01
+OPMUL = 0x02
+OPSUB = 0x03
+OPEXP = 0x0A
+
+OP_SSTORE = 0x55
+
+OP_CALL = 0xF1
+OP_CALLCODE = 0xF2
+OP_DELEGATECALL = 0xF4
+OP_STATICCALL = 0xFA
+
+OP_REVERT = 0xFD
+OP_INVALID = 0xFE
+OP_SELFDESTRUCT = 0xFF
+
+OP_ORIGIN = 0x32
+
+arith_ops = [OPADD, OPMUL, OPSUB, OPEXP]
+#define OP_SSTORE 0x55
+
+@dataclass
+class EVMCall:
+    pc: int
+    opcode: int
+    to: str
+    value: int
+    revert: bool
+
+
 
 def parse_trace_and_detect_bug(trace_file, contract_name, ast_parser = None):
     evm_output = json.loads(open(trace_file).read())

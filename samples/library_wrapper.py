@@ -22,8 +22,8 @@ class CuEVMLib:
 
     def update_persistent_state(self, json_result):
         trace_values = json_result
-        print ("trace value result")
-        pprint(json_result)
+        # print ("trace value result")
+        # pprint(json_result)
         for i in range(len(trace_values.get("post"))):
             post_state = trace_values.get("post")[i].get("state")
             # print("\n\n post_state %d \n\n" % i)
@@ -41,6 +41,57 @@ class CuEVMLib:
         self.build_instance_data(tx_data)
         result_state = libcuevm.run_dict(self.instances)
         self.update_persistent_state(result_state)
+        return self.post_process_trace(result_state)
+
+    # post process the trace to detect integer bugs and simplify the distance
+    def post_process_trace(self, trace):
+        final_trace = []
+        for i in range(len(trace.get("post"))):
+            post_state = trace.get("post")[i].get("traces")
+            missed_branches = []
+            covered_branches = []
+            bugs = []
+            for branch in post_state.get("branches",[]):
+                missed_branches.append([str(branch.get("pc")) + "," + str(branch.get("missed_destination")), branch.get("distance")])
+                covered_branches.append([str(branch.get("pc")) + "," + str(branch.get("destination"))])
+            for bug in post_state.get("bugs",[]):
+                current_opcode  = bug.get("opcode")
+                if current_opcode in arith_ops:
+                    op_1 = int(bug.get("operand_1"),16)
+                    op_2 = int(bug.get("operand_2"),16)
+                    if current_opcode == OPADD:
+                        if op_1 + op_2 > 2**256:
+                            bugs.append([str(bug.get("pc")), "overflow"])
+                    if current_opcode == OPSUB:
+                        if op_1 < op_2:
+                            bugs.append([str(bug.get("pc")), "underflow"])
+                    if current_opcode == OPMUL:
+                        if op_1 * op_2 > 2**256:
+                            bugs.append([str(bug.get("pc")), "overflow"])
+                    if current_opcode == OPEXP:
+                        if op_1 ** op_2 > 2**256:
+                            bugs.append([str(bug.get("pc")), "overflow"])
+                else:
+                    if current_opcode == OP_SELFDESTRUCT:
+                        bugs.append([str(bug.get("pc")), "self destruct"])
+                    elif current_opcode == OP_ORIGIN:
+                        bugs.append([str(bug.get("pc")), "tx.origin"])
+
+            all_call = []
+            for call in post_state.get("calls",[]):
+                if (call.get("pc") != 0):
+                    all_call.append(EVMCall(call.get("pc"), call.get("opcode"), call.get("to"), call.get("value"), False))
+                else:
+                    for i in range(len(all_call)-1,-1,-1):
+                        if all_call[i].revert == False:
+                            all_call[i].revert = True
+                            break
+
+            final_trace.append({"missed_branches": missed_branches, "covered_branches": covered_branches,\
+                                 "bugs": bugs, "calls": all_call})
+
+        return final_trace
+
 
     ## initiate num_instances clones of the initial state
     def initiate_instance_data(self, source_file, num_instances, config = None, detect_bug=False):
@@ -117,10 +168,14 @@ if __name__ == "__main__":
     # for debugging, altering the state 2
     my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"]["0x00"] = "0x22"
     my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["balance"] = "0x00"
-    my_lib.run_transactions([tx_1 , tx_2])
-    print ("\n\n Updated instance data \n\n")
-    my_lib.print_instance_data()
+    trace_res = my_lib.run_transactions([tx_1 , tx_2])
+    print ("\n\n trace res \n\n")
+    pprint(trace_res)
+    # print ("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
 
-    my_lib.run_transactions([tx_1 , tx_1])
-    print ("\n\n Updated instance data \n\n")
-    my_lib.print_instance_data()
+    trace_res = my_lib.run_transactions([tx_1 , tx_1])
+    print ("\n\n trace res \n\n")
+    pprint(trace_res)
+    # print ("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
