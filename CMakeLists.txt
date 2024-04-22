@@ -4,7 +4,7 @@ option(WITH_DOCS "Generating the documentation for the code" OFF)
 option(ONLY_CPU "Generating the CPU version of cuEVM " OFF)
 option(ENABLE_TRACING "Enable tracer" ON)
 option(ENABLE_COMPLEX_TRACER "Enable complex tracer" ON)
-set(CUDA_COMPUTE_CAPABILITY "89" CACHE STRING "CUDA Compute Capability")
+set(CUDA_COMPUTE_CAPABILITY "50" CACHE STRING "CUDA Compute Capability")
 
 project(cuevm
         VERSION 0.1.0

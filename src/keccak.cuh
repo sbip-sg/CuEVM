@@ -230,11 +230,29 @@ namespace keccak
                 md[idx] = _content->st.b[idx];
         }
 
+        __host__ __device__ void nist_sha3_final(uint8_t *md)
+        {
+            int idx;
+            // why not _parameters->rndc[0]? 0x06 for sha3, 0x1F for shake, 0x01 for keccak
+            _content->st.b[_content->pt] ^= 0x06;
+            _content->st.b[_content->rsiz - 1] ^= 0x80;
+            sha3_keccakf(_content->st.q);
+            for (idx = 0; idx < _content->mdlen; idx++)
+                md[idx] = _content->st.b[idx];
+        }
+
         __host__ __device__ void sha3(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen)
         {
             sha3_init(mdlen);
             sha3_update(in, inlen);
             sha3_final(md);
+        }
+
+        __host__ __device__ void nist_sha3(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen)
+        {
+            sha3_init(mdlen);
+            sha3_update(in, inlen);
+            nist_sha3_final(md);
         }
         // SHAKE128 and SHAKE256 extensible-output functions
         __host__ __device__ void shake_xof(uint8_t *md, int len)

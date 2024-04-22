@@ -294,10 +294,11 @@ public:
 
 
   /**
-   * Set the given memory data.
+   * Set the given memory data. Outside available_size is 0.
    * @param[in] data The data to be set.
    * @param[in] index The index of the memory access.
    * @param[in] length The length of the memory access.
+   * @param[in] available_size The available size of the memory.
    * @param[out] error_code The error code.
   */
   __host__ __device__ __forceinline__ void set(

@@ -1017,7 +1017,8 @@ public:
     bn_t sender_address;
     account_t *sender_account;
     get_sender(sender_address);
-    error_code = ERR_NONE;
+    // TODO: came back for this
+    // error_code = ERR_NONE;
     // get the world state account
     sender_account = touch_state._accessed_state->_world_state->get_account(
       sender_address,
@@ -1123,12 +1124,14 @@ public:
       // nonce is -1 in YP but here is before validating the transaction
       // and increasing the nonce
       cgbn_load(_arith._env, sender_nonce, &(account->nonce));
+
       message_t::get_create_contract_address(
           _arith,
           to,
           sender,
           sender_nonce,
           keccak);
+
     }
     else
     {
