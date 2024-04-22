@@ -3515,7 +3515,7 @@ public:
         keccak.sha3(code, code_size, hash, 32);
         _arith.word_from_memory(code_hash, hash);
         _arith.hex_string_from_cgbn_memory(hex_string_ptr, code_hash);
-        cJSON_AddStringToObject(account_json, "codehash", hex_string_ptr);
+        cJSON_AddStringToObject(account_json, "codeHash", hex_string_ptr);
 
         // set the storage
         storage_json = cJSON_CreateArray();
