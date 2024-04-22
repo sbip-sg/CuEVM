@@ -376,7 +376,9 @@ namespace internal_operations{
             size_t destination_s;
             int32_t overflow;
             overflow = arith.size_t_from_cgbn(destination_s, destination);
-
+            //printf("[JUMP] destination_s: %lu\n", destination_s);
+            //printf("[JUMP] overflow: %d\n", overflow);
+            //jumpdest.print();
             if (error_code == ERR_NONE)
             {
                 // if is not a valid jump destination
@@ -385,6 +387,7 @@ namespace internal_operations{
                     (jumpdest.has(destination_s) == 0))
                 {
                     error_code = ERR_INVALID_JUMP_DESTINATION;
+                    //printf("[JUMP] INVALID DESTINATION\n");
                 }
                 else
                 {

@@ -415,12 +415,7 @@ public:
 #ifdef TRACER
         _message_ptrs[_depth]->get_contract_address(_trace_address);
 #endif
-        if (_jump_destinations != NULL)
-        {
-            delete _jump_destinations;
-            _jump_destinations = NULL;
-        }
-        _jump_destinations = new jump_destinations_t(_bytecode, _code_size);
+        _jump_destinations = _message_ptrs[_depth]->get_jump_destinations();
     }
 
     /**
@@ -3190,7 +3185,7 @@ public:
         _accessed_state->to_accessed_state_data_t(
             *_final_accessed_state_data);
         *_final_error = _error_code;
-        delete _jump_destinations;
+        // delete _jump_destinations;
         _jump_destinations = NULL;
     }
 

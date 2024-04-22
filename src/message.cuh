@@ -10,6 +10,7 @@
 #include "include/utils.h"
 #include "state.cuh"
 #include "keccak.cuh"
+#include "jump_destinations.cuh"
 
 /**
  * The message call class.
@@ -47,6 +48,7 @@ public:
   } message_data_t;
 
   message_data_t *_content; /**< The message content */
+  jump_destinations_t *_jump_destinations; /**< The jump destinations */
   arith_t _arith;           /**< The arithmetical environment */
 
   /**
@@ -117,6 +119,11 @@ public:
     cgbn_store(_arith._env, &(_content->return_data_offset), return_data_offset);
     cgbn_store(_arith._env, &(_content->return_data_size), return_data_size);
     _content->static_env = static_env;
+
+    // create the jump destinations
+    _jump_destinations = new jump_destinations_t(
+        _content->byte_code.data,
+        _content->byte_code.size);
   }
 
   /**
@@ -137,6 +144,8 @@ public:
         }
         delete _content;)
     _content = NULL;
+    delete _jump_destinations;
+    _jump_destinations = NULL;
   }
 
   /**
@@ -394,6 +403,14 @@ public:
         _content->byte_code.data = NULL;
       })
       _content->byte_code.size = byte_code_size;
+      if (_jump_destinations != NULL)
+      {
+        delete _jump_destinations;
+        _jump_destinations = NULL;
+      }
+      _jump_destinations = new jump_destinations_t(
+          _content->byte_code.data,
+          _content->byte_code.size);
   }
 
   /**
@@ -414,6 +431,15 @@ public:
       bn_t &return_data_size)
   {
     cgbn_store(_arith._env, &(_content->return_data_size), return_data_size);
+  }
+
+  /**
+   * Get the jump destinations.
+   * @return The jump destinations.
+  */
+  __host__ __device__ __forceinline__ jump_destinations_t *get_jump_destinations()
+  {
+    return _jump_destinations;
   }
 
   __host__ __device__ __forceinline__ static void get_create_contract_address(

@@ -2363,11 +2363,15 @@ public:
         bn_t &gas_refund)
     {
         // find out if it is a warm or cold storage access
+        // it does not matter anymore in the gas computation
         _accessed_state->get_access_storage_gas_cost(address, key, gas_cost);
         if (cgbn_compare_ui32(_arith._env, gas_cost, GAS_WARM_ACCESS) == 0)
         {
             cgbn_set_ui32(_arith._env, gas_cost, 0); // 100 is not add here
+            //printf("WARM ACCESS\n");
         }
+        
+        // cgbn_set_ui32(_arith._env, gas_cost, 0);
         // get the original value from accessed state/global state
         bn_t original_value;
         _accessed_state->get_value(address, key, original_value);
@@ -2377,6 +2381,10 @@ public:
 
         // TODO: if we keep separate gas refund and remaining gas we can delete this
         cgbn_set_ui32(_arith._env, gas_refund, 0);
+        //printf("[SSTORE] value: %u\n", cgbn_get_ui32(_arith._env, value));
+        //printf("[SSTORE] current_value: %u\n", cgbn_get_ui32(_arith._env, current_value));
+        //printf("[SSTORE] original_value: %u\n", cgbn_get_ui32(_arith._env, original_value));
+        //printf("[SSTORE] gas_cost: %u\n", cgbn_get_ui32(_arith._env, gas_cost));
 
         // EIP-2200
         if (cgbn_compare(_arith._env, value, current_value) == 0)
@@ -2390,10 +2398,12 @@ public:
                 if (cgbn_compare_ui32(_arith._env, original_value, 0) == 0)
                 {
                     cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_STORAGE_SET);
+                    //printf("GAS_STORAGE_SET\n");
                 }
                 else
                 {
                     cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_SSTORE_RESET);
+                    //printf("GAS_SSTORE_RESET\n");
                     if (cgbn_compare_ui32(_arith._env, value, 0)==0){
                         cgbn_add_ui32(_arith._env, gas_refund, gas_refund, GAS_SSTORE_CLEARS_SCHEDULE);
                     }
@@ -2407,7 +2417,6 @@ public:
                     if (cgbn_compare_ui32(_arith._env, current_value, 0) == 0)
                     {
                         cgbn_sub_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
-                        //cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_STORAGE_CLEAR_REFUND);
                     }else if (cgbn_compare_ui32(_arith._env, value, 0) == 0)
                     {
                         cgbn_add_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
@@ -2430,6 +2439,7 @@ public:
                 }
             }
         }
+        printf("[SSTORE] after gas_cost: %u\n", cgbn_get_ui32(_arith._env, gas_cost));
     }
 
     /**
@@ -3505,7 +3515,7 @@ public:
         keccak.sha3(code, code_size, hash, 32);
         _arith.word_from_memory(code_hash, hash);
         _arith.hex_string_from_cgbn_memory(hex_string_ptr, code_hash);
-        cJSON_AddStringToObject(account_json, "codeHash", hex_string_ptr);
+        cJSON_AddStringToObject(account_json, "codehash", hex_string_ptr);
 
         // set the storage
         storage_json = cJSON_CreateArray();
