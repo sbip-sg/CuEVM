@@ -64,12 +64,12 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
         }
     }
     */
-    printf("\n print transaction data after get_cpu_instances_plain_data\n");
-    for (Py_ssize_t idx = 0; idx < count; idx++) {
-        printf("Transaction data %d\n", idx);
-        transaction_t::print_transaction_data_t(arith, all_transactions[idx]);
+    // printf("\n print transaction data after get_cpu_instances_plain_data\n");
+    // for (Py_ssize_t idx = 0; idx < count; idx++) {
+    //     printf("Transaction data %d\n", idx);
+    //     transaction_t::print_transaction_data_t(arith, all_transactions[idx]);
 
-    }
+    // }
 
 
     #ifndef ONLY_CPU

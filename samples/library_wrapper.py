@@ -54,7 +54,7 @@ class CuEVMLib:
             covered_branches = []
             bugs = []
             storage_write = []
-            for branch in post_state.get("branches",[]):
+            for branch in post_state.get("branches",[])[3:]:
                 missed_branches.append([str(branch.get("pc")) + "," + str(branch.get("missed_destination")), branch.get("distance")])
                 covered_branches.append([str(branch.get("pc")) + "," + str(branch.get("destination"))])
             for bug in post_state.get("bugs",[]):
@@ -151,6 +151,7 @@ class CuEVMLib:
             self.instances[i]["transaction"]["value"] = tx_data[i]["value"]
             if (tx_data[i].get("sender")):
                 self.instances[i]["transaction"]["sender"] = tx_data[i]["sender"]
+
             # TODO: add other fuzz-able fields
 
 

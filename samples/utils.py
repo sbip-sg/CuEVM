@@ -112,6 +112,19 @@ def get_transaction_data_from_config(item, contract_instance):
 
     return [four_byte + encoded_data]
 
+def get_transaction_data_from_processed_abi(processed_abi, function_name, inputs):
+    print("Target function inputs ", function_name, inputs)
+    entry = processed_abi.get(function_name)
+    if entry:
+        input_types = entry.get("input_types")
+        four_byte = "0x"+entry.get("4byte")
+        if len(inputs) > 0:
+            encoded_data = encode(input_types, inputs).hex()
+        else:
+            encoded_data = ""
+        return [four_byte + encoded_data]
+    else:
+        return [""]
 
 
 def decode_abi_bin_from_compiled_json(compiled_sol):
