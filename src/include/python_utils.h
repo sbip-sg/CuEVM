@@ -391,7 +391,7 @@ namespace python_utils{
      * @param[in] tracer_data The trace data structure.
      * @return The pythonobject.
     */
-    __host__ static PyObject* pyobject_from_tracer_data_t(arith_t &arith, tracer_data_t* tracer_data) {
+    __host__ static PyObject* pyobject_from_tracer_data_t(arith_t &arith, tracer_data_t tracer_data) {
         char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
         PyObject* tracer_root = PyDict_New();
 
@@ -405,7 +405,7 @@ namespace python_utils{
         PyObject* stack_json = NULL;
 
         size_t previous_distance;
-/*
+
         for (size_t idx = 0; idx < tracer_data.size; idx++) {
             uint8_t current_opcode = tracer_data.opcodes[idx];
             uint32_t current_pc = tracer_data.pcs[idx];
@@ -557,7 +557,7 @@ namespace python_utils{
                 Py_DECREF(storage_item);
             }
         }
-*/
+
         PyDict_SetItemString(tracer_root, "traces", tracer_json);
         PyDict_SetItemString(tracer_root, "branches", branches);
         PyDict_SetItemString(tracer_root, "bugs", bugs);
@@ -797,9 +797,9 @@ namespace python_utils{
             PyDict_SetItemString(instance_json, "state", state_json);
 
             #ifdef TRACER
-            // PyObject* tracer_json = pyobject_from_tracer_data_t(arith, &instances.tracers_data[idx]);
-            // PyDict_SetItemString(instance_json, "traces", tracer_json);
-            // Py_DECREF(tracer_json);
+            PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
+            PyDict_SetItemString(instance_json, "traces", tracer_json);
+            Py_DECREF(tracer_json);
             #endif
 
             PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances.errors[idx]));

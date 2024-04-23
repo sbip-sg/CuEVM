@@ -515,7 +515,7 @@ public:
                 delete[] cpu_instances[idx].addresses;
                 delete[] cpu_instances[idx].pcs;
                 delete[] cpu_instances[idx].opcodes;
-                printf("\n\nFree cpu instances stack %d %d %p\n\n", idx, cpu_instances[idx].capacity, cpu_instances[idx].stacks);
+                // printf("\n\nFree cpu instances stack %d %d %p\n\n", idx, cpu_instances[idx].capacity, cpu_instances[idx].stacks);
                 stack_t::free_cpu_instances(cpu_instances[idx].stacks, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].stacks;
                 #ifdef COMPLEX_TRACER

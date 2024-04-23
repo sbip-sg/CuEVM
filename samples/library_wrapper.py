@@ -14,9 +14,9 @@ sys.path.append('../build/')
 import libcuevm  # Now you can import your module as usual
 
 class CuEVMLib:
-    def __init__(self, source_file, num_instances, config = None,
+    def __init__(self, source_file, num_instances, config = None, contract_name=None,
                  detect_bug=False, sender = "0x1111111111111111111111111111111111111111"):
-        self.initiate_instance_data(source_file, num_instances, config, detect_bug)
+        self.initiate_instance_data(source_file, num_instances, config, contract_name, detect_bug)
         self.sender = sender
 
 
@@ -99,12 +99,15 @@ class CuEVMLib:
 
 
     ## initiate num_instances clones of the initial state
-    def initiate_instance_data(self, source_file, num_instances, config = None, detect_bug=False):
+    def initiate_instance_data(self, source_file, num_instances, config = None, contract_name = None, detect_bug=False):
         default_config = json.loads(open("configurations/default.json").read())
         print(default_config)
         # tx_sequence_list
         tx_sequence_config = json.loads(open(config).read())
-        self.contract_name = tx_sequence_config.get("contract_name")
+        if contract_name is None:
+            self.contract_name = tx_sequence_config.get("contract_name")
+        else:
+            self.contract_name = contract_name
         self.contract_instance, self.ast_parser = compile_file(source_file, self.contract_name)
         contract_bin_runtime = self.contract_instance.get("binary_runtime")
         # the merged config fields : "env", "pre" (populated with code), "transaction" (populated with tx data and value)
@@ -189,12 +192,23 @@ if __name__ == "__main__":
     # print ("\n\n Updated instance data \n\n")
     # my_lib.print_instance_data()
 
-    my_lib = CuEVMLib("contracts/erc20.sol", 2, "configurations/default.json", False)
+    my_lib = CuEVMLib("contracts/erc20.sol", 2, "configurations/default.json", contract_name="ERC20", detect_bug=False)
+    test_case = {
+        "function": "transfer",
+        "type": "exec",
+        "input_types": ["address","uint256"],
+        "input": ["0x0000000000000000000000000000000000000001",512],
+        "sender": 0
+    }
+
     tx_1 = {
         "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
-        "value" : [hex(0)]
+        "value" : [hex(512)]
     }
     tx_2 = {
         "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
-        "value" : [hex(0)]
+        "value" : [hex(512)]
     }
+    trace_res = my_lib.run_transactions([tx_1 , tx_2])
+    print ("\n\n trace res \n\n")
+    pprint(trace_res)

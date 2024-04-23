@@ -2463,7 +2463,7 @@ public:
             storage_idx = account->storage_size;
             ONE_THREAD_PER_INSTANCE(
                 size_t new_storage_size = ++account->storage_size;
-                if (new_storage_size % STORAGE_CHUNK == 1) {
+                if (new_storage_size % STORAGE_CHUNK > 0) {
                     // Round up to the next multiple of STORAGE_CHUNK
                     size_t new_capacity = ((new_storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
                     contract_storage_t *tmp_storage = new contract_storage_t[new_capacity];

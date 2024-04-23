@@ -7,8 +7,8 @@ from utils import *
 class Fuzzer:
 
     def __init__(self, contract_source, num_instances=2, timeout=10, \
-                 config="configurations/default.json", output=None, test_case_file = None) -> None:
-        self.library = CuEVMLib(contract_source, num_instances, config, True)
+                 config="configurations/default.json", contract_name=None, output=None, test_case_file = None) -> None:
+        self.library = CuEVMLib(contract_source, num_instances, config, contract_name=contract_name, detect_bug=True)
         self.ast_parser = self.library.ast_parser
         self.contract_name = self.library.contract_name
         self.timeout = timeout # in seconds
@@ -43,7 +43,7 @@ class Fuzzer:
             "data":  get_transaction_data_from_config(test_case, self.library.contract_instance),
             "value": [temp_val]
         })
-
+        # print ("testcase" , test_case)
         return tx
     def parse_fuzzing_confg(self, config):
         ...
@@ -55,7 +55,7 @@ class Fuzzer:
         ...
 
 
-# python fuzzer.py --input sample.sol --config sample_config.json --timeout 10 --output report.json --test_case test_case.json
+# python fuzzer.py --input sample.sol --config sample_config.json --timeout 10 --contract_name Test --output report.json --test_case test_case.json
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run EVM fuzzer")
     parser.add_argument(
@@ -68,11 +68,14 @@ if __name__ == "__main__":
         "--timeout", default=10, help="timeout in seconds"
     )
     parser.add_argument(
-        "--output", default="NA", help="output file"
+        "--contract_name", help="contract name"
     )
     parser.add_argument(
-        "--test_case", default="NA", help="test case file"
+        "--output", help="output file"
+    )
+    parser.add_argument(
+        "--test_case", help="test case file"
     )
     args = parser.parse_args()
-    fuzzer = Fuzzer(args.input, 2, args.timeout, args.config, args.output, args.test_case)
+    fuzzer = Fuzzer(args.input, 2, args.timeout, args.config, args.contract_name , args.output, args.test_case)
     fuzzer.finalize_report()
