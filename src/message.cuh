@@ -1583,6 +1583,7 @@ public:
     }
     for (size_t idx = 0; idx < count; idx++)
     {
+      printf("freeing transaction %d\n", idx);
       if (transactions[idx].data_init.size > 0)
       {
         delete[] transactions[idx].data_init.data;

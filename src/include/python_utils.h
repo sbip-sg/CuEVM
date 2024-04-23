@@ -30,7 +30,7 @@ using touch_state_data_t = touch_state_t::touch_state_data_t ;
 
 namespace python_utils{
 
-    block_data_t* getBlockDataFromPyObject(arith_t arith, PyObject* data){
+    block_data_t* getBlockDataFromPyObject(arith_t &arith, PyObject* data){
         // construct blockt_t
 
         block_data_t* block_data;
@@ -113,7 +113,7 @@ namespace python_utils{
         }
     }
 
-    transaction_data_t* getTransactionDataFromListofPyObject(arith_t arith, PyObject* read_roots){
+    transaction_data_t* getTransactionDataFromListofPyObject(arith_t &arith, PyObject* read_roots){
         Py_ssize_t count = PyList_Size(read_roots);
         transaction_data_t *transactions;
         #ifndef ONLY_CPU
@@ -192,7 +192,7 @@ namespace python_utils{
         return transactions;
     }
 
-    transaction_data_t* getTransactionDataFromPyObject(arith_t arith, PyObject* data, size_t &instances_count){
+    transaction_data_t* getTransactionDataFromPyObject(arith_t &arith, PyObject* data, size_t &instances_count){
         // get data size
         PyObject* tx_data =  PyDict_GetItemString(data, "data");
         PyObject* tx_gas_limit = PyDict_GetItemString(data, "gasLimit");
@@ -271,7 +271,7 @@ namespace python_utils{
         return transactions;
     }
 
-    state_data_t* getStateDataFromPyObject(arith_t arith, PyObject* data) {
+    state_data_t* getStateDataFromPyObject(arith_t &arith, PyObject* data) {
         PyObject *key, *value;
         Py_ssize_t pos = 0;
         state_data_t* state_data;
@@ -391,20 +391,21 @@ namespace python_utils{
      * @param[in] tracer_data The trace data structure.
      * @return The pythonobject.
     */
-    __host__ static PyObject* pyobject_from_tracer_data_t(arith_t &arith, tracer_data_t tracer_data) {
+    __host__ static PyObject* pyobject_from_tracer_data_t(arith_t &arith, tracer_data_t* tracer_data) {
         char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
         PyObject* tracer_root = PyDict_New();
 
         PyObject* branches = PyList_New(0);
         PyObject* bugs = PyList_New(0);
         PyObject* calls = PyList_New(0);
+        PyObject* storage_write = PyList_New(0);
 
         PyObject* tracer_json = PyList_New(0);
         PyObject* item = NULL;
         PyObject* stack_json = NULL;
 
         size_t previous_distance;
-
+/*
         for (size_t idx = 0; idx < tracer_data.size; idx++) {
             uint8_t current_opcode = tracer_data.opcodes[idx];
             uint32_t current_pc = tracer_data.pcs[idx];
@@ -537,11 +538,31 @@ namespace python_utils{
                 Py_DECREF(revert_item);
             }
 
-        }
+            if (current_opcode == OP_SSTORE){
+                PyObject* storage_item = PyDict_New();
+                PyDict_SetItemString(storage_item, "address", PyUnicode_FromString(hex_string_ptr));
+                PyDict_SetItemString(storage_item, "pc", PyLong_FromSize_t(current_pc));
 
+                uint32_t stack_size = tracer_data.stacks[idx].stack_offset;
+                evm_word_t * value = tracer_data.stacks[idx].stack_base + stack_size - 2;
+                evm_word_t * key = tracer_data.stacks[idx].stack_base + stack_size - 1;
+
+                arith.hex_string_from_cgbn_memory(hex_string_ptr, *key);
+                PyDict_SetItemString(storage_item, "key", PyUnicode_FromString(hex_string_ptr));
+
+                arith.hex_string_from_cgbn_memory(hex_string_ptr, *value);
+                PyDict_SetItemString(storage_item, "value", PyUnicode_FromString(hex_string_ptr));
+
+                PyList_Append(storage_write, storage_item);
+                Py_DECREF(storage_item);
+            }
+        }
+*/
         PyDict_SetItemString(tracer_root, "traces", tracer_json);
         PyDict_SetItemString(tracer_root, "branches", branches);
         PyDict_SetItemString(tracer_root, "bugs", bugs);
+        PyDict_SetItemString(tracer_root, "calls", calls);
+        PyDict_SetItemString(tracer_root, "storage_write", storage_write);
 
         delete[] hex_string_ptr;
         return tracer_root;
@@ -776,9 +797,9 @@ namespace python_utils{
             PyDict_SetItemString(instance_json, "state", state_json);
 
             #ifdef TRACER
-            PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
-            PyDict_SetItemString(instance_json, "traces", tracer_json);
-            Py_DECREF(tracer_json);
+            // PyObject* tracer_json = pyobject_from_tracer_data_t(arith, &instances.tracers_data[idx]);
+            // PyDict_SetItemString(instance_json, "traces", tracer_json);
+            // Py_DECREF(tracer_json);
             #endif
 
             PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances.errors[idx]));

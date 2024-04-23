@@ -39,6 +39,8 @@ class CuEVMLib:
     ## 3. return the simplified trace during execution
     def run_transactions(self, tx_data):
         self.build_instance_data(tx_data)
+        self.print_instance_data()
+        print ("before running")
         result_state = libcuevm.run_dict(self.instances)
         self.update_persistent_state(result_state)
         return self.post_process_trace(result_state)
@@ -47,10 +49,11 @@ class CuEVMLib:
     def post_process_trace(self, trace):
         final_trace = []
         for i in range(len(trace.get("post"))):
-            post_state = trace.get("post")[i].get("traces")
+            post_state = trace.get("post")[i].get("traces",{})
             missed_branches = []
             covered_branches = []
             bugs = []
+            storage_write = []
             for branch in post_state.get("branches",[]):
                 missed_branches.append([str(branch.get("pc")) + "," + str(branch.get("missed_destination")), branch.get("distance")])
                 covered_branches.append([str(branch.get("pc")) + "," + str(branch.get("destination"))])
@@ -87,8 +90,10 @@ class CuEVMLib:
                             all_call[i].revert = True
                             break
 
+            for slot in post_state.get("storage_write",[]):
+                storage_write.append(EVMStore(slot.get("pc"), slot.get("key"), slot.get("value")))
             final_trace.append({"missed_branches": missed_branches, "covered_branches": covered_branches,\
-                                 "bugs": bugs, "calls": all_call})
+                                 "bugs": bugs, "calls": all_call, "storage_write": storage_write})
 
         return final_trace
 
@@ -133,7 +138,11 @@ class CuEVMLib:
     ## build instances data from new tx data
     ## tx_data is a list of tx data
     def build_instance_data(self, tx_data):
-        assert len(tx_data) == len(self.instances)
+        if len(tx_data) < len(self.instances):
+            tx_data = tx_data + [tx_data[-1]] * (len(self.instances) - len(tx_data))
+        if len(tx_data) > len(self.instances):
+            tx_data = tx_data[:len(self.instances)]
+        print (f"tx_data_rebuilt {tx_data}")
         for i in range(len(tx_data)):
             self.instances[i]["transaction"]["data"] = tx_data[i]["data"]
             self.instances[i]["transaction"]["value"] = tx_data[i]["value"]
@@ -143,16 +152,44 @@ class CuEVMLib:
 
 
 if __name__ == "__main__":
-    my_lib = CuEVMLib("contracts/state_change.sol", 2, "configurations/state_change.json", False)
-    test_case = {
-                    "function": "increase",
-                    "type": "exec",
-                    "input_types": [],
-                    "input": [],
-                    "sender": 0
-                }
+    # my_lib = CuEVMLib("contracts/state_change.sol", 2, "configurations/state_change.json", False)
+    # test_case = {
+    #                 "function": "increase",
+    #                 "type": "exec",
+    #                 "input_types": [],
+    #                 "input": [],
+    #                 "sender": 0
+    #             }
 
 
+    # tx_1 = {
+    #     "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
+    #     "value" : [hex(0)]
+    # }
+    # tx_2 = {
+    #     "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
+    #     "value" : [hex(0)]
+    # }
+
+    # # for debugging, altering tx2 data
+    # tx_2["data"] = ["0x22"]
+    # tx_2["value"] = [hex(10)]
+    # # for debugging, altering the state 2
+    # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"]["0x00"] = "0x22"
+    # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["balance"] = "0x00"
+    # trace_res = my_lib.run_transactions([tx_1 , tx_2])
+    # print ("\n\n trace res \n\n")
+    # pprint(trace_res)
+    # # print ("\n\n Updated instance data \n\n")
+    # # my_lib.print_instance_data()
+
+    # trace_res = my_lib.run_transactions([tx_1 , tx_1])
+    # print ("\n\n trace res \n\n")
+    # pprint(trace_res)
+    # print ("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
+
+    my_lib = CuEVMLib("contracts/erc20.sol", 2, "configurations/default.json", False)
     tx_1 = {
         "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
         "value" : [hex(0)]
@@ -161,21 +198,3 @@ if __name__ == "__main__":
         "data" : get_transaction_data_from_config(test_case, my_lib.contract_instance),  # must return an array
         "value" : [hex(0)]
     }
-
-    # for debugging, altering tx2 data
-    tx_2["data"] = ["0x22"]
-    tx_2["value"] = [hex(10)]
-    # for debugging, altering the state 2
-    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"]["0x00"] = "0x22"
-    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["balance"] = "0x00"
-    trace_res = my_lib.run_transactions([tx_1 , tx_2])
-    print ("\n\n trace res \n\n")
-    pprint(trace_res)
-    # print ("\n\n Updated instance data \n\n")
-    # my_lib.print_instance_data()
-
-    trace_res = my_lib.run_transactions([tx_1 , tx_1])
-    print ("\n\n trace res \n\n")
-    pprint(trace_res)
-    # print ("\n\n Updated instance data \n\n")
-    # my_lib.print_instance_data()

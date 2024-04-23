@@ -409,6 +409,7 @@ public:
   {
     for (int index = 0; index < count; index++)
     {
+      printf("freeing index %d\n", index);
       if (cpu_instances[index].stack_base != NULL)
       {
         delete[] cpu_instances[index].stack_base;

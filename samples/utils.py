@@ -40,6 +40,11 @@ class EVMCall:
     value: int
     revert: bool
 
+@dataclass
+class EVMStore:
+    pc: int
+    key: int
+    value: int
 
 
 def parse_trace_and_detect_bug(trace_file, contract_name, ast_parser = None):

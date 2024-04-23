@@ -54,6 +54,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
     printf("Generating instances\n");
     evm_t::get_cpu_instances_plain_data(cpu_instances, all_state_data, all_block_data, all_transactions, count);
     printf("%d instances generated\n", cpu_instances.count);
+/*
     printf("\n print state data after get_cpu_instances_plain_data\n");
 
     for (Py_ssize_t idx = 0; idx < count; idx++) {
@@ -62,6 +63,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
             world_state_t::print_account_t(arith, all_state_data[idx]->accounts[i]);
         }
     }
+    */
     printf("\n print transaction data after get_cpu_instances_plain_data\n");
     for (Py_ssize_t idx = 0; idx < count; idx++) {
         printf("Transaction data %d\n", idx);

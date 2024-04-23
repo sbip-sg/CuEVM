@@ -3260,7 +3260,7 @@ public:
         for (size_t idx = 0; idx < cpu_instances.count; idx++)
         {
             world_state_t *cpu_world_state;
-            printf("world state data pointer %d instance %p \n\n", idx, cpu_instances.world_state_data[idx]);
+            // printf("world state data pointer %d instance %p \n\n", idx, cpu_instances.world_state_data[idx]);
 
             cpu_world_state = new world_state_t(arith, cpu_instances.world_state_data[idx]);
             cpu_world_state->free_content();

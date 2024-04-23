@@ -4,7 +4,7 @@ option(WITH_DOCS "Generating the documentation for the code" OFF)
 option(ONLY_CPU "Generating the CPU version of cuEVM " OFF)
 option(ENABLE_TRACING "Enable tracer" ON)
 option(BUILD_LIBRARY "Build as a shared library" OFF) # Added option for building as a library
-option(ENABLE_COMPLEX_TRACER "Enable complex tracer" ON)
+option(ENABLE_COMPLEX_TRACER "Enable complex tracer" OFF)
 set(CUDA_COMPUTE_CAPABILITY "89" CACHE STRING "CUDA Compute Capability")
 
 project(cuevm

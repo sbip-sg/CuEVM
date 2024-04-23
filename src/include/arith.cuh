@@ -305,6 +305,7 @@ public:
     mpz_t value;
     size_t written;
     mpz_init(value);
+    // potential segfault len < 2
     if (
       (src_hex_string[0] == '0') &&
       ((src_hex_string[1] == 'x') || (src_hex_string[1] == 'X'))
