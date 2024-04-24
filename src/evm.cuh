@@ -3122,8 +3122,8 @@ public:
     {
         // sent the gas value to the block beneficiary
         bn_t gas_value;
-        // bn_t beneficiary;
-        // _block->get_coin_base(beneficiary);
+        bn_t beneficiary;
+        _block->get_coin_base(beneficiary);
         // char *temp = new char[arith_t::BYTES * 2 + 3];
 
         if (error_code == ERR_RETURN)
@@ -3143,7 +3143,8 @@ public:
             }
             // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
             cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
-            cgbn_mul(_arith._env, gas_value, gas_value, _gas_price);
+            bn_t send_back_gas;
+            cgbn_mul(_arith._env, send_back_gas, gas_value, _gas_price);
             // add to sender balance g^{*}
             bn_t sender_balance;
             bn_t sender_address;
@@ -3153,7 +3154,9 @@ public:
             // _transaction->get_value(tx_value);
             // cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
-            // cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
+            cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
+            cgbn_mul(_arith._env, gas_value, gas_value, _gas_priority_fee);
+
 
             // update the transaction state
             _transaction_touch_state->update_with_child_state(
@@ -3161,8 +3164,9 @@ public:
             _transaction_log_state->update_with_child_state(
                 *_log_state_ptrs[_depth]);
             _transaction_touch_state->get_account_balance(sender_address, sender_balance);
-            cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
+            cgbn_add(_arith._env, sender_balance, sender_balance, send_back_gas);
             _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+
 
             // set the eror code for a succesfull transaction
             _error_code = ERR_NONE;
@@ -3174,10 +3178,12 @@ public:
             _error_code = error_code;
         }
         // send the gas value to the beneficiary
-        // bn_t beneficiary_balance;
-        // _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
-        // cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
-        // _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
+        if (cgbn_compare_ui32(_arith._env, gas_value, 0) > 0 ) {
+            bn_t beneficiary_balance;
+            _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
+            cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
+            _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
+        }
 
         // update the final state modification done by the transaction
         _transaction_touch_state->to_touch_state_data_t(

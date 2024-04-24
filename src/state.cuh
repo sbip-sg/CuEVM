@@ -3624,7 +3624,10 @@ public:
                 writen_accounts[account_idx] = 1;
             }
             account_json = account_root_json(world_account, touch_account, keccak, touch);
-            cJSON_AddItemToArray(accounts_json, account_json);
+            if ( (touch & WRITE_DELETE) == 0)
+                cJSON_AddItemToArray(accounts_json, account_json);
+            else
+                cJSON_Delete(account_json);
         }
         for (idx = 0; idx < _content->touch_accounts.no_accounts; idx++)
         {
@@ -3635,7 +3638,10 @@ public:
                     keccak,
                     0
                 );
-                cJSON_AddItemToArray(accounts_json, account_json);
+                if ( (_content->touch[idx] & WRITE_DELETE) == 0)
+                    cJSON_AddItemToArray(accounts_json, account_json);
+                else
+                    cJSON_Delete(account_json);
             }
         }
         delete [] writen_accounts;
