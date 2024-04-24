@@ -395,6 +395,7 @@ public:
         _block->get_coin_base(coin_base_address);
         _accessed_state->get_account(coin_base_address, READ_BALANCE);
         bn_t precompiled_address;
+        // 10 for Cancun with the addition of point evaluation
         for (uint32_t i = 1; i < 10; i++)
         {
             cgbn_set_ui32(_arith._env, precompiled_address, i);
@@ -812,7 +813,11 @@ public:
                     cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CALL_VALUE);
                     cgbn_set_ui32(arith._env, gas_stippend, GAS_CALL_STIPEND);
                     // If the empty account is called
-                    if (touch_state.is_empty_account(contract_address))
+                    // only for call opcode
+                    if (
+                        touch_state.is_empty_account(contract_address) &&
+                        (new_message.get_call_type() == OP_CALL)
+                    )
                     {
                         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_NEW_ACCOUNT);
                     };
