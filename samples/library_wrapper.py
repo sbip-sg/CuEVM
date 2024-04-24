@@ -39,8 +39,8 @@ class CuEVMLib:
     ## 3. return the simplified trace during execution
     def run_transactions(self, tx_data):
         self.build_instance_data(tx_data)
-        self.print_instance_data()
-        print ("before running")
+        # self.print_instance_data()
+        # print ("before running")
         result_state = libcuevm.run_dict(self.instances)
         self.update_persistent_state(result_state)
         return self.post_process_trace(result_state)
@@ -145,7 +145,7 @@ class CuEVMLib:
             tx_data = tx_data + [tx_data[-1]] * (len(self.instances) - len(tx_data))
         if len(tx_data) > len(self.instances):
             tx_data = tx_data[:len(self.instances)]
-        print (f"tx_data_rebuilt {tx_data}")
+        # print (f"tx_data_rebuilt {tx_data}")
         for i in range(len(tx_data)):
             self.instances[i]["transaction"]["data"] = tx_data[i]["data"]
             self.instances[i]["transaction"]["value"] = tx_data[i]["value"]

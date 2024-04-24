@@ -140,7 +140,7 @@ namespace python_utils{
                 return NULL;
             }
 
-            printf("Transaction count: %d\n", count);
+            // printf("Transaction count: %d\n", count);
 
             transaction_data_t *template_transaction = new transaction_data_t;
             memset(template_transaction, 0, sizeof(transaction_data_t));
@@ -206,7 +206,7 @@ namespace python_utils{
         size_t value_count = PyList_Size(tx_value);
         size_t count = max(max(tx_data_count, gas_limit_count), value_count);
         instances_count = count;
-        printf("Transaction count: %d\n", count);
+        // printf("Transaction count: %d\n", count);
         transaction_data_t *transactions;
     #ifndef ONLY_CPU
         CUDA_CHECK(cudaMallocManaged((void **)&(transactions), count * sizeof(transaction_data_t)));

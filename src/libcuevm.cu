@@ -51,9 +51,9 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
     }
 
     // get instances to run
-    printf("Generating instances\n");
+    // printf("Generating instances\n");
     evm_t::get_cpu_instances_plain_data(cpu_instances, all_state_data, all_block_data, all_transactions, count);
-    printf("%d instances generated\n", cpu_instances.count);
+    // printf("%d instances generated\n", cpu_instances.count);
 /*
     printf("\n print state data after get_cpu_instances_plain_data\n");
 
@@ -102,7 +102,7 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
 
         printf("Results copied\n");
     #else
-        printf("Running CPU EVM\n");
+        // printf("Running CPU EVM\n");
         // run the evm
         evm_t *evm = NULL;
         uint32_t tmp_error;
@@ -129,10 +129,10 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
         evm = NULL;
 
         }
-        printf("CPU EVM finished\n");
-        auto cpu_end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> cpu_duration = cpu_end - cpu_start;
-        printf("CPU EVM execution took %f ms\n", cpu_duration.count());
+        // printf("CPU EVM finished\n");
+        // auto cpu_end = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<double, std::milli> cpu_duration = cpu_end - cpu_start;
+        // printf("CPU EVM execution took %f ms\n", cpu_duration.count());
     #endif
 
     // free the memory

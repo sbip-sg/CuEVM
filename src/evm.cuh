@@ -3255,7 +3255,7 @@ public:
         evm_instances_t &cpu_instances)
     {
         arith_t arith(cgbn_report_monitor, 0);
-        printf("free instances\n");
+        // printf("free instances\n");
 #ifdef BUILD_LIB
         for (size_t idx = 0; idx < cpu_instances.count; idx++)
         {
