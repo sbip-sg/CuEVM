@@ -93,7 +93,7 @@ def get_transaction_data_from_config(item, contract_instance):
     # print (contract_instance)
     target_function = item["function"]
     inputs = item["input"]
-    print("Target function inputs ", target_function, inputs)
+    # print("Target function inputs ", target_function, inputs)
     # print (contract_instance['abi'])
     function_abi = [
         i
@@ -113,7 +113,7 @@ def get_transaction_data_from_config(item, contract_instance):
     return [four_byte + encoded_data]
 
 def get_transaction_data_from_processed_abi(processed_abi, function_name, inputs):
-    print("Target function inputs ", function_name, inputs)
+    # print("Target function inputs ", function_name, inputs)
     entry = processed_abi.get(function_name)
     if entry:
         input_types = entry.get("input_types")

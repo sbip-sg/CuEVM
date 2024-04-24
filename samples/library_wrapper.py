@@ -48,6 +48,8 @@ class CuEVMLib:
     # post process the trace to detect integer bugs and simplify the distance
     def post_process_trace(self, trace):
         final_trace = []
+        # print("\ntrace\n")
+        # pprint(trace)
         for i in range(len(trace.get("post"))):
             post_state = trace.get("post")[i].get("traces",{})
             missed_branches = []
@@ -83,13 +85,16 @@ class CuEVMLib:
             all_call = []
             for call in post_state.get("calls",[]):
                 if (call.get("pc") != 0):
-                    all_call.append(EVMCall(call.get("pc"), call.get("opcode"), call.get("to"), call.get("value"), False))
+                    all_call.append(EVMCall(call.get("pc"), call.get("opcode"), call.get("to"), int(call.get("value"), 16), False))
                 else:
                     for i in range(len(all_call)-1,-1,-1):
                         if all_call[i].revert == False:
                             all_call[i].revert = True
                             break
-
+            # check unauthorized send
+            for call in all_call:
+                if call.value != 0 and call.revert == False:
+                    bugs.append([str(call.pc), "unauthorized send"])
             for slot in post_state.get("storage_write",[]):
                 storage_write.append(EVMStore(slot.get("pc"), slot.get("key"), slot.get("value")))
             final_trace.append({"missed_branches": missed_branches, "covered_branches": covered_branches,\
@@ -109,6 +114,9 @@ class CuEVMLib:
         else:
             self.contract_name = contract_name
         self.contract_instance, self.ast_parser = compile_file(source_file, self.contract_name)
+        if self.contract_instance is None:
+            print ("Error in compiling the contract {self.contract_name} {source_file}")
+            return
         contract_bin_runtime = self.contract_instance.get("binary_runtime")
         # the merged config fields : "env", "pre" (populated with code), "transaction" (populated with tx data and value)
         pre_env = tx_sequence_config.get("pre", {})

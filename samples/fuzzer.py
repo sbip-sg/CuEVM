@@ -8,12 +8,17 @@ import random
 import copy
 from collections import deque
 from utils import *
-
+import os
 BRANCH_POPULATION = 3
 
 SMALL_DELTA = 16
+
+MAXIMUM_INT = int(os.environ.get("MAXIMUM_INT", 2**16))
+DEBUG = os.environ.get("DEBUG_MODE", "NA")
+
+
 class SimpleMutator:
-    def __init__(self, literal_values, maximum_int = 2**16):
+    def __init__(self, literal_values, maximum_int = MAXIMUM_INT):
         self.literal_values = literal_values
         self.maximum_int = maximum_int
 
@@ -62,6 +67,13 @@ class Seed:
     inputs: list
     distance: int
 
+@dataclass
+class DetectedBug:
+    pc: int
+    bug_type: str
+    input: dict
+    line_info: list
+
 class Fuzzer:
 
     def __init__(self, contract_source, num_instances=2, timeout=10, \
@@ -89,6 +101,7 @@ class Fuzzer:
         self.covered_branches = set()
         self.missed_branches = set()
         self.population = {} # store the population for each branch
+        self.detected_bugs = {}
         self.raw_inputs = []
         self.run_seed_round()
 
@@ -136,6 +149,11 @@ class Fuzzer:
                 if branch[0] in self.missed_branches:
                     self.missed_branches.remove(branch[0])
 
+            for bug in trace.get("bugs", []):
+                bug_id = str(bug[0]) + "_" + str(bug[1])
+                if bug_id not in self.detected_bugs:
+                    self.detected_bugs[bug_id] = DetectedBug(bug[0], bug[1], self.raw_inputs[idx],[])
+
 
     def print_population(self):
         print("Printing Population")
@@ -143,10 +161,6 @@ class Fuzzer:
             print("\n\n ==========")
             print(f"Branch {k} : ")
             pprint(v)
-
-    def encode_inputs (self):
-        ...
-
 
     def mutate(self, inputs, function, generate_random=False):
         if (generate_random):
@@ -176,11 +190,12 @@ class Fuzzer:
                 # for input_ in self.abi_list[function].get("input_types"):
                 #     inputs.append(self.fuzzer.generate_random_input(input_))
                 inputs = self.mutate([], function, generate_random=True)
-                print(f"Function {function} : {inputs}")
+                # print(f"Function {function} : {inputs}")
                 self.post_process_input(tx_data, inputs, function)
 
 
             tx_trace = self.library.run_transactions(tx_data)
+            # print(f"Seed round {function} : {tx_data}")
             # print(f"Trace result : ")
             # pprint(tx_trace)
             self.process_tx_trace(tx_trace)
@@ -200,10 +215,6 @@ class Fuzzer:
         return seed.inputs, seed.function
         # return random.choice(self.population[next_branch])
 
-    def generate_population(self, branch):
-        for i in range(BRANCH_POPULATION):
-            self.fuzzer.generate_random_input()
-
 
     def run_test_case(self, test_case_file):
         with open(test_case_file) as f:
@@ -218,7 +229,6 @@ class Fuzzer:
 
             # self.library.build_instance_data(tx_data)
             trace_res = self.library.run_transactions(tx_data)
-
 
             print(f"Trace result : ")
             pprint(trace_res)
@@ -240,20 +250,46 @@ class Fuzzer:
 
     def run(self, num_iterations=10):
         for i in range(num_iterations):
+            if DEBUG[0] == "v":
+                print ("\n" + "-"*80)
+                print(f"Iteration {i}\n")
             tx_data = []
             self.raw_inputs = []
             for idx in range(self.num_instances):
                 input, function = self.select_next_input()
                 new_input = self.mutate(input, function)
+                if DEBUG[0] == "v":
+                    print(f"Function {function} : {new_input}")
                 self.post_process_input(tx_data, new_input, function)
-            # print(f"Iteration {i} : {tx_data}")
+
             tx_trace = self.library.run_transactions(tx_data)
             self.process_tx_trace(tx_trace)
+            if len(DEBUG) > 1 and DEBUG[1] == "v":
+                print(f"Iteration {i} : {tx_data}")
+                pprint(tx_trace)
 
+        print ("\n\n Final Population \n\n")
         self.print_population()
 
     def finalize_report(self):
-        ...
+        for k_, bug in self.detected_bugs.items():
+            print ("\n")
+            print ("-"*80)
+            # print(bug)
+            print (f" 🚨 Bug Detected: {bug.bug_type} PC: {bug.pc}")
+            try:
+                frag = self.library.ast_parser.source_by_pc(self.contract_name, int(bug.pc), deploy=False)
+                lines = frag.get("linenums",[0,0])
+                self.detected_bugs[k_].line_info = lines
+                if lines[0] == lines[1]:
+                    print (f" Line: {lines[0]} \n Function: {bug.input.get('function')} \n Inputs: {bug.input.get('inputs')} \n Source code:\n \t {frag.get('fragment')}")
+                else:
+                    print (f" Line: {lines[0]} - {lines[1]} \n Function: {bug.input.get('function')} \n Inputs: {bug.input.get('inputs')} \n Source code:\n \t {frag.get('fragment')}")
+                # print (frag)
+            except:
+                print (f"Failed to get solidity source line")
+                pass
+
 
 
 # python fuzzer.py --input sample.sol --config sample_config.json --timeout 10 --contract_name Test --output report.json \

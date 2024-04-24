@@ -376,7 +376,7 @@ namespace python_utils{
     std::unordered_set<int> interesting_opcodes = {OP_ADD, OP_MUL, OP_SUB, OP_MOD, OP_EXP, \
                                                 OP_CALL, OP_CALLCODE, OP_DELEGATECALL, \
                                                 OP_LT, OP_GT, OP_SLT, OP_SGT, OP_EQ, \
-                                                OP_REVERT, OP_INVALID, OP_SSTORE, OP_JUMPI, OP_SELFDESTRUCT};
+                                                OP_REVERT, OP_INVALID, OP_SSTORE, OP_JUMPI, OP_SELFDESTRUCT, OP_ORIGIN};
     std::unordered_set<int> bug_opcodes = {OP_ADD, OP_MUL, OP_SUB, OP_MOD, OP_EXP, OP_SELFDESTRUCT, OP_ORIGIN};
     std::unordered_set<int> call_opcodes = {OP_CALL, OP_CALLCODE, OP_DELEGATECALL}; // ignore static call for now
     std::unordered_set<int> comparison_opcodes = {OP_LT, OP_GT, OP_SLT, OP_SGT, OP_EQ};

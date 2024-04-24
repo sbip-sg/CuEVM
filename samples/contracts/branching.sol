@@ -23,8 +23,13 @@ contract TestBranching {
     function test_branch_2(uint input) public {
         if (input == 4567){
             branch = 2;
-        } else {
-            branch = 3;
+            selfdestruct(msg.sender);
+        }
+    }
+    function test_branch_3(uint input) public {
+        if (input == 45678){
+            branch = 2;
+            msg.sender.send(1 ether);
         }
     }
 }
