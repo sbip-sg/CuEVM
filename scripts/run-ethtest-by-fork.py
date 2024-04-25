@@ -38,7 +38,7 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_s
     debug_print(' '.join(command))
 
     clean_test_out()
-    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=120)
     check_output(result.stdout, result.stderr, without_state_root)
 
     debug_print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")

@@ -118,7 +118,7 @@ public:
         size_t index;
         for (index = 0; index < _size; index++)
         {
-            printf("0x%08x\n", _destinations[index]);
+            printf("%lu\n", _destinations[index]);
         }
     }
 };

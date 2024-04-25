@@ -2439,7 +2439,7 @@ public:
                 }
             }
         }
-        printf("[SSTORE] after gas_cost: %u\n", cgbn_get_ui32(_arith._env, gas_cost));
+        //printf("[SSTORE] after gas_cost: %u\n", cgbn_get_ui32(_arith._env, gas_cost));
     }
 
     /**
@@ -3545,6 +3545,8 @@ public:
                 if (!(hex_string_ptr[2] == '0' && hex_string_ptr[3] == '\0')) {
                     cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
                     cJSON_AddItemToArray(storage_json, key_value_json);
+                } else {
+                    cJSON_Delete(key_value_json);
                 }
             }
             for (jdx = 0; jdx < touch_account->storage_size; jdx++)
@@ -3560,6 +3562,8 @@ public:
                     if (!(hex_string_ptr[2] == '0' && hex_string_ptr[3] == '\0')) {
                         cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
                         cJSON_AddItemToArray(storage_json, key_value_json);
+                    } else {
+                        cJSON_Delete(key_value_json);
                     }
                 }
             }

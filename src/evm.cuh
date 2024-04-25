@@ -3133,7 +3133,7 @@ public:
 
         if (error_code == ERR_RETURN)
         {
-            bn_t gas_left, tx_value;
+            bn_t gas_left;
             // \f$T_{g} - g\f$
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
 

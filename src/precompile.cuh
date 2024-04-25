@@ -190,6 +190,8 @@ namespace precompile_operations {
         // the missing byutes are consider 0 value bytes
         bn_t base_size, exponent_size, modulus_size;
         bn_t index, length;
+        uint32_t dynamic_gas_overflow;
+        dynamic_gas_overflow = 0;
         cgbn_set_ui32(arith._env, index, 0);
         cgbn_set_ui32(arith._env, length, 32);
         uint8_t *size_bytearray;
@@ -240,7 +242,27 @@ namespace precompile_operations {
         cgbn_shift_right(arith._env, max_length, max_length, 3);
         // multiplication_complexity = words ^ 2
         bn_t multiplication_complexity;
-        cgbn_mul(arith._env, multiplication_complexity, max_length, max_length);
+
+        cgbn_mul_high(
+            arith._env,
+            multiplication_complexity,
+            max_length,
+            max_length
+        );
+        dynamic_gas_overflow = dynamic_gas_overflow | (
+            cgbn_compare_ui32(
+                arith._env,
+                multiplication_complexity,
+                0
+            ) != 0
+        );
+        cgbn_mul(
+            arith._env,
+            multiplication_complexity,
+            max_length,
+            max_length
+        );
+        //cgbn_mul(arith._env, multiplication_complexity, max_length, max_length);
 
         // find the most signigicant position of non-zero bit
         // in the least significant 256 bits of the expoennt
@@ -418,8 +440,6 @@ namespace precompile_operations {
         }
 
         bn_t dynamic_gas;
-        uint32_t dynamic_gas_overflow;
-        dynamic_gas_overflow = 0;
         // dynamic_gas = max(200, multiplication_complexity * iteration_count / 3)
         // The dynamic gas value can overflow from the overflow
         // of iteration count when the multiplication complexity
@@ -434,7 +454,7 @@ namespace precompile_operations {
             iteration_count,
             multiplication_complexity
         );
-        dynamic_gas_overflow = (
+        dynamic_gas_overflow = dynamic_gas_overflow | (
             cgbn_compare_ui32(
                 arith._env,
                 dynamic_gas,

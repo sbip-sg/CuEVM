@@ -45,9 +45,10 @@ Please refer to subfolder `samples/README.md` for testing and demo how to use th
 #### Testing of the EVM using ethtest:
 Please refer to `scripts/run-ethtest-by-fork`.
 
-`python scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors`
+`python3 scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors --microtests`
 
-
+To see the results of gethvm
+`gethvm --json --noreturndata --dump statetest {input_test_file}`
 
 ## Tool usage [TODO after completion]
 * `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [input_json_file] --output [output_json_file]`
@@ -165,7 +166,7 @@ python ./run-ethtest-without-stateroot-comparison.py -t /tmp/out --runtest-bin r
 
 
 
-### Test results by comparing the traces between geth and cuevm without stateRoot comparison
+### Test results by comparing the traces between geth and cuevm with stateRoot comparison
 
 The tests results are collected by running the [Python script](https://gist.github.com/cassc/a161177bf850dbee4b7f3b2614250108) from the [ethereum](https://github.com/ethereum/tests) root folder:
 
@@ -208,28 +209,28 @@ python ./run-ethtest-with-stateroot-comparison.py -t /tmp/out --runtest-bin runt
 | stMemoryStressTest                   | 78     | 2      | 0       |
 | stMemoryTest                         | 24     | 47     | 0       |
 | stNonZeroCallsTest                   | 6      | 18     | 12      |
-| stPreCompiledContracts               | 13     | 9      | 1       |
-| stPreCompiledContracts2              | 76     | 84     | 0       |
+| stPreCompiledContracts               | 929    | 31     | 1       |
+| stPreCompiledContracts2              | 223    | 25     | 0       |
 | stRandom                             | 121    | 193    | 0       |
 | stRandom2                            | 89     | 137    | 0       |
 | stRecursiveCreate                    | 0      | 2      | 0       |
-| stRefundTest                         | 0      | 22     | 1       |
-| stReturnDataTest                     | 3      | 38     | 0       |
-| stRevertTest                         | 47     | 37     | 11      |
-| stSelfBalance                        | 0      | 6      | 0       |
-| stShift                              | 0      | 42     | 0       |
-| stSLoadTest                          | 0      | 1      | 0       |
-| stSolidityTest                       | 4      | 14     | 0       |
-| stSpecialTest                        | 5      | 10     | 3       |
-| stSStoreTest                         | 0      | 28     | 1       |
-| stStackTests                         | 185    | 3      | 0       |
-| stStaticFlagEnabled                  | 0      | 13     | 0       |
-| stSystemOperationsTest               | 26     | 43     | 1       |
-| stTransactionTest                    | 110    | 21     | 2       |
-| stTransitionTest                     | 0      | 6      | 0       |
-| stWalletTest                         | 4      | 40     | 0       |
-| stZeroCallsRevert                    | 12     | 4      | 8       |
-| stZeroCallsTest                      | 6      | 18     | 12      |
-| stZeroKnowledge                      | 410    | 33     | 1       |
-| stZeroKnowledge2                     | 485    | 10     | 3       |
-| VMTests                              | 232    | 58     | 0       |
+| stRefundTest                         | 26     | 0      | 1       |
+| stReturnDataTest                     | 230    | 43     | 0       |
+| stRevertTest                         | 231    | 41     | 11      |
+| stSelfBalance                        | 41     | 1      | 0       |
+| stShift                              | 40     | 2      | 0       |
+| stSLoadTest                          | 1      | 0      | 0       |
+| stSolidityTest                       | 21     | 2      | 0       |
+| stSpecialTest                        | 19     | 3      | 3       |
+| stSStoreTest                         | 189    | 286    | 1       |
+| stStackTests                         | 371    | 4      | 0       |
+| stStaticFlagEnabled                  | 34     | 0      | 0       |
+| stSystemOperationsTest               | 70     | 13     | 1       |
+| stTransactionTest                    | 252    | 8      | 2       |
+| stTransitionTest                     | 6      | 0      | 0       |
+| stWalletTest                         | 46     | 0      | 0       |
+| stZeroCallsRevert                    | 16     | 0      | 8       |
+| stZeroCallsTest                      | 23     | 1      | 12      |
+| stZeroKnowledge                      | 765    | 35     | 1       |
+| stZeroKnowledge2                     | 519    | 0      | 3       |
+| VMTests                              | 636    | 15     | 0       |
