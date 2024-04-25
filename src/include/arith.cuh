@@ -531,6 +531,7 @@ public:
       memset(byte_array, 0, BYTES);
     )
 
+  if(length > 0) {
     size_t idx;
     for (idx = length; idx > 2; idx -= 2)
     {
@@ -545,6 +546,8 @@ public:
     } else { //idx = 2
       byte_array[BYTES - 1 - ((length-2) / 2)] = byte_from_two_hex(current_char[0], current_char[1]);
     }
+
+  }
     /*bn_t tmp;
     cgbn_from_memory(tmp, byte_array);
     printf("cgbn_memory_from_hex_string: ");
