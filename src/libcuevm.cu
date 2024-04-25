@@ -28,9 +28,22 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
     }
 
     Py_ssize_t count = PyList_Size(read_roots);
+    block_data_t **all_block_data ;
+    state_data_t **all_state_data ;
+    #ifndef ONLY_CPU
+        CUDA_CHECK(cudaMallocManaged(
+            (void **)&(all_block_data),
+            sizeof(block_data_t*)*count
+        ));
 
-    block_data_t **all_block_data = (block_data_t**)malloc(sizeof(block_data_t*)*count);
-    state_data_t **all_state_data = (state_data_t**)malloc(sizeof(state_data_t*)*count);
+        CUDA_CHECK(cudaMallocManaged(
+            (void **)&(all_state_data),
+            sizeof(state_data_t*)*count
+        ));
+    #else
+        all_block_data = (block_data_t**)malloc(sizeof(block_data_t*)*count);
+        all_state_data = (state_data_t**)malloc(sizeof(state_data_t*)*count);
+    #endif
     // transaction_data_t* transactions = getTransactionDataFromPyObject(arith, PyDict_GetItemString(read_root, "transaction"));
     transaction_data_t* all_transactions = getTransactionDataFromListofPyObject(arith, read_roots);
 
@@ -54,16 +67,15 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
     // printf("Generating instances\n");
     evm_t::get_cpu_instances_plain_data(cpu_instances, all_state_data, all_block_data, all_transactions, count);
     // printf("%d instances generated\n", cpu_instances.count);
-/*
-    printf("\n print state data after get_cpu_instances_plain_data\n");
+    //   printf("\n print state data after get_cpu_instances_plain_data\n");
 
-    for (Py_ssize_t idx = 0; idx < count; idx++) {
-        printf("State data %d\n", idx);
-        for (size_t i = 0; i < all_state_data[idx]->no_accounts; i++) {
-            world_state_t::print_account_t(arith, all_state_data[idx]->accounts[i]);
-        }
-    }
-    */
+    // for (Py_ssize_t idx = 0; idx < count; idx++) {
+    //     printf("State data %d\n", idx);
+    //     for (size_t i = 0; i < all_state_data[idx]->no_accounts; i++) {
+    //         world_state_t::print_account_t(arith, all_state_data[idx]->accounts[i]);
+    //     }
+    // }
+
     // printf("\n print transaction data after get_cpu_instances_plain_data\n");
     // for (Py_ssize_t idx = 0; idx < count; idx++) {
     //     printf("Transaction data %d\n", idx);
@@ -85,8 +97,8 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
         // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 256*1024));
         CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 64*1024));
         cudaDeviceGetLimit(&heap_size, cudaLimitMallocHeapSize);
-        printf("Heap size: %zu\n", heap_size);
-        printf("Running GPU kernel ...\n");
+        // printf("Heap size: %zu\n", heap_size);
+        // printf("Running GPU kernel ...\n");
         // CUDA_CHECK(cudaDeviceSynchronize());
         kernel_evm<evm_params><<<cpu_instances.count, evm_params::TPI>>>(report, gpu_instances);
         // CUDA_CHECK(cudaPeekAtLastError());
@@ -96,11 +108,11 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
         CGBN_CHECK(report);
 
         // copy the results back to the CPU
-        printf("Copying results back to CPU\n");
+        // printf("Copying results back to CPU\n");
         CUDA_CHECK(cudaMemcpy(&tmp_gpu_instances, gpu_instances, sizeof(evm_instances_t), cudaMemcpyDeviceToHost));
         evm_t::get_cpu_instances_from_gpu_instances(cpu_instances, tmp_gpu_instances);
 
-        printf("Results copied\n");
+        // printf("Results copied\n");
     #else
         // printf("Running CPU EVM\n");
         // run the evm
@@ -137,6 +149,8 @@ PyObject* run_interpreter_pyobject(PyObject *read_roots) {
 
     // free the memory
     // printf("Freeing the memory ...\n");
+    // printf("Printing the results ...\n");
+    // evm_t::print_evm_instances_t(arith, cpu_instances, true );
 
     PyObject* write_root = python_utils::pyobject_from_evm_instances_t(arith, cpu_instances);
     evm_t::free_instances(cpu_instances);

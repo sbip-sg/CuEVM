@@ -717,7 +717,7 @@ public:
         tracer_data_t *gpu_instances,
         uint32_t count)
     {
-        printf("Copying the tracer data structures...\n");
+        // printf("Copying the tracer data structures...\n");
         tracer_data_t *cpu_instances, *tmp_gpu_instances, *tmp_cpu_instances;
         cpu_instances = new tracer_data_t[count];
         CUDA_CHECK(cudaMemcpy(
@@ -725,13 +725,13 @@ public:
             gpu_instances,
             sizeof(tracer_data_t) * count,
             cudaMemcpyDeviceToHost));
-        printf("Copying the tracer data structures...\n");
+
         tmp_cpu_instances = new tracer_data_t[count];
         memcpy(
             tmp_cpu_instances,
             cpu_instances,
             sizeof(tracer_data_t) * count);
-        printf("Copying the tracer data structures...\n");
+
         // allocate the necessary memory for the transfer
         // of the data arrays
         for (size_t idx = 0; idx < count; idx++)
@@ -811,25 +811,25 @@ public:
                 #endif
             }
         }
-        printf("Copying the tracer data structures...\n");
+        // printf("Copying the tracer data structures...\n");
         CUDA_CHECK(cudaMalloc(
             (void **)&tmp_gpu_instances,
             sizeof(tracer_data_t) * count));
-        printf("Copying the tracer data structures...\n");
+        // printf("Copying the tracer data structures...\n");
         CUDA_CHECK(cudaMemcpy(
             tmp_gpu_instances,
             tmp_cpu_instances,
             sizeof(tracer_data_t) * count,
             cudaMemcpyHostToDevice));
-        printf("Copying the tracer data structures...\n");
+        // printf("Copying the tracer data structures...\n");
         delete[] tmp_cpu_instances;
         tmp_cpu_instances = NULL;
-        printf("Copying the data arrays...\n");
+        // printf("Copying the data arrays...\n");
         // copy the data array with the kernel
         kernel_tracers<tracer_data_t, evm_word_t><<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaFree(gpu_instances));
-        printf("Copying the data arrays done.\n");
+        // printf("Copying the data arrays done.\n");
         gpu_instances = tmp_gpu_instances;
 
         // copy the data array to CPUs

@@ -20,12 +20,12 @@ contract TestBranching {
     //     branch = 1;
     // }
 
-    function test_branch_2(uint input) public {
-        if (input == 4567){
-            branch = 2;
-            selfdestruct(msg.sender);
-        }
-    }
+    // function test_branch_2(uint input) public {
+    //     if (input == 4567){
+    //         branch = 2;
+    //         selfdestruct(msg.sender);
+    //     }
+    // }
     function test_branch_3(uint input) public {
         if (input == 45678){
             branch = 2;

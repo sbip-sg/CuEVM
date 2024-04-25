@@ -1701,6 +1701,7 @@ public:
         bn_t intrsinc_gas_used;
         start_TRANSACTION(intrsinc_gas_used, error_code);
         start_CALL(error_code);
+        // printf("error_code: %d\n", error_code);
         // if it is a invalid transaction or not enough gas to start the call
         if (error_code != ERR_NONE)
         {
@@ -1728,6 +1729,7 @@ public:
             }
             // ONE_THREAD_PER_INSTANCE(printf("pc: %d opcode: %d\n", _pcs[_depth], _opcode);)
 #ifdef TRACER
+            // ONE_THREAD_PER_INSTANCE(printf("tracer set ");)
             _trace_pc = _pcs[_depth];
             _trace_opcode = _opcode;
             _tracer->push(

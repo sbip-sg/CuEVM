@@ -9,7 +9,8 @@ from pprint import pprint
 from utils import *
 
 # Add the directory containing your .so file to the Python path
-sys.path.append('../build/')
+# sys.path.append('../build/')
+sys.path.append('./binary/')
 
 import libcuevm  # Now you can import your module as usual
 
@@ -41,6 +42,7 @@ class CuEVMLib:
         self.build_instance_data(tx_data)
         # self.print_instance_data()
         # print ("before running")
+
         result_state = libcuevm.run_dict(self.instances)
         self.update_persistent_state(result_state)
         return self.post_process_trace(result_state)
@@ -113,6 +115,7 @@ class CuEVMLib:
             self.contract_name = tx_sequence_config.get("contract_name")
         else:
             self.contract_name = contract_name
+        # print(f" source file {source_file} contract_name {self.contract_name} \n\n")
         self.contract_instance, self.ast_parser = compile_file(source_file, self.contract_name)
         if self.contract_instance is None:
             print ("Error in compiling the contract {self.contract_name} {source_file}")
@@ -136,7 +139,7 @@ class CuEVMLib:
         new_test["transaction"]["data"] = ["0x00"]
         new_test["transaction"]["value"] = [0]
         new_test["transaction"]["nonce"] = "0x00"
-
+        # print (f"new_test {new_test}")
         self.instances = [copy.deepcopy(new_test) for _ in range(num_instances)]
 
     def print_instance_data(self):
@@ -201,7 +204,7 @@ if __name__ == "__main__":
     # print ("\n\n Updated instance data \n\n")
     # my_lib.print_instance_data()
 
-    my_lib = CuEVMLib("contracts/erc20.sol", 2, "configurations/default.json", contract_name="ERC20", detect_bug=False)
+    my_lib = CuEVMLib("contracts/erc20.sol", 2, "configurations/erc20.json", contract_name="ERC20", detect_bug=False)
     test_case = {
         "function": "transfer",
         "type": "exec",
