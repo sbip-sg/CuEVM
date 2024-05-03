@@ -3471,7 +3471,7 @@ public:
         touch_state_t *cpu_touch_state;
         cpu_touch_state = new touch_state_t(&instances.touch_states_data[0], cpu_accessed_state, NULL);
         cJSON *final_state_root_json = NULL;
-        
+
         keccak_t *keccak;
         keccak = new keccak_t(instances.sha3_parameters);
         final_state_root_json = cpu_touch_state->state_root_json(*keccak);

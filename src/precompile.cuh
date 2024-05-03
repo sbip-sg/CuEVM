@@ -816,7 +816,7 @@ namespace precompile_operations {
 
 
             ecc::Curve curve = ecc::get_curve(arith,128);
-            
+
             bn_t x1, y1, x2, y2;
             arith.cgbn_from_memory(x1, input);
             arith.cgbn_from_memory(y1, input + 32);
@@ -931,13 +931,13 @@ namespace precompile_operations {
         cgbn_set_ui32(arith._env, index, 0);
         input = message.get_data(index, length, size);
         arith.ecpairing_cost(gas_used, size);
-
+        arith.print_byte_array_as_hex(input,size);
         if (arith.has_gas(gas_limit, gas_used, error_code)) {
-            if (size % 192 != 0 || size == 0) {
+            if (size % 192 != 0) {
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
             } else {
                 int res = ecc::pairing_multiple(arith, input, size);
-                // printf("res: %d", res);
+
                 if (res== -1) {
                     error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
                 } else {
@@ -948,9 +948,12 @@ namespace precompile_operations {
                     output[31] = (res == 1);
                     return_data.set(output, 32);
                     error_code = ERR_RETURN;
+
                 }
             }
-            
+
+        } else {
+            error_code = ERR_OUT_OF_GAS;
         }
     }
 

@@ -101,7 +101,21 @@ namespace ecc {
         return curve;
     }
 
+    // /***
+    //  * @brief helper function to print FQP in hex
+    // */
+    // template <size_t Degree>
+    // void print_fqp(arith_t &arith, FQ<Degree> &P, const char *name) {
+    //     evm_word_t scratch_pad;
+    //     char *temp_str = new char[evm_params::BITS/8 * 2 + 3];
+    //     printf("%s: \n", name);
+    //     for (size_t i = 0; i < Degree; i++) {
+    //         cgbn_store(arith._env, &scratch_pad, P.coeffs[i]);
+    //         arith.pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
+    //         printf("%s[%d] : %s\n", name, i, temp_str);
+    //     }
 
+    // }
 
     __host__ __device__ __forceinline__ void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
         env_t::cgbn_wide_t temp;
@@ -766,6 +780,8 @@ namespace ecc {
     template <size_t Degree>
     __host__ __device__ __forceinline__ bool FQP_is_on_curve(arith_t &arith, FQ<Degree> &Px, FQ<Degree> &Py, bn_t& mod, FQ<Degree> &B){
         // y^2 = x^3 + B
+        if (FQP_is_inf(arith, Px, Py))
+            return true;
         FQ<Degree> temp, temp2;
         FQP_mul(arith, temp, Px, Px, mod);
         FQP_mul(arith, temp, temp, Px, mod);
@@ -773,6 +789,16 @@ namespace ecc {
         FQP_mul(arith, temp2, Py, Py, mod);
 
         return FQP_equals(arith, temp, temp2);
+    }
+
+    // check if coordinates are valid (smaller than mod_fp)
+      template <size_t Degree>
+    __host__ __device__ __forceinline__ bool FQP_is_valid(arith_t &arith, FQ<Degree> &P, bn_t& mod){
+        for (size_t i = 0; i < Degree; i++) {
+            if (cgbn_compare(arith._env, P.coeffs[i], mod) >= 0)
+                return false;
+        }
+        return true;
     }
 
     template <size_t Degree>
@@ -1026,11 +1052,11 @@ namespace ecc {
             "c230974d83561841d766f9c9d570bb7fbe04c7e8a6c3c760c0de81def35692da",
             "361102b6b9b2b918837fa97896e84abb40a4efb7e54523a486964b64ca86f120"};
 
-        cgbn_set_ui32(arith._env, res.coeffs[0], 1);
+        FQ<Degree> temp, temp_res;
+        cgbn_set_ui32(arith._env, temp_res.coeffs[0], 1);
         for (int i = 1 ; i < Degree; i++){
-            cgbn_set_ui32(arith._env, res.coeffs[i], 0);
+            cgbn_set_ui32(arith._env, temp_res.coeffs[i], 0);
         }
-        FQ<Degree> temp;
 
         FQP_copy(arith, temp, p);
 
@@ -1044,7 +1070,7 @@ namespace ecc {
 
                 if (cgbn_extract_bits_ui32(arith._env, temp_n, 0, 1) == 1) {
                     // cgbn_mul_mod(env, res, res, temp, mod);
-                    FQP_mul(arith, res, res, temp, mod);
+                    FQP_mul(arith, temp_res, temp_res, temp, mod);
                 }
                 // cgbn_mul_mod(env, temp, temp, temp, mod);
                 FQP_mul(arith, temp, temp, temp, mod);
@@ -1052,6 +1078,7 @@ namespace ecc {
             }
 
         }
+        FQP_copy(arith, res, temp_res);
     }
 
     /**
@@ -1184,7 +1211,6 @@ namespace ecc {
 
         for (int i = 0; i<num_pairs; i++){
             FQ<12> temp_res;
-            points_data += i*192;
 
             arith.cgbn_from_memory(Px.coeffs[0], points_data );
             arith.cgbn_from_memory(Py.coeffs[0], points_data + 32);
@@ -1193,29 +1219,33 @@ namespace ecc {
             arith.cgbn_from_memory(Qx.coeffs[0], points_data + 96);
             arith.cgbn_from_memory(Qy.coeffs[1], points_data + 128);
             arith.cgbn_from_memory(Qy.coeffs[0], points_data + 160);
+            points_data += 192;
             //print point for debugging
-            //print_fqp(env, Px, "Px");
-            //print_fqp(env, Py, "Py");
-            //print_fqp(env, Qx, "Qx");
-            //print_fqp(env, Qy, "Qy");
+            // print_fqp(arith, Px, "Px");
+            // print_fqp(arith, Py, "Py");
+            // print_fqp(arith, Qx, "Qx");
+            // print_fqp(arith, Qy, "Qy");
             bool on_curve = FQP_is_on_curve(arith, Px, Py, mod_fp, B1)  && FQP_is_on_curve(arith, Qx, Qy, mod_fp, B2);
-            if (!on_curve){
+            bool valid = FQP_is_valid(arith, Px, mod_fp) && FQP_is_valid(arith, Py, mod_fp)
+                            && FQP_is_valid(arith, Qx, mod_fp) && FQP_is_valid(arith, Qy, mod_fp);
+            if (!on_curve || !valid){
+                return -1;
+            } else {
                 if (FQP_is_inf(arith, Qx, Qy) || FQP_is_inf(arith, Px, Py)){
                     FQ<12> one_fq12 = get_one<12>(arith);
                     FQP_copy(arith, temp_res, one_fq12);
-                } else {
-                    return -1;
-                }
-            } else {
-                pairing(arith, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
+                } else
+                    pairing(arith, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, false);
             }
-                FQP_mul(arith, final_res, final_res, temp_res, mod_fp);
 
+            FQP_mul(arith, final_res, final_res, temp_res, mod_fp);
+            // print_fqp(arith, temp_res, "Temp Res");
+            // print_fqp(arith, final_res, "Acc Res");
         }
         // final exp
         FQP_final_exponentiation(arith, final_res, final_res, mod_fp);
-        printf("Final result: \n");
-        //print_fqp(arith._env, final_res, "Final");
+
+        // print_fqp(arith, final_res, "Final");
         FQ<12> one_fq12 = get_one<12>(arith);
         return FQP_equals(arith, final_res, one_fq12) ? 1 : 0;
     }
