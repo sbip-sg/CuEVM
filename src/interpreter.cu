@@ -120,14 +120,15 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     evm_t::print_evm_instances_t(arith, cpu_instances, verbose);
     printf("Results printed\n");
 
-    // print to json files
-     printf("Printing to json files ...\n");
-     cJSON_AddItemToObject(
-       write_root,
-       test->string,
-       evm_t::json_from_evm_instances_t(arith, cpu_instances));
-     printf("Json files printed\n");
-
+    if (write_json_filename != nullptr){
+      // print to json files
+      printf("Printing to json files ...\n");
+      cJSON_AddItemToObject(
+                            write_root,
+                            test->string,
+                            evm_t::json_from_evm_instances_t(arith, cpu_instances));
+      printf("Json files printed\n");
+    }
     // free the memory
     printf("Freeing the memory ...\n");
     evm_t::free_instances(cpu_instances);
@@ -138,12 +139,14 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     #endif
   }
   cJSON_Delete(read_root);
-  char *json_str=cJSON_Print(write_root);
-  FILE *fp=fopen(write_json_filename, "w");
-  fprintf(fp, "%s", json_str);
-  fclose(fp);
-  free(json_str);
-  cJSON_Delete(write_root);
+  if (write_json_filename != nullptr){
+    char *json_str=cJSON_Print(write_root);
+    FILE *fp=fopen(write_json_filename, "w");
+    fprintf(fp, "%s", json_str);
+    fclose(fp);
+    free(json_str);
+    cJSON_Delete(write_root);
+  }
 }
 
 int main(int argc, char *argv[]) {//getting the input
@@ -153,7 +156,7 @@ int main(int argc, char *argv[]) {//getting the input
   bool verbose = false; // Verbose flag
   static struct option long_options[] = {
         {"input", required_argument, 0, 'i'},
-        {"output", required_argument, 0, 'o'},
+        {"output", optional_argument, 0, 'o'},
         {"clones", required_argument, 0, 'c'},
         {"verbose", no_argument, 0, 'v'},
         {0, 0, 0, 0}};
@@ -180,9 +183,9 @@ int main(int argc, char *argv[]) {//getting the input
           exit(EXIT_FAILURE);
       }
   }
-  if (!read_json_filename || !write_json_filename)
+  if (!read_json_filename)
   {
-      fprintf(stdout, "Both --input and --output flags are required\n");
+      fprintf(stdout, "--input argument is required\n");
       exit(EXIT_FAILURE);
   }
 
