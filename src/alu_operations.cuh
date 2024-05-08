@@ -334,9 +334,22 @@ namespace arithmetic_operations {
                     cgbn_negate(arith._env, b, b);
                 }
                 cgbn_rem(arith._env, r, a, b);
-                if (sign)
+
+                uint32_t r_sign = cgbn_extract_bits_ui32(arith._env, r, arith_t::BITS - 1, 1);
+
+                // remove sign from result
+                if (r_sign){
+                    bn_t mask;
+                    cgbn_set_ui32(arith._env, mask, ~0);
+                    cgbn_shift_right(arith._env, mask, mask, 1);
+                    cgbn_bitwise_and(arith._env, r, r, mask);
+                }
+
+                // twos-complement if first number is negative
+                if (sign_a)
                 {
-                    cgbn_negate(arith._env, r, r);
+                    cgbn_bitwise_complement(arith._env, r, r);
+                    cgbn_add_ui32(arith._env, r, r, 1);
                 }
             }
 
