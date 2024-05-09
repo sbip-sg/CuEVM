@@ -3131,6 +3131,23 @@ public:
         _block->get_coin_base(beneficiary);
         // char *temp = new char[arith_t::BYTES * 2 + 3];
 
+        // return gas left when reverted
+        if (error_code == ERR_REVERT){
+            bn_t gas_left;
+            cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
+            bn_t send_back_gas;
+            cgbn_mul(_arith._env, send_back_gas, gas_left, _gas_price);
+            bn_t sender_balance;
+            bn_t sender_address;
+            _transaction->get_sender(sender_address);
+            cgbn_sub(_arith._env, gas_value, _gas_limit, gas_left);
+            cgbn_mul(_arith._env, gas_value, gas_value, _gas_priority_fee);
+
+            _transaction_touch_state->get_account_balance(sender_address, sender_balance);
+            cgbn_add(_arith._env, sender_balance, sender_balance, send_back_gas);
+            _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+        }
+
         if (error_code == ERR_RETURN)
         {
             bn_t gas_left;
