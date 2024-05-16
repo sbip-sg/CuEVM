@@ -29,7 +29,10 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("Error: could not read the json file\n");
     exit(EXIT_FAILURE);
   }
-  cJSON *write_root = cJSON_CreateObject();
+  cJSON *write_root = nullptr;
+  if (write_json_filename != nullptr) {
+    write_root = cJSON_CreateObject();
+  }
   const cJSON *test = NULL;
   cJSON_ArrayForEach(test, read_root) {
     // get instaces to run

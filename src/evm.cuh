@@ -2430,6 +2430,8 @@ public:
                         *_stack_ptrs[_depth],
                         *_memory_ptrs[_depth],
                         *_last_return_data_ptrs[_depth]);
+                    
+                    printf("[Return data copy oepration] %d\n", error_code);
                 }
                 break;
                 case OP_EXTCODEHASH: // EXTCODEHASH
@@ -3132,6 +3134,7 @@ public:
         // char *temp = new char[arith_t::BYTES * 2 + 3];
 
         // return gas left when reverted
+        /*
         if (error_code == ERR_REVERT){
             bn_t gas_left;
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
@@ -3147,24 +3150,30 @@ public:
             cgbn_add(_arith._env, sender_balance, sender_balance, send_back_gas);
             _transaction_touch_state->set_account_balance(sender_address, sender_balance);
         }
+        */
 
-        if (error_code == ERR_RETURN)
+        if ( (error_code == ERR_RETURN) || (error_code == ERR_REVERT) )
         {
             bn_t gas_left;
             // \f$T_{g} - g\f$
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
 
-            bn_t capped_refund_gas;
-            // \f$g/5\f$
-            cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
-            // min ( \f$g/5\f$, \f$R_{g}\f$)
+            // if return add the refund gas
+            if (error_code == ERR_RETURN) {
+                bn_t capped_refund_gas;
+                // \f$g/5\f$
+                cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
+                // min ( \f$g/5\f$, \f$R_{g}\f$)
 
-            if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
-            {
-                cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
+                if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
+                {
+                    cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
+                }
+                // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
+                cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
+            } else {
+                cgbn_set(_arith._env, gas_value, gas_left);
             }
-            // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
-            cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
             bn_t send_back_gas;
             cgbn_mul(_arith._env, send_back_gas, gas_value, _gas_price);
             // add to sender balance g^{*}
@@ -3181,10 +3190,14 @@ public:
 
 
             // update the transaction state
-            _transaction_touch_state->update_with_child_state(
-                *_touch_state_ptrs[_depth]);
-            _transaction_log_state->update_with_child_state(
-                *_log_state_ptrs[_depth]);
+            if (error_code == ERR_RETURN)
+            {
+                _transaction_touch_state->update_with_child_state(
+                    *_touch_state_ptrs[_depth]);
+                _transaction_log_state->update_with_child_state(
+                    *_log_state_ptrs[_depth]);
+            }
+            // sent the value of unused gas to the sender
             _transaction_touch_state->get_account_balance(sender_address, sender_balance);
             cgbn_add(_arith._env, sender_balance, sender_balance, send_back_gas);
             _transaction_touch_state->set_account_balance(sender_address, sender_balance);

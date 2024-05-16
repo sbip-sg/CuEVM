@@ -107,7 +107,7 @@ public:
       uint32_t &error_code)
   {
     size_t request_size = index + size;
-    if ((request_size > index) || (request_size > size))
+    if ((request_size < index) || (request_size < size))
     {
       error_code = ERROR_RETURN_DATA_OVERFLOW;
       return _content->data;

@@ -782,9 +782,13 @@ namespace precompile_operations {
                 } else {
                     // TODO: do we consume all gas?
                     // it happens by default because of the error code
-                    error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+                    // error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+                    return_data.set(NULL, 0);
+                    error_code = ERR_RETURN;
                 }
-
+            } else {
+                return_data.set(NULL, 0);
+                error_code = ERR_RETURN;
             }
             ONE_THREAD_PER_INSTANCE(
                 delete[] input;
