@@ -47,8 +47,13 @@ Please refer to `scripts/run-ethtest-by-fork`.
 
 `python3 scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors --microtests`
 
+Single test:
+`python3 scripts/run-ethtest-by-fork.py -i ./tmp/{input_test_file_dir} -t ./dtmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors --microtests`
+
 To see the results of gethvm
-`gethvm --json --noreturndata --dump statetest {input_test_file}`
+`gethvm --json --noreturndata --dump statetest {input_test_file} &> geth.out`
+To see the result of cuevm
+`clear && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/cuevm  --input {input_test_file}modexp.json &> cuevm.out`
 
 ## Tool usage [TODO after completion]
 * `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [input_json_file] --output [output_json_file]`

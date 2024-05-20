@@ -281,6 +281,19 @@ namespace precompile_operations {
         bn_t call_exponent_size_bn;
         arith.cgbn_from_size_t(call_exponent_size_bn, call_exponent_size);
         bn_t exponent_bit_length_bn;
+        uint8_t *exponent_MSB_32_bytes = NULL;
+        exponent_MSB_32_bytes = arith.padded_malloc_byte_array(call_exponent_data, call_exponent_size, 32);
+        bigint tmp_exponent_bigint[1];
+        bigint_init(tmp_exponent_bigint);
+        bigint_from_bytes(tmp_exponent_bigint, exponent_MSB_32_bytes, 32);
+        int bitlength = bigint_bitlength(tmp_exponent_bigint);
+        cgbn_set_ui32(arith._env, exponent_bit_length_bn, (uint32_t) bitlength);
+        bigint_free(tmp_exponent_bigint);
+        ONE_THREAD_PER_INSTANCE(
+            delete[] exponent_MSB_32_bytes;
+        )
+
+        /* OLD WAY
         // how many bytes are not part of the call data
         bn_t remainig_exponent_size;
         cgbn_sub(
@@ -389,6 +402,7 @@ namespace precompile_operations {
                 cgbn_set_ui32(arith._env, exponent_bit_length_bn, 0);
             }
         }
+        */
 
         // compute the iteration count depending on the size
         // of the exponent and its most significant non-zero
@@ -402,6 +416,16 @@ namespace precompile_operations {
         // and substract 1
         if (cgbn_compare_ui32(arith._env, exponent_size, 32) <= 0) {
             if (cgbn_get_ui32(arith._env, exponent_bit_length_bn) != 0) {
+                // bitlength = bitlength - (32 - exponet_size) * 8
+                bn_t tmp_value;
+                cgbn_set_ui32(arith._env, tmp_value, 32);
+                cgbn_sub(arith._env, tmp_value, tmp_value, exponent_size);
+                cgbn_mul_ui32(arith._env, tmp_value, tmp_value, 8);
+                cgbn_sub(
+                    arith._env,
+                    exponent_bit_length_bn,
+                    exponent_bit_length_bn,
+                    tmp_value);
                 // exponent.bit_length() - 1
                 cgbn_sub_ui32(
                     arith._env,
@@ -410,7 +434,7 @@ namespace precompile_operations {
                     1);
             }
         } else {
-            // elif Esize > 32: iteration_count = (8 * (Esize - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+            // elif Esize > 32: iteration_count = (8 * (Esize - 32)) + exponent.bit_length() - 1
             cgbn_sub_ui32(
                 arith._env,
                 iteration_count,
@@ -423,16 +447,19 @@ namespace precompile_operations {
                 iteration_count,
                 iteration_count,
                 8);
-            iteration_count_overflow = iteration_count_overflow | cgbn_add(
-                arith._env,
-                iteration_count,
-                iteration_count,
-                exponent_bit_length_bn);
-            cgbn_sub_ui32(
-                arith._env,
-                iteration_count,
-                iteration_count,
-                1);
+            if (cgbn_compare_ui32(arith._env, exponent_bit_length_bn, 1) > 0) {
+                iteration_count_overflow = iteration_count_overflow | cgbn_add(
+                    arith._env,
+                    iteration_count,
+                    iteration_count,
+                    exponent_bit_length_bn);
+                cgbn_sub_ui32(
+                    arith._env,
+                    iteration_count,
+                    iteration_count,
+                    1);
+
+            }
         }
         // iteration_count = max(iteration_count, 1)
         if (cgbn_compare_ui32(arith._env, iteration_count, 1) < 0) {
