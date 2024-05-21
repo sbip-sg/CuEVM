@@ -1010,7 +1010,8 @@ public:
                     bn_t child_success;
                     cgbn_set_ui32(arith._env, child_success, 0);
                     stack.push(child_success, error_code);
-                    // cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
+                    cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
+                    // todo_cl should refund gas
                     return_data.set(
                         NULL,
                         0);
