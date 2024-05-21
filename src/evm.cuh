@@ -1924,7 +1924,7 @@ public:
                     *_stack_ptrs[_depth],
                     _opcode);
             }
-            else if ((_opcode & 0xF0) == 0xA0) // LOGX
+            else if (_opcode >= 0xA0 && _opcode <= 0xA4) // LOGX
             {
                 internal_operations::operation_LOGX(
                     _arith,
@@ -2430,7 +2430,7 @@ public:
                         *_stack_ptrs[_depth],
                         *_memory_ptrs[_depth],
                         *_last_return_data_ptrs[_depth]);
-                    
+
                     printf("[Return data copy oepration] %d\n", error_code);
                 }
                 break;
