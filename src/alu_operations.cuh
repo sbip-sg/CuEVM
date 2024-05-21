@@ -334,7 +334,9 @@ namespace arithmetic_operations {
                     cgbn_negate(arith._env, b, b);
                 }
                 cgbn_rem(arith._env, r, a, b);
-                if (sign)
+
+                // twos-complement if first number is negative
+                if (sign_a)
                 {
                     cgbn_negate(arith._env, r, r);
                 }

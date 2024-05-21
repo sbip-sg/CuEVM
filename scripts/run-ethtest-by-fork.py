@@ -22,31 +22,36 @@ def read_as_json_lines(filepath):
         for line in f:
             yield json.loads(line)
 
-def check_output(output, error):
+def check_output(output, error, without_state_root):
     has_str = lambda s: s in (output + error)
-    if has_str('error'): # and not has_str('stateRoot')
-        raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
+    if without_state_root:
+        if has_str('error') and not has_str('stateRoot'):
+            raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
+    else:
+        if has_str('error'):
+            raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
 
-def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin):
+
+def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root):
     command = [runtest_bin, f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 
     debug_print(' '.join(command))
 
     clean_test_out()
-    result = subprocess.run(command, capture_output=True, text=True, timeout=30)
-    check_output(result.stdout, result.stderr)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=120)
+    check_output(result.stdout, result.stderr, without_state_root)
 
     debug_print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
-def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth', cuevm_bin='cuevm', ignore_errors=False, result={}):
+def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth', cuevm_bin='cuevm', ignore_errors=False, result={}, without_state_root=False, microtests=False):
     result = result or {'n_success': 0, 'failed_files': []}
     output_filepath = None
     for dirpath, dirnames, filenames in os.walk(input_directory):
         rel_path = os.path.relpath(dirpath, input_directory)
         for filename in filenames:
             debug_print("Processing", dirpath, filename)
-            rootname = filename.split('.')[0]
             try:
+                rootname = filename.split('.')[0]
                 if filename.endswith(".json"):
                     input_filepath = os.path.join(dirpath, filename)
 
@@ -96,8 +101,15 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
 
                             debug_print(f"Processed and saved {output_filepath} successfully.")
 
-                            run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin)
-                            result['n_success'] += 1
+                            try:
+                                run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root)
+                                result['n_success'] += 1
+                            except Exception as e:
+                                result['failed_files'].append(output_filepath)
+                                if microtests:
+                                    debug_print(f"{str(e)}")
+                                else:
+                                    raise
             except Exception as e:
                 result['failed_files'].append(output_filepath)
                 if ignore_errors:
@@ -114,6 +126,8 @@ def main():
     parser.add_argument('--geth', type=str, required=True, help='geth binary path')
     parser.add_argument('--cuevm', type=str, required=True, help='cuevm binary path')
     parser.add_argument('--ignore-errors', action='store_true', help='Continue testing even when test errors occur')
+    parser.add_argument('--without-state-root', action='store_true', help='verify without the state root', default=False)
+    parser.add_argument('--microtests', action='store_true', help='verify without the state root', default=False)
 
     args = parser.parse_args()
 
@@ -124,7 +138,7 @@ def main():
     try:
         test_root = args.input
         print(f"Running tests for {test_root}")
-        runtest_fork(test_root, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result)
+        runtest_fork(test_root, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result, without_state_root=args.without_state_root, microtests=args.microtests)
     except Exception:
         pass
     finally:

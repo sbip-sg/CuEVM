@@ -2363,11 +2363,15 @@ public:
         bn_t &gas_refund)
     {
         // find out if it is a warm or cold storage access
+        // it does not matter anymore in the gas computation
         _accessed_state->get_access_storage_gas_cost(address, key, gas_cost);
         if (cgbn_compare_ui32(_arith._env, gas_cost, GAS_WARM_ACCESS) == 0)
         {
             cgbn_set_ui32(_arith._env, gas_cost, 0); // 100 is not add here
+            //printf("WARM ACCESS\n");
         }
+        
+        // cgbn_set_ui32(_arith._env, gas_cost, 0);
         // get the original value from accessed state/global state
         bn_t original_value;
         _accessed_state->get_value(address, key, original_value);
@@ -2377,6 +2381,10 @@ public:
 
         // TODO: if we keep separate gas refund and remaining gas we can delete this
         cgbn_set_ui32(_arith._env, gas_refund, 0);
+        //printf("[SSTORE] value: %u\n", cgbn_get_ui32(_arith._env, value));
+        //printf("[SSTORE] current_value: %u\n", cgbn_get_ui32(_arith._env, current_value));
+        //printf("[SSTORE] original_value: %u\n", cgbn_get_ui32(_arith._env, original_value));
+        //printf("[SSTORE] gas_cost: %u\n", cgbn_get_ui32(_arith._env, gas_cost));
 
         // EIP-2200
         if (cgbn_compare(_arith._env, value, current_value) == 0)
@@ -2390,10 +2398,12 @@ public:
                 if (cgbn_compare_ui32(_arith._env, original_value, 0) == 0)
                 {
                     cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_STORAGE_SET);
+                    //printf("GAS_STORAGE_SET\n");
                 }
                 else
                 {
                     cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_SSTORE_RESET);
+                    //printf("GAS_SSTORE_RESET\n");
                     if (cgbn_compare_ui32(_arith._env, value, 0)==0){
                         cgbn_add_ui32(_arith._env, gas_refund, gas_refund, GAS_SSTORE_CLEARS_SCHEDULE);
                     }
@@ -2407,7 +2417,6 @@ public:
                     if (cgbn_compare_ui32(_arith._env, current_value, 0) == 0)
                     {
                         cgbn_sub_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
-                        //cgbn_add_ui32(_arith._env, gas_cost, gas_cost, GAS_STORAGE_CLEAR_REFUND);
                     }else if (cgbn_compare_ui32(_arith._env, value, 0) == 0)
                     {
                         cgbn_add_ui32(_arith._env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
@@ -2430,6 +2439,7 @@ public:
                 }
             }
         }
+        //printf("[SSTORE] after gas_cost: %u\n", cgbn_get_ui32(_arith._env, gas_cost));
     }
 
     /**
@@ -3535,6 +3545,8 @@ public:
                 if (!(hex_string_ptr[2] == '0' && hex_string_ptr[3] == '\0')) {
                     cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
                     cJSON_AddItemToArray(storage_json, key_value_json);
+                } else {
+                    cJSON_Delete(key_value_json);
                 }
             }
             for (jdx = 0; jdx < touch_account->storage_size; jdx++)
@@ -3550,6 +3562,8 @@ public:
                     if (!(hex_string_ptr[2] == '0' && hex_string_ptr[3] == '\0')) {
                         cJSON_AddItemToArray(key_value_json, cJSON_CreateString(hex_string_ptr));
                         cJSON_AddItemToArray(storage_json, key_value_json);
+                    } else {
+                        cJSON_Delete(key_value_json);
                     }
                 }
             }
@@ -3614,7 +3628,10 @@ public:
                 writen_accounts[account_idx] = 1;
             }
             account_json = account_root_json(world_account, touch_account, keccak, touch);
-            cJSON_AddItemToArray(accounts_json, account_json);
+            if ( (touch & WRITE_DELETE) == 0)
+                cJSON_AddItemToArray(accounts_json, account_json);
+            else
+                cJSON_Delete(account_json);
         }
         for (idx = 0; idx < _content->touch_accounts.no_accounts; idx++)
         {
@@ -3625,7 +3642,10 @@ public:
                     keccak,
                     0
                 );
-                cJSON_AddItemToArray(accounts_json, account_json);
+                if ( (_content->touch[idx] & WRITE_DELETE) == 0)
+                    cJSON_AddItemToArray(accounts_json, account_json);
+                else
+                    cJSON_Delete(account_json);
             }
         }
         delete [] writen_accounts;

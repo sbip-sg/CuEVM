@@ -395,6 +395,7 @@ public:
         _block->get_coin_base(coin_base_address);
         _accessed_state->get_account(coin_base_address, READ_BALANCE);
         bn_t precompiled_address;
+        // 10 for Cancun with the addition of point evaluation
         for (uint32_t i = 1; i < 10; i++)
         {
             cgbn_set_ui32(_arith._env, precompiled_address, i);
@@ -415,12 +416,7 @@ public:
 #ifdef TRACER
         _message_ptrs[_depth]->get_contract_address(_trace_address);
 #endif
-        if (_jump_destinations != NULL)
-        {
-            delete _jump_destinations;
-            _jump_destinations = NULL;
-        }
-        _jump_destinations = new jump_destinations_t(_bytecode, _code_size);
+        _jump_destinations = _message_ptrs[_depth]->get_jump_destinations();
     }
 
     /**
@@ -817,7 +813,11 @@ public:
                     cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CALL_VALUE);
                     cgbn_set_ui32(arith._env, gas_stippend, GAS_CALL_STIPEND);
                     // If the empty account is called
-                    if (touch_state.is_empty_account(contract_address))
+                    // only for call opcode
+                    if (
+                        touch_state.is_empty_account(contract_address) &&
+                        (new_message.get_call_type() == OP_CALL)
+                    )
                     {
                         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_NEW_ACCOUNT);
                     };
@@ -1924,7 +1924,7 @@ public:
                     *_stack_ptrs[_depth],
                     _opcode);
             }
-            else if ((_opcode & 0xF0) == 0xA0) // LOGX
+            else if (_opcode >= 0xA0 && _opcode <= 0xA4) // LOGX
             {
                 internal_operations::operation_LOGX(
                     _arith,
@@ -2430,6 +2430,8 @@ public:
                         *_stack_ptrs[_depth],
                         *_memory_ptrs[_depth],
                         *_last_return_data_ptrs[_depth]);
+
+                    printf("[Return data copy oepration] %d\n", error_code);
                 }
                 break;
                 case OP_EXTCODEHASH: // EXTCODEHASH
@@ -3127,28 +3129,53 @@ public:
     {
         // sent the gas value to the block beneficiary
         bn_t gas_value;
-        // bn_t beneficiary;
-        // _block->get_coin_base(beneficiary);
+        bn_t beneficiary;
+        _block->get_coin_base(beneficiary);
         // char *temp = new char[arith_t::BYTES * 2 + 3];
 
-        if (error_code == ERR_RETURN)
+        // return gas left when reverted
+        /*
+        if (error_code == ERR_REVERT){
+            bn_t gas_left;
+            cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
+            bn_t send_back_gas;
+            cgbn_mul(_arith._env, send_back_gas, gas_left, _gas_price);
+            bn_t sender_balance;
+            bn_t sender_address;
+            _transaction->get_sender(sender_address);
+            cgbn_sub(_arith._env, gas_value, _gas_limit, gas_left);
+            cgbn_mul(_arith._env, gas_value, gas_value, _gas_priority_fee);
+
+            _transaction_touch_state->get_account_balance(sender_address, sender_balance);
+            cgbn_add(_arith._env, sender_balance, sender_balance, send_back_gas);
+            _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+        }
+        */
+
+        if ( (error_code == ERR_RETURN) || (error_code == ERR_REVERT) )
         {
-            bn_t gas_left, tx_value;
+            bn_t gas_left;
             // \f$T_{g} - g\f$
             cgbn_sub(_arith._env, gas_left, _gas_limit, _gas_useds[_depth]);
 
-            bn_t capped_refund_gas;
-            // \f$g/5\f$
-            cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
-            // min ( \f$g/5\f$, \f$R_{g}\f$)
+            // if return add the refund gas
+            if (error_code == ERR_RETURN) {
+                bn_t capped_refund_gas;
+                // \f$g/5\f$
+                cgbn_div_ui32(_arith._env, capped_refund_gas, _gas_useds[_depth], 5);
+                // min ( \f$g/5\f$, \f$R_{g}\f$)
 
-            if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
-            {
-                cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
+                if (cgbn_compare(_arith._env, capped_refund_gas, _gas_refunds[_depth]) > 0)
+                {
+                    cgbn_set(_arith._env, capped_refund_gas, _gas_refunds[_depth]);
+                }
+                // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
+                cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
+            } else {
+                cgbn_set(_arith._env, gas_value, gas_left);
             }
-            // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
-            cgbn_add(_arith._env, gas_value, gas_left, capped_refund_gas);
-            cgbn_mul(_arith._env, gas_value, gas_value, _gas_price);
+            bn_t send_back_gas;
+            cgbn_mul(_arith._env, send_back_gas, gas_value, _gas_price);
             // add to sender balance g^{*}
             bn_t sender_balance;
             bn_t sender_address;
@@ -3158,16 +3185,23 @@ public:
             // _transaction->get_value(tx_value);
             // cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
-            // cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
+            cgbn_sub(_arith._env, gas_value, _gas_limit, gas_value);
+            cgbn_mul(_arith._env, gas_value, gas_value, _gas_priority_fee);
+
 
             // update the transaction state
-            _transaction_touch_state->update_with_child_state(
-                *_touch_state_ptrs[_depth]);
-            _transaction_log_state->update_with_child_state(
-                *_log_state_ptrs[_depth]);
+            if (error_code == ERR_RETURN)
+            {
+                _transaction_touch_state->update_with_child_state(
+                    *_touch_state_ptrs[_depth]);
+                _transaction_log_state->update_with_child_state(
+                    *_log_state_ptrs[_depth]);
+            }
+            // sent the value of unused gas to the sender
             _transaction_touch_state->get_account_balance(sender_address, sender_balance);
-            cgbn_add(_arith._env, sender_balance, sender_balance, gas_value);
+            cgbn_add(_arith._env, sender_balance, sender_balance, send_back_gas);
             _transaction_touch_state->set_account_balance(sender_address, sender_balance);
+
 
             // set the eror code for a succesfull transaction
             _error_code = ERR_NONE;
@@ -3179,10 +3213,12 @@ public:
             _error_code = error_code;
         }
         // send the gas value to the beneficiary
-        // bn_t beneficiary_balance;
-        // _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
-        // cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
-        // _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
+        if (cgbn_compare_ui32(_arith._env, gas_value, 0) > 0 ) {
+            bn_t beneficiary_balance;
+            _transaction_touch_state->get_account_balance(beneficiary, beneficiary_balance);
+            cgbn_add(_arith._env, beneficiary_balance, beneficiary_balance, gas_value);
+            _transaction_touch_state->set_account_balance(beneficiary, beneficiary_balance);
+        }
 
         // update the final state modification done by the transaction
         _transaction_touch_state->to_touch_state_data_t(
@@ -3190,7 +3226,7 @@ public:
         _accessed_state->to_accessed_state_data_t(
             *_final_accessed_state_data);
         *_final_error = _error_code;
-        delete _jump_destinations;
+        // delete _jump_destinations;
         _jump_destinations = NULL;
     }
 
@@ -3465,7 +3501,7 @@ public:
         touch_state_t *cpu_touch_state;
         cpu_touch_state = new touch_state_t(&instances.touch_states_data[0], cpu_accessed_state, NULL);
         cJSON *final_state_root_json = NULL;
-        
+
         keccak_t *keccak;
         keccak = new keccak_t(instances.sha3_parameters);
         final_state_root_json = cpu_touch_state->state_root_json(*keccak);

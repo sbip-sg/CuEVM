@@ -1108,6 +1108,8 @@ namespace environmental_operations{
         stack.pop(data_offset, error_code);
         stack.pop(length, error_code);
 
+        printf("RETURNDATACOPY: %d\n", error_code);
+
         if (error_code == ERR_NONE)
         {
             // compute the dynamic gas cost
@@ -1123,6 +1125,8 @@ namespace environmental_operations{
                 gas_used,
                 error_code);
 
+            printf("RETURNDATACOPY memory grow: %d\n", error_code);
+
             if (error_code == ERR_NONE)
             {
                 if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1132,6 +1136,9 @@ namespace environmental_operations{
                     int32_t overflow;
                     overflow = arith.size_t_from_cgbn(data_offset_s, data_offset);
                     overflow = overflow || arith.size_t_from_cgbn(length_s, length);
+
+
+                    printf("RETURNDATACOPY overflow: %d\n", overflow);
                     if (overflow)
                     {
                         error_code = ERROR_RETURN_DATA_OVERFLOW;
@@ -1149,6 +1156,7 @@ namespace environmental_operations{
                             length,
                             length_s,
                             error_code);
+                        printf("RETURNDATACOPY memory set: %d\n", error_code);
 
                         pc = pc + 1;
                     }

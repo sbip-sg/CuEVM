@@ -111,6 +111,16 @@ public:
         }
         return 0;
     }
+
+    __host__ __device__ void print(
+    )
+    {
+        size_t index;
+        for (index = 0; index < _size; index++)
+        {
+            printf("%lu\n", _destinations[index]);
+        }
+    }
 };
 
 #endif
