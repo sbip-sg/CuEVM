@@ -16,7 +16,8 @@
 				"NVIDIA.nsight-vscode-edition",
 				"ms-vscode.cpptools-extension-pack",
 				"ccimage.jsonviewer",
-				"xaver.clang-format"
+				"xaver.clang-format",
+				"ms-vscode.makefile-tools"
 			]
 		}
 	}//,
