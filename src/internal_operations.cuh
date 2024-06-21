@@ -8,8 +8,8 @@
 #define _INTERNAL_OP_H_
 
 #include "include/utils.h"
-#include "stack.cuh"
-#include "block.cuh"
+#include "include/stack.cuh"
+#include "include/block.cuh"
 #include "state.cuh"
 #include "message.cuh"
 #include "logs.cuh"
@@ -39,6 +39,7 @@ namespace internal_operations{
      * The number of bytes in a hash.
      */
     static const uint32_t HASH_BYTES = 32;
+    using EVMStack = cuEVM::stack::EVMStack;
 
     /**
      * The MLOAD operation implementation.
@@ -59,7 +60,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         memory_t &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
@@ -113,7 +114,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         memory_t &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
@@ -173,7 +174,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         memory_t &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
@@ -236,7 +237,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         touch_state_t &touch_state,
         message_t &message)
     {
@@ -295,7 +296,7 @@ namespace internal_operations{
         bn_t &gas_refund,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         touch_state_t &touch_state,
         message_t &message)
     {
@@ -364,7 +365,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         jump_destinations_t &jumpdest)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
@@ -416,7 +417,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         jump_destinations_t &jumpdest)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_HIGH);
@@ -471,7 +472,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
@@ -503,7 +504,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         memory_t &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -540,7 +541,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
@@ -604,7 +605,7 @@ namespace internal_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         memory_t &memory,
         message_t &message,
         log_state_t &log_state,

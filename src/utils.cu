@@ -88,3 +88,29 @@ __host__ cJSON *get_json_from_file(const char *filepath) {
     free(buffer);
     return root;
 }
+
+
+__host__ __device__ char hex_from_nibble(uint8_t nibble) {
+    if (nibble < 10)
+        return '0' + nibble;
+    return 'a' + (nibble - 10);
+}
+
+__host__ __device__ void hex_string_from_evm_word(char *hex_string, evm_word_t &word) {
+    uint32_t limb;
+    uint32_t nibble;
+    int32_t hex_index = 0;
+    int32_t limb_index;
+    int32_t nibble_index;
+    hex_index=0;
+    hex_string[hex_index++]='0';
+    hex_string[hex_index++]='x';
+    for(limb_index=(evm_params::BITS+31)/32;limb_index>=0;limb_index--) {
+      limb=word._limbs[limb_index];
+      for(nibble_index=7;nibble_index>=0;nibble_index--) {
+        nibble=(limb>>((nibble_index)*4))&0xF;
+        hex_string[hex_index++]=hex_from_nibble(nibble);
+      }
+    }
+    hex_string[hex_index]=0;
+}

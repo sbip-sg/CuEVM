@@ -1,0 +1,24 @@
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+
+project("some-application"
+    VERSION 0.0.1
+    DESCRIPTION "A project with nested library"
+)
+
+enable_language(CUDA)
+#set(CMAKE_CXX_STANDARD 11)
+#set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CUDA_STANDARD 20)
+
+add_subdirectory(CuCrypto)
+
+add_executable(${PROJECT_NAME})
+
+target_sources(${PROJECT_NAME}
+    PRIVATE
+        test_cucrypto.cu
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE CuCrypto)

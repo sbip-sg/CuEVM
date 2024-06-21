@@ -10,3 +10,6 @@
 [submodule "bigint"]
 	path = bigint
 	url = https://github.com/sbip-sg/bigint.git
+[submodule "libraries/CGBN"]
+	path = libraries/CGBN
+	url = https://github.com/sdcioc/CGBN.git

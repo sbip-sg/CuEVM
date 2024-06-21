@@ -7,7 +7,7 @@
 #ifndef _RETURN_DATA_H_
 #define _RETURN_DATA_H_
 
-#include "include/data_content.h"
+#include "include/data_content.cuh"
 
 /**
  * Copy data content between two device memories

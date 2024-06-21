@@ -9,8 +9,8 @@
 
 #include "include/utils.h"
 #include "state.cuh"
-#include "keccak.cuh"
 #include "jump_destinations.cuh"
+#include <CuCrypto/keccak.cuh>
 
 /**
  * The message call class.
@@ -21,10 +21,6 @@ class message_t
 {
 public:
 
-  /**
-   * THe keccak class
-  */
-  typedef keccak::keccak_t keccak_t;
   static const uint32_t HASH_BYTES = 32; /**< the number of byte in hash*/
 
   /**
@@ -446,8 +442,7 @@ public:
     arith_t &arith,
     bn_t &contract_address,
     bn_t &sender_address,
-    bn_t &sender_nonce,
-    keccak_t &keccak
+    bn_t &sender_nonce
   )
   {
     SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
@@ -514,7 +509,7 @@ public:
     */
 
     SHARED_MEMORY uint8_t address_bytes[HASH_BYTES];
-    keccak.sha3(
+    CuCrypto::keccak::sha3(
         &(rlp_list[0]),
         rlp_list_length + 1,
         &(address_bytes[0]),
@@ -535,15 +530,13 @@ public:
    * @param[in] sender_address The sender address YP: \f$s\f$.
    * @param[in] salt The salt YP: \f$n\f$.
    * @param[in] byte_code The byte code YP: \f$b\f$.
-   * @param[in] keccak The keccak class.
   */
   __host__ __device__ __forceinline__ static void get_create2_contract_address(
     arith_t &arith,
     bn_t &contract_address,
     bn_t &sender_address,
     bn_t &salt,
-    data_content_t &byte_code,
-    keccak_t &keccak
+    data_content_t &byte_code
   )
   {
     SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
@@ -558,7 +551,7 @@ public:
     size_t total_bytes = 1 + arith_t::ADDRESS_BYTES + arith_t::BYTES + HASH_BYTES;
 
     SHARED_MEMORY uint8_t hash_code[HASH_BYTES];
-    keccak.sha3(
+    CuCrypto::keccak::sha3(
         byte_code.data,
         byte_code.size,
         &(hash_code[0]),
@@ -581,7 +574,7 @@ public:
         HASH_BYTES);
     )
     SHARED_MEMORY uint8_t address_bytes[HASH_BYTES];
-    keccak.sha3(
+    CuCrypto::keccak::sha3(
         input_data,
         total_bytes,
         &(address_bytes[0]),
@@ -649,10 +642,6 @@ public:
    * The account class.
   */
   typedef world_state_t::account_t account_t;
-  /**
-   * THe keccak class
-  */
-  typedef keccak::keccak_t keccak_t;
   /**
    * The maximum number of transactions per test.
    */
@@ -1125,8 +1114,7 @@ public:
    * @return The message call.
   */
   __host__ __device__ message_t *get_message_call(
-      accessed_state_t &accessed_state,
-      keccak_t &keccak
+      accessed_state_t &accessed_state
   )
   {
     bn_t sender, to, gas_limit, value;
@@ -1155,8 +1143,7 @@ public:
           _arith,
           to,
           sender,
-          sender_nonce,
-          keccak);
+          sender_nonce);
 
     }
     else

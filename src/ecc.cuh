@@ -2,7 +2,7 @@
 #ifndef _ECC_H_
 #define _ECC_H_
 #include "include/utils.h"
-#include "keccak.cuh"
+#include <CuCrypto/keccak.cuh>
 /// The secp256k1 field prime number (P) and order
 inline constexpr const char *secp256k1_FieldPrime = "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f";
 inline constexpr const char *secp256k1_Order = "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
@@ -308,7 +308,12 @@ namespace ecc {
         return 0;
     }
 
-    __host__ __device__ __forceinline__ void convert_point_to_address(arith_t &arith, keccak::keccak_t &keccak, bn_t& address, bn_t &X, bn_t &Y){
+    __host__ __device__ __forceinline__ void convert_point_to_address(
+        arith_t &arith,
+        bn_t& address,
+        bn_t &X,
+        bn_t &Y)
+    {
 
         evm_word_t scratch_pad;
         uint8_t input[64];
@@ -328,7 +333,7 @@ namespace ecc {
         // print the entire byte array
         // print_byte_array_as_hex(input, 64);
         uint32_t in_length=64, out_length=32;
-        keccak.sha3(input, in_length, (uint8_t*)temp_array, out_length);
+        CuCrypto::keccak::sha3(input, in_length, (uint8_t*)temp_array, out_length);
 
         arith.cgbn_from_memory( address, temp_array);
         //cgbn_bitwise_mask_and(arith._env, address, address, 160);
@@ -340,11 +345,15 @@ namespace ecc {
      * Recover signer from the signature with the above structure. return the signer address in cgbn type
      *
      * @param arith
-     * @param keccak
      * @param sig
      * @param signer
      */
-    __host__ __device__ __forceinline__ int ec_recover(arith_t &arith, keccak::keccak_t &keccak, signature_t sig,  bn_t &signer){
+    __host__ __device__ __forceinline__ int ec_recover(
+        arith_t &arith,
+        signature_t sig,
+        bn_t &signer
+    )
+    {
 
         Curve  curve;
         arith.cgbn_memory_from_hex_string(curve.FP, secp256k1_FieldPrime);
@@ -417,7 +426,7 @@ namespace ecc {
         //calculate Q = Qr * r_inv %N
         ec_mul(arith, curve, ResX, ResY, ResX, ResY, r_inv);
 
-        convert_point_to_address(arith, keccak, signer, ResX, ResY);
+        convert_point_to_address(arith, signer, ResX, ResY);
         return 0;
     }
 

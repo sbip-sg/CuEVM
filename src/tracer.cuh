@@ -8,7 +8,7 @@
 #define _TRACER_H_
 
 #include "include/utils.h"
-#include "stack.cuh"
+#include "include/stack.cuh"
 #include "memory.cuh"
 #include "state.cuh"
 
@@ -48,7 +48,7 @@ public:
     /**
      * The stack data type
     */
-    typedef typename stack_t::stack_data_t stack_data_t;
+    typedef typename cuEVM::stack::stack_data_t stack_data_t;
     /**
      * The memory type.
     */
@@ -236,7 +236,7 @@ public:
         uint32_t pc,
         uint32_t depth,
         uint8_t opcode,
-        stack_t &stack,
+        cuEVM::stack::EVMStack &stack,
         memory_t &memory,
         touch_state_t &touch_state,
         bn_t &gas_used,
@@ -285,7 +285,7 @@ public:
      * @param[in] stack The stack.
     */
     __host__ __device__ __forceinline__ void modify_last_stack(
-        stack_t &stack)
+        cuEVM::stack::EVMStack &stack)
     {
         stack.to_stack_data_t(_content->stacks[_content->size - 1]);
     }
@@ -450,7 +450,7 @@ public:
             cJSON_AddNumberToObject(item, "pc", tracer_data.pcs[idx]);
             cJSON_AddNumberToObject(item, "depth", tracer_data.depths[idx]);
             cJSON_AddNumberToObject(item, "opcode", tracer_data.opcodes[idx]);
-            stack_json = stack_t::json_from_stack_data_t(
+            stack_json = cuEVM::stack::json_from_stack_data_t(
                 arith,
                 tracer_data.stacks[idx]);
             cJSON_AddItemToObject(item, "stack", stack_json);
@@ -523,7 +523,7 @@ public:
                 delete[] cpu_instances[idx].pcs;
                 delete[] cpu_instances[idx].depths;
                 delete[] cpu_instances[idx].opcodes;
-                stack_t::free_cpu_instances(cpu_instances[idx].stacks, cpu_instances[idx].capacity);
+                cuEVM::stack::free_cpu_instances(cpu_instances[idx].stacks, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].stacks;
                 #ifdef COMPLEX_TRACER
                 memory_t::free_cpu_instances(cpu_instances[idx].memories, cpu_instances[idx].capacity);
@@ -606,7 +606,7 @@ public:
                 CUDA_CHECK(cudaMalloc(
                     (void **)&(tmp_cpu_instances[idx].opcodes),
                     sizeof(uint8_t) * tmp_cpu_instances[idx].size));
-                tmp_cpu_instances[idx].stacks = stack_t::get_gpu_instances_from_cpu_instances(
+                tmp_cpu_instances[idx].stacks = cuEVM::stack::get_gpu_instances_from_cpu_instances(
                     cpu_instances[idx].stacks,
                     cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER
@@ -701,7 +701,7 @@ public:
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].pcs));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].depths));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].opcodes));
-                stack_t::free_gpu_instances(tmp_cpu_instances[idx].stacks, tmp_cpu_instances[idx].size);
+                cuEVM::stack::free_gpu_instances(tmp_cpu_instances[idx].stacks, tmp_cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER
                 memory_t::free_gpu_instances(tmp_cpu_instances[idx].memories, tmp_cpu_instances[idx].size);
                 touch_state_t::free_gpu_instances(tmp_cpu_instances[idx].touch_states, tmp_cpu_instances[idx].size);
@@ -763,9 +763,9 @@ public:
                     (void **)&(tmp_cpu_instances[idx].opcodes),
                     sizeof(uint8_t) * cpu_instances[idx].size));
                 // reset the stack data structures
-                cpu_instances[idx].stacks = stack_t::get_cpu_instances(
+                cpu_instances[idx].stacks = cuEVM::stack::get_cpu_instances(
                     cpu_instances[idx].size);
-                tmp_cpu_instances[idx].stacks = stack_t::get_gpu_instances_from_cpu_instances(
+                tmp_cpu_instances[idx].stacks = cuEVM::stack::get_gpu_instances_from_cpu_instances(
                     cpu_instances[idx].stacks,
                     cpu_instances[idx].size);
                 delete[] cpu_instances[idx].stacks;
@@ -888,7 +888,7 @@ public:
                     sizeof(uint8_t) * cpu_instances[idx].size,
                     cudaMemcpyDeviceToHost));
                 CUDA_CHECK(cudaFree(cpu_instances[idx].opcodes));
-                tmp_cpu_instances[idx].stacks = stack_t::get_cpu_instances_from_gpu_instances(
+                tmp_cpu_instances[idx].stacks = cuEVM::stack::get_cpu_instances_from_gpu_instances(
                     cpu_instances[idx].stacks,
                     cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER

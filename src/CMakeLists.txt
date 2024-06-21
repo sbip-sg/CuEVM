@@ -1,9 +1,10 @@
 enable_language(CUDA)
-find_package(CUDAToolkit REQUIRED)
 find_package(GMP REQUIRED)
 find_package(cJSON REQUIRED) # Assuming cJSON is available as a find package
 
-include_directories(${PROJECT_SOURCE_DIR}/CGBN/include)
+# include_directories(${PROJECT_SOURCE_DIR}/CGBN/include)
+
+include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 include_directories(${PROJECT_SOURCE_DIR}/bigint)
 include_directories(${GMP_INCLUDE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -15,15 +16,23 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 # Set this to your CUDA device's compute capability
 set(CMAKE_CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 
-add_executable(${PROJECT_NAME} interpreter.cu)
+add_executable(${PROJECT_NAME}
+    interpreter.cu
+    data_content.cu
+    block.cu
+    stack.cu
+)
 
-set_target_properties(${PROJECT_NAME}  PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(${PROJECT_NAME}  PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+
+#set_target_properties(${PROJECT_NAME}  PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
 
 # Add specific NVCC flags using target_compile_options (if necessary)
 target_compile_options(${PROJECT_NAME}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true>)
 
 # Link libraries
 # target_link_libraries(cuevm CUDA::cudart ${GMP_LIBRARIES} ${cJSON_LIBRARIES})
-target_link_libraries(${PROJECT_NAME}  gmp cjson)
+target_link_libraries(${PROJECT_NAME} gmp cjson CGBN CuCrypto)
+# target_link_libraries(${PROJECT_NAME} PRIVATE )
 

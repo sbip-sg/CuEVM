@@ -7,10 +7,9 @@
 #include <stdlib.h>
 #include <cuda.h>
 #include <cjson/cJSON.h>
-#include <bigint.h>
-
-#include "cgbn_wrapper.h"
-#include "data_content.h"
+#include <CGBN/cgbn.h>
+#include <gmp.h>
+#include "data_content.cuh"
 #include "opcodes.h"
 #include "error_codes.h"
 #include "gas_cost.h"
@@ -68,13 +67,13 @@ using evm_params = mr_params<8, 256, 1, 1024, 4096, 50>;
  * the number of threads per instance and the
  * parameters class as template parameters.
 */
-using context_t = cgbn_context_t<evm_params::TPI, evm_params>;
+using context_t = cgbn_context_t<32, cgbn_default_parameters_t>;
 
 /**
  * The CGBN environment type. This is a template type that takes the
  * context type as a template parameter. It provides the CGBN functions.
 */
-using env_t = cgbn_env_t<context_t, evm_params::BITS>;
+using env_t = cgbn_env_t<context_t, 256>;
 
 /**
  * The CGBN base type for the given number of bit in environment.
@@ -87,7 +86,7 @@ using bn_wide_t = env_t::cgbn_wide_t;
 /**
  * The EVM word type. also use for store CGBN base type.
 */
-using evm_word_t =  cgbn_mem_t<evm_params::BITS>;
+using evm_word_t =  cgbn_mem_t<256>;
 
 
 __host__ size_t adjusted_length(char** hex_string);
@@ -97,6 +96,8 @@ void cgbn_check(cgbn_error_report_t *report, const char *file=NULL, int32_t line
 __host__ void from_mpz(uint32_t *words, uint32_t count, mpz_t value);
 __host__ void to_mpz(mpz_t r, uint32_t *x, uint32_t count);
 __host__ cJSON *get_json_from_file(const char *filepath);
+__host__ __device__ char hex_from_nibble(uint8_t nibble);
+__host__ __device__ void hex_string_from_evm_word(char *hex_string, evm_word_t &word);
 
 #include "arith.cuh"
 

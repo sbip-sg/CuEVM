@@ -19,7 +19,8 @@ if(WITH_DOCS)
 endif()
 
 if(WITH_COMPILE)
-        add_subdirectory("${PROJECT_SOURCE_DIR}/src")
+    add_subdirectory(libraries)
+    add_subdirectory("${PROJECT_SOURCE_DIR}/src")
 endif()
 
 if(ENABLE_TRACING)

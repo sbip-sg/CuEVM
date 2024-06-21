@@ -1,0 +1,2 @@
+add_subdirectory(CGBN)
+add_subdirectory(CuCrypto)

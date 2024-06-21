@@ -8,10 +8,11 @@
 #define _ENVIRONMENTAL_OP_H_
 
 #include "include/utils.h"
-#include "stack.cuh"
-#include "block.cuh"
+#include "include/stack.cuh"
+#include "include/block.cuh"
 #include "state.cuh"
 #include "message.cuh"
+#include <CuCrypto/keccak.cuh>
 
 // 40s: Block Information
 
@@ -31,7 +32,7 @@
  * not related to the block.
  */
 namespace block_operations{
-
+    using EVMStack = cuEVM::stack::EVMStack;
     /**
      * The BLOCKHASH operation implementation.
      * Takes the number from the stack and pushes the hash of the block
@@ -51,7 +52,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BLOCKHASH);
@@ -88,7 +89,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -120,7 +121,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -152,7 +153,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -184,7 +185,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -218,7 +219,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -250,7 +251,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -282,7 +283,7 @@ namespace block_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -322,11 +323,7 @@ namespace block_operations{
  *      - EXTCODEHASH
 */
 namespace environmental_operations{
-
-    /**
-     * The keccak class.
-     */
-    using keccak::keccak_t;
+    using EVMStack = cuEVM::stack::EVMStack;
     /**
      * The numver of bytes in a hash.
      */
@@ -347,7 +344,6 @@ namespace environmental_operations{
      * @param[out] error_code The error code.
      * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
-     * @param[in] keccak The keccak object.
      * @param[inout] memory The memory object.
     */
     __host__ __device__ __forceinline__ static void operation_SHA3(
@@ -356,8 +352,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
-        keccak_t &keccak,
+        EVMStack &stack,
         memory_t &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_KECCAK256);
@@ -394,7 +389,7 @@ namespace environmental_operations{
                 arith.size_t_from_cgbn(input_length, length);
                 if (error_code == ERR_NONE)
                 {
-                    keccak.sha3(
+                    CuCrypto::keccak::sha3(
                         data,
                         input_length,
                         &(hash[0]),
@@ -431,7 +426,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -466,7 +461,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         touch_state_t &touch_state)
     {
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
@@ -512,7 +507,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         transaction_t &transaction)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -545,7 +540,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -577,7 +572,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -613,7 +608,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
@@ -654,7 +649,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -698,7 +693,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message,
         memory_t &memory)
     {
@@ -763,7 +758,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -809,7 +804,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         message_t &message,
         memory_t &memory)
     {
@@ -880,7 +875,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         block_t &block,
         transaction_t &transaction)
     {
@@ -923,7 +918,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         touch_state_t &touch_state)
     {
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
@@ -978,7 +973,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         touch_state_t &touch_state,
         memory_t &memory)
     {
@@ -1053,7 +1048,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         return_data_t &return_data)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -1097,7 +1092,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         memory_t &memory,
         return_data_t &return_data)
     {
@@ -1181,7 +1176,6 @@ namespace environmental_operations{
      * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
      * @param[in] touch_state The touch state object. The executing world state.
-     * @param[in] keccak The keccak object.
     */
     __host__ __device__ __forceinline__ static void operation_EXTCODEHASH(
         arith_t &arith,
@@ -1189,9 +1183,8 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
-        touch_state_t &touch_state,
-        keccak_t &keccak)
+        EVMStack &stack,
+        touch_state_t &touch_state)
     {
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
@@ -1226,7 +1219,7 @@ namespace environmental_operations{
                     code_size = touch_state.get_account_code_size(
                         address);
 
-                    keccak.sha3(
+                    CuCrypto::keccak::sha3(
                         bytecode,
                         code_size,
                         &(hash[0]),
@@ -1264,7 +1257,7 @@ namespace environmental_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         touch_state_t &touch_state,
         message_t &message)
     {

@@ -8,7 +8,7 @@
 #define _ALU_H_
 
 #include "include/utils.h"
-#include "stack.cuh"
+#include "include/stack.cuh"
 
 /**
  * The arithmetic operations class.
@@ -30,7 +30,7 @@ namespace arithmetic_operations {
     /**
      * The stackk class.
      */
-    // using stack_t = ::stack_t;
+    using EVMStack = cuEVM::stack::EVMStack;
 
     /**
      * The ADD operation implementation.
@@ -49,7 +49,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -83,7 +83,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -117,7 +117,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -153,7 +153,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -194,7 +194,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -267,7 +267,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -308,7 +308,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -367,7 +367,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -429,7 +429,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -478,7 +478,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_EXP);
         bn_t a, exponent, r;
@@ -556,7 +556,7 @@ namespace arithmetic_operations {
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         /*
         Even if x has more bytes than the value b, the operation consider only the first
@@ -614,6 +614,7 @@ namespace stack_operations{
      * integer library.
      */
     using arith_t = arith_env_t<evm_params>;
+    using EVMStack = cuEVM::stack::EVMStack;
 
     /**
      * The POP operation implementation.
@@ -631,7 +632,7 @@ namespace stack_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
@@ -661,7 +662,7 @@ namespace stack_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -697,7 +698,7 @@ namespace stack_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         uint8_t *bytecode,
         uint32_t &code_size,
         uint8_t &opcode)
@@ -744,7 +745,7 @@ namespace stack_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         uint8_t &opcode)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
@@ -781,7 +782,7 @@ namespace stack_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack,
+        EVMStack &stack,
         uint8_t &opcode)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
@@ -816,7 +817,7 @@ namespace comparison_operations{
     /**
      * The stack class.
      */
-    // using stack_t = ::stack_t<evm_params>;
+    using EVMStack = cuEVM::stack::EVMStack;
 
     /**
      * Compare the top two values from the stack.
@@ -832,7 +833,7 @@ namespace comparison_operations{
     __host__ __device__ __forceinline__ static int32_t compare(
         arith_t &arith,
         uint32_t &error_code,
-        stack_t &stack)
+        EVMStack &stack)
     {
         bn_t a, b;
         stack.pop(a, error_code);
@@ -854,7 +855,7 @@ namespace comparison_operations{
     __host__ __device__ __forceinline__ static int32_t scompare(
         arith_t &arith,
         uint32_t &error_code,
-        stack_t &stack)
+        EVMStack &stack)
     {
         bn_t a, b;
         stack.pop(a, error_code);
@@ -896,7 +897,7 @@ namespace comparison_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -937,7 +938,7 @@ namespace comparison_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -978,7 +979,7 @@ namespace comparison_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1019,7 +1020,7 @@ namespace comparison_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1059,7 +1060,7 @@ namespace comparison_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1099,7 +1100,7 @@ namespace comparison_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1147,7 +1148,7 @@ namespace bitwise_operations{
     /**
      * The stack class.
      */
-    // using stack_t = ::stack_t<evm_params>;
+    using EVMStack = cuEVM::stack::EVMStack;
 
     /**
      * The AND operation implementation.
@@ -1166,7 +1167,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1201,7 +1202,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1236,7 +1237,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1272,7 +1273,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1309,7 +1310,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1355,7 +1356,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1400,7 +1401,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1448,7 +1449,7 @@ namespace bitwise_operations{
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
-        stack_t &stack)
+        EVMStack &stack)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
         if (arith.has_gas(gas_limit, gas_used, error_code))

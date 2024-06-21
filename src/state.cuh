@@ -8,8 +8,8 @@
 #define _STATE_T_H_
 
 #include "include/utils.h"
-#include "keccak.cuh"
 #include <iostream>
+#include <CuCrypto/keccak.cuh>
 
 #define READ_NONE 0
 #define READ_BALANCE 1
@@ -3466,7 +3466,6 @@ public:
     __host__ cJSON *account_root_json(
         account_t *world_account,
         account_t *touch_account,
-        keccak::keccak_t &keccak,
         uint8_t touch
     ) {
         cJSON *account_json = NULL;
@@ -3512,7 +3511,7 @@ public:
             code = world_account->bytecode;
             code_size = world_account->code_size;
         }
-        keccak.sha3(code, code_size, hash, 32);
+        CuCrypto::keccak::sha3(code, code_size, hash, 32);
         _arith.word_from_memory(code_hash, hash);
         _arith.hex_string_from_cgbn_memory(hex_string_ptr, code_hash);
         cJSON_AddStringToObject(account_json, "codeHash", hex_string_ptr);
@@ -3597,7 +3596,6 @@ public:
      * @return The state root json
     */
     __host__ cJSON *state_root_json(
-        keccak::keccak_t &keccak
     ) {
         cJSON *state_json = NULL;
         cJSON *account_json = NULL;
@@ -3627,7 +3625,7 @@ public:
                 touch = _content->touch[account_idx];
                 writen_accounts[account_idx] = 1;
             }
-            account_json = account_root_json(world_account, touch_account, keccak, touch);
+            account_json = account_root_json(world_account, touch_account, touch);
             if ( (touch & WRITE_DELETE) == 0)
                 cJSON_AddItemToArray(accounts_json, account_json);
             else
@@ -3639,7 +3637,6 @@ public:
                 account_json = account_root_json(
                     &(_content->touch_accounts.accounts[idx]),
                     NULL,
-                    keccak,
                     0
                 );
                 if ( (_content->touch[idx] & WRITE_DELETE) == 0)

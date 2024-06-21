@@ -9,6 +9,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
   // typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
   typedef arith_env_t<evm_params> arith_t;
+  printf("Running the interpreter\n");
 
   evm_instances_t         cpu_instances;
   #ifndef ONLY_CPU
@@ -94,8 +95,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
           arith,
           cpu_instances.world_state_data,
           cpu_instances.block_data,
-          cpu_instances.sha3_parameters,
-          cpu_instances.sha256_parameters,
           &(cpu_instances.transactions_data[instance]),
           &(cpu_instances.accessed_states_data[instance]),
           &(cpu_instances.touch_states_data[instance]),

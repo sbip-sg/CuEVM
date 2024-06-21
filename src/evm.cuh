@@ -2,14 +2,14 @@
 #define _EVM_H_
 
 #include "include/utils.h"
-#include "stack.cuh"
+#include "include/stack.cuh"
 #include "message.cuh"
 #include "memory.cuh"
 #include "returndata.cuh"
-#include "block.cuh"
+#include "include/block.cuh"
 #include "tracer.cuh"
 #include "state.cuh"
-#include "keccak.cuh"
+#include <CuCrypto/keccak.cuh>
 #include "jump_destinations.cuh"
 #include "logs.cuh"
 #include "alu_operations.cuh"
@@ -62,22 +62,6 @@ public:
      * The tracer data structure.
      */
     typedef typename tracer_t::tracer_data_t tracer_data_t;
-    /**
-     * The keccak class.
-     */
-    typedef keccak::keccak_t keccak_t;
-    /**
-     * The keccak parameters.
-     */
-    typedef typename keccak_t::sha3_parameters_t sha3_parameters_t;
-    /**
-     * The sha256 class.
-    */
-    typedef sha256::sha256_t sha256_t;
-    /**
-     * The sha256 parameters.
-     */
-    typedef typename sha256_t::sha256_parameters_t sha256_parameters_t;
 
     /**
      * The logs state data type.
@@ -103,8 +87,6 @@ public:
     {
         state_data_t *world_state_data; /**< The world state content*/
         block_data_t *block_data; /**< The current block infomation*/
-        sha3_parameters_t *sha3_parameters; /**< The constants for the KECCAK*/
-        sha256_parameters_t *sha256_parameters; /**< The constants for the SHA256*/
         transaction_data_t *transactions_data; /**< The transactions information*/
         accessed_state_data_t *accessed_states_data; /**< The data cotaining the states access by the transactions execution*/
         touch_state_data_t *touch_states_data; /**< The data containing the states modified by the transactions execution*/
@@ -120,8 +102,6 @@ public:
     arith_t _arith; /**< The arithmetical environment*/
     world_state_t *_world_state; /**< The world state*/
     block_t *_block; /**< The current block*/
-    keccak_t *_keccak; /**< The keccak object*/
-    sha256_t *_sha256; /**< The sha256 object*/
     transaction_t *_transaction; /**< The current transaction*/
     accessed_state_t *_accessed_state; /**< The accessed state*/
     touch_state_t *_transaction_touch_state; /**< The final touch state of the transaction*/
@@ -139,7 +119,7 @@ public:
     return_data_t *_final_return_data; /**< The final return data*/
     message_t **_message_ptrs; /**< The message call for every depth call*/
     memory_t **_memory_ptrs; /**< The memory for every depth call*/
-    stack_t **_stack_ptrs; /**< The stack for every depth call*/
+    cuEVM::stack::EVMStack **_stack_ptrs; /**< The stack for every depth call*/
     bn_t *_gas_useds; /**< The current gas used for every depth call*/
     bn_t *_gas_refunds; /**< The current gas refunds for every depth call*/
     uint32_t *_pcs; /**< The current program counter for every depth call*/
@@ -175,8 +155,6 @@ public:
      * @param[in] arith The arithmetical environment.
      * @param[in] world_state_data The world state data.
      * @param[in] block_data The block data.
-     * @param[in] sha3_parameters The sha3 parameters.
-     * @param[in] sha256_parameters The sha256 parameters.
      * @param[in] transaction_data The transaction data.
      * @param[out] accessed_state_data The accessed state data.
      * @param[out] touch_state_data The touch state data.
@@ -190,8 +168,6 @@ public:
         arith_t arith,
         state_data_t *world_state_data,
         block_data_t *block_data,
-        sha3_parameters_t *sha3_parameters,
-        sha256_parameters_t *sha256_parameters,
         transaction_data_t *transaction_data,
         accessed_state_data_t *accessed_state_data,
         touch_state_data_t *touch_state_data,
@@ -205,8 +181,6 @@ public:
     {
         _world_state = new world_state_t(arith, world_state_data);
         _block = new block_t(arith, block_data);
-        _keccak = new keccak_t(sha3_parameters);
-        _sha256 = new sha256_t(sha256_parameters);
         _transaction = new transaction_t(arith, transaction_data);
         _accessed_state = new accessed_state_t(_world_state);
         _transaction_touch_state = new touch_state_t(_accessed_state, NULL);
@@ -222,7 +196,7 @@ public:
         _final_return_data = new return_data_t(return_data);
         _message_ptrs = new message_t *[_allocated_depth];
         _memory_ptrs = new memory_t *[_allocated_depth];
-        _stack_ptrs = new stack_t *[_allocated_depth];
+        _stack_ptrs = new cuEVM::stack::EVMStack *[_allocated_depth];
         // TODO: infeficient but because of their form
         // we allocate them with maximum depth from the
         // begining
@@ -252,8 +226,6 @@ public:
         _transaction_log_state->to_log_state_data_t(*_final_log_state_data);
         delete _world_state;
         delete _block;
-        delete _keccak;
-        delete _sha256;
         delete _transaction;
         delete _accessed_state;
         delete _transaction_touch_state;
@@ -293,7 +265,7 @@ public:
         return_data_t **new_return_data_ptrs = new return_data_t *[new_allocated_depth];
         message_t **new_message_ptrs = new message_t *[new_allocated_depth];
         memory_t **new_memory_ptrs = new memory_t *[new_allocated_depth];
-        stack_t **new_stack_ptrs = new stack_t *[new_allocated_depth];
+        cuEVM::stack::EVMStack **new_stack_ptrs = new cuEVM::stack::EVMStack *[new_allocated_depth];
         /*
         bn_t *new_gas_useds = new bn_t[new_allocated_depth];
         bn_t *new_gas_refunds = new bn_t[new_allocated_depth];
@@ -323,7 +295,7 @@ public:
         memcpy(
             new_stack_ptrs,
             _stack_ptrs,
-            _allocated_depth * sizeof(stack_t *));
+            _allocated_depth * sizeof(cuEVM::stack::EVMStack *));
         /*
         memcpy(
             new_gas_useds,
@@ -434,7 +406,7 @@ public:
         update_CALL();
         // allocate the memory, the stack, the touch state, the log state, the return data
         _last_return_data_ptrs[_depth] = new return_data_t();
-        _stack_ptrs[_depth] = new stack_t(_arith);
+        _stack_ptrs[_depth] = new cuEVM::stack::EVMStack(_arith);
         _memory_ptrs[_depth] = new memory_t(_arith);
         if (_depth > 0)
         {
@@ -522,7 +494,6 @@ public:
                 case 1:
                     precompile_operations::operation_ecRecover(
                         _arith,
-                        *_keccak,
                         _gas_limit,
                         _gas_useds[_depth],
                         error_code,
@@ -537,8 +508,7 @@ public:
                         _gas_useds[_depth],
                         error_code,
                         *return_data,
-                        *_message_ptrs[_depth],
-                        *_sha256
+                        *_message_ptrs[_depth]
                     );
                     break;
                 case 3:
@@ -752,7 +722,7 @@ public:
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
@@ -913,7 +883,7 @@ public:
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
@@ -1046,7 +1016,6 @@ public:
          * @param[in] memory The memory.
          * @param[in] touch_state The touch state.
          * @param[in] opcode The operation opcode
-         * @param[in] keccak The keccak object.
          * @param[out] evm The evm.
          * @param[out] return_data The return data.
          */
@@ -1056,12 +1025,11 @@ public:
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
-            keccak_t &keccak,
             evm_t &evm,
             return_data_t &return_data)
         {
@@ -1113,8 +1081,7 @@ public:
                     arith,
                     address,
                     sender_address,
-                    sender_nonce,
-                    keccak);
+                    sender_nonce);
 
                 message_t *new_message = new message_t(
                     arith,
@@ -1174,7 +1141,7 @@ public:
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
@@ -1262,7 +1229,7 @@ public:
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
@@ -1344,7 +1311,7 @@ public:
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             memory_t &memory,
             return_data_t &return_data)
         {
@@ -1404,7 +1371,7 @@ public:
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
@@ -1483,7 +1450,6 @@ public:
          * @param[in] memory The memory.
          * @param[inout] touch_state The touch state.
          * @param[in] opcode The operation opcode
-         * @param[in] keccak The keccak object.
          * @param[out] evm The evm.
          * @param[out] return_data The return data.
          */
@@ -1493,12 +1459,11 @@ public:
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
-            keccak_t &keccak,
             evm_t &evm,
             return_data_t &return_data)
         {
@@ -1548,8 +1513,7 @@ public:
                     address,
                     sender_address,
                     salt,
-                    initialisation_code,
-                    keccak);
+                    initialisation_code);
 
                 // create the message
                 message_t *new_message = new message_t(
@@ -1610,7 +1574,7 @@ public:
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             memory_t &memory,
             touch_state_t &touch_state,
@@ -1692,7 +1656,7 @@ public:
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             memory_t &memory,
             return_data_t &return_data)
         {
@@ -1759,7 +1723,7 @@ public:
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
-            stack_t &stack,
+            cuEVM::stack::EVMStack &stack,
             message_t &message,
             touch_state_t &touch_state,
             return_data_t &return_data,
@@ -1831,7 +1795,7 @@ public:
         uint32_t &error_code)
     {
         // get the first message call from transaction
-        _message_ptrs[_depth] = _transaction->get_message_call(*_accessed_state, *_keccak);
+        _message_ptrs[_depth] = _transaction->get_message_call(*_accessed_state);
         // process the transaction
         bn_t intrsinc_gas_used;
         start_TRANSACTION(intrsinc_gas_used, error_code);
@@ -2243,7 +2207,6 @@ public:
                         error_code,
                         _pcs[_depth],
                         *_stack_ptrs[_depth],
-                        *_keccak,
                         *_memory_ptrs[_depth]);
                 }
                 break;
@@ -2443,8 +2406,7 @@ public:
                         error_code,
                         _pcs[_depth],
                         *_stack_ptrs[_depth],
-                        *_touch_state_ptrs[_depth],
-                        *_keccak);
+                        *_touch_state_ptrs[_depth]);
                 }
                 break;
                 case OP_BLOCKHASH: // BLOCKHASH
@@ -2722,7 +2684,6 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *_keccak,
                         *this,
                         *_last_return_data_ptrs[_depth]);
                 }
@@ -2820,7 +2781,6 @@ public:
                         *_memory_ptrs[_depth],
                         *_touch_state_ptrs[_depth],
                         _opcode,
-                        *_keccak,
                         *this,
                         *_last_return_data_ptrs[_depth]);
                 }
@@ -3277,20 +3237,6 @@ public:
         delete cpu_block;
         cpu_block = NULL;
 
-        // setup the keccak paramameters
-        keccak_t *keccak;
-        keccak = new keccak_t();
-        instances.sha3_parameters = keccak->_parameters;
-        delete keccak;
-        keccak = NULL;
-
-        // setup the sha256 parameters
-        sha256_t *sha256;
-        sha256 = new sha256_t();
-        instances.sha256_parameters = sha256->_parameters;
-        delete sha256;
-        sha256 = NULL;
-
         // get the transactions
         transaction_t::get_transactions(instances.transactions_data, test, instances.count, 0, clones);
 
@@ -3336,10 +3282,6 @@ public:
 
         gpu_instances.block_data = cpu_instances.block_data;
 
-        gpu_instances.sha3_parameters = cpu_instances.sha3_parameters;
-
-        gpu_instances.sha256_parameters = cpu_instances.sha256_parameters;
-
         gpu_instances.transactions_data = cpu_instances.transactions_data;
 
         gpu_instances.accessed_states_data = accessed_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
@@ -3370,8 +3312,6 @@ public:
 
         cpu_instances.world_state_data = gpu_instances.world_state_data;
         cpu_instances.block_data = gpu_instances.block_data;
-        cpu_instances.sha3_parameters = gpu_instances.sha3_parameters;
-        cpu_instances.sha256_parameters = gpu_instances.sha256_parameters;
         cpu_instances.transactions_data = gpu_instances.transactions_data;
         cpu_instances.return_data = return_data_t::get_cpu_instances_from_gpu_instances(gpu_instances.return_data, gpu_instances.count);
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
@@ -3407,18 +3347,6 @@ public:
         cpu_block->free_content();
         delete cpu_block;
         cpu_block = NULL;
-
-        keccak_t *keccak;
-        keccak = new keccak_t(cpu_instances.sha3_parameters);
-        keccak->free_parameters();
-        delete keccak;
-        keccak = NULL;
-
-        sha256_t *sha256;
-        sha256 = new sha256_t(cpu_instances.sha256_parameters);
-        sha256->free_parameters();
-        delete sha256;
-        sha256 = NULL;
 
         transaction_t::free_instances(cpu_instances.transactions_data, cpu_instances.count);
         cpu_instances.transactions_data = NULL;
@@ -3502,11 +3430,7 @@ public:
         cpu_touch_state = new touch_state_t(&instances.touch_states_data[0], cpu_accessed_state, NULL);
         cJSON *final_state_root_json = NULL;
 
-        keccak_t *keccak;
-        keccak = new keccak_t(instances.sha3_parameters);
-        final_state_root_json = cpu_touch_state->state_root_json(*keccak);
-        delete keccak;
-        keccak = NULL;
+        final_state_root_json = cpu_touch_state->state_root_json();
         char *final_state_root_json_str = cJSON_PrintUnformatted(final_state_root_json);
         //printf("%s\n", final_state_root_json_str);
         fprintf(stderr, "%s\n", final_state_root_json_str);
@@ -3565,7 +3489,6 @@ public:
         uint8_t hash[32];
         evm_word_t t_word;
         std::string out = "{";
-        keccak::keccak_t *k = new keccak::keccak_t();
 
         out += "\"accounts\": [";
 
@@ -3584,7 +3507,7 @@ public:
             out += "\", \"codehash\": \"" ;
             auto bytecode = account.bytecode;
             auto code_size = account.code_size;
-            k->sha3(bytecode, code_size, hash, 32);
+            CuCrypto::keccak::sha3(bytecode, code_size, hash, 32);
             arith.word_from_memory(t_word, hash);
             arith.pretty_hex_string_from_cgbn_memory(temp, t_word);
             out += temp; // codehash, better cache it and calculate only once
@@ -3625,9 +3548,6 @@ public:
         out += "]}";
         delete[] temp;
         temp = nullptr;
-        k->free_parameters();
-        delete k;
-        k = nullptr;
         std::cerr << out << std::endl;
     }
 
@@ -3718,8 +3638,6 @@ __global__ void kernel_evm(
         arith,
         instances->world_state_data,
         instances->block_data,
-        instances->sha3_parameters,
-        instances->sha256_parameters,
         &(instances->transactions_data[instance]),
         &(instances->accessed_states_data[instance]),
         &(instances->touch_states_data[instance]),
