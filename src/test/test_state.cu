@@ -18,8 +18,8 @@ __host__ __device__ __forceinline__ void test_storage(
   typedef world_state_t<params> world_state_t;
   typedef accessed_state_t<params> accessed_state_t;
   typedef touch_state_t<params> touch_state_t;
-  typedef arith_env_t<params> arith_t;
-  typedef typename arith_t::bn_t  bn_t;
+  typedef arith_env_t<params> ArithEnv;
+  typedef typename ArithEnv::bn_t  bn_t;
   typedef typename world_state_t::account_t account_t;
   typedef typename accessed_state_t::accessed_state_data_t accessed_state_data_t;
 
@@ -127,17 +127,17 @@ __global__ void kernel_storage(
   if(instance >= instance_count)
     return;
 
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
 
   // setup arithmetic
-  arith_t arith(cgbn_report_monitor, report, instance);
+  ArithEnv arith(cgbn_report_monitor, report, instance);
 
   test_storage<params>(arith, world_state_data, &(access_state_data[instance]), &(touch_state_data[instance]), instance);
 }
 
 template<class params>
 void run_test(uint32_t instance_count) {
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
   typedef world_state_t<params> world_state_t;
   typedef typename world_state_t::state_data_t state_data_t;
   typedef accessed_state_t<params> accessed_state_t;
@@ -156,7 +156,7 @@ void run_test(uint32_t instance_count) {
   touch_state_data_t *gpu_touch_states_data;
   cgbn_error_report_t     *report;
   #endif
-  arith_t arith(cgbn_report_monitor, 0);
+  ArithEnv arith(cgbn_report_monitor, 0);
   
   //read the json file with the world state
   cJSON *root = get_json_from_file("input/evm_test.json");

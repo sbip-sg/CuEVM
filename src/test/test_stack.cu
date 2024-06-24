@@ -12,8 +12,8 @@ __host__ __device__ __forceinline__ void test_stack(
     typename stack_t<params>::stack_data_t *stack_data,
     uint32_t &instance)
 {
-  typedef arith_env_t<params> arith_t;
-  typedef typename arith_t::bn_t bn_t;
+  typedef arith_env_t<params> ArithEnv;
+  typedef typename ArithEnv::bn_t bn_t;
   typedef cgbn_mem_t<params::BITS> evm_word_t;
   typedef stack_t<params> stack_t;
   typedef typename stack_t::stack_data_t stack_data_t;
@@ -67,7 +67,7 @@ __global__ void kernel_stack(
     typename stack_t<params>::stack_data_t *stacks_data,
     uint32_t count)
 {
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
 
   uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
 
@@ -75,7 +75,7 @@ __global__ void kernel_stack(
     return;
 
   // setup arithmetic
-  arith_t arith(cgbn_report_monitor, report, instance);
+  ArithEnv arith(cgbn_report_monitor, report, instance);
 
   test_stack(arith, &(stacks_data[instance]), instance);
 }
@@ -83,13 +83,13 @@ __global__ void kernel_stack(
 template <class params>
 void run_test(uint32_t instance_count)
 {
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
   typedef stack_t<params> stack_t;
   typedef typename stack_t::stack_data_t stack_data_t;
   typedef cgbn_mem_t<params::BITS> evm_word_t;
 
   stack_data_t *cpu_stacks;
-  arith_t arith(cgbn_report_monitor, 0);
+  ArithEnv arith(cgbn_report_monitor, 0);
 
 #ifndef ONLY_CPU
   CUDA_CHECK(cudaDeviceReset());

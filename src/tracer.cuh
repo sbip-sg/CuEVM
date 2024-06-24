@@ -9,7 +9,7 @@
 
 #include "include/utils.h"
 #include "include/stack.cuh"
-#include "memory.cuh"
+#include "include/memory.cuh"
 #include "state.cuh"
 
 
@@ -50,13 +50,9 @@ public:
     */
     typedef typename cuEVM::stack::stack_data_t stack_data_t;
     /**
-     * The memory type.
-    */
-    // typedef memory_t<params> memory_t;
-    /**
      * The memory data type.
     */
-    typedef typename memory_t::memory_data_t memory_data_t;
+    typedef typename cuEVM::memory::memory_data_t memory_data_t;
 
     /**
      * The touch state data type.
@@ -88,13 +84,13 @@ public:
     } tracer_data_t;
 
     tracer_data_t *_content; /**< The content of the tracer*/
-    arith_t _arith; /**< The arithmetical environment*/
+    ArithEnv _arith; /**< The arithmetical environment*/
 
     /**
      * The constructor of the tracer.
     */
     __host__ __device__ __forceinline__ tracer_t(
-        arith_t arith,
+        ArithEnv arith,
         tracer_data_t *content) : _arith(arith),
                                   _content(content)
     {
@@ -237,7 +233,7 @@ public:
         uint32_t depth,
         uint8_t opcode,
         cuEVM::stack::EVMStack &stack,
-        memory_t &memory,
+        cuEVM::memory::EVMMemory &memory,
         touch_state_t &touch_state,
         bn_t &gas_used,
         bn_t &gas_limit,
@@ -295,14 +291,14 @@ public:
      * @param[in] tracer_data The trace data structure.
     */
     __host__ __forceinline__ static void print_tracer_data_t(
-        arith_t &arith,
-        tracer_data_t &tracer_data, data_content_t* return_data)
+        ArithEnv &arith,
+        tracer_data_t &tracer_data, cuEVM::byte_array_t* return_data)
     {
         //printf("Tracer data:\n");
         //printf("Size: %lu\n", tracer_data.size);
-        char *gas_left_str = new char[arith_t::BYTES * 2 + 3];
-        char *gas_cost_str = new char[arith_t::BYTES * 2 + 3];
-        char *temp = new char[arith_t::BYTES * 2 + 3];
+        char *gas_left_str = new char[EVM_WORD_SIZE * 2 + 3];
+        char *gas_cost_str = new char[EVM_WORD_SIZE * 2 + 3];
+        char *temp = new char[EVM_WORD_SIZE * 2 + 3];
         bn_t gas_cost;
         bn_t prev_gas_used;
         bn_t gas_used;
@@ -375,7 +371,7 @@ public:
             // stack_t::print_stack_data_t(arith, tracer_data.stacks[idx]);
 
             // printf("Memory:\n");
-            // memory_t::print_memory_data_t(arith, tracer_data.memories[idx]);
+            // cuEVM::memory::print_memory_data_t(arith, tracer_data.memories[idx]);
             // printf("Touch state:\n");
             // touch_state_t::print_touch_state_data_t(arith, tracer_data.touch_states[idx]);
             // printf("Gas used: ");
@@ -398,7 +394,7 @@ public:
         arith.pretty_hex_string_from_cgbn_memory(gas_left_str, *evm_word);
 
         if (return_data != nullptr) {
-            char* return_data_str = hex_from_bytes(return_data->data, return_data->size);
+            char* return_data_str = cuEVM::byte_array::hex_from_bytes(return_data->data, return_data->size);
             fprintf(stderr, "{\"output\":\"%s\",\"gasUsed\":\"%s\"}\n", return_data_str+2, gas_left_str);
             delete[] return_data_str;
         }
@@ -428,10 +424,10 @@ public:
      * @return The json object.
     */
     __host__ static cJSON *json_from_tracer_data_t(
-        arith_t &arith,
+        ArithEnv &arith,
         tracer_data_t &tracer_data)
     {
-        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
         cJSON *tracer_json = cJSON_CreateArray();
         cJSON *item = NULL;
         cJSON *stack_json = NULL;
@@ -455,7 +451,7 @@ public:
                 tracer_data.stacks[idx]);
             cJSON_AddItemToObject(item, "stack", stack_json);
             #ifdef COMPLEX_TRACER
-            memory_json = memory_t::json_from_memory_data_t(
+            memory_json = cuEVM::memory::json_from_memory_data_t(
                 arith,
                 tracer_data.memories[idx]);
             cJSON_AddItemToObject(item, "memory", memory_json);
@@ -526,7 +522,7 @@ public:
                 cuEVM::stack::free_cpu_instances(cpu_instances[idx].stacks, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].stacks;
                 #ifdef COMPLEX_TRACER
-                memory_t::free_cpu_instances(cpu_instances[idx].memories, cpu_instances[idx].capacity);
+                cuEVM::memory::free_cpu_instances(cpu_instances[idx].memories, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].memories;
                 touch_state_t::free_cpu_instances(cpu_instances[idx].touch_states, cpu_instances[idx].capacity);
                 //delete[] cpu_instances[idx].touch_states;
@@ -610,7 +606,7 @@ public:
                     cpu_instances[idx].stacks,
                     cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER
-                tmp_cpu_instances[idx].memories = memory_t::get_gpu_instances_from_cpu_instances(
+                tmp_cpu_instances[idx].memories = cuEVM::memory::get_gpu_instances_from_cpu_instances(
                     cpu_instances[idx].memories,
                     cpu_instances[idx].size);
                 tmp_cpu_instances[idx].touch_states = touch_state_t::get_gpu_instances_from_cpu_instances(
@@ -703,7 +699,7 @@ public:
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].opcodes));
                 cuEVM::stack::free_gpu_instances(tmp_cpu_instances[idx].stacks, tmp_cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER
-                memory_t::free_gpu_instances(tmp_cpu_instances[idx].memories, tmp_cpu_instances[idx].size);
+                cuEVM::memory::free_gpu_instances(tmp_cpu_instances[idx].memories, tmp_cpu_instances[idx].size);
                 touch_state_t::free_gpu_instances(tmp_cpu_instances[idx].touch_states, tmp_cpu_instances[idx].size);
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_useds));
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].gas_limits));
@@ -772,9 +768,9 @@ public:
                 cpu_instances[idx].stacks = NULL;
                 #ifdef COMPLEX_TRACER
                 // reset the memory data structures
-                cpu_instances[idx].memories = memory_t::get_cpu_instances(
+                cpu_instances[idx].memories = cuEVM::memory::get_cpu_instances(
                     cpu_instances[idx].size);
-                tmp_cpu_instances[idx].memories = memory_t::get_gpu_instances_from_cpu_instances(
+                tmp_cpu_instances[idx].memories = cuEVM::memory::get_gpu_instances_from_cpu_instances(
                     cpu_instances[idx].memories,
                     cpu_instances[idx].size);
                 delete[] cpu_instances[idx].memories;
@@ -892,7 +888,7 @@ public:
                     cpu_instances[idx].stacks,
                     cpu_instances[idx].size);
                 #ifdef COMPLEX_TRACER
-                tmp_cpu_instances[idx].memories = memory_t::get_cpu_instances_from_gpu_instances(
+                tmp_cpu_instances[idx].memories = cuEVM::memory::get_cpu_instances_from_gpu_instances(
                     cpu_instances[idx].memories,
                     cpu_instances[idx].size);
                 tmp_cpu_instances[idx].touch_states = touch_state_t::get_cpu_instances_from_gpu_instances(

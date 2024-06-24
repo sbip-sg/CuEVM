@@ -8,7 +8,7 @@
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose=false) {
   // typedef evm_t<evm_params> evm_t;
   typedef typename evm_t::evm_instances_t evm_instances_t;
-  typedef arith_env_t<evm_params> arith_t;
+  typedef arith_env_t<evm_params> ArithEnv;
   printf("Running the interpreter\n");
 
   evm_instances_t         cpu_instances;
@@ -22,7 +22,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
   CUDA_CHECK(cudaEventCreate(&stop));
   #endif
 
-  arith_t arith(cgbn_report_monitor, 0);
+  ArithEnv arith(cgbn_report_monitor, 0);
 
   //read the json file with the global state
   cJSON *read_root = get_json_from_file(read_json_filename);

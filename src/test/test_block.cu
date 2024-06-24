@@ -15,8 +15,8 @@ __host__ __device__ __forceinline__ void test_block(
     uint32_t &instance)
 {
   typedef block_t<params> block_t;
-  typedef arith_env_t<params> arith_t;
-  typedef typename arith_t::bn_t bn_t;
+  typedef arith_env_t<params> ArithEnv;
+  typedef typename ArithEnv::bn_t bn_t;
   // get the current block
   block_t *block;
   block = new block_t(arith, current_block_data);
@@ -63,9 +63,9 @@ __global__ void kernel_block(
 {
   uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
 
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
 
-  arith_t arith(cgbn_report_monitor, report, instance);
+  ArithEnv arith(cgbn_report_monitor, report, instance);
   
   printf("kernel %p\n", current_block_data);
 
@@ -82,10 +82,10 @@ void run_test()
 
   typedef block_t<utils_params> block_t;
   typedef typename block_t::block_data_t block_data_t;
-  typedef arith_env_t<utils_params> arith_t;
+  typedef arith_env_t<utils_params> ArithEnv;
   block_data_t *block_data = NULL;
   block_t *cpu_block = NULL;
-  arith_t arith(cgbn_report_monitor, 0);
+  ArithEnv arith(cgbn_report_monitor, 0);
 
 
   // read the json file with the global state

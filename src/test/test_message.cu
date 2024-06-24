@@ -15,8 +15,8 @@ __host__ __device__ __forceinline__ void test_message(
 {
   typedef transaction_t<params> transaction_t;
   typedef message_t<params> message_t;
-  typedef arith_env_t<params>             arith_t;
-  typedef typename arith_t::bn_t          bn_t;
+  typedef arith_env_t<params>             ArithEnv;
+  typedef typename ArithEnv::bn_t          bn_t;
 
   transaction_t *transaction;
   message_t *message;
@@ -95,20 +95,20 @@ __global__ void kernel_message(
 
   if(instance>=count)
     return;
-  typedef arith_env_t<params>             arith_t;
-  arith_t arith(cgbn_report_monitor, report, instance);
+  typedef arith_env_t<params>             ArithEnv;
+  ArithEnv arith(cgbn_report_monitor, report, instance);
   
   test_message(arith, &(transanctions_data[instance]), instance);
 }
 
 template<class params>
 void run_test() {
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
   typedef transaction_t<params> transaction_t;
   typedef typename transaction_t::transaction_data_t transaction_data_t;
   
   transaction_data_t            *transactions_data;
-  arith_t arith(cgbn_report_monitor, 0);
+  ArithEnv arith(cgbn_report_monitor, 0);
   
   #ifndef ONLY_CPU
   CUDA_CHECK(cudaDeviceReset());

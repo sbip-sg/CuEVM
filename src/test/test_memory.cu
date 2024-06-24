@@ -13,9 +13,9 @@ __host__ __device__ __forceinline__ void test_memory(
     typename memory_t<params>::memory_data_t *memory_data,
     uint32_t &instance)
 {
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
   typedef memory_t<params> memory_t;
-  typedef typename arith_t::bn_t bn_t;
+  typedef typename ArithEnv::bn_t bn_t;
   memory_t *memory;
   SHARED_MEMORY uint8_t tmp[32];
   memory = new memory_t(arith);
@@ -33,7 +33,7 @@ __host__ __device__ __forceinline__ void test_memory(
   cgbn_set_ui32(arith._env, c, 100);
   cgbn_set_ui32(arith._env, index, 30);
   cgbn_set_ui32(arith._env, length, 20);
-  size_t available_size = arith_t::BYTES;
+  size_t available_size = EVM_WORD_SIZE;
 
   arith.memory_from_cgbn(&(tmp[0]), a);
   memory->grow_cost(index, length, gas, error_code);
@@ -69,9 +69,9 @@ __global__ void kernel_memory_run(
 {
 
   typedef memory_t<params> memory_t;
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
   typedef typename memory_t::memory_data_t memory_data_t;
-  typedef typename arith_t::bn_t bn_t;
+  typedef typename ArithEnv::bn_t bn_t;
 
   uint32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / params::TPI;
 
@@ -79,7 +79,7 @@ __global__ void kernel_memory_run(
     return;
 
   // setup arithmetic
-  arith_t arith(cgbn_report_monitor, report, instance);
+  ArithEnv arith(cgbn_report_monitor, report, instance);
 
   // test memory
   test_memory(arith, &(memory_data[instance]), instance);
@@ -89,11 +89,11 @@ template <class params>
 void run_test(uint32_t instance_count)
 {
   typedef memory_t<params> memory_t;
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
   typedef typename memory_t::memory_data_t memory_data_t;
 
   memory_data_t *cpu_memories;
-  arith_t arith(cgbn_report_monitor, 0);
+  ArithEnv arith(cgbn_report_monitor, 0);
 #ifndef ONLY_CPU
   memory_data_t *gpu_memories;
   cgbn_error_report_t *report;

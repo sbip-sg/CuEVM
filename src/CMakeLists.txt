@@ -18,9 +18,13 @@ set(CMAKE_CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 
 add_executable(${PROJECT_NAME}
     interpreter.cu
-    data_content.cu
+    byte_array.cu
+    arith.cu
     block.cu
     stack.cu
+    memory.cu
+    jump_destinations.cu
+    return_data.cu
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

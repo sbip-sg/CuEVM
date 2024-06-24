@@ -4,18 +4,21 @@
 #include "include/utils.h"
 #include "include/stack.cuh"
 #include "message.cuh"
-#include "memory.cuh"
-#include "returndata.cuh"
+#include "include/memory.cuh"
+#include "include/return_data.cuh"
 #include "include/block.cuh"
 #include "tracer.cuh"
 #include "state.cuh"
 #include <CuCrypto/keccak.cuh>
-#include "jump_destinations.cuh"
+#include "include/jump_destinations.cuh"
 #include "logs.cuh"
 #include "alu_operations.cuh"
 #include "env_operations.cuh"
 #include "internal_operations.cuh"
 #include "precompile.cuh"
+#include "include/evm_defines.h"
+#include "include/arith.cuh"
+#include "include/error_codes.h"
 
 class evm_t
 {
@@ -24,7 +27,7 @@ public:
     /**
      * The block information data type.
      */
-    typedef block_t::block_data_t block_data_t;
+    typedef cuEVM::block::block_data_t block_data_t;
     /**
      * World state information class.
      */
@@ -70,15 +73,15 @@ public:
 
 
     // constants
-    static const uint32_t MAX_DEPTH = 1024; /**< The maximum call depth*/
+    static const uint32_t MAX_DEPTH = EVM_MAX_DEPTH; /**< The maximum call depth*/
     static const uint32_t MAX_EXECUTION_STEPS = 30000; /**< maximum number of execution steps TODO: DELETE*/
     static const uint32_t DEPTH_PAGE_SIZE = 32; /**< allocation size for depth variable like stack, memory, states, return data*/
-    static const uint32_t MAX_CODE_SIZE = 24576; /**< EIP-170 Maximum contract size*/
-    static const uint32_t MAX_INIT_CODE_SIZE = 2 * MAX_CODE_SIZE; /**< EIP-3860 Maximum initicode size*/
+    static const uint32_t MAX_CODE_SIZE = EVM_MAX_CODE_SIZE; /**< EIP-170 Maximum contract size*/
+    static const uint32_t MAX_INIT_CODE_SIZE = EVM_MAX_INITCODE_SIZE; /**< EIP-3860 Maximum initicode size*/
     /**
      * The numver of bytes in a hash.
      */
-    static const uint32_t HASH_BYTES = 32;
+    static const uint32_t HASH_BYTES = EVM_HASH_SIZE;
 
     /**
      * The evm instances data structure.
@@ -91,7 +94,7 @@ public:
         accessed_state_data_t *accessed_states_data; /**< The data cotaining the states access by the transactions execution*/
         touch_state_data_t *touch_states_data; /**< The data containing the states modified by the transactions execution*/
         log_state_data_t *logs_data; /**< The logs done by the transactions*/
-        data_content_t *return_data; /**< The return data of the transactions*/
+        cuEVM::byte_array_t *return_data; /**< The return data of the transactions*/
 #ifdef TRACER
         tracer_data_t *tracers_data; /**< Tracer datas for debug*/
 #endif
@@ -99,9 +102,9 @@ public:
         size_t count; /**< The number of instances/transactions*/
     } evm_instances_t;
 
-    arith_t _arith; /**< The arithmetical environment*/
+    cuEVM::ArithEnv _arith; /**< The arithmetical environment*/
     world_state_t *_world_state; /**< The world state*/
-    block_t *_block; /**< The current block*/
+    cuEVM::block::BlockInfo *_block; /**< The current block*/
     transaction_t *_transaction; /**< The current transaction*/
     accessed_state_t *_accessed_state; /**< The accessed state*/
     touch_state_t *_transaction_touch_state; /**< The final touch state of the transaction*/
@@ -115,10 +118,10 @@ public:
 #endif
     touch_state_t **_touch_state_ptrs; /**< The touch states for every depth call*/
     log_state_t **_log_state_ptrs; /**< The log states for every depth call*/
-    return_data_t **_last_return_data_ptrs; /**< The last return data for every depth call*/
-    return_data_t *_final_return_data; /**< The final return data*/
+    cuEVM::EVMReturnData **_last_return_data_ptrs; /**< The last return data for every depth call*/
+    cuEVM::EVMReturnData *_final_return_data; /**< The final return data*/
     message_t **_message_ptrs; /**< The message call for every depth call*/
-    memory_t **_memory_ptrs; /**< The memory for every depth call*/
+    cuEVM::memory::EVMMemory **_memory_ptrs; /**< The memory for every depth call*/
     cuEVM::stack::EVMStack **_stack_ptrs; /**< The stack for every depth call*/
     bn_t *_gas_useds; /**< The current gas used for every depth call*/
     bn_t *_gas_refunds; /**< The current gas refunds for every depth call*/
@@ -134,7 +137,7 @@ public:
     uint8_t *_bytecode;     /**< The current executing code YP: \f$I_{b}\f$*/
     uint32_t _code_size;   /**< The current executing code size*/
     uint8_t _opcode;       /**< The current opcode*/
-    jump_destinations_t *_jump_destinations; /**< The jump destinations for the current execution context*/
+    cuEVM::EVMJumpDestinations *_jump_destinations; /**< The jump destinations for the current execution context*/
     uint32_t _error_code; /**< The error code*/
     uint32_t *_final_error; /**< The final error code*/
     /*
@@ -165,14 +168,14 @@ public:
      * @return The evm instance.
     */
     __host__ __device__ __forceinline__ evm_t(
-        arith_t arith,
+        ArithEnv arith,
         state_data_t *world_state_data,
         block_data_t *block_data,
         transaction_data_t *transaction_data,
         accessed_state_data_t *accessed_state_data,
         touch_state_data_t *touch_state_data,
         log_state_data_t *log_state_data,
-        data_content_t *return_data,
+        cuEVM::byte_array_t *return_data,
 #ifdef TRACER
         tracer_data_t *tracer_data,
 #endif
@@ -180,7 +183,7 @@ public:
         uint32_t *error) : _arith(arith), _instance(instance), _final_error(error)
     {
         _world_state = new world_state_t(arith, world_state_data);
-        _block = new block_t(arith, block_data);
+        _block = new cuEVM::block::BlockInfo(arith, block_data);
         _transaction = new transaction_t(arith, transaction_data);
         _accessed_state = new accessed_state_t(_world_state);
         _transaction_touch_state = new touch_state_t(_accessed_state, NULL);
@@ -192,10 +195,10 @@ public:
         _allocated_depth = DEPTH_PAGE_SIZE;
         _touch_state_ptrs = new touch_state_t *[_allocated_depth];
         _log_state_ptrs = new log_state_t *[_allocated_depth];
-        _last_return_data_ptrs = new return_data_t *[_allocated_depth];
-        _final_return_data = new return_data_t(return_data);
+        _last_return_data_ptrs = new cuEVM::EVMReturnData *[_allocated_depth];
+        _final_return_data = new cuEVM::EVMReturnData(return_data);
         _message_ptrs = new message_t *[_allocated_depth];
-        _memory_ptrs = new memory_t *[_allocated_depth];
+        _memory_ptrs = new cuEVM::memory::EVMMemory *[_allocated_depth];
         _stack_ptrs = new cuEVM::stack::EVMStack *[_allocated_depth];
         // TODO: infeficient but because of their form
         // we allocate them with maximum depth from the
@@ -238,7 +241,7 @@ public:
         delete[] _last_return_data_ptrs;
 
         ONE_THREAD_PER_INSTANCE(
-            _final_return_data->_content = new data_content_t;
+            _final_return_data->_content = new cuEVM::byte_array_t;
             _final_return_data->_content->size = 0;
             _final_return_data->_content->data = NULL;
         )
@@ -262,9 +265,9 @@ public:
         uint32_t new_allocated_depth = _allocated_depth + DEPTH_PAGE_SIZE;
         touch_state_t **new_touch_state_ptrs = new touch_state_t *[new_allocated_depth];
         log_state_t **new_log_state_ptrs = new log_state_t *[new_allocated_depth];
-        return_data_t **new_return_data_ptrs = new return_data_t *[new_allocated_depth];
+        cuEVM::EVMReturnData **new_return_data_ptrs = new cuEVM::EVMReturnData *[new_allocated_depth];
         message_t **new_message_ptrs = new message_t *[new_allocated_depth];
-        memory_t **new_memory_ptrs = new memory_t *[new_allocated_depth];
+        cuEVM::memory::EVMMemory **new_memory_ptrs = new cuEVM::memory::EVMMemory *[new_allocated_depth];
         cuEVM::stack::EVMStack **new_stack_ptrs = new cuEVM::stack::EVMStack *[new_allocated_depth];
         /*
         bn_t *new_gas_useds = new bn_t[new_allocated_depth];
@@ -283,7 +286,7 @@ public:
         memcpy(
             new_return_data_ptrs,
             _last_return_data_ptrs,
-            _allocated_depth * sizeof(return_data_t *));
+            _allocated_depth * sizeof(cuEVM::EVMReturnData *));
         memcpy(
             new_message_ptrs,
             _message_ptrs,
@@ -291,7 +294,7 @@ public:
         memcpy(
             new_memory_ptrs,
             _memory_ptrs,
-            _allocated_depth * sizeof(memory_t *));
+            _allocated_depth * sizeof(cuEVM::memory::EVMMemory *));
         memcpy(
             new_stack_ptrs,
             _stack_ptrs,
@@ -405,9 +408,9 @@ public:
         // update the current context
         update_CALL();
         // allocate the memory, the stack, the touch state, the log state, the return data
-        _last_return_data_ptrs[_depth] = new return_data_t();
+        _last_return_data_ptrs[_depth] = new cuEVM::EVMReturnData();
         _stack_ptrs[_depth] = new cuEVM::stack::EVMStack(_arith);
-        _memory_ptrs[_depth] = new memory_t(_arith);
+        _memory_ptrs[_depth] = new cuEVM::memory::EVMMemory(_arith);
         if (_depth > 0)
         {
             _touch_state_ptrs[_depth] = new touch_state_t(
@@ -474,7 +477,7 @@ public:
             (call_type != OP_CREATE) &&
             (call_type != OP_CREATE2))
         {
-            return_data_t *return_data;
+            cuEVM::EVMReturnData *return_data;
             if (_depth == 0)
             {
                 return_data = _final_return_data;
@@ -627,7 +630,7 @@ public:
          * @return 1 if the message call is valid, 0 otherwise.
          */
         __host__ __device__ __forceinline__ static int32_t valid_CALL(
-            arith_t &arith,
+            ArithEnv &arith,
             message_t &message,
             touch_state_t &touch_state)
         {
@@ -679,7 +682,7 @@ public:
          * @return 1 if the message create call is valid, 0 otherwise.
          */
         __host__ __device__ __forceinline__ static int32_t valid_CREATE(
-            arith_t &arith,
+            ArithEnv &arith,
             message_t &message,
             touch_state_t &touch_state)
         {
@@ -718,19 +721,19 @@ public:
          * @param[out] return_data The return data.
          */
         __host__ __device__ __forceinline__ static void generic_CALL(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             evm_t &evm,
             message_t &new_message,
             bn_t &args_offset,
             bn_t &args_size,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
             // try to send value in static call
             bn_t value;
@@ -879,19 +882,19 @@ public:
          * @param[out] return_data The return data.
          */
         __host__ __device__ __forceinline__ static void generic_CREATE(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             evm_t &evm,
             message_t &new_message,
             bn_t &args_offset,
             bn_t &args_size,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
 
             #ifdef ONLY_CPU
@@ -914,7 +917,7 @@ public:
                 printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
                 #endif
                 // set the init code
-                SHARED_MEMORY data_content_t initialisation_code;
+                SHARED_MEMORY cuEVM::byte_array_t initialisation_code;
                 arith.size_t_from_cgbn(initialisation_code.size, args_size);
                 initialisation_code.data = memory.get(
                     args_offset,
@@ -995,7 +998,7 @@ public:
          * @param[out] error_code The error code.
          */
         __host__ __device__ __forceinline__ static void operation_STOP(
-            return_data_t &return_data,
+            cuEVM::EVMReturnData &return_data,
             uint32_t &error_code)
         {
             return_data.set(
@@ -1020,18 +1023,18 @@ public:
          * @param[out] return_data The return data.
          */
         __host__ __device__ __forceinline__ static void operation_CREATE(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
             evm_t &evm,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t value, memory_offset, length;
             stack.pop(value, error_code);
@@ -1136,18 +1139,18 @@ public:
          * @param[out] return_data The return data.
          */
         __host__ __device__ __forceinline__ static void operation_CALL(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
             evm_t &evm,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -1224,18 +1227,18 @@ public:
          * @param[out] return_data The return data.
         */
         __host__ __device__ __forceinline__ static void operation_CALLCODE(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
             evm_t &evm,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -1307,13 +1310,13 @@ public:
          * @param[out] return_data The return data.
         */
         __host__ __device__ __forceinline__ static void operation_RETURN(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             cuEVM::stack::EVMStack &stack,
-            memory_t &memory,
-            return_data_t &return_data)
+            cuEVM::memory::EVMMemory &memory,
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t memory_offset, length;
             stack.pop(memory_offset, error_code);
@@ -1366,18 +1369,18 @@ public:
          * @param[out] return_data The return data.
         */
         __host__ __device__ __forceinline__ static void operation_DELEGATECALL(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
             evm_t &evm,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -1454,18 +1457,18 @@ public:
          * @param[out] return_data The return data.
          */
         __host__ __device__ __forceinline__ static void operation_CREATE2(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
             evm_t &evm,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t value, memory_offset, length, salt;
             stack.pop(value, error_code);
@@ -1495,7 +1498,7 @@ public:
 
             if (arith.has_gas(gas_limit, gas_used, error_code))
             {
-                SHARED_MEMORY data_content_t initialisation_code;
+                SHARED_MEMORY cuEVM::byte_array_t initialisation_code;
 
                 arith.size_t_from_cgbn(initialisation_code.size, length);
                 initialisation_code.data = memory.get(
@@ -1569,18 +1572,18 @@ public:
          * @param[out] return_data The return data.
         */
         __host__ __device__ __forceinline__ static void operation_STATICCALL(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             uint32_t &pc,
             cuEVM::stack::EVMStack &stack,
             message_t &message,
-            memory_t &memory,
+            cuEVM::memory::EVMMemory &memory,
             touch_state_t &touch_state,
             uint8_t &opcode,
             evm_t &evm,
-            return_data_t &return_data)
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
             stack.pop(gas, error_code);
@@ -1652,13 +1655,13 @@ public:
          * @param[out] return_data The return data.
         */
         __host__ __device__ __forceinline__ static void operation_REVERT(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
             cuEVM::stack::EVMStack &stack,
-            memory_t &memory,
-            return_data_t &return_data)
+            cuEVM::memory::EVMMemory &memory,
+            cuEVM::EVMReturnData &return_data)
         {
             bn_t memory_offset, length;
             stack.pop(memory_offset, error_code);
@@ -1718,7 +1721,7 @@ public:
          * @param[out] evm The evm.
         */
         __host__ __device__ __forceinline__ static void operation_SELFDESTRUCT(
-            arith_t &arith,
+            ArithEnv &arith,
             bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &error_code,
@@ -1726,7 +1729,7 @@ public:
             cuEVM::stack::EVMStack &stack,
             message_t &message,
             touch_state_t &touch_state,
-            return_data_t &return_data,
+            cuEVM::EVMReturnData &return_data,
             evm_t &evm)
         {
             if (message.get_static_env())
@@ -3091,7 +3094,7 @@ public:
         bn_t gas_value;
         bn_t beneficiary;
         _block->get_coin_base(beneficiary);
-        // char *temp = new char[arith_t::BYTES * 2 + 3];
+        // char *temp = new char[EVM_WORD_SIZE * 2 + 3];
 
         // return gas left when reverted
         /*
@@ -3221,7 +3224,7 @@ public:
         size_t clones=1)
     {
         //setup the arithmetic environment
-        arith_t arith(cgbn_report_monitor, 0);
+        ArithEnv arith(cgbn_report_monitor, 0);
 
         // get the world state
         world_state_t *cpu_world_state;
@@ -3231,8 +3234,8 @@ public:
         cpu_world_state = NULL;
 
         // ge the current block
-        block_t *cpu_block = NULL;
-        cpu_block = new block_t(arith, test);
+        cuEVM::block::BlockInfo *cpu_block = NULL;
+        cpu_block = new cuEVM::block::BlockInfo(arith, test);
         instances.block_data = cpu_block->_content;
         delete cpu_block;
         cpu_block = NULL;
@@ -3250,7 +3253,7 @@ public:
         instances.logs_data = log_state_t::get_cpu_instances(instances.count);
 
         // allocated the memory for return data
-        instances.return_data = return_data_t::get_cpu_instances(instances.count);
+        instances.return_data = cuEVM::byte_array::get_cpu_instances(instances.count);
 #ifdef TRACER
         // allocated the memory for tracers
         instances.tracers_data = tracer_t::get_cpu_instances(instances.count);
@@ -3290,7 +3293,7 @@ public:
 
         gpu_instances.logs_data = log_state_t::get_gpu_instances_from_cpu_instances(cpu_instances.logs_data, cpu_instances.count);
 
-        gpu_instances.return_data = return_data_t::get_gpu_instances_from_cpu_instances(cpu_instances.return_data, cpu_instances.count);
+        gpu_instances.return_data = cuEVM::byte_array::get_gpu_instances_from_cpu_instances(cpu_instances.return_data, cpu_instances.count);
 
 #ifdef TRACER
         gpu_instances.tracers_data = tracer_t::get_gpu_instances_from_cpu_instances(cpu_instances.tracers_data, cpu_instances.count);
@@ -3313,7 +3316,7 @@ public:
         cpu_instances.world_state_data = gpu_instances.world_state_data;
         cpu_instances.block_data = gpu_instances.block_data;
         cpu_instances.transactions_data = gpu_instances.transactions_data;
-        cpu_instances.return_data = return_data_t::get_cpu_instances_from_gpu_instances(gpu_instances.return_data, gpu_instances.count);
+        cpu_instances.return_data = cuEVM::byte_array::get_cpu_instances_from_gpu_instances(gpu_instances.return_data, gpu_instances.count);
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
         cpu_instances.accessed_states_data = accessed_state_t::get_cpu_instances_from_gpu_instances(gpu_instances.accessed_states_data, gpu_instances.count);
         touch_state_t::free_cpu_instances(cpu_instances.touch_states_data, cpu_instances.count);
@@ -3334,7 +3337,7 @@ public:
     __host__ static void free_instances(
         evm_instances_t &cpu_instances)
     {
-        arith_t arith(cgbn_report_monitor, 0);
+        ArithEnv arith(cgbn_report_monitor, 0);
 
         world_state_t *cpu_world_state;
         cpu_world_state = new world_state_t(arith, cpu_instances.world_state_data);
@@ -3342,8 +3345,8 @@ public:
         delete cpu_world_state;
         cpu_world_state = NULL;
 
-        block_t *cpu_block = NULL;
-        cpu_block = new block_t(arith, cpu_instances.block_data);
+        cuEVM::block::BlockInfo *cpu_block = NULL;
+        cpu_block = new cuEVM::block::BlockInfo(arith, cpu_instances.block_data);
         cpu_block->free_content();
         delete cpu_block;
         cpu_block = NULL;
@@ -3351,7 +3354,7 @@ public:
         transaction_t::free_instances(cpu_instances.transactions_data, cpu_instances.count);
         cpu_instances.transactions_data = NULL;
 
-        return_data_t::free_cpu_instances(cpu_instances.return_data, cpu_instances.count);
+        cuEVM::byte_array::free_cpu_instances(cpu_instances.return_data, cpu_instances.count);
         cpu_instances.return_data = NULL;
 
         accessed_state_t::free_cpu_instances(cpu_instances.accessed_states_data, cpu_instances.count);
@@ -3382,7 +3385,7 @@ public:
      * @param[in] instances evm instances
     */
     __host__ static void print_evm_instances_t(
-        arith_t &arith,
+        ArithEnv &arith,
         evm_instances_t instances,
         bool verbose = false)
     {
@@ -3393,8 +3396,8 @@ public:
           printf("World state:\n");
             cpu_world_state->print();
 
-            block_t *cpu_block = NULL;
-            cpu_block = new block_t(arith, instances.block_data);
+            cuEVM::block::BlockInfo *cpu_block = NULL;
+            cpu_block = new cuEVM::block::BlockInfo(arith, instances.block_data);
             printf("Block:\n");
             cpu_block->print();
             delete cpu_block;
@@ -3480,12 +3483,12 @@ public:
         }
     }
 
-    __host__ static void print_touched_trie_accounts(arith_t &arith, touch_state_data_t *evm_instances)    {
+    __host__ static void print_touched_trie_accounts(ArithEnv &arith, touch_state_data_t *evm_instances)    {
         auto accounts = evm_instances->touch_accounts.accounts;
         auto num_accounts = evm_instances->touch_accounts.no_accounts;
 
 
-        char *temp = new char[arith_t::BYTES * 2 + 3];
+        char *temp = new char[EVM_WORD_SIZE * 2 + 3];
         uint8_t hash[32];
         evm_word_t t_word;
         std::string out = "{";
@@ -3513,7 +3516,7 @@ public:
             out += temp; // codehash, better cache it and calculate only once
             out += "\", \"storage\": [" ;
 
-            print_bytes(account.bytecode, account.code_size);
+            cuEVM::byte_array::print_bytes(account.bytecode, account.code_size);
 
             // printing storages as: `[[k, v], [k, v], ...]`
             bn_t temp_bn ;
@@ -3558,7 +3561,7 @@ public:
      * @return json
     */
     __host__ static cJSON *json_from_evm_instances_t(
-        arith_t &arith,
+        ArithEnv &arith,
         evm_instances_t instances)
     {
         cJSON *root = cJSON_CreateObject();
@@ -3570,8 +3573,8 @@ public:
         delete cpu_world_state;
         cpu_world_state = NULL;
 
-        block_t *cpu_block = NULL;
-        cpu_block = new block_t(arith, instances.block_data);
+        cuEVM::block::BlockInfo *cpu_block = NULL;
+        cpu_block = new cuEVM::block::BlockInfo(arith, instances.block_data);
         cJSON *block_json = cpu_block->json();
         cJSON_AddItemToObject(root, "env", block_json);
         delete cpu_block;
@@ -3628,7 +3631,7 @@ __global__ void kernel_evm(
         return;
 
     // setup arith
-    arith_t arith(
+    ArithEnv arith(
         cgbn_report_monitor,
         report,
         instance);

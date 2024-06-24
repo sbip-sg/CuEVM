@@ -13,8 +13,8 @@ __host__ __device__ __forceinline__ void test_logs(
   uint32_t &instance
 )
 {
-  typedef arith_env_t<params> arith_t;
-  typedef typename arith_t::bn_t  bn_t;
+  typedef arith_env_t<params> ArithEnv;
+  typedef typename ArithEnv::bn_t  bn_t;
   typedef log_state_t<params> log_state_t;
   typedef typename log_state_t::log_state_data_t log_state_data_t;
   typedef typename log_state_t::log_data_t log_data_t;
@@ -26,7 +26,7 @@ __host__ __device__ __forceinline__ void test_logs(
   parent_1_log_state=new log_state_t(arith);
   
   bn_t address, topic_1, topic_2, topic_3, topic_4;
-  SHARED_MEMORY data_content_t record;
+  SHARED_MEMORY byte_array_t record;
   uint32_t no_topics;
 
   //test 1
@@ -94,17 +94,17 @@ __global__ void kernel_logs(
   if(instance >= instance_count)
     return;
 
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
 
   // setup arithmetic
-  arith_t arith(cgbn_report_monitor, report, instance);
+  ArithEnv arith(cgbn_report_monitor, report, instance);
 
   test_logs<params>(arith,  &(log_states_data[instance]), instance);
 }
 
 template<class params>
 void run_test(uint32_t instance_count) {
-  typedef arith_env_t<params> arith_t;
+  typedef arith_env_t<params> ArithEnv;
   typedef log_state_t<params> log_state_t;
   typedef typename log_state_t::log_state_data_t log_state_data_t;
 
@@ -116,7 +116,7 @@ void run_test(uint32_t instance_count) {
   log_state_data_t *gpu_log_states_data;
   cgbn_error_report_t     *report;
   #endif
-  arith_t arith(cgbn_report_monitor, 0);
+  ArithEnv arith(cgbn_report_monitor, 0);
 
   printf("Generating log states\n");
   cpu_log_states_data=log_state_t::get_cpu_instances(instance_count);

@@ -10,6 +10,8 @@
 #include "include/utils.h"
 #include "include/stack.cuh"
 #include "include/block.cuh"
+#include "include/memory.cuh"
+#include "include/jump_destinations.cuh"
 #include "state.cuh"
 #include "message.cuh"
 #include "logs.cuh"
@@ -40,6 +42,8 @@ namespace internal_operations{
      */
     static const uint32_t HASH_BYTES = 32;
     using EVMStack = cuEVM::stack::EVMStack;
+    using EVMMemory = cuEVM::memory::EVMMemory;
+    using EVMJumpDestinations = cuEVM::EVMJumpDestinations;
 
     /**
      * The MLOAD operation implementation.
@@ -55,20 +59,20 @@ namespace internal_operations{
      * @param[in] memory The memory.
      */
     __host__ __device__ __forceinline__ static void operation_MLOAD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
 
         bn_t memory_offset;
         stack.pop(memory_offset, error_code);
         bn_t length;
-        cgbn_set_ui32(arith._env, length, arith_t::BYTES);
+        cgbn_set_ui32(arith._env, length, EVM_WORD_SIZE);
 
         memory.grow_cost(
             memory_offset,
@@ -109,13 +113,13 @@ namespace internal_operations{
      * @param[out] memory The memory.
      */
     __host__ __device__ __forceinline__ static void operation_MSTORE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
 
@@ -124,7 +128,7 @@ namespace internal_operations{
         bn_t value;
         stack.pop(value, error_code);
         bn_t length;
-        cgbn_set_ui32(arith._env, length, arith_t::BYTES);
+        cgbn_set_ui32(arith._env, length, EVM_WORD_SIZE);
 
         if (error_code == ERR_NONE)
         {
@@ -136,12 +140,12 @@ namespace internal_operations{
 
             if (arith.has_gas(gas_limit, gas_used, error_code))
             {
-                uint8_t data[arith_t::BYTES];
+                uint8_t data[EVM_WORD_SIZE];
                 size_t available_size;
                 arith.memory_from_cgbn(
                     &(data[0]),
                     value);
-                available_size = arith_t::BYTES;
+                available_size = EVM_WORD_SIZE;
 
                 memory.set(
                     &(data[0]),
@@ -169,13 +173,13 @@ namespace internal_operations{
      * @param[out] memory The memory.
      */
     __host__ __device__ __forceinline__ static void operation_MSTORE8(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
 
@@ -196,7 +200,7 @@ namespace internal_operations{
 
             if (arith.has_gas(gas_limit, gas_used, error_code))
             {
-                uint8_t data[arith_t::BYTES];
+                uint8_t data[EVM_WORD_SIZE];
                 size_t available_size;
                 arith.memory_from_cgbn(
                     &(data[0]),
@@ -204,7 +208,7 @@ namespace internal_operations{
                 available_size = 1;
 
                 memory.set(
-                    &(data[arith_t::BYTES - 1]),
+                    &(data[EVM_WORD_SIZE - 1]),
                     memory_offset,
                     length,
                     available_size,
@@ -232,7 +236,7 @@ namespace internal_operations{
      * @param[in] message The message that started the execution.
      */
     __host__ __device__ __forceinline__ static void operation_SLOAD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -290,7 +294,7 @@ namespace internal_operations{
      * @param[in] message The message that started the execution.
      */
     __host__ __device__ __forceinline__ static void operation_SSTORE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         bn_t &gas_refund,
@@ -360,13 +364,13 @@ namespace internal_operations{
      * @param[in] jumpdest The jump destinations.
      */
     __host__ __device__ __forceinline__ static void operation_JUMP(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        jump_destinations_t &jumpdest)
+        EVMJumpDestinations &jumpdest)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_MID);
 
@@ -374,9 +378,10 @@ namespace internal_operations{
         {
             bn_t destination;
             stack.pop(destination, error_code);
-            size_t destination_s;
+            uint32_t destination_s;
             int32_t overflow;
-            overflow = arith.size_t_from_cgbn(destination_s, destination);
+            //overflow = arith.size_t_from_cgbn(destination_s, destination);
+            overflow = arith.uint32_t_from_cgbn(destination_s, destination);
             //printf("[JUMP] destination_s: %lu\n", destination_s);
             //printf("[JUMP] overflow: %d\n", overflow);
             //jumpdest.print();
@@ -412,13 +417,13 @@ namespace internal_operations{
      * @param[in] jumpdest The jump destinations.
      */
     __host__ __device__ __forceinline__ static void operation_JUMPI(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        jump_destinations_t &jumpdest)
+        EVMJumpDestinations &jumpdest)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_HIGH);
 
@@ -433,9 +438,10 @@ namespace internal_operations{
             {
                 if (cgbn_compare_ui32(arith._env, condition, 0) != 0)
                 {
-                    size_t destination_s;
+                    uint32_t destination_s;
                     int32_t overflow;
-                    overflow = arith.size_t_from_cgbn(destination_s, destination);
+                    //overflow = arith.size_t_from_cgbn(destination_s, destination);
+                    overflow = arith.uint32_t_from_cgbn(destination_s, destination);
                     // if is not a valid jump destination
                     if (
                         (overflow == 1) ||
@@ -467,7 +473,7 @@ namespace internal_operations{
      * @param[out] stack The stack.
      */
     __host__ __device__ __forceinline__ static void operation_PC(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -499,13 +505,13 @@ namespace internal_operations{
      * @param[in] memory The memory.
      */
     __host__ __device__ __forceinline__ static void operation_MSIZE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
 
@@ -536,7 +542,7 @@ namespace internal_operations{
      * @param[out] stack The stack.
      */
     __host__ __device__ __forceinline__ static void operation_GAS(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -567,7 +573,7 @@ namespace internal_operations{
      * @param[inout] pc The program counter.
      */
     __host__ __device__ __forceinline__ static void operation_JUMPDEST(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -600,13 +606,13 @@ namespace internal_operations{
      * @param[in] opcode The opcode.
     */
     __host__ __device__ __forceinline__ static void operation_LOGX(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        memory_t &memory,
+        EVMMemory &memory,
         message_t &message,
         log_state_t &log_state,
         uint8_t &opcode)
@@ -658,7 +664,7 @@ namespace internal_operations{
 
                 if (arith.has_gas(gas_limit, gas_used, error_code))
                 {
-                    SHARED_MEMORY data_content_t record;
+                    SHARED_MEMORY cuEVM::byte_array_t record;
                     record.data = memory.get(
                         memory_offset,
                         length,

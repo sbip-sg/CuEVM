@@ -7,15 +7,11 @@
 #ifndef _STACK_H_
 #define _STACK_H_
 
-#include "utils.h"
+#include "arith.cuh"
 
 namespace cuEVM
 {
   namespace stack {
-    /**
-     * The size of the stack.
-     */
-    const uint32_t STACK_SIZE = evm_params::STACK_SIZE;
     /**
      * The stack data structure.
      */
@@ -85,7 +81,7 @@ namespace cuEVM
      * @param[in] stack_data The stack data structure
     */
     __host__ __device__ void print_stack_data_t(
-        arith_t &arith,
+        ArithEnv &arith,
         stack_data_t &stack_data);
 
 
@@ -96,7 +92,7 @@ namespace cuEVM
      * @return The JSON object
     */
     __host__ cJSON *json_from_stack_data_t(
-        arith_t &arith,
+        ArithEnv &arith,
         stack_data_t &stack_data);
 
     /**
@@ -107,7 +103,7 @@ namespace cuEVM
 
 
       stack_data_t *_content; /**< The conent of the stack*/
-      arith_t _arith; /**< The arithmetical environment*/
+      ArithEnv _arith; /**< The arithmetical environment*/
 
       /**
        * The constructor of the stack given the arithmetical environment
@@ -116,7 +112,7 @@ namespace cuEVM
        * @param[in] content The stack data structure
       */
       __host__ __device__ EVMStack(
-          arith_t arith,
+          ArithEnv arith,
           stack_data_t *content);
 
       /**
@@ -124,7 +120,7 @@ namespace cuEVM
        * @param[in] arith The arithmetical environment
       */
       __host__ __device__ EVMStack(
-          arith_t arith);
+          ArithEnv arith);
 
       /**
        * The destructor of the stack.

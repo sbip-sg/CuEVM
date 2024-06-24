@@ -20,3 +20,6 @@ docs/api/
 cuEVM
 tmp
 run-ethtest-by-fork.log
+dtmp
+cuevm.out
+geth.out

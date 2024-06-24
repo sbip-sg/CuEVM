@@ -44,7 +44,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_ADD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -78,7 +78,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_MUL(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -112,7 +112,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SUB(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -148,7 +148,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_DIV(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -189,7 +189,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SDIV(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -210,9 +210,9 @@ namespace arithmetic_operations {
             cgbn_sub_ui32(arith._env, d, d, 1);
             // e = -2^254
             cgbn_set_ui32(arith._env, e, 1);
-            cgbn_shift_left(arith._env, e, e, arith_t::BITS - 1);
-            uint32_t sign_a = cgbn_extract_bits_ui32(arith._env, a, arith_t::BITS - 1, 1);
-            uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, b, arith_t::BITS - 1, 1);
+            cgbn_shift_left(arith._env, e, e, ArithEnv::BITS - 1);
+            uint32_t sign_a = cgbn_extract_bits_ui32(arith._env, a, ArithEnv::BITS - 1, 1);
+            uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, b, ArithEnv::BITS - 1, 1);
             uint32_t sign = sign_a ^ sign_b;
             // division by zero no error
             if (cgbn_compare_ui32(arith._env, b, 0) == 0)
@@ -262,7 +262,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_MOD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -303,7 +303,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SMOD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -317,8 +317,8 @@ namespace arithmetic_operations {
             stack.pop(a, error_code);
             stack.pop(b, error_code);
 
-            uint32_t sign_a = cgbn_extract_bits_ui32(arith._env, a, arith_t::BITS - 1, 1);
-            uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, b, arith_t::BITS - 1, 1);
+            uint32_t sign_a = cgbn_extract_bits_ui32(arith._env, a, ArithEnv::BITS - 1, 1);
+            uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, b, ArithEnv::BITS - 1, 1);
             uint32_t sign = sign_a ^ sign_b;
             if (cgbn_compare_ui32(arith._env, b, 0) == 0)
                 cgbn_set_ui32(arith._env, r, 0);
@@ -362,7 +362,7 @@ namespace arithmetic_operations {
      * @param[inout] pc The program counter.
     */
     __host__ __device__ __forceinline__ static void operation_ADDMOD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -424,7 +424,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_MULMOD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -473,7 +473,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_EXP(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -486,7 +486,7 @@ namespace arithmetic_operations {
         stack.pop(exponent, error_code);
 
         int32_t last_bit;
-        last_bit = arith_t::BITS - 1 - cgbn_clz(arith._env, exponent);
+        last_bit = ArithEnv::BITS - 1 - cgbn_clz(arith._env, exponent);
         uint32_t exponent_byte_size;
         if (last_bit == -1)
         {
@@ -551,7 +551,7 @@ namespace arithmetic_operations {
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SIGNEXTEND(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -571,7 +571,7 @@ namespace arithmetic_operations {
             stack.pop(b, error_code);
             stack.pop(x, error_code);
 
-            if (cgbn_compare_ui32(arith._env, b, (arith_t::BYTES - 1) ) == 1)
+            if (cgbn_compare_ui32(arith._env, b, (EVM_WORD_SIZE - 1) ) == 1)
             {
                 cgbn_set(arith._env, r, x);
             }
@@ -582,7 +582,7 @@ namespace arithmetic_operations {
                 int32_t numbits = int32_t(c);
                 if (sign == 1)
                 {
-                    numbits = int32_t(arith_t::BITS) - 8 * numbits;
+                    numbits = int32_t(ArithEnv::BITS) - 8 * numbits;
                     numbits = -numbits;
                     cgbn_bitwise_mask_ior(arith._env, r, x, numbits);
                 }
@@ -613,7 +613,7 @@ namespace stack_operations{
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    using arith_t = arith_env_t<evm_params>;
+    using ArithEnv = arith_env_t<evm_params>;
     using EVMStack = cuEVM::stack::EVMStack;
 
     /**
@@ -627,7 +627,7 @@ namespace stack_operations{
      * @param[out] stack The stack.
      */
     __host__ __device__ __forceinline__ static void operation_POP(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -657,7 +657,7 @@ namespace stack_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_PUSH0(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -693,7 +693,7 @@ namespace stack_operations{
      * @param[in] opcode The opcode.
     */
     __host__ __device__ __forceinline__ static void operation_PUSHX(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -740,7 +740,7 @@ namespace stack_operations{
      * @param[in] opcode The opcode.
     */
     __host__ __device__ __forceinline__ static void operation_DUPX(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -777,7 +777,7 @@ namespace stack_operations{
      * @param[in] opcode The opcode.
     */
     __host__ __device__ __forceinline__ static void operation_SWAPX(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -812,7 +812,7 @@ namespace comparison_operations{
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    using arith_t = arith_env_t<evm_params>;
+    using ArithEnv = arith_env_t<evm_params>;
 
     /**
      * The stack class.
@@ -831,7 +831,7 @@ namespace comparison_operations{
      * @return The result of the comparison.
     */
     __host__ __device__ __forceinline__ static int32_t compare(
-        arith_t &arith,
+        ArithEnv &arith,
         uint32_t &error_code,
         EVMStack &stack)
     {
@@ -853,7 +853,7 @@ namespace comparison_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static int32_t scompare(
-        arith_t &arith,
+        ArithEnv &arith,
         uint32_t &error_code,
         EVMStack &stack)
     {
@@ -861,8 +861,8 @@ namespace comparison_operations{
         stack.pop(a, error_code);
         stack.pop(b, error_code);
 
-        uint32_t sign_a = cgbn_extract_bits_ui32(arith._env, a, arith_t::BITS - 1, 1);
-        uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, b, arith_t::BITS - 1, 1);
+        uint32_t sign_a = cgbn_extract_bits_ui32(arith._env, a, ArithEnv::BITS - 1, 1);
+        uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, b, ArithEnv::BITS - 1, 1);
         if (sign_a == 0 && sign_b == 1)
         {
             return 1;
@@ -892,7 +892,7 @@ namespace comparison_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_LT(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -933,7 +933,7 @@ namespace comparison_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_GT(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -974,7 +974,7 @@ namespace comparison_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SLT(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1015,7 +1015,7 @@ namespace comparison_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SGT(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1055,7 +1055,7 @@ namespace comparison_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_EQ(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1095,7 +1095,7 @@ namespace comparison_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_ISZERO(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1143,7 +1143,7 @@ namespace bitwise_operations{
      * The arithmetical environment used by the arbitrary length
      * integer library.
      */
-    using arith_t = arith_env_t<evm_params>;
+    using ArithEnv = arith_env_t<evm_params>;
 
     /**
      * The stack class.
@@ -1162,7 +1162,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_AND(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1197,7 +1197,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_OR(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1232,7 +1232,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_XOR(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1268,7 +1268,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_NOT(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1282,7 +1282,7 @@ namespace bitwise_operations{
             stack.pop(a, error_code);
             bn_t r;
 
-            cgbn_bitwise_mask_xor(arith._env, r, a, arith_t::BITS);
+            cgbn_bitwise_mask_xor(arith._env, r, a, ArithEnv::BITS);
 
             stack.push(r, error_code);
 
@@ -1305,7 +1305,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_BYTE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1320,14 +1320,14 @@ namespace bitwise_operations{
             stack.pop(x, error_code);
             bn_t r;
 
-            if (cgbn_compare_ui32(arith._env, i, (arith_t::BYTES-1)) == 1)
+            if (cgbn_compare_ui32(arith._env, i, (EVM_WORD_SIZE-1)) == 1)
             {
                 cgbn_set_ui32(arith._env, r, 0);
             }
             else
             {
                 uint32_t index = cgbn_get_ui32(arith._env, i);
-                uint32_t byte = cgbn_extract_bits_ui32(arith._env, x, 8 * ((arith_t::BYTES - 1) - index), 8);
+                uint32_t byte = cgbn_extract_bits_ui32(arith._env, x, 8 * ((EVM_WORD_SIZE - 1) - index), 8);
                 cgbn_set_ui32(arith._env, r, byte);
             }
 
@@ -1351,7 +1351,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SHL(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1366,7 +1366,7 @@ namespace bitwise_operations{
             stack.pop(value, error_code);
             bn_t r;
 
-            if (cgbn_compare_ui32(arith._env, shift, arith_t::BITS - 1) == 1)
+            if (cgbn_compare_ui32(arith._env, shift, ArithEnv::BITS - 1) == 1)
             {
                 cgbn_set_ui32(arith._env, r, 0);
             }
@@ -1396,7 +1396,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SHR(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1411,7 +1411,7 @@ namespace bitwise_operations{
             stack.pop(value, error_code);
             bn_t r;
 
-            if (cgbn_compare_ui32(arith._env, shift, arith_t::BITS - 1) == 1)
+            if (cgbn_compare_ui32(arith._env, shift, ArithEnv::BITS - 1) == 1)
             {
                 cgbn_set_ui32(arith._env, r, 0);
             }
@@ -1444,7 +1444,7 @@ namespace bitwise_operations{
      * @param[inout] stack The stack.
     */
     __host__ __device__ __forceinline__ static void operation_SAR(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1459,11 +1459,11 @@ namespace bitwise_operations{
             stack.pop(value, error_code);
             bn_t r;
 
-            uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, value, arith_t::BITS - 1, 1);
+            uint32_t sign_b = cgbn_extract_bits_ui32(arith._env, value, ArithEnv::BITS - 1, 1);
             uint32_t shift_right = cgbn_get_ui32(arith._env, shift);
 
-            if (cgbn_compare_ui32(arith._env, shift, arith_t::BITS - 1) == 1)
-                shift_right = arith_t::BITS;
+            if (cgbn_compare_ui32(arith._env, shift, ArithEnv::BITS - 1) == 1)
+                shift_right = ArithEnv::BITS;
 
             cgbn_shift_right(arith._env, r, value, shift_right);
             if (sign_b == 1)

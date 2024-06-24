@@ -6,6 +6,9 @@
 
 
 #include "include/stack.cuh"
+#include "include/utils.h"
+#include "include/evm_defines.h"
+#include "include/error_codes.h"
 
 namespace cuEVM {
   namespace stack {
@@ -209,7 +212,7 @@ namespace cuEVM {
     }
 
     __host__ __device__ void print_stack_data_t(
-        arith_t &arith,
+        ArithEnv &arith,
         stack_data_t &stack_data)
     {
       printf("Stack size: %d, data:\n", stack_data.stack_offset);
@@ -220,10 +223,10 @@ namespace cuEVM {
     }
 
     __host__ cJSON *json_from_stack_data_t(
-        arith_t &arith,
+        ArithEnv &arith,
         stack_data_t &stack_data)
     {
-      char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+      char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
       cJSON *stack_json = cJSON_CreateObject();
 
       cJSON *stack_data_json = cJSON_CreateArray();
@@ -238,19 +241,19 @@ namespace cuEVM {
     }
 
     __host__ __device__ EVMStack::EVMStack(
-          arith_t arith,
+          ArithEnv arith,
           stack_data_t *content) : _arith(arith),
                                   _content(content)
     {
     }
 
     __host__ __device__ EVMStack::EVMStack(
-        arith_t arith) : _arith(arith)
+        ArithEnv arith) : _arith(arith)
     {
       SHARED_MEMORY stack_data_t *content;
       ONE_THREAD_PER_INSTANCE(
           content = new stack_data_t;
-          content->stack_base = new evm_word_t[STACK_SIZE];
+          content->stack_base = new evm_word_t[EVM_MAX_STACK_SIZE];
           content->stack_offset = 0;)
       _content = content;
     }
@@ -280,12 +283,12 @@ namespace cuEVM {
 
     __host__ __device__ void EVMStack::push(const bn_t &value, uint32_t &error_code)
     {
-      if (size() >= STACK_SIZE)
+      if (size() >= EVM_MAX_STACK_SIZE)
       {
         error_code = ERR_STACK_OVERFLOW;
         return;
       }
-      cgbn_store(_arith._env, top(), value);
+      cgbn_store(_arith.env, top(), value);
       _content->stack_offset++;
     }
 
@@ -294,11 +297,11 @@ namespace cuEVM {
       if (size() == 0)
       {
         error_code = ERR_STACK_UNDERFLOW;
-        cgbn_set_ui32(_arith._env, y, 0);
+        cgbn_set_ui32(_arith.env, y, 0);
         return;
       }
       _content->stack_offset--;
-      cgbn_load(_arith._env, y, top());
+      cgbn_load(_arith.env, y, top());
     }
 
     __host__ __device__ void EVMStack::pushx(
@@ -313,11 +316,11 @@ namespace cuEVM {
         return;
       }
       bn_t r;
-      cgbn_set_ui32(_arith._env, r, 0);
+      cgbn_set_ui32(_arith.env, r, 0);
       for (uint8_t idx = (x - src_byte_size); idx < x; idx++)
       {
         cgbn_insert_bits_ui32(
-            _arith._env,
+            _arith.env,
             r,
             r,
             idx * 8,
@@ -355,7 +358,7 @@ namespace cuEVM {
       {
         return;
       }
-      cgbn_load(_arith._env, r, value);
+      cgbn_load(_arith.env, r, value);
       push(r, error_code);
     }
 
@@ -375,10 +378,10 @@ namespace cuEVM {
       {
         return;
       }
-      cgbn_load(_arith._env, a, value_b);
-      cgbn_load(_arith._env, b, value_a);
-      cgbn_store(_arith._env, value_a, a);
-      cgbn_store(_arith._env, value_b, b);
+      cgbn_load(_arith.env, a, value_b);
+      cgbn_load(_arith.env, b, value_a);
+      cgbn_store(_arith.env, value_a, a);
+      cgbn_store(_arith.env, value_b, b);
     }
 
     __host__ __device__ void EVMStack::to_stack_data_t(
@@ -405,7 +408,7 @@ namespace cuEVM {
         bool full)
     {
       printf("Stack size: %d, data:\n", size());
-      uint32_t print_size = full ? STACK_SIZE : size();
+      uint32_t print_size = full ? EVM_MAX_STACK_SIZE : size();
       for (uint32_t idx = 0; idx < print_size; idx++)
       {
         _arith.print_cgbn_memory(_content->stack_base[idx]);
@@ -419,11 +422,11 @@ namespace cuEVM {
     */
     __host__ cJSON * EVMStack::json(bool full)
     {
-      char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+      char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
       cJSON *stack_json = cJSON_CreateObject();
 
       cJSON *stack_data_json = cJSON_CreateArray();
-      uint32_t print_size = full ? STACK_SIZE : size();
+      uint32_t print_size = full ? EVM_MAX_STACK_SIZE : size();
       for (uint32_t idx = 0; idx < print_size; idx++)
       {
         _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->stack_base[idx]);

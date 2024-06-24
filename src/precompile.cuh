@@ -9,9 +9,8 @@
 
 #include "include/utils.h"
 #include "include/stack.cuh"
-#include "memory.cuh"
 #include "message.cuh"
-#include "returndata.cuh"
+#include "include/return_data.cuh"
 #include <CuCrypto/sha256.cuh>
 #include <CuCrypto/ripemd160.cuh>
 #include <CuCrypto/blake2.cuh>
@@ -43,11 +42,11 @@ namespace precompile_operations {
      * @param[in] message The message
     */
     __host__ __device__ static void operation_IDENTITY(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message) {
         // Identity function
 
@@ -87,11 +86,11 @@ namespace precompile_operations {
      * @param[in] message The message
     */
     __host__ __device__ static void operation_SHA256(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // static gas
@@ -124,11 +123,11 @@ namespace precompile_operations {
     }
 
     __host__ __device__ __forceinline__ static void operation_RIPEMD160(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // static gas
@@ -168,11 +167,11 @@ namespace precompile_operations {
     }
 
     __host__ __device__ static void operation_MODEXP(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // get the size of the base, exponent and modulus
@@ -691,11 +690,11 @@ namespace precompile_operations {
 
 
     __host__ __device__ static void operation_BLAKE2(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // expecting 213 bytes inputs
@@ -748,11 +747,11 @@ namespace precompile_operations {
 
 
    __host__ __device__  static void operation_ecRecover(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
@@ -809,11 +808,11 @@ namespace precompile_operations {
     }
 
     __host__ __device__  static void operation_ecAdd(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECADD);
@@ -862,11 +861,11 @@ namespace precompile_operations {
   }
 
     __host__ __device__ static void operation_ecMul(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
 
@@ -914,11 +913,11 @@ namespace precompile_operations {
     }
 
     __host__ __device__  static void operation_ecPairing(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        return_data_t &return_data,
+        cuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
 

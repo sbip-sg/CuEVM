@@ -53,7 +53,7 @@ public:
     typedef struct
     {
         evm_word_t address; /**< The address of the code executing */
-        data_content_t record; /**< The record of the log */
+        cuEVM::byte_array_t record; /**< The record of the log */
         evm_word_t topics[4]; /**< The topics of the log */
         uint32_t no_topics; /**< The number of topics */
     } log_data_t;
@@ -69,7 +69,7 @@ public:
     static const uint32_t LOG_PAGE_SIZE = 20; /**< The write operation for log */
 
     log_state_data_t *_content; /**< The content of the touch state */
-    arith_t _arith;             /**< The arithmetical environment */
+    ArithEnv _arith;             /**< The arithmetical environment */
     uint32_t _allocated_size;   /**< The allocated size */
 
 
@@ -79,7 +79,7 @@ public:
      * @param[in] content The content of the log state
     */
     __host__ __device__ __forceinline__ log_state_t(
-        arith_t &arith,
+        ArithEnv &arith,
         log_state_data_t *content
     ) : _arith(arith),
         _content(content),
@@ -92,7 +92,7 @@ public:
      * @param[in] arith The arithmetical environment
     */
     __host__ __device__ __forceinline__ log_state_t(
-        arith_t &arith
+        ArithEnv &arith
     ) : _arith(arith)
     {
         // aloocate the memory for the log state
@@ -158,7 +158,7 @@ public:
 
     __host__ __device__ __forceinline__ void push(
         bn_t &address,
-        data_content_t &record,
+        cuEVM::byte_array_t &record,
         bn_t &topic_1,
         bn_t &topic_2,
         bn_t &topic_3,
@@ -205,7 +205,7 @@ public:
     {
         uint32_t idx;
         bn_t address;
-        SHARED_MEMORY data_content_t record;
+        SHARED_MEMORY cuEVM::byte_array_t record;
         bn_t topic_1, topic_2, topic_3, topic_4;
         
         // go through all the logs of the child
@@ -715,7 +715,7 @@ public:
      * @param[in] log_state_data The log state data
     */
     __host__ __device__ __forceinline__ static void print_log_state_data_t(
-        arith_t &arith,
+        ArithEnv &arith,
         log_state_data_t &log_state_data
     )
     {
@@ -732,7 +732,7 @@ public:
                 printf("topics[%u]: ", jdx);
                 arith.print_cgbn_memory(log_state_data.logs[idx].topics[jdx]);
             }
-            print_data_content_t(log_state_data.logs[idx].record);
+            cuEVM::byte_array::print_byte_array_t(log_state_data.logs[idx].record);
         }
     }
 
@@ -751,7 +751,7 @@ public:
      * @return The json of the lof state data
     */
     __host__ static cJSON *json_from_log_state_data_t(
-        arith_t &arith,
+        ArithEnv &arith,
         log_state_data_t &log_state_data
     )
     {
@@ -759,7 +759,7 @@ public:
         cJSON *logs_json = NULL;
         cJSON *log_json = NULL;
         cJSON *topics_json = NULL;
-        char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+        char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
         log_data_json = cJSON_CreateObject();
         logs_json = cJSON_CreateArray();
         for (uint32_t idx = 0; idx < log_state_data.no_logs; idx++)
@@ -782,7 +782,7 @@ public:
             }
             cJSON_AddItemToObject(log_json, "topics", topics_json);
 
-            cJSON_AddItemToObject(log_json, "record", json_from_data_content_t(log_state_data.logs[idx].record));
+            cJSON_AddItemToObject(log_json, "record", cuEVM::byte_array::json_from_byte_array_t(log_state_data.logs[idx].record));
 
             cJSON_AddItemToArray(logs_json, log_json);
             

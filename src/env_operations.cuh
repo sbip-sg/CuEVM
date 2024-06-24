@@ -10,6 +10,7 @@
 #include "include/utils.h"
 #include "include/stack.cuh"
 #include "include/block.cuh"
+#include "include/memory.cuh"
 #include "state.cuh"
 #include "message.cuh"
 #include <CuCrypto/keccak.cuh>
@@ -33,6 +34,7 @@
  */
 namespace block_operations{
     using EVMStack = cuEVM::stack::EVMStack;
+    using EVMMemory = cuEVM::memory::EVMMemory;
     /**
      * The BLOCKHASH operation implementation.
      * Takes the number from the stack and pushes the hash of the block
@@ -47,13 +49,13 @@ namespace block_operations{
      * @param[in] block The block.
      */
     __host__ __device__ __forceinline__ static void operation_BLOCKHASH(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BLOCKHASH);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -84,13 +86,13 @@ namespace block_operations{
      * @param[in] block The block.
     */
     __host__ __device__ __forceinline__ static void operation_COINBASE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -116,13 +118,13 @@ namespace block_operations{
      * @param[in] block The block.
     */
     __host__ __device__ __forceinline__ static void operation_TIMESTAMP(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -148,13 +150,13 @@ namespace block_operations{
      * @param[in] block The block.
     */
     __host__ __device__ __forceinline__ static void operation_NUMBER(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -180,13 +182,13 @@ namespace block_operations{
      * @param[in] block The block.
     */
     __host__ __device__ __forceinline__ static void operation_PREVRANDAO(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -214,13 +216,13 @@ namespace block_operations{
      * @param[in] block The block.
     */
     __host__ __device__ __forceinline__ static void operation_GASLIMIT(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -246,13 +248,13 @@ namespace block_operations{
      * @param[in] block The block.
     */
     __host__ __device__ __forceinline__ static void operation_CHAINID(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -278,13 +280,13 @@ namespace block_operations{
      * @param[in] block The block.
     */
     __host__ __device__ __forceinline__ static void operation_BASEFEE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block)
+        BlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -324,6 +326,7 @@ namespace block_operations{
 */
 namespace environmental_operations{
     using EVMStack = cuEVM::stack::EVMStack;
+    using EVMMemory = cuEVM::memory::EVMMemory;
     /**
      * The numver of bytes in a hash.
      */
@@ -347,13 +350,13 @@ namespace environmental_operations{
      * @param[inout] memory The memory object.
     */
     __host__ __device__ __forceinline__ static void operation_SHA3(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_KECCAK256);
 
@@ -421,7 +424,7 @@ namespace environmental_operations{
      * @param[in] message The message.
     */
     __host__ __device__ __forceinline__ static void operation_ADDRESS(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -456,7 +459,7 @@ namespace environmental_operations{
      * @param[in] touch_state The touch state object.
     */
     __host__ __device__ __forceinline__ static void operation_BALANCE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -502,7 +505,7 @@ namespace environmental_operations{
      * @param[in] transaction The transaction.
     */
     __host__ __device__ __forceinline__ static void operation_ORIGIN(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -535,7 +538,7 @@ namespace environmental_operations{
      * @param[in] message The message.
     */
     __host__ __device__ __forceinline__ static void operation_CALLER(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -567,7 +570,7 @@ namespace environmental_operations{
      * @param[in] message The message.
     */
     __host__ __device__ __forceinline__ static void operation_CALLVALUE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -603,7 +606,7 @@ namespace environmental_operations{
      * @param[in] message The message.
     */
     __host__ __device__ __forceinline__ static void operation_CALLDATALOAD(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -617,7 +620,7 @@ namespace environmental_operations{
             bn_t index;
             stack.pop(index, error_code);
             bn_t length;
-            cgbn_set_ui32(arith._env, length, arith_t::BYTES);
+            cgbn_set_ui32(arith._env, length, EVM_WORD_SIZE);
 
             size_t available_data;
             uint8_t *data;
@@ -626,7 +629,7 @@ namespace environmental_operations{
                 length,
                 available_data);
 
-            stack.pushx(arith_t::BYTES, error_code, data, available_data);
+            stack.pushx(EVM_WORD_SIZE, error_code, data, available_data);
 
             pc = pc + 1;
         }
@@ -644,7 +647,7 @@ namespace environmental_operations{
      * @param[in] message The message.
     */
     __host__ __device__ __forceinline__ static void operation_CALLDATASIZE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -688,14 +691,14 @@ namespace environmental_operations{
      * @param[out] memory The memory.
     */
     __host__ __device__ __forceinline__ static void operation_CALLDATACOPY(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
         message_t &message,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
 
@@ -753,7 +756,7 @@ namespace environmental_operations{
      * @param[in] message The message.
     */
     __host__ __device__ __forceinline__ static void operation_CODESIZE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -799,14 +802,14 @@ namespace environmental_operations{
      * @param[out] memory The memory.
     */
     __host__ __device__ __forceinline__ static void operation_CODECOPY(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
         message_t &message,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
 
@@ -870,13 +873,13 @@ namespace environmental_operations{
      * @param[in] transaction The transaction.
     */
     __host__ __device__ __forceinline__ static void operation_GASPRICE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        block_t &block,
+        BlockInfo &block,
         transaction_t &transaction)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
@@ -913,7 +916,7 @@ namespace environmental_operations{
      * @param[in] touch_state The touch state object. The executing world state.
     */
     __host__ __device__ __forceinline__ static void operation_EXTCODESIZE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -968,14 +971,14 @@ namespace environmental_operations{
      * @param[out] memory The memory.
     */
     __host__ __device__ __forceinline__ static void operation_EXTCODECOPY(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
         touch_state_t &touch_state,
-        memory_t &memory)
+        EVMMemory &memory)
     {
         // cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_ZERO);
 
@@ -1043,13 +1046,13 @@ namespace environmental_operations{
      * @param[in] return_data The return data.
     */
     __host__ __device__ __forceinline__ static void operation_RETURNDATASIZE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        return_data_t &return_data)
+        cuEVM::EVMReturnData &return_data)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -1087,14 +1090,14 @@ namespace environmental_operations{
      * @param[in] return_data The return data.
     */
     __host__ __device__ __forceinline__ static void operation_RETURNDATACOPY(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        memory_t &memory,
-        return_data_t &return_data)
+        EVMMemory &memory,
+        cuEVM::EVMReturnData &return_data)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_VERY_LOW);
 
@@ -1178,7 +1181,7 @@ namespace environmental_operations{
      * @param[in] touch_state The touch state object. The executing world state.
     */
     __host__ __device__ __forceinline__ static void operation_EXTCODEHASH(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
@@ -1252,7 +1255,7 @@ namespace environmental_operations{
      * @param[in] transaction The transaction.
     */
     __host__ __device__ __forceinline__ static void operation_SELFBALANCE(
-        arith_t &arith,
+        ArithEnv &arith,
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,

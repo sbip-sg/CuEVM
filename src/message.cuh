@@ -9,7 +9,7 @@
 
 #include "include/utils.h"
 #include "state.cuh"
-#include "jump_destinations.cuh"
+#include "include/jump_destinations.cuh"
 #include <CuCrypto/keccak.cuh>
 
 /**
@@ -36,16 +36,16 @@ public:
     uint32_t depth;              /**< The depth YP: \f$e\f$ */
     uint8_t call_type;           /**< The call type internal has the opcode */
     evm_word_t storage_address;  /**< The storage address YP: \f$a\f$ */
-    data_content_t data;         /**< The data YP: \f$d\f$ */
-    data_content_t byte_code;    /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
+    cuEVM::byte_array_t data;         /**< The data YP: \f$d\f$ */
+    cuEVM::byte_array_t byte_code;    /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
     evm_word_t return_data_offset; /**< The return data offset in memory */
     evm_word_t return_data_size;   /**< The return data size in memory */
     uint32_t static_env;         /**< The static flag (STATICCALL) YP: \f$w\f$ */
   } message_data_t;
 
   message_data_t *_content; /**< The message content */
-  jump_destinations_t *_jump_destinations; /**< The jump destinations */
-  arith_t _arith;           /**< The arithmetical environment */
+  cuEVM::EVMJumpDestinations *_jump_destinations; /**< The jump destinations */
+  ArithEnv _arith;           /**< The arithmetical environment */
 
   /**
    * The constructor. Takes the message parameters.
@@ -67,7 +67,7 @@ public:
    * @param[in] static_env The static flag (STATICCALL) YP: \f$w\f$.
   */
   __host__ __device__ __forceinline__ message_t(
-      arith_t &arith,
+      ArithEnv &arith,
       bn_t &sender,
       bn_t &recipient,
       bn_t &contract_address,
@@ -117,7 +117,7 @@ public:
     _content->static_env = static_env;
 
     // create the jump destinations
-    _jump_destinations = new jump_destinations_t(
+    _jump_destinations = new cuEVM::EVMJumpDestinations(
         _content->byte_code.data,
         _content->byte_code.size);
   }
@@ -404,7 +404,7 @@ public:
         delete _jump_destinations;
         _jump_destinations = NULL;
       }
-      _jump_destinations = new jump_destinations_t(
+      _jump_destinations = new cuEVM::EVMJumpDestinations(
           _content->byte_code.data,
           _content->byte_code.size);
   }
@@ -433,45 +433,45 @@ public:
    * Get the jump destinations.
    * @return The jump destinations.
   */
-  __host__ __device__ __forceinline__ jump_destinations_t *get_jump_destinations()
+  __host__ __device__ __forceinline__ cuEVM::EVMJumpDestinations *get_jump_destinations()
   {
     return _jump_destinations;
   }
 
   __host__ __device__ __forceinline__ static void get_create_contract_address(
-    arith_t &arith,
+    ArithEnv &arith,
     bn_t &contract_address,
     bn_t &sender_address,
     bn_t &sender_nonce
   )
   {
-    SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
+    SHARED_MEMORY uint8_t sender_address_bytes[EVM_WORD_SIZE];
     arith.memory_from_cgbn(
         &(sender_address_bytes[0]),
         sender_address);
-    SHARED_MEMORY uint8_t sender_nonce_bytes[arith_t::BYTES];
+    SHARED_MEMORY uint8_t sender_nonce_bytes[EVM_WORD_SIZE];
     arith.memory_from_cgbn(
         &(sender_nonce_bytes[0]),
         sender_nonce);
 
     uint8_t nonce_bytes;
-    for (nonce_bytes = arith_t::BYTES; nonce_bytes > 0; nonce_bytes--)
+    for (nonce_bytes = EVM_WORD_SIZE; nonce_bytes > 0; nonce_bytes--)
     {
-      if (sender_nonce_bytes[arith_t::BYTES - nonce_bytes] != 0)
+      if (sender_nonce_bytes[EVM_WORD_SIZE - nonce_bytes] != 0)
       {
         break;
       }
     }
 
-    // TODO: this might work only for arith_t::BYTES == 32
+    // TODO: this might work only for EVM_WORD_SIZE == 32
 
-    SHARED_MEMORY uint8_t rlp_list[1 + 1 + arith_t::ADDRESS_BYTES + 1 + arith_t::BYTES];
+    SHARED_MEMORY uint8_t rlp_list[1 + 1 + ArithEnv::ADDRESS_BYTES + 1 + EVM_WORD_SIZE];
 
     // the adress has only 20 bytes
-    rlp_list[1] = 0x80 + arith_t::ADDRESS_BYTES;
-    for (uint8_t idx = 0; idx < arith_t::ADDRESS_BYTES; idx++)
+    rlp_list[1] = 0x80 + ArithEnv::ADDRESS_BYTES;
+    for (uint8_t idx = 0; idx < ArithEnv::ADDRESS_BYTES; idx++)
     {
-      rlp_list[2 + idx] = sender_address_bytes[arith_t::BYTES - arith_t::ADDRESS_BYTES + idx];
+      rlp_list[2 + idx] = sender_address_bytes[EVM_WORD_SIZE - ArithEnv::ADDRESS_BYTES + idx];
     }
 
     uint8_t rlp_list_length;
@@ -479,14 +479,14 @@ public:
     // and the 1 byte is the 0x80 + length of the address (20)
     if (cgbn_compare_ui32(arith._env, sender_nonce, 128) < 0)
     {
-      rlp_list_length = 1 + arith_t::ADDRESS_BYTES + 1;
+      rlp_list_length = 1 + ArithEnv::ADDRESS_BYTES + 1;
       if (cgbn_compare_ui32(arith._env, sender_nonce, 0)  == 0)
       {
-        rlp_list[2 + arith_t::ADDRESS_BYTES] = 0x80; // special case for nonce 0
+        rlp_list[2 + ArithEnv::ADDRESS_BYTES] = 0x80; // special case for nonce 0
       }
       else
       {
-        rlp_list[2 + arith_t::ADDRESS_BYTES] = sender_nonce_bytes[arith_t::BYTES - 1];
+        rlp_list[2 + ArithEnv::ADDRESS_BYTES] = sender_nonce_bytes[EVM_WORD_SIZE - 1];
       }
     }
     else
@@ -494,10 +494,10 @@ public:
       // 1 byte for the length of the nonce
       // 0x80 + length of the nonce
       rlp_list_length = 21 + 1 + nonce_bytes;
-      rlp_list[2 + arith_t::ADDRESS_BYTES] = 0x80 + nonce_bytes;
+      rlp_list[2 + ArithEnv::ADDRESS_BYTES] = 0x80 + nonce_bytes;
       for (uint8_t idx = 0; idx < nonce_bytes; idx++)
       {
-        rlp_list[2 + arith_t::ADDRESS_BYTES + 1 + idx] = sender_nonce_bytes[arith_t::BYTES - nonce_bytes + idx];
+        rlp_list[2 + ArithEnv::ADDRESS_BYTES + 1 + idx] = sender_nonce_bytes[EVM_WORD_SIZE - nonce_bytes + idx];
       }
     }
     rlp_list[0] = 0xc0 + rlp_list_length;
@@ -514,7 +514,7 @@ public:
         rlp_list_length + 1,
         &(address_bytes[0]),
         HASH_BYTES);
-    for (uint8_t idx = 0; idx < arith_t::BYTES - arith_t::ADDRESS_BYTES; idx++)
+    for (uint8_t idx = 0; idx < EVM_WORD_SIZE - ArithEnv::ADDRESS_BYTES; idx++)
     {
       address_bytes[idx] = 0;
     }
@@ -532,23 +532,23 @@ public:
    * @param[in] byte_code The byte code YP: \f$b\f$.
   */
   __host__ __device__ __forceinline__ static void get_create2_contract_address(
-    arith_t &arith,
+    ArithEnv &arith,
     bn_t &contract_address,
     bn_t &sender_address,
     bn_t &salt,
-    data_content_t &byte_code
+    cuEVM::byte_array_t &byte_code
   )
   {
-    SHARED_MEMORY uint8_t sender_address_bytes[arith_t::BYTES];
+    SHARED_MEMORY uint8_t sender_address_bytes[EVM_WORD_SIZE];
     arith.memory_from_cgbn(
         &(sender_address_bytes[0]),
         sender_address);
-    SHARED_MEMORY uint8_t salt_bytes[arith_t::BYTES];
+    SHARED_MEMORY uint8_t salt_bytes[EVM_WORD_SIZE];
     arith.memory_from_cgbn(
         &(salt_bytes[0]),
         salt);
 
-    size_t total_bytes = 1 + arith_t::ADDRESS_BYTES + arith_t::BYTES + HASH_BYTES;
+    size_t total_bytes = 1 + ArithEnv::ADDRESS_BYTES + EVM_WORD_SIZE + HASH_BYTES;
 
     SHARED_MEMORY uint8_t hash_code[HASH_BYTES];
     CuCrypto::keccak::sha3(
@@ -557,19 +557,19 @@ public:
         &(hash_code[0]),
         HASH_BYTES);
 
-    SHARED_MEMORY uint8_t input_data[1 + arith_t::ADDRESS_BYTES + arith_t::BYTES + HASH_BYTES];
+    SHARED_MEMORY uint8_t input_data[1 + ArithEnv::ADDRESS_BYTES + EVM_WORD_SIZE + HASH_BYTES];
     input_data[0] = 0xff;
     ONE_THREAD_PER_INSTANCE(
     memcpy(
         &(input_data[1]),
-        &(sender_address_bytes[arith_t::BYTES - arith_t::ADDRESS_BYTES]),
-        arith_t::ADDRESS_BYTES);
+        &(sender_address_bytes[EVM_WORD_SIZE - ArithEnv::ADDRESS_BYTES]),
+        ArithEnv::ADDRESS_BYTES);
     memcpy(
-        &(input_data[1 + arith_t::ADDRESS_BYTES]),
+        &(input_data[1 + ArithEnv::ADDRESS_BYTES]),
         &(salt_bytes[0]),
-        arith_t::BYTES);
+        EVM_WORD_SIZE);
     memcpy(
-        &(input_data[1 + arith_t::ADDRESS_BYTES + arith_t::BYTES]),
+        &(input_data[1 + ArithEnv::ADDRESS_BYTES + EVM_WORD_SIZE]),
         &(hash_code[0]),
         HASH_BYTES);
     )
@@ -579,7 +579,7 @@ public:
         total_bytes,
         &(address_bytes[0]),
         HASH_BYTES);
-    for (uint8_t idx = 0; idx < arith_t::BYTES - arith_t::ADDRESS_BYTES; idx++)
+    for (uint8_t idx = 0; idx < EVM_WORD_SIZE - ArithEnv::ADDRESS_BYTES; idx++)
     {
       address_bytes[idx] = 0;
     }
@@ -612,14 +612,14 @@ public:
     if (_content->data.size > 0)
     {
       printf("DATA: ");
-      print_bytes(_content->data.data, _content->data.size);
+      cuEVM::byte_array::print_bytes(_content->data.data, _content->data.size);
       printf("\n");
     }
     printf("BYTE_CODE_SIZE: %lu\n", _content->byte_code.size);
     if (_content->byte_code.size > 0)
     {
       printf("BYTE_CODE: ");
-      print_bytes(_content->byte_code.data, _content->byte_code.size);
+      cuEVM::byte_array::print_bytes(_content->byte_code.data, _content->byte_code.size);
       printf("\n");
     }
     printf("RETURN_DATA_OFFSET: ");
@@ -687,11 +687,11 @@ public:
     evm_word_t max_fee_per_gas;          /**< The max fee per gas YP: \f$T_{m}\f$ */
     evm_word_t max_priority_fee_per_gas; /**< The max priority fee per gas YP: \f$T_{f}\f$ */
     evm_word_t gas_price;                /**< The gas proce YP: \f$T_{p}\f$ */
-    data_content_t data_init;            /**< The init or data YP:\f$T_{i}\f$ or \f$T_{d}\f$ */
+    cuEVM::byte_array_t data_init;            /**< The init or data YP:\f$T_{i}\f$ or \f$T_{d}\f$ */
   } transaction_data_t;
 
   transaction_data_t *_content; /**< The transaction content */
-  arith_t _arith; /**< The arithmetic  */
+  ArithEnv _arith; /**< The arithmetic  */
 
   /**
    * The constructor. Takes the transaction content.
@@ -699,7 +699,7 @@ public:
    * @param[in] content The transaction content.
   */
   __host__ __device__ __forceinline__ transaction_t(
-      arith_t arith,
+      ArithEnv arith,
       transaction_data_t *content) : _arith(arith),
                                      _content(content)
   {
@@ -1183,7 +1183,7 @@ public:
    * @param[in] transaction_data The transaction data.
   */
   __host__ __device__ static void print_transaction_data_t(
-    arith_t &arith,
+    ArithEnv &arith,
     transaction_data_t &transaction_data
   )
   {
@@ -1225,7 +1225,7 @@ public:
       arith.print_cgbn_memory(transaction_data.gas_price);
     }
     printf("DATA_INIT: ");
-    print_data_content_t(transaction_data.data_init);
+    cuEVM::byte_array::print_byte_array_t(transaction_data.data_init);
   }
 
   /**
@@ -1243,7 +1243,7 @@ public:
   __host__ cJSON *json()
   {
     cJSON *transaction_json = cJSON_CreateObject();
-    char *hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+    char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
     char *bytes_string = NULL;
 
     // set the type
@@ -1317,7 +1317,7 @@ public:
     // set the data init
     if (_content->data_init.size > 0)
     {
-      bytes_string = hex_from_data_content(_content->data_init);
+      bytes_string = cuEVM::byte_array::hex_from_byte_array_t(_content->data_init);
       cJSON_AddStringToObject(transaction_json, "data", bytes_string);
       delete[] bytes_string;
       bytes_string = NULL;
@@ -1366,7 +1366,7 @@ public:
       size_t clones=1)
   {
     const cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(test, "transaction");
-    arith_t arith(cgbn_report_monitor, 0);
+    ArithEnv arith(cgbn_report_monitor, 0);
     //transaction_data_t *transactions = NULL;
     size_t available_no_transactions = get_no_transaction(test);
     if (start_index >= available_no_transactions)

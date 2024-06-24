@@ -53,7 +53,7 @@ Single test:
 To see the results of gethvm
 `gethvm --json --noreturndata --dump statetest {input_test_file} &> geth.out`
 To see the result of cuevm
-`clear && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/cuevm  --input {input_test_file}modexp.json &> cuevm.out`
+`clear && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/cuevm  --input {input_test_file} &> cuevm.out`
 
 ## Tool usage [TODO after completion]
 * `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [input_json_file] --output [output_json_file]`

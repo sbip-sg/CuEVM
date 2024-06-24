@@ -90,11 +90,13 @@ __host__ cJSON *get_json_from_file(const char *filepath) {
 }
 
 
+/*
 __host__ __device__ char hex_from_nibble(uint8_t nibble) {
     if (nibble < 10)
         return '0' + nibble;
     return 'a' + (nibble - 10);
 }
+
 
 __host__ __device__ void hex_string_from_evm_word(char *hex_string, evm_word_t &word) {
     uint32_t limb;
@@ -114,3 +116,4 @@ __host__ __device__ void hex_string_from_evm_word(char *hex_string, evm_word_t &
     }
     hex_string[hex_index]=0;
 }
+*/

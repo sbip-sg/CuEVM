@@ -4,37 +4,21 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _JUMP_DESTINATION_H_
-#define _JUMP_DESTINATION_H_
+#include "include/jump_destinations.cuh"
+#include "include/opcodes.h"
+#include "include/utils.h"
 
-
-/**
- * The class for keeping the valid jump destination of the code
- * (i.e. the locations of the JUMPDEST opcodes).
- * (YP: \f$D(c)=D_{j}(c,0)\f$)
-*/
-class jump_destinations_t
-{
-private:
-    size_t _size; /**< The number of valid JUMPDEST \f$|D(c)|\f */
-    size_t *_destinations; /**< The array of valid JUMPDESTs pc \f$D(c)\f$ */
-
-public:
-    /**
-     * Cosntructor from the given code
-     * @param[in] byte_code The code
-     * @param[in] code_size The size of the code
-    */
-    __host__ __device__ __forceinline__ jump_destinations_t(
+namespace cuEVM {
+    __host__ __device__ EVMJumpDestinations::EVMJumpDestinations(
         uint8_t *byte_code,
-        size_t code_size
+        uint32_t code_size
     )
     {
         _size = 0;
         _destinations = NULL;
         uint8_t opcode;
         uint8_t push_size;
-        size_t pc;
+        uint32_t pc;
         for (pc = 0; pc < code_size; pc++)
         {
             opcode = byte_code[pc];
@@ -52,22 +36,23 @@ public:
                 _size = _size + 1;
             }
         }
-        SHARED_MEMORY size_t *tmp_destinations;
+        SHARED_MEMORY uint32_t *tmp_destinations;
         ONE_THREAD_PER_INSTANCE(
             if (_size > 0) {
-                tmp_destinations = new size_t[_size];
-                size_t index = 0;
+                tmp_destinations = new uint32_t[_size];
+                uint32_t index = 0;
                 for (pc = 0; pc < code_size; pc++)
                 {
                     opcode = byte_code[pc];
                     // if a push x
-                    if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70))
-                    {
+                    if (
+                        ((opcode & 0xF0) == 0x60) ||
+                        ((opcode & 0xF0) == 0x70)
+                    ) {
                         push_size = (opcode & 0x1F) + 1;
                         pc = pc + push_size;
                     }
-                    if (opcode == OP_JUMPDEST)
-                    {
+                    if (opcode == OP_JUMPDEST) {
                         tmp_destinations[index] = pc;
                         index = index + 1;
                     }
@@ -79,11 +64,7 @@ public:
         _destinations = tmp_destinations;
     }
 
-    /**
-     * Destructor of the class
-     * free the alocated memory
-    */
-    __host__ __device__ ~jump_destinations_t()
+    __host__ __device__ EVMJumpDestinations::~EVMJumpDestinations()
     {
         ONE_THREAD_PER_INSTANCE(
             if ((_destinations != NULL) && (_size > 0)) {
@@ -97,11 +78,11 @@ public:
      * Find out if a given pc is a valid JUMPDEST
      * @param[in] pc The pc to check
     */
-    __host__ __device__ uint32_t has(
-        size_t pc
+    __host__ __device__ uint32_t EVMJumpDestinations::has(
+        uint32_t pc
     )
     {
-        size_t index;
+        uint32_t index;
         for (index = 0; index < _size; index++)
         {
             if (_destinations[index] == pc)
@@ -112,15 +93,14 @@ public:
         return 0;
     }
 
-    __host__ __device__ void print(
+    __host__ __device__ void EVMJumpDestinations::print(
     )
     {
-        size_t index;
+        uint32_t index;
         for (index = 0; index < _size; index++)
         {
-            printf("%lu\n", _destinations[index]);
+            printf("%u\n", _destinations[index]);
         }
     }
-};
 
-#endif
+}
