@@ -38,6 +38,12 @@ namespace cuEVM {
      */
     __host__ __device__ uint8_t nibble_from_hex(const char hex);
     /**
+     * Check if a character is a hex character.
+     * @param[in] hex The character.
+     * @return 1 if it is a hex character, 0 otherwise.
+     */
+    __host__ __device__ int32_t is_hex(const char hex);
+    /**
      * Get the byte from two nibbles.
      * @param[in] high The high nibble.
      * @param[in] low The low nibble.
@@ -90,6 +96,61 @@ namespace cuEVM {
     */
     __host__ char *hex_from_byte_array_t(
       byte_array_t &data_content);
+    
+    /**
+     * Get the number of bytes oh a string
+     * @param[in] hex_string
+     * @return the number of bytes
+     */
+    __host__ __device__ int32_t hex_string_length(
+      const char *hex_string);
+    /**
+     * Clean the hex string from prefix and return the length
+     * @param[inout] hex_string
+     * @return the length of the hex string
+     */
+    __host__ __device__ int32_t clean_hex_string(
+      char **hex_string);
+    /**
+     * Get the byte array from a hex string in Little Endian format.
+     * @param[out] dst The destination byte array.
+     * @param[in] clean_hex_string The clean hex string.
+     * @param[in] length The length of the clean hex string.
+     */
+    __host__ __device__ int32_t byte_array_t_from_hex_set_le(
+      byte_array_t &dst,
+      const char *clean_hex_string,
+      int32_t length);
+    /**
+     * Get the byte array from a hex string in Little Endian format.
+     * @param[out] dst The destination byte array.
+     * @param[in] hex_string The hex string.
+     * @return 1 for error, 0 otherwise.
+     */
+    __host__ __device__ int32_t byte_array_t_from_hex_le(
+      byte_array_t &dst,
+      const char *hex_string);
+    /**
+     * Get the byte array from a hex string in Big Endian format.
+     * @param[out] dst The destination byte array.
+     * @param[in] clean_hex_string The clean hex string.
+     * @param[in] length The length of the clean hex string.
+     * @param[in] padded The padding direction ( 0 for left padding, 1 for right padding)
+     */
+    __host__ __device__ int32_t byte_array_t_from_hex_set_be(
+      byte_array_t &dst,
+      const char *clean_hex_string,
+      int32_t length,
+      int32_t padded = 0);
+    /**
+     * Get the byte array from a hex string in Big Endian format.
+     * @param[out] dst The destination byte array.
+     * @param[in] hex_string The hex string.
+     * @return 1 for error, 0 otherwise.
+     */
+    __host__ __device__ int32_t byte_array_t_from_hex_be(
+      byte_array_t &dst,
+      const char *hex_string);
 
     /**
      * Clean for leading zeroes in hex string

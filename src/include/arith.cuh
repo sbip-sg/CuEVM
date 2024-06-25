@@ -311,7 +311,26 @@ __host__ __device__ void evm_address_conversion(
   ArithEnv &arith,
   bn_t &address
 );
-
-
+/**
+ * Convert and evm word to and address format
+ * @param[out] dst the destination evm word
+ * @param[in] src the source hex string for
+ * @return 1 for error, 0 otherwiese
+ */
+__host__ __device__ int32_t evm_word_t_from_hex_string(
+  evm_word_t &dst,
+  const char *src_hex_string);
+/**
+ * Get the hex string from an evm word.
+ * The hex string is already allocated. the result is in big endian.
+ * @param[out] hex_string The hex string
+ * @param[in] evm_word The evm word
+ * @param[in] count The number of limbs
+ * @return 1 for error, 0 otherwiese
+ */
+__host__ void hex_string_from_evm_word_t(
+  char *hex_string,
+  evm_word_t &evm_word,
+  uint32_t count = CGBN_LIMBS);
 }
 #endif

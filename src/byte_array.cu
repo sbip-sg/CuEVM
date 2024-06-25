@@ -20,7 +20,15 @@ namespace cuEVM {
         )
       );
     }
-    
+
+    __host__ __device__ int32_t is_hex(const char hex) {
+      return hex >= '0' && hex <= '9' ? 1 : (
+        hex >= 'a' && hex <= 'f' ? 1 : (
+          hex >= 'A' && hex <= 'F' ? 1 : 0
+        )
+      );
+    }
+      
     __host__ __device__ uint8_t byte_from_nibbles(const uint8_t high, const uint8_t low) {
       return (high << 4) | low;
     }
@@ -65,6 +73,181 @@ namespace cuEVM {
 
     __host__ __device__ char *hex_from_byte_array_t(byte_array_t &data_content) {
       return hex_from_bytes(data_content.data, data_content.size);
+    }
+
+    __host__ __device__ int32_t hex_string_length(
+      const char *hex_string)
+    {
+      int32_t length;
+      int32_t error = 0;
+      char *current_char;
+      current_char = (char *)hex_string;
+      if (
+        (hex_string[0] == '0') &&
+        ((hex_string[1] == 'x') || (hex_string[1] == 'X'))
+      ) {
+        current_char += 2; // Skip the "0x" prefix
+      }
+      length = 0;
+      do {
+        length++;
+        error = error | (nibble_from_hex(current_char[length]) == 0);
+      } while(current_char[length] != '\0');
+      return error ? -1 : length;
+    }
+
+    __host__ __device__ int32_t clean_hex_string(
+      char **hex_string)
+    {
+      char *current_char;
+      current_char = (char *)*hex_string;
+      if (current_char == NULL || current_char[0] == '\0')
+      {
+        return 1;
+      }
+      if (
+        (current_char[0] == '0') &&
+        ((current_char[1] == 'x') || (current_char[1] == 'X'))
+      ) {
+        current_char += 2; // Skip the "0x" prefix
+        *hex_string += 2;
+      }
+      int32_t length = 0;
+      int32_t error = 0;
+      do {
+        error = error || (is_hex(current_char[length++]) == 0);
+      } while(current_char[length] != '\0');
+      return error ? -1 : length;
+    }
+
+    __host__ __device__ int32_t byte_array_t_from_hex_set_le(
+      byte_array_t &dst,
+      const char *clean_hex_string,
+      int32_t length)
+    {
+      // clean the memory
+      memset(dst.data, 0, dst.size * sizeof(uint8_t));
+      if ( (length < 0) || ( (dst.size * 2) < length ) ) {
+        return 1;
+      }
+      if (length > 0)
+      {
+        char *current_char;
+        current_char = (char *)clean_hex_string;
+        int32_t index;
+        for (index = 0; index < ((length+1)/2) - 1; index++)
+        {
+          dst.data[index] = byte_from_two_hex_char(
+            *(current_char),
+            *(current_char+1)
+          );
+          current_char += 2;
+        }
+        if (length % 2 == 1)
+        {
+          dst.data[index] = byte_from_two_hex_char(
+            *current_char++,
+            '0'
+          );
+        } else {
+          dst.data[index] = byte_from_two_hex_char(
+            *(current_char),
+            *(current_char+1)
+          );
+          current_char += 2;
+        }
+      }
+      return 0;
+    }
+
+    __host__ __device__ int32_t byte_array_t_from_hex_set_be(
+      byte_array_t &dst,
+      const char *clean_hex_string,
+      int32_t length,
+      int32_t padded)
+    {
+      // clean the memory
+      memset(dst.data, 0, dst.size * sizeof(uint8_t));
+      if ( (length < 0) || ( (dst.size * 2) < length ) ) {
+        return 1;
+      }
+      if (length > 0)
+      {
+        char *current_char;
+        current_char = (char *)clean_hex_string;
+        int32_t index;
+        uint8_t *dst_ptr;
+        if (padded == 1) { // right padding
+          dst_ptr = dst.data + dst.size - 1;
+        } else { // left padding
+          dst_ptr = dst.data + (length + 1) / 2 - 1;
+        }
+         
+        if (length % 2 == 1)
+        {
+          *dst_ptr-- = byte_from_two_hex_char(
+            '0',
+            *current_char++
+          );
+        } else {
+          *dst_ptr-- = byte_from_two_hex_char(
+            *(current_char),
+            *(current_char+1)
+          );
+          current_char += 2;
+        }
+        while(*current_char != '\0') {
+          *dst_ptr-- = byte_from_two_hex_char(
+            *(current_char),
+            *(current_char+1)
+          );
+          current_char += 2;
+        }
+      }
+      return 0;
+    }
+  
+  // TODO BE and LE
+    __host__ __device__ int32_t byte_array_t_from_hex_le(
+      byte_array_t &dst,
+      const char *hex_string)
+    {
+      char *current_char;
+      current_char = (char *)hex_string;
+      int32_t length = clean_hex_string(&current_char);
+      if (length < 0)
+      {
+        return 1;
+      }
+      // TODO: maybe if length is odd throw an error
+      dst.size = (length + 1) / 2;
+      if (dst.size > 0)
+      {
+        dst.data = new uint8_t[dst.size];
+        return byte_array_t_from_hex_set_le(dst, current_char, length);
+      }
+      return 0;
+    }
+
+    __host__ __device__ int32_t byte_array_t_from_hex_be(
+      byte_array_t &dst,
+      const char *hex_string)
+    {
+      char *current_char;
+      current_char = (char *)hex_string;
+      int32_t length = clean_hex_string(&current_char);
+      if (length < 0)
+      {
+        return 1;
+      }
+      // TODO: maybe if length is odd throw an error
+      dst.size = (length + 1) / 2;
+      if (dst.size > 0)
+      {
+        dst.data = new uint8_t[dst.size];
+        return byte_array_t_from_hex_set_be(dst, current_char, length);
+      }
+      return 0;
     }
 
     __host__ __device__ void rm_leading_zero_hex_string(

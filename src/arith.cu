@@ -352,4 +352,55 @@ namespace cuEVM {
         }
     }
   }
+__host__ __device__ int32_t evm_word_t_from_hex_string(
+  evm_word_t &dst,
+  const char *src_hex_string)
+{
+  cuEVM::byte_array_t byte_array;
+  byte_array.size = EVM_WORD_SIZE;
+  byte_array.data = new uint8_t[EVM_WORD_SIZE];
+  char *hex_string = (char *)src_hex_string;
+  int32_t length = cuEVM::byte_array::clean_hex_string(&hex_string);
+  int32_t error = cuEVM::byte_array::byte_array_t_from_hex_set_be(
+    byte_array,
+    hex_string,
+    length,
+    0
+  );
+  if (error != 0)
+  {
+    delete[] byte_array.data;
+    return error;
+  }
+  uint8_t *bytes = byte_array.data;
+  for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+  {
+    dst._limbs[idx] = (
+      *(bytes++) |
+      *(bytes++) << 8 |
+      *(bytes++) << 16 |
+      *(bytes++) << 24
+    );
+  }
+  delete[] byte_array.data;
+  return 0;
+}
+
+__host__ void hex_string_from_evm_word_t(
+    char *hex_string,
+    evm_word_t &evm_word,
+    uint32_t count)
+{
+  hex_string[0] = '0';
+  hex_string[1] = 'x';
+  for (uint32_t idx = 0; idx < count; idx++)
+  {
+    sprintf(
+      hex_string + 2 + idx * 8,
+      "%08x",
+      evm_word._limbs[count - 1 - idx]
+    );
+  }
+  hex_string[count * 8 + 2] = '\0';
+}
 }
