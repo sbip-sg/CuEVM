@@ -55,7 +55,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BLOCKHASH);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -92,7 +92,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -124,7 +124,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -156,7 +156,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -188,7 +188,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -222,7 +222,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -254,7 +254,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -286,7 +286,7 @@ namespace block_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block)
+        EVMBlockInfo &block)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);
         if (arith.has_gas(gas_limit, gas_used, error_code))
@@ -879,7 +879,7 @@ namespace environmental_operations{
         uint32_t &error_code,
         uint32_t &pc,
         EVMStack &stack,
-        BlockInfo &block,
+        EVMBlockInfo &block,
         transaction_t &transaction)
     {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_BASE);

@@ -24,7 +24,7 @@ namespace cuEVM
         evm_word_t balance; /**< The balance of the account (YP: \f$\sigma[a]_{b}\f$) */
         evm_word_t nonce; /**< The nonce of the account (YP: \f$\sigma[a]_{n}\f$) */
         byte_array_t byte_code; /**< The bytecode of the account (YP: \f$b\f$) */
-        size_t storage_size; /**< The number of storage entries (YP: \f$|\sigma[a]_{s}|\f$) */
+        uint32_t storage_size; /**< The number of storage entries (YP: \f$|\sigma[a]_{s}|\f$) */
         contract_storage_t *storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
     } account_t;
 
@@ -142,37 +142,35 @@ namespace cuEVM
     
     /**
      * Get the storage index for the given key.
+     * @param[out] index The index of the storage
      * @param[in] arith The arithmetical environment
      * @param[in] account The account data structure
      * @param[in] key The key
-     * @param[out] error_code The error code
-     * @return The storage index
+     * @return If found 1, otherwise 0
      */
-    __host__ __device__ size_t get_storage_index(
+    __host__ __device__ int32_t get_storage_index(
+        int32_t &index,
         ArithEnv &arith,
         const account_t &account,
-        bn_t &key,
-        uint32_t &error_code);
+        bn_t &key);
     
     /**
      * Make the account empty.
-     * @param[in] arith The arithmetical environment
      * @param[inout] account The account data structure
      */
     __host__ __device__ void empty(
-        ArithEnv &arith,
         account_t &account);
     
     /**
      * Duplicate the account data structure.
-     * @param[in] arith The arithmetical environment
      * @param[out] dst The destination account data structure
      * @param[in] src The source account data structure
+     * @param[in] with_storage The flag to indicate if the storage should be duplicated
      */
     __host__ __device__ void duplicate(
-        ArithEnv &arith,
         account_t &dst,
-        const account_t &src);
+        const account_t &src,
+        bool with_storage = false);
     
     /**
      * Check if the account is empty.
@@ -182,7 +180,7 @@ namespace cuEVM
      */
     __host__ __device__ int32_t is_empty(
         ArithEnv &arith,
-        const account_t &account);
+        account_t &account);
   }
 }
 #endif

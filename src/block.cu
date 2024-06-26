@@ -5,18 +5,18 @@
 // SPDX-License-Identifier: MIT
 #include "include/block.cuh"
 #include "include/error_codes.h"
-#include "include/utils.h"
+#include "include/utils.cuh"
 
 namespace cuEVM {
   namespace block {
-    __host__ __device__ BlockInfo::BlockInfo(
+    __host__ __device__ EVMBlockInfo::EVMBlockInfo(
         ArithEnv arith,
         block_data_t *content
     ) : _arith(arith),
         content(content)
     {
     }
-    __host__ BlockInfo::BlockInfo(
+    __host__ EVMBlockInfo::EVMBlockInfo(
         ArithEnv arith,
         const cJSON *test
     ) : _arith(arith)
@@ -37,53 +37,32 @@ namespace cuEVM {
       block_json = cJSON_GetObjectItemCaseSensitive(test, "env");
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentCoinbase");
-      _arith.cgbn_memory_from_hex_string(
-        content->coin_base,
-        element_json->valuestring
-      );
+      content->coin_base.from_hex(element_json->valuestring);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentTimestamp");
-      _arith.cgbn_memory_from_hex_string(
-        content->time_stamp,
-        element_json->valuestring
-      );
+      content->time_stamp.from_hex(element_json->valuestring);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentNumber");
-      _arith.cgbn_memory_from_hex_string(
-        content->number,
-        element_json->valuestring
-      );
-
+      content->number.from_hex(element_json->valuestring);
+  
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentDifficulty");
-      _arith.cgbn_memory_from_hex_string(
-        content->difficulty,
-        element_json->valuestring
-      );
+      content->difficulty.from_hex(element_json->valuestring);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentRandom");
       if (element_json != NULL)
       {
-        _arith.cgbn_memory_from_hex_string(
-          content->prevrandao,
-          element_json->valuestring
-        );
+        content->prevrandao.from_hex(element_json->valuestring);
       }
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentGasLimit");
-      _arith.cgbn_memory_from_hex_string(
-        content->gas_limit,
-        element_json->valuestring
-      );
+      content->gas_limit.from_hex(element_json->valuestring);
 
       // element_json=cJSON_GetObjectItemCaseSensitive(block_json, "currentChainId");
       //_arith.cgbn_memory_from_hex_string(content->chain_id, element_json->valuestring);
-      _arith.cgbn_memory_from_size_t(content->chain_id, 1);
+      content->chain_id.from_size_t(1);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentBaseFee");
-      _arith.cgbn_memory_from_hex_string(
-        content->base_fee,
-        element_json->valuestring
-      );
+      content->base_fee.from_hex(element_json->valuestring);
 
       previous_blocks_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHashes");
       if (previous_blocks_json != NULL and cJSON_IsArray(previous_blocks_json))
@@ -92,16 +71,10 @@ namespace cuEVM {
         cJSON_ArrayForEach(element_json, previous_blocks_json)
         {
           element_json = cJSON_GetObjectItemCaseSensitive(element_json, "number");
-          _arith.cgbn_memory_from_hex_string(
-            content->previous_blocks[idx].number,
-            element_json->valuestring
-          );
+          content->previous_blocks[idx].number.from_hex(element_json->valuestring);
 
           element_json = cJSON_GetObjectItemCaseSensitive(element_json, "hash");
-          _arith.cgbn_memory_from_hex_string(
-            content->previous_blocks[idx].hash,
-            element_json->valuestring
-          );
+          content->previous_blocks[idx].hash.from_hex(element_json->valuestring);
           idx++;
         }
       }
@@ -131,13 +104,13 @@ namespace cuEVM {
     }
 
 
-    __host__ __device__ BlockInfo::~BlockInfo()
+    __host__ __device__ EVMBlockInfo::~EVMBlockInfo()
     {
       content = NULL;
     }
 
 
-    __host__ void BlockInfo::free_content()
+    __host__ void EVMBlockInfo::free_content()
     {
     #ifndef ONLY_CPU
       CUDA_CHECK(cudaFree(content));
@@ -148,60 +121,60 @@ namespace cuEVM {
     }
 
 
-    __host__ __device__ void BlockInfo::get_coin_base(
+    __host__ __device__ void EVMBlockInfo::get_coin_base(
         bn_t &coin_base)
     {
       cgbn_load(_arith.env, coin_base, &(content->coin_base));
     }
 
 
-    __host__ __device__ void BlockInfo::get_time_stamp(
+    __host__ __device__ void EVMBlockInfo::get_time_stamp(
         bn_t &time_stamp)
     {
       cgbn_load(_arith.env, time_stamp, &(content->time_stamp));
     }
 
-    __host__ __device__ void BlockInfo::get_number(
+    __host__ __device__ void EVMBlockInfo::get_number(
       bn_t &number)
     {
       cgbn_load(_arith.env, number, &(content->number));
     }
 
 
-    __host__ __device__ void BlockInfo::get_difficulty(
+    __host__ __device__ void EVMBlockInfo::get_difficulty(
       bn_t &difficulty)
     {
       cgbn_load(_arith.env, difficulty, &(content->difficulty));
     }
 
-    __host__ __device__ void BlockInfo::get_prevrandao(
+    __host__ __device__ void EVMBlockInfo::get_prevrandao(
       bn_t &val)
     {
       cgbn_load(_arith.env, val, &(content->prevrandao));
     }
 
 
-    __host__ __device__ void BlockInfo::get_gas_limit(
+    __host__ __device__ void EVMBlockInfo::get_gas_limit(
       bn_t &gas_limit)
     {
       cgbn_load(_arith.env, gas_limit, &(content->gas_limit));
     }
 
 
-    __host__ __device__ void BlockInfo::get_chain_id(
+    __host__ __device__ void EVMBlockInfo::get_chain_id(
       bn_t &chain_id)
     {
       cgbn_load(_arith.env, chain_id, &(content->chain_id));
     }
 
 
-    __host__ __device__ void BlockInfo::get_base_fee(
+    __host__ __device__ void EVMBlockInfo::get_base_fee(
       bn_t &base_fee)
     {
       cgbn_load(_arith.env, base_fee, &(content->base_fee));
     }
 
-    __host__ __device__ void BlockInfo::get_previous_hash(
+    __host__ __device__ void EVMBlockInfo::get_previous_hash(
         bn_t &previous_hash,
         bn_t &previous_number,
         uint32_t &error_code)
@@ -229,7 +202,7 @@ namespace cuEVM {
         cgbn_set_ui32(_arith.env, previous_hash, 0);
     }
 
-    __host__ __device__ void BlockInfo::print()
+    __host__ __device__ void EVMBlockInfo::print()
     {
       uint32_t idx = 0;
       bn_t number;
@@ -264,7 +237,7 @@ namespace cuEVM {
       }
     }
 
-    __host__ cJSON * BlockInfo::json()
+    __host__ cJSON * EVMBlockInfo::to_json()
     {
       uint32_t idx = 0;
       char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];

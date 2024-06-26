@@ -5,9 +5,161 @@
 // SPDX-License-Identifier: MIT
 
 #include "include/arith.cuh"
-#include "include/utils.h"
+#include "include/utils.cuh"
 
 namespace cuEVM {
+  __host__ __device__ evm_word_t::evm_word_t(
+    const evm_word_t &src)
+  {
+    #pragma unroll
+    for (int32_t index = 0; index < CGBN_LIMBS; index++)
+    {
+      _limbs[index] = src._limbs[index];
+    }
+  }
+
+  __host__ __device__ evm_word_t& evm_word_t::operator=(
+    const evm_word_t &src) {
+    #pragma unroll
+    for (int32_t index = 0; index < CGBN_LIMBS; index++) {
+      _limbs[index] = src._limbs[index];
+    }
+    return *this;
+  }
+
+  __host__ __device__ int32_t evm_word_t::from_hex(
+    const char *hex_string)
+  {
+    cuEVM::byte_array_t byte_array(
+      hex_string,
+      EVM_WORD_SIZE,
+      BIG_ENDIAN,
+      cuEVM::PaddingDirection::LEFT_PADDING
+    );
+    return from_byte_array_t(byte_array);
+  }
+
+  __host__ __device__ int32_t evm_word_t::from_byte_array_t(
+    byte_array_t &byte_array)
+  {
+    uint8_t *bytes = byte_array.data;
+    if (bytes == NULL)
+    {
+      return 1;
+    }
+    #pragma unroll
+    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+    {
+      _limbs[idx] = (
+        *(bytes++) |
+        *(bytes++) << 8 |
+        *(bytes++) << 16 |
+        *(bytes++) << 24
+      );
+    }
+    return 0;
+  }
+
+  __host__ __device__ int32_t evm_word_t::from_size_t(
+    size_t value)
+  {
+    if (sizeof(size_t) == sizeof(uint64_t))
+    {
+      return from_uint64_t(value);
+    }
+    else if (sizeof(size_t) == sizeof(uint32_t))
+    {
+      return from_uint32_t(value);
+    }
+    else
+    {
+      return 1;
+    }
+  }
+
+  __host__ __device__ int32_t evm_word_t::from_uint64_t(
+    uint64_t value)
+  {
+    #pragma unroll
+    for (uint32_t idx = 2; idx < CGBN_LIMBS; idx++)
+    {
+      _limbs[idx] = 0;
+    }
+    _limbs[0] = value & 0xFFFFFFFF;
+    _limbs[1] = (value >> 32) & 0xFFFFFFFF;
+  }
+
+  __host__ __device__ int32_t evm_word_t::from_uint32_t(
+    uint32_t value)
+  {
+    #pragma unroll
+    for (uint32_t idx = 1; idx < CGBN_LIMBS; idx++)
+    {
+      _limbs[idx] = 0;
+    }
+    _limbs[0] = value;
+  }
+
+  __host__ __device__ void evm_word_t::print()
+  {
+    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+      printf("%08x ", _limbs[CGBN_LIMBS - 1 - idx]);
+    printf("\n");
+  }
+
+  __host__ __device__ char* evm_word_t::to_hex(
+    uint32_t count = CGBN_LIMBS)
+  {
+    char *hex_string = new char[count * 8 + 3];
+    hex_string[0] = '0';
+    hex_string[1] = 'x';
+    for (uint32_t idx = 0; idx < count; idx++)
+    {
+      sprintf(
+        hex_string + 2 + idx * 8,
+        "%08x",
+        _limbs[count - 1 - idx]
+      );
+    }
+    hex_string[count * 8 + 2] = '\0';
+  }
+
+  __host__ __device__ char* evm_word_t::to_pretty_hex()
+  {
+    char *hex_string = this->to_hex();
+    cuEVM::utils::hex_string_without_leading_zeros(hex_string);
+    return hex_string;
+  }
+
+  __host__ __device__ byte_array_t* evm_word_t::to_byte_array_t()
+  {
+    byte_array_t *byte_array = new byte_array_t(EVM_WORD_SIZE);
+    uint8_t *bytes = byte_array->data + EVM_WORD_SIZE - 1;
+    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+    {
+      *(bytes--) = _limbs[idx] & 0xFF;
+      *(bytes--) = (_limbs[idx] >> 8) & 0xFF;
+      *(bytes--) = (_limbs[idx] >> 16) & 0xFF;
+      *(bytes--) = (_limbs[idx] >> 24) & 0xFF;
+    }
+    return byte_array;
+  }
+
+  __host__ __device__ byte_array_t* evm_word_t::to_bit_array_t()
+  {
+    byte_array_t *byte_array = new byte_array_t(EVM_WORD_BITS);
+    uint8_t *bytes = byte_array->data + EVM_WORD_BITS - 1;
+    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+    {
+      for (int bit = 0; bit < 32; bit++)
+      {
+        *(bytes--) = (_limbs[idx] >> bit) & 0x01;
+      }
+    }
+    return byte_array;
+  }
+
+
   __device__ ArithEnv::ArithEnv(
     cgbn_monitor_t monitor,
     cgbn_error_report_t *report,
@@ -41,41 +193,6 @@ namespace cuEVM {
       env(_context),
       instance(env.instance)
   {
-  }
-
-  __host__ __device__ void evm_address_conversion(
-    ArithEnv &arith,
-    bn_t &address) {
-    cgbn_bitwise_mask_and(arith.env, address, address, EVM_ADDRESS_BITS);
-  }
-
-  __host__ __device__ size_t ArithEnv::memory_from_cgbn(
-    uint8_t *dst,
-    bn_t &src) {
-    for (uint32_t idx = 0; idx < EVM_WORD_SIZE; idx++)
-    {
-      dst[idx] = cgbn_extract_bits_ui32(env, src, EVM_WORD_BITS - (idx + 1) * 8, 8);
-    }
-    return EVM_WORD_SIZE;
-  }
-
-  __host__ __device__ void ArithEnv::cgbn_from_memory(
-    bn_t &dst,
-    uint8_t *src) {
-    for (uint32_t idx = 0; idx < EVM_WORD_SIZE; idx++)
-    {
-      cgbn_insert_bits_ui32(env, dst, dst, EVM_WORD_BITS - (idx + 1) * 8, 8, src[idx]);
-    }
-  }
-
-  __host__ __device__ void ArithEnv::word_from_memory(
-    evm_word_t &dst,
-    uint8_t *src
-  )
-  {
-    bn_t src_cgbn;
-    cgbn_from_memory(src_cgbn, src);
-    cgbn_store(env, &dst, src_cgbn);
   }
 
   __host__ __device__ void ArithEnv::cgbn_from_fixed_memory(
@@ -208,22 +325,6 @@ namespace cuEVM {
     cgbn_shift_right(env, dst, src, numbits);
   }
 
-  __host__ void ArithEnv::hex_string_from_cgbn_memory(
-    char *dst_hex_string,
-    evm_word_t &src_cgbn_mem,
-    uint32_t count) {
-    dst_hex_string[0] = '0';
-    dst_hex_string[1] = 'x';
-    for (uint32_t idx = 0; idx < count; idx++)
-    {
-      sprintf(
-        dst_hex_string + 2 + idx * 8,
-        "%08x",
-        src_cgbn_mem._limbs[count - 1 - idx]
-      );
-    }
-    dst_hex_string[count * 8 + 2] = '\0';
-  }
   __host__ void ArithEnv::pretty_hex_string_from_cgbn_memory(
     char *dst_hex_string,
     evm_word_t &src_cgbn_mem,
@@ -258,68 +359,6 @@ namespace cuEVM {
     dst_hex_string[offset] = '\0'; // Null-terminate the string
   }
 
-  __host__ __device__ int32_t ArithEnv::cgbn_memory_from_hex_string(
-    evm_word_t &dst_cgbn_memory,
-    const char *src_hex_string) {
-    size_t length;
-    char *current_char;
-    current_char = (char *)src_hex_string;
-    if (
-      (src_hex_string[0] == '0') &&
-      ((src_hex_string[1] == 'x') || (src_hex_string[1] == 'X'))
-    ) {
-      current_char += 2; // Skip the "0x" prefix
-    }
-    for (length = 0; current_char[length] != '\0'; length++)
-      ;
-    if (length > (2 * EVM_WORD_SIZE)) {
-      return 1;
-    }
-    SHARED_MEMORY uint8_t *byte_array;
-    ONE_THREAD_PER_INSTANCE(
-      byte_array = new uint8_t[EVM_WORD_SIZE];
-      memset(byte_array, 0, EVM_WORD_SIZE);
-    )
-
-    if(length > 0) {
-      size_t idx;
-      for (idx = length; idx > 2; idx -= 2)
-      {
-        byte_array[EVM_WORD_SIZE - 1 - ((length - idx) / 2)] = byte_array::byte_from_two_hex_char(
-          current_char[idx - 2],
-          current_char[idx - 1]
-        );
-      }
-      if (idx == 1)
-      {
-        byte_array[EVM_WORD_SIZE - 1 - ((length-1) / 2)] = byte_array::byte_from_two_hex_char('0', current_char[0]);
-      } else { //idx = 2
-        byte_array[EVM_WORD_SIZE - 1 - ((length-2) / 2)] = byte_array::byte_from_two_hex_char(current_char[0], current_char[1]);
-      }
-
-    }
-    word_from_memory(dst_cgbn_memory, byte_array);
-    ONE_THREAD_PER_INSTANCE(
-      delete[] byte_array;
-    )
-    return 0;
-  }
-
-  __host__ __device__ void ArithEnv::cgbn_memory_from_size_t(
-    evm_word_t &dst_cgbn_memory,
-    size_t src) {
-    bn_t src_cgbn;
-    cgbn_from_size_t(src_cgbn, src);
-    cgbn_store(env, &dst_cgbn_memory, src_cgbn);
-  }
-
-  __host__ __device__ void ArithEnv::print_cgbn_memory(
-    evm_word_t &src_cgbn_memory) {
-    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
-      printf("%08x ", src_cgbn_memory._limbs[CGBN_LIMBS - 1 - idx]);
-    printf("\n");
-  }
-
   __host__ __device__ uint8_t* ArithEnv::get_data(
     cuEVM::byte_array_t &data_content,
     bn_t &index,
@@ -352,55 +391,4 @@ namespace cuEVM {
         }
     }
   }
-__host__ __device__ int32_t evm_word_t_from_hex_string(
-  evm_word_t &dst,
-  const char *src_hex_string)
-{
-  cuEVM::byte_array_t byte_array;
-  byte_array.size = EVM_WORD_SIZE;
-  byte_array.data = new uint8_t[EVM_WORD_SIZE];
-  char *hex_string = (char *)src_hex_string;
-  int32_t length = cuEVM::byte_array::clean_hex_string(&hex_string);
-  int32_t error = cuEVM::byte_array::byte_array_t_from_hex_set_be(
-    byte_array,
-    hex_string,
-    length,
-    0
-  );
-  if (error != 0)
-  {
-    delete[] byte_array.data;
-    return error;
-  }
-  uint8_t *bytes = byte_array.data;
-  for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
-  {
-    dst._limbs[idx] = (
-      *(bytes++) |
-      *(bytes++) << 8 |
-      *(bytes++) << 16 |
-      *(bytes++) << 24
-    );
-  }
-  delete[] byte_array.data;
-  return 0;
-}
-
-__host__ void hex_string_from_evm_word_t(
-    char *hex_string,
-    evm_word_t &evm_word,
-    uint32_t count)
-{
-  hex_string[0] = '0';
-  hex_string[1] = 'x';
-  for (uint32_t idx = 0; idx < count; idx++)
-  {
-    sprintf(
-      hex_string + 2 + idx * 8,
-      "%08x",
-      evm_word._limbs[count - 1 - idx]
-    );
-  }
-  hex_string[count * 8 + 2] = '\0';
-}
 }

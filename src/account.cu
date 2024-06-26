@@ -535,25 +535,98 @@ namespace cuEVM
     }
     
     __host__ __device__ void print(
-        account_t &account);
+        account_t &account)
+    {
+        printf("address: ");
+        print_evm_word_t(account.address);
+        printf("balance: ");
+        print_evm_word_t(account.balance);
+        printf("nonce: ");
+        print_evm_word_t(account.nonce);
+        cuEVM::byte_array::print_byte_array_t(account.byte_code);
+        printf("storage_size: %lu\n", account.storage_size);
+        for (size_t idx = 0; idx < account.storage_size; idx++)
+        {
+            printf("storage[%lu].key: ", idx);
+            print_evm_word_t(account.storage[idx].key);
+            printf("storage[%lu].value: ", idx);
+            print_evm_word_t(account.storage[idx].value);
+        }
+    }
     
-    __host__ __device__ size_t get_storage_index(
+    __host__ __device__ int32_t get_storage_index(
+        int32_t &index,
         ArithEnv &arith,
         const account_t &account,
-        bn_t &key,
-        uint32_t &error_code);
+        bn_t &key)
+    {
+        bn_t local_key;
+        for (index = 0; index < account.storage_size; index++)
+        {
+            cgbn_load(arith.env, local_key, &(account.storage[index].key));
+            if (cgbn_compare(arith.env, local_key, key) == 0)
+            {
+                return 1;
+            }
+        }
+        return 0;
+    }
     
     __host__ __device__ void empty(
-        ArithEnv &arith,
-        account_t &account);
+        account_t &account)
+    {
+        memset(&account, 0, sizeof(account_t));
+    }
     
     __host__ __device__ void duplicate(
-        ArithEnv &arith,
         account_t &dst,
-        const account_t &src);
+        const account_t &src,
+        bool with_storage)
+    {
+        memcpy(&dst, &src, sizeof(account_t));
+        if (
+            (src.byte_code.data != NULL) &&
+            (src.byte_code.size > 0)
+        ) {
+            dst.byte_code.data = new uint8_t[src.byte_code.size];
+            memcpy(
+                dst.byte_code.data,
+                src.byte_code.data,
+                src.byte_code.size * sizeof(uint8_t)
+            );
+        } else {
+            dst.byte_code.data = NULL;
+            dst.byte_code.size = 0;
+        }
+        if (
+            (src.storage != NULL) &&
+            (src.storage_size > 0) &&
+            with_storage
+        ) {
+            dst.storage = new contract_storage_t[src.storage_size];
+            memcpy(
+                dst.storage,
+                src.storage,
+                src.storage_size * sizeof(contract_storage_t)
+            );
+        } else {
+            dst.storage = NULL;
+            dst.storage_size = 0;
+        }
+    }
     
     __host__ __device__ int32_t is_empty(
         ArithEnv &arith,
-        const account_t &account);
+        account_t &account)
+    {
+        bn_t balance, nonce;
+        cgbn_load(arith.env, balance, &(account.balance));
+        cgbn_load(arith.env, nonce, &(account.nonce));
+        return (
+            (cgbn_compare_ui32(arith.env, balance, 0) == 0) &&
+            (cgbn_compare_ui32(arith.env, nonce, 0) == 0) &&
+            (account.byte_code.size == 0)
+        );
+    }
   }
 }

@@ -104,7 +104,7 @@ public:
 
     cuEVM::ArithEnv _arith; /**< The arithmetical environment*/
     world_state_t *_world_state; /**< The world state*/
-    cuEVM::block::BlockInfo *_block; /**< The current block*/
+    cuEVM::block::EVMBlockInfo *_block; /**< The current block*/
     transaction_t *_transaction; /**< The current transaction*/
     accessed_state_t *_accessed_state; /**< The accessed state*/
     touch_state_t *_transaction_touch_state; /**< The final touch state of the transaction*/
@@ -183,7 +183,7 @@ public:
         uint32_t *error) : _arith(arith), _instance(instance), _final_error(error)
     {
         _world_state = new world_state_t(arith, world_state_data);
-        _block = new cuEVM::block::BlockInfo(arith, block_data);
+        _block = new cuEVM::block::EVMBlockInfo(arith, block_data);
         _transaction = new transaction_t(arith, transaction_data);
         _accessed_state = new accessed_state_t(_world_state);
         _transaction_touch_state = new touch_state_t(_accessed_state, NULL);
@@ -3234,8 +3234,8 @@ public:
         cpu_world_state = NULL;
 
         // ge the current block
-        cuEVM::block::BlockInfo *cpu_block = NULL;
-        cpu_block = new cuEVM::block::BlockInfo(arith, test);
+        cuEVM::block::EVMBlockInfo *cpu_block = NULL;
+        cpu_block = new cuEVM::block::EVMBlockInfo(arith, test);
         instances.block_data = cpu_block->_content;
         delete cpu_block;
         cpu_block = NULL;
@@ -3345,8 +3345,8 @@ public:
         delete cpu_world_state;
         cpu_world_state = NULL;
 
-        cuEVM::block::BlockInfo *cpu_block = NULL;
-        cpu_block = new cuEVM::block::BlockInfo(arith, cpu_instances.block_data);
+        cuEVM::block::EVMBlockInfo *cpu_block = NULL;
+        cpu_block = new cuEVM::block::EVMBlockInfo(arith, cpu_instances.block_data);
         cpu_block->free_content();
         delete cpu_block;
         cpu_block = NULL;
@@ -3396,8 +3396,8 @@ public:
           printf("World state:\n");
             cpu_world_state->print();
 
-            cuEVM::block::BlockInfo *cpu_block = NULL;
-            cpu_block = new cuEVM::block::BlockInfo(arith, instances.block_data);
+            cuEVM::block::EVMBlockInfo *cpu_block = NULL;
+            cpu_block = new cuEVM::block::EVMBlockInfo(arith, instances.block_data);
             printf("Block:\n");
             cpu_block->print();
             delete cpu_block;
@@ -3573,8 +3573,8 @@ public:
         delete cpu_world_state;
         cpu_world_state = NULL;
 
-        cuEVM::block::BlockInfo *cpu_block = NULL;
-        cpu_block = new cuEVM::block::BlockInfo(arith, instances.block_data);
+        cuEVM::block::EVMBlockInfo *cpu_block = NULL;
+        cpu_block = new cuEVM::block::EVMBlockInfo(arith, instances.block_data);
         cJSON *block_json = cpu_block->json();
         cJSON_AddItemToObject(root, "env", block_json);
         delete cpu_block;

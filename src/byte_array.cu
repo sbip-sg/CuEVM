@@ -5,322 +5,241 @@
 // SPDX-License-Identifier: MIT
 
 #include "include/byte_array.cuh"
-#include "include/utils.h"
+#include "include/utils.cuh"
 
 namespace cuEVM {
-  namespace byte_array {
-    __host__ __device__ char hex_from_nibble(const uint8_t nibble) {
-      return nibble < 10 ? '0' + nibble : 'a' + nibble - 10;
-    }
-    
-    __host__ __device__ uint8_t nibble_from_hex(const char hex) {
-      return hex >= '0' && hex <= '9' ? hex - '0' : (
-        hex >= 'a' && hex <= 'f' ? hex - 'a' + 10 : (
-          hex >= 'A' && hex <= 'F' ? hex - 'A' + 10 : 0
-        )
-      );
-    }
 
-    __host__ __device__ int32_t is_hex(const char hex) {
-      return hex >= '0' && hex <= '9' ? 1 : (
-        hex >= 'a' && hex <= 'f' ? 1 : (
-          hex >= 'A' && hex <= 'F' ? 1 : 0
-        )
-      );
-    }
-      
-    __host__ __device__ uint8_t byte_from_nibbles(const uint8_t high, const uint8_t low) {
-      return (high << 4) | low;
-    }
-    
-    __host__ __device__ void hex_from_byte(char *dst, const uint8_t byte){
-      if (dst == NULL)
-        return;
-      dst[0] = hex_from_nibble(byte >> 4);
-      dst[1] = hex_from_nibble(byte & 0x0F);
-    }
+  __host__ __device__ byte_array_t::byte_array_t(
+    uint32_t size) : size(size) {
+      if (size > 0)
+        data = new uint8_t[size];
+      else
+        data = NULL;
+  }
 
-
-    __host__ __device__ uint8_t byte_from_two_hex_char(const char high, const char low) {
-      return byte_from_nibbles(nibble_from_hex(high), nibble_from_hex(low));
-    }
-
-    __host__ char *hex_from_bytes(uint8_t *bytes, size_t count) {
-      char *hex_string = new char[count*2+1];
-      char *return_string = new char[count*2+1+2];
-      for(size_t idx=0; idx<count; idx++)
-        hex_from_byte(&hex_string[idx*2], bytes[idx]);
-      hex_string[count*2]=0;
-      memcpy(return_string + 2, hex_string, count*2+1);
-      delete[] hex_string;
-      hex_string = NULL;
-      return_string[0]='0';
-      return_string[1]='x';
-      return return_string;
-    }
-
-    __host__ __device__ void print_bytes(uint8_t *bytes, size_t count) {
-      printf("data: ");
-      for(size_t idx=0; idx<count; idx++)
-        printf("%02x", bytes[idx]);
-      printf("\n");
-    }
-
-    __host__ __device__ void print_byte_array_t(byte_array_t &data_content) {
-      printf("size: %lu\n", data_content.size);
-      print_bytes(data_content.data, data_content.size);
-    }
-
-    __host__ __device__ char *hex_from_byte_array_t(byte_array_t &data_content) {
-      return hex_from_bytes(data_content.data, data_content.size);
-    }
-
-    __host__ __device__ int32_t hex_string_length(
-      const char *hex_string)
-    {
-      int32_t length;
-      int32_t error = 0;
-      char *current_char;
-      current_char = (char *)hex_string;
-      if (
-        (hex_string[0] == '0') &&
-        ((hex_string[1] == 'x') || (hex_string[1] == 'X'))
-      ) {
-        current_char += 2; // Skip the "0x" prefix
-      }
-      length = 0;
-      do {
-        length++;
-        error = error | (nibble_from_hex(current_char[length]) == 0);
-      } while(current_char[length] != '\0');
-      return error ? -1 : length;
-    }
-
-    __host__ __device__ int32_t clean_hex_string(
-      char **hex_string)
-    {
-      char *current_char;
-      current_char = (char *)*hex_string;
-      if (current_char == NULL || current_char[0] == '\0')
+  __host__ __device__ byte_array_t::byte_array_t(
+    uint8_t *data,
+    uint32_t size) : size(size) {
+      if (size > 0)
       {
-        return 1;
+        this->data = new uint8_t[size];
+        std::copy(data, data + size, this->data);
       }
-      if (
-        (current_char[0] == '0') &&
-        ((current_char[1] == 'x') || (current_char[1] == 'X'))
-      ) {
-        current_char += 2; // Skip the "0x" prefix
-        *hex_string += 2;
-      }
-      int32_t length = 0;
-      int32_t error = 0;
-      do {
-        error = error || (is_hex(current_char[length++]) == 0);
-      } while(current_char[length] != '\0');
-      return error ? -1 : length;
-    }
+      else
+        this->data = NULL;
+  }
 
-    __host__ __device__ int32_t byte_array_t_from_hex_set_le(
-      byte_array_t &dst,
-      const char *clean_hex_string,
-      int32_t length)
-    {
-      // clean the memory
-      memset(dst.data, 0, dst.size * sizeof(uint8_t));
-      if ( (length < 0) || ( (dst.size * 2) < length ) ) {
-        return 1;
-      }
-      if (length > 0)
-      {
-        char *current_char;
-        current_char = (char *)clean_hex_string;
-        int32_t index;
-        for (index = 0; index < ((length+1)/2) - 1; index++)
+  __host__ __device__ byte_array_t::byte_array_t(
+    const char *hex_string,
+    uint32_t size,
+    int32_t endian,
+    PaddingDirection padding) : size(size) {
+      char *tmp_hex_char;
+      tmp_hex_char = (char *)hex_string;
+      int32_t length = cuEVM::utils::clean_hex_string(&tmp_hex_char);
+      if (size == 0) {
+        if (length <= 0)
         {
-          dst.data[index] = byte_from_two_hex_char(
-            *(current_char),
-            *(current_char+1)
-          );
-          current_char += 2;
+          data = NULL;
+          return;
         }
-        if (length % 2 == 1)
-        {
-          dst.data[index] = byte_from_two_hex_char(
-            *current_char++,
-            '0'
-          );
-        } else {
-          dst.data[index] = byte_from_two_hex_char(
-            *(current_char),
-            *(current_char+1)
-          );
-          current_char += 2;
-        }
+        size = (length + 1) / 2;
       }
-      return 0;
-    }
-
-    __host__ __device__ int32_t byte_array_t_from_hex_set_be(
-      byte_array_t &dst,
-      const char *clean_hex_string,
-      int32_t length,
-      int32_t padded)
-    {
-      // clean the memory
-      memset(dst.data, 0, dst.size * sizeof(uint8_t));
-      if ( (length < 0) || ( (dst.size * 2) < length ) ) {
-        return 1;
-      }
-      if (length > 0)
+      data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
+      int32_t error;
+      if (endian == LITTLE_ENDIAN)
       {
-        char *current_char;
-        current_char = (char *)clean_hex_string;
-        int32_t index;
-        uint8_t *dst_ptr;
-        if (padded == 1) { // right padding
-          dst_ptr = dst.data + dst.size - 1;
-        } else { // left padding
-          dst_ptr = dst.data + (length + 1) / 2 - 1;
-        }
-         
-        if (length % 2 == 1)
-        {
-          *dst_ptr-- = byte_from_two_hex_char(
-            '0',
-            *current_char++
-          );
-        } else {
-          *dst_ptr-- = byte_from_two_hex_char(
-            *(current_char),
-            *(current_char+1)
-          );
-          current_char += 2;
-        }
-        while(*current_char != '\0') {
-          *dst_ptr-- = byte_from_two_hex_char(
-            *(current_char),
-            *(current_char+1)
-          );
-          current_char += 2;
-        }
-      }
-      return 0;
-    }
-  
-  // TODO BE and LE
-    __host__ __device__ int32_t byte_array_t_from_hex_le(
-      byte_array_t &dst,
-      const char *hex_string)
-    {
-      char *current_char;
-      current_char = (char *)hex_string;
-      int32_t length = clean_hex_string(&current_char);
-      if (length < 0)
-      {
-        return 1;
-      }
-      // TODO: maybe if length is odd throw an error
-      dst.size = (length + 1) / 2;
-      if (dst.size > 0)
-      {
-        dst.data = new uint8_t[dst.size];
-        return byte_array_t_from_hex_set_le(dst, current_char, length);
-      }
-      return 0;
-    }
-
-    __host__ __device__ int32_t byte_array_t_from_hex_be(
-      byte_array_t &dst,
-      const char *hex_string)
-    {
-      char *current_char;
-      current_char = (char *)hex_string;
-      int32_t length = clean_hex_string(&current_char);
-      if (length < 0)
-      {
-        return 1;
-      }
-      // TODO: maybe if length is odd throw an error
-      dst.size = (length + 1) / 2;
-      if (dst.size > 0)
-      {
-        dst.data = new uint8_t[dst.size];
-        return byte_array_t_from_hex_set_be(dst, current_char, length);
-      }
-      return 0;
-    }
-
-    __host__ __device__ void rm_leading_zero_hex_string(
-      char *hex_string) {
-      size_t length;
-      char *current_char;
-      current_char = (char *)hex_string;
-      if (
-        (hex_string[0] == '0') &&
-        ((hex_string[1] == 'x') || (hex_string[1] == 'X'))
-      ) {
-        current_char += 2; // Skip the "0x" prefix
-      }
-      for (length = 0; current_char[length] != '\0'; length++)
-        ;
-      size_t idx;
-      for (idx = 0; idx < length; idx++)
-      {
-        if (current_char[idx] != '0')
-        {
-          break;
-        }
-      }
-      if (idx == length)
-      {
-        hex_string[2] = '0';
-        hex_string[3] = '\0';
+        error = this->from_hex_set_le(tmp_hex_char, length);
       }
       else
       {
-        for (size_t i = 0; i < length - idx; i++)
-        {
-          current_char[i] = current_char[i + idx];
-        }
-        current_char[length - idx] = '\0';
+        error = this->from_hex_set_be(tmp_hex_char, length, padding);
       }
-    }
-
-    __host__ cJSON *json_from_byte_array_t(byte_array_t &data_content) {
-      cJSON *data_json = cJSON_CreateObject();
-      char *hex_string;
-      //cJSON_AddNumberToObject(json, "size", data_content.size);
-      if (data_content.size > 0)
+      if (error != 0)
       {
-        hex_string = hex_from_byte_array_t(data_content);
-        cJSON_AddStringToObject(data_json, "data", hex_string);
-        delete[] hex_string;
-      } else {
-        cJSON_AddStringToObject(data_json, "data", "0x");
+        delete[] data;
+        data = NULL;
+        size = 0;
       }
-      return data_json;
-    }
+  }
 
-    __host__ __device__ int32_t padded_copy_BE(
-      const byte_array_t dst,
-      const byte_array_t src
-    ) {
-      size_t copy_size;
-      int32_t size_diff;
-      if (src.size == dst.size) {
-        size_diff = 0;
-        copy_size = src.size;
-      } else if (src.size < dst.size) {
-        size_diff = 1;
-        copy_size = src.size;
-      } else {
-        size_diff = -1;
-        copy_size = dst.size;
-      }
-      memcpy(dst.data, src.data, copy_size);
-      memset(dst.data + copy_size, 0, dst.size - src.size);
-      return size_diff;
+  __host__ __device__ byte_array_t::~byte_array_t() {
+    if (size > 0) {
+      size = 0;
+      delete[] data;
     }
+  }
+
+  __host__ __device__ byte_array_t::byte_array_t(
+    const byte_array_t &other) : size(other.size) {
+      if (size > 0)
+      {
+        data = new uint8_t[size];
+        std::copy(other.data, other.data + size, data);
+      }
+      else
+        data = NULL;
+  }
+
+  __host__ __device__ byte_array_t &byte_array_t::operator=(
+    const byte_array_t &other) {
+      if (this == &other)
+        return *this;
+      if ((size > 0) && (size != other.size)) {
+        delete[] data;
+        data = NULL;
+        size = other.size;
+        data = new uint8_t[size];
+      }
+      if (size > 0)
+      {
+        std::copy(other.data, other.data + size, data);
+      }
+      else
+        data = NULL;
+      return *this;
+  }
+
+  __host__ __device__ void byte_array_t::print() {
+      printf("size: %u\n", size);
+      printf("data: ");
+      for(uint32_t index=0; index<size; index++)
+        printf("%02x", data[index]);
+      printf("\n");
+  }
+
+  __host__ __device__ char *byte_array_t::to_hex() {
+    char *hex_string = new char[size*2+3]; // 3 - 0x and \0
+    hex_string[0]='0';
+    hex_string[1]='x';
+    char *tmp_hex_string = (char *)hex_string + 2;
+    uint8_t *tmp_data = data;
+    for(uint32_t idx=0; idx<size; idx++) {
+      cuEVM::utils::hex_from_byte(tmp_hex_string, *(tmp_data++));
+      tmp_hex_string += 2;
+    }
+    hex_string[size*2+2]=0;
+    return hex_string;
+  }
+
+  __host__ __device__ cJSON* byte_array_t::to_json() {
+    cJSON *data_json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(data_json, "size", size);
+    if (size > 0)
+    {
+      char *hex_string = to_hex();
+      cJSON_AddStringToObject(data_json, "data", hex_string);
+      delete[] hex_string;
+    } else {
+      cJSON_AddStringToObject(data_json, "data", "0x");
+    }
+    return data_json;
+  }
+
+  __host__ __device__ int32_t byte_array_t::from_hex_set_le(
+    const char *clean_hex_string,
+    int32_t length) {
+    if ( (length < 0) || ( (size * 2) < length ) ) {
+      return 1;
+    }
+    if (length > 0)
+    {
+      char *current_char;
+      current_char = (char *)clean_hex_string;
+      int32_t index;
+      uint8_t *dst_ptr;
+      dst_ptr = data;
+      for (index = 0; index < ((length+1)/2) - 1; index++)
+      {
+        *(dst_ptr++) = cuEVM::utils::byte_from_two_hex_char(
+          *(current_char),
+          *(current_char+1)
+        );
+        current_char += 2;
+      }
+      if (length % 2 == 1)
+      {
+        *(dst_ptr++) = cuEVM::utils::byte_from_two_hex_char(
+          *current_char++,
+          '0'
+        );
+      } else {
+        *(dst_ptr++) = cuEVM::utils::byte_from_two_hex_char(
+          *(current_char),
+          *(current_char+1)
+        );
+        current_char += 2;
+      }
+    }
+    return 0;
+  }
+
+  __host__ __device__ int32_t byte_array_t::from_hex_set_be(
+    const char *clean_hex_string,
+    int32_t length,
+    PaddingDirection padding) {
+    if ( (length < 0) || ( (size * 2) < length ) ) {
+      return 1;
+    }
+    if (length > 0)
+    {
+      char *current_char;
+      current_char = (char *)clean_hex_string;
+      int32_t index;
+      uint8_t *dst_ptr;
+      if (padding == PaddingDirection::RIGHT_PADDING) { // right padding
+        dst_ptr = data + size - 1;
+      } else if (padding == PaddingDirection::LEFT_PADDING) { // left padding
+        dst_ptr = data + (length + 1) / 2 - 1;
+      } else {
+        return 1;
+      }
+        
+      if (length % 2 == 1)
+      {
+        *dst_ptr-- = cuEVM::utils::byte_from_two_hex_char(
+          '0',
+          *current_char++
+        );
+      } else {
+        *dst_ptr-- = cuEVM::utils::byte_from_two_hex_char(
+          *(current_char),
+          *(current_char+1)
+        );
+        current_char += 2;
+      }
+      while(*current_char != '\0') {
+        *dst_ptr-- = cuEVM::utils::byte_from_two_hex_char(
+          *(current_char),
+          *(current_char+1)
+        );
+        current_char += 2;
+      }
+    }
+    return 0;
+  }
+
+  __host__ __device__ int32_t byte_array_t::padded_copy_BE(
+    const byte_array_t src
+  ) {
+    uint32_t copy_size;
+    int32_t size_diff;
+    if (src.size == size) {
+      size_diff = 0;
+      copy_size = src.size;
+    } else if (src.size < size) {
+      size_diff = 1;
+      copy_size = src.size;
+    } else {
+      size_diff = -1;
+      copy_size = size;
+    }
+    memcpy(data, src.data, copy_size);
+    memset(data + copy_size, 0, size - src.size);
+    return size_diff;
+  }
+
+  namespace byte_array {
 
     // CPU-GPU
     __global__ void transfer_kernel(

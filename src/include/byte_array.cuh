@@ -14,171 +14,113 @@
 #include <cjson/cJSON.h>
 
 namespace cuEVM {
+  enum PaddingDirection {
+    NO_PADDING = 0,
+    LEFT_PADDING = 1,
+    RIGHT_PADDING = 2
+  };
+  
   /**
    * The byte array structure.
    * It has the size of the data and a pointer to the data.
   */
-  typedef struct
+  struct byte_array_t
   {
-    size_t size; /**< The size of the array */
+    uint32_t size; /**< The size of the array */
     uint8_t *data; /**< The content of the array */
-  } byte_array_t;
+    /**
+     * The default constructor.
+     */
+    __host__ __device__ byte_array_t() = default;
+    /**
+     * The constructor with the size.
+     * @param[in] size The size of the array.
+     */
+    __host__ __device__ byte_array_t(
+      uint32_t size);
+    /**
+     * The constructor with the data.
+     * @param[in] data The data of the array.
+     * @param[in] size The size of the array.
+     */
+    __host__ __device__ byte_array_t(
+      uint8_t *data,
+      uint32_t size);
+    /**
+     * The constructor with the hex string.
+     * @param[in] hex_string The hex string.
+     * @param[in] size The size of the array.
+     * @param[in] endian The endian format.
+     * @param[in] padding The padding direction.
+     */
+    __host__ __device__ byte_array_t(
+      const char *hex_string,
+      uint32_t size = 0,
+      int32_t endian = LITTLE_ENDIAN,
+      PaddingDirection padding = NO_PADDING);
+    /**
+     * The destructor.
+     */
+    __host__ __device__ ~byte_array_t();
+    /**
+     * The copy constructor.
+     * @param[in] other The other byte array.
+     */
+    __host__ __device__ byte_array_t(
+      const byte_array_t &other);
+    /**
+     * The assignment operator.
+     */
+    __host__ __device__ byte_array_t &operator=(
+      const byte_array_t &other);
 
-  namespace byte_array {
     /**
-     * Get the hex string from a nibble.
-     * @param[in] nibble The nibble.
-     * @return The hex string.
+     * Print the byte array.
      */
-    __host__ __device__ char hex_from_nibble(const uint8_t nibble);
+    __host__ __device__ void print();
     /**
-     * Get the nibble from a hex string.
-     * @param[in] hex The hex string.
-     * @return The nibble.
-     */
-    __host__ __device__ uint8_t nibble_from_hex(const char hex);
-    /**
-     * Check if a character is a hex character.
-     * @param[in] hex The character.
-     * @return 1 if it is a hex character, 0 otherwise.
-     */
-    __host__ __device__ int32_t is_hex(const char hex);
-    /**
-     * Get the byte from two nibbles.
-     * @param[in] high The high nibble.
-     * @param[in] low The low nibble.
-     */
-    __host__ __device__ uint8_t byte_from_nibbles(const uint8_t high, const uint8_t low);
-    /**
-     * Get the hex string from a byte.
-     * @param[in] byte The byte.
-     * @param[out] dst The destination hex string.
-     */
-    __host__ __device__ void hex_from_byte(char *dst, const uint8_t byte);
-
-    /**
-     * Get the byte from two hex characters.
-     * @param[in] high The high hex character.
-     * @param[in] low The low hex character.
-     * @return The byte.
-    */
-    __host__ __device__ uint8_t byte_from_two_hex_char(const char high, const char low);
-    /**
-     * Get the hex string from a byte array.
+     * Get the hex string from the byte array.
      * The hex string is allocated on the heap and needs to be freed.
-     * @param[in] bytes The byte array.
-     * @param[in] count The number of bytes.
      * @return The hex string.
      */
-    __host__ __device__ char *hex_from_bytes(
-      uint8_t *bytes,
-      size_t count);
+    __host__ __device__ char* to_hex();
     /**
-     * Print a byte array.
-     * @param[in] bytes The byte array.
-     * @param[in] count The number of bytes.
-    */
-    __host__ __device__ void print_bytes(
-      uint8_t *bytes,
-      size_t count);
-
-    /**
-     * Print the data content.
-     * @param[in] data_content The data content.
-    */
-    __host__ __device__ void print_byte_array_t(
-      byte_array_t &data_content);
-    /**
-     * Get the hex string from a data content.
-     * The hex string is allocated on the heap and needs to be freed.
-     * @param[in] data_content The data content.
-     * @return The hex string.
-    */
-    __host__ char *hex_from_byte_array_t(
-      byte_array_t &data_content);
-    
-    /**
-     * Get the number of bytes oh a string
-     * @param[in] hex_string
-     * @return the number of bytes
+     * Get the json object from the byte array.
+     * @return The json object.
      */
-    __host__ __device__ int32_t hex_string_length(
-      const char *hex_string);
-    /**
-     * Clean the hex string from prefix and return the length
-     * @param[inout] hex_string
-     * @return the length of the hex string
-     */
-    __host__ __device__ int32_t clean_hex_string(
-      char **hex_string);
+    __host__ __device__ cJSON *to_json();
     /**
      * Get the byte array from a hex string in Little Endian format.
-     * @param[out] dst The destination byte array.
      * @param[in] clean_hex_string The clean hex string.
      * @param[in] length The length of the clean hex string.
      */
-    __host__ __device__ int32_t byte_array_t_from_hex_set_le(
-      byte_array_t &dst,
+    __host__ __device__ int32_t from_hex_set_le(
       const char *clean_hex_string,
       int32_t length);
     /**
-     * Get the byte array from a hex string in Little Endian format.
-     * @param[out] dst The destination byte array.
-     * @param[in] hex_string The hex string.
-     * @return 1 for error, 0 otherwise.
-     */
-    __host__ __device__ int32_t byte_array_t_from_hex_le(
-      byte_array_t &dst,
-      const char *hex_string);
-    /**
      * Get the byte array from a hex string in Big Endian format.
-     * @param[out] dst The destination byte array.
      * @param[in] clean_hex_string The clean hex string.
      * @param[in] length The length of the clean hex string.
      * @param[in] padded The padding direction ( 0 for left padding, 1 for right padding)
      */
-    __host__ __device__ int32_t byte_array_t_from_hex_set_be(
-      byte_array_t &dst,
+    __host__ __device__ int32_t from_hex_set_be(
       const char *clean_hex_string,
       int32_t length,
-      int32_t padded = 0);
+      PaddingDirection padding);
     /**
-     * Get the byte array from a hex string in Big Endian format.
-     * @param[out] dst The destination byte array.
-     * @param[in] hex_string The hex string.
-     * @return 1 for error, 0 otherwise.
-     */
-    __host__ __device__ int32_t byte_array_t_from_hex_be(
-      byte_array_t &dst,
-      const char *hex_string);
-
-    /**
-     * Clean for leading zeroes in hex string
-     * @param[inout]  hex_string
-    */
-    __host__ __device__ void rm_leading_zero_hex_string(
-      char *hex_string);
-    /**
-     * Get the json object from a data content.
-     * @param[in] data_content The data content.
-     * @return The json object.
-     */
-    __host__ cJSON *json_from_byte_array_t(
-      byte_array_t &data_content);
-
-    /**
-     * Copy the source byte array in the destination
+     * Copy the source byte array
      * considering a Big Endian format, the extra size
-     * of the destination byte array will be padded with
+     * of the byte array will be padded with
      * zeros.
-     * @param[out] dst The destination byte array
      * @param[in] src The source byte array
      * @return the difference in size -1 <, 0 =, 1 >
      */
     __host__ __device__ int32_t padded_copy_BE(
-      const byte_array_t dst,
       const byte_array_t src
     );
+  };
+
+  namespace byte_array {
     // GPU-CPU interaction
     /**
      * Copy data content between two device memories

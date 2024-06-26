@@ -53,7 +53,7 @@ namespace cuEVM {
      * The block class is used to store the block information
      * before the transaction are done. YP: H
      */
-    class BlockInfo
+    class EVMBlockInfo
     {
     private:
       ArithEnv _arith; /**< The arithmetical environment */
@@ -66,7 +66,7 @@ namespace cuEVM {
        * @param arith The arithmetical environment
        * @param content The block information content
        */
-      __host__ __device__  BlockInfo(
+      __host__ __device__  EVMBlockInfo(
           ArithEnv arith,
           block_data_t *content
       );
@@ -76,7 +76,7 @@ namespace cuEVM {
        * @param arith The arithmetical environment
        * @param test The block information in JSON format
        */
-      __host__ BlockInfo(
+      __host__ EVMBlockInfo(
           ArithEnv arith,
           const cJSON *test
       );
@@ -84,7 +84,7 @@ namespace cuEVM {
       /**
        * The destructor of the block class.
       */
-      __host__ __device__ ~BlockInfo();
+      __host__ __device__ ~EVMBlockInfo();
 
       /**
        * deallocates the block information content
@@ -161,7 +161,7 @@ namespace cuEVM {
        * Get the block information in JSON format.
        * @return The block information in JSON format
       */
-      __host__ cJSON *json();
+      __host__ cJSON *to_json();
     };
   }
 }

@@ -17,6 +17,7 @@
 
 
 namespace cuEVM {
+#define CGBN_LIMBS ((EVM_WORD_BITS + 31) / 32)
 /**
  * The CGBN context type.  This is a template type that takes
  * the number of threads per instance and the
@@ -38,12 +39,97 @@ using bn_t = env_t::cgbn_t;
  * The CGBN wide type with double the given number of bits in environment.
 */
 using bn_wide_t = env_t::cgbn_wide_t;
+//using evm_word_t =  cgbn_mem_t<EVM_WORD_BITS>;
 /**
  * The EVM word type. also use for store CGBN base type.
 */
-using evm_word_t =  cgbn_mem_t<EVM_WORD_BITS>;
+struct evm_word_t : cgbn_mem_t<EVM_WORD_BITS> {
+  /**
+   * The default constructor.
+   */
+  __host__ __device__ evm_word_t() = default;
+  /**
+   * The copy constructor.
+   */
+  __host__ __device__ evm_word_t(
+    const evm_word_t &src);
 
-#define CGBN_LIMBS ((EVM_WORD_BITS + 31) / 32)
+  /**
+   * Set the evm_word_t from a hex string.
+   * The hex string is in Big Endian format.
+   * @param[in] hex_string The source hex string
+   * @return 1 for error, 0 otherwiese
+   */
+  __host__ __device__ int32_t from_hex(
+    const char *hex_string);
+  /**
+   * Set the evm_word_t from a byte array.
+   * The byte array is in Big Endian format.
+   * @param[in] byte_array The source byte array
+   * @return 1 for error, 0 otherwiese
+   */
+  __host__ __device__ int32_t from_byte_array_t(
+    byte_array_t &byte_array);
+  /**
+   * Set the evm_word_t from a size_t.
+   * @param[in] value The source size_t
+   * @return 1 for error, 0 otherwiese
+   */
+  __host__ __device__ int32_t from_size_t(
+    size_t value);
+  /**
+   * Set the evm_word_t from a uint64_t.
+   * @param[in] value The source uint64_t
+   * @return 1 for error, 0 otherwiese
+   */
+  __host__ __device__ int32_t from_uint64_t(
+    uint64_t value);
+  /**
+   * Set the evm_word_t from a uint32_t.
+   * @param[in] value The source uint32_t
+   * @return 1 for error, 0 otherwiese
+   */
+  __host__ __device__ int32_t from_uint32_t(
+    uint32_t value);
+
+  /**
+   * Print the evm_word_t.
+   */
+  __host__ __device__ void print();
+  /**
+   * Get the hex string from the evm_word_t.
+   * The hex string is in Big Endian format.
+   * The hex string must be freed by the caller.
+   * @param[in] count The number of the least significant
+   * limbs to convert
+   * @return The hex string
+   */
+  __host__ __device__ char* to_hex(
+    uint32_t count = CGBN_LIMBS);
+  /**
+   * Get the pretty hex string from the evm_word_t.
+   * The hex string is in Big Endian format.
+   * The hex string must be freed by the caller.
+   * The hex string has the leading zeroes removed.
+   * @return The hex string
+   */
+  __host__ __device__ char* to_pretty_hex();
+  /**
+   * Get the byte array from the evm_word_t.
+   * The byte array is in Big Endian format.
+   * The byte array must be freed by the caller.
+   * @return byte_array The destination byte array
+   */
+  __host__ __device__ byte_array_t* to_byte_array_t();
+  /**
+   * Get the bit array from the evm_word_t.
+   * The bit array is in Big Endian format.
+   * The bit array must be freed by the caller.
+   * @param[out] bit_array The destination bit array
+   */
+  __host__ __device__ byte_array_t* to_bit_array_t();
+};
+
 
 /**
  * The arithmetic environment class is a wrapper around the CGBN library.
@@ -101,38 +187,6 @@ public:
   */
   __host__ __device__ ArithEnv(
     const ArithEnv &env
-  );
-
-  /**
-   * Get a memory byte array from CGBN base type.
-   * The memory byte array is in Big Endian format.
-   * The memory byte array must be allocated by the caller.
-   * @param[out] dst The memory byte array
-   * @param[in] src The source CGBN
-   * @return The size of the byte array
-  */
-  __host__ __device__ size_t memory_from_cgbn(
-    uint8_t *dst,
-    bn_t &src
-  );
-
-  /**
-   * Get a CGBN type from memory byte array.
-   * The memory byte array is in Big Endian format.
-   * @param[out] dst The destination CGBN
-   * @param[in] src The memory byte array
-  */
-  __host__ __device__ void cgbn_from_memory(
-    bn_t &dst,
-    uint8_t *src
-  );
-
-  /**
-   * Get evm_word_t from byte array.
-  */
-  __host__ __device__ void word_from_memory(
-    evm_word_t &dst,
-    uint8_t *src
   );
 
   /**
@@ -230,57 +284,6 @@ public:
    * @param[src] src The number to trim down to uint64
   */
   __host__ __device__ void trim_to_uint64(bn_t &dst, bn_t &src);
-
-  /**
-   * Get a hex string from the CGBn memory.
-   * The hex string is in Big Endian format.
-   * The hex string must be allocated by the caller.
-   * @param[out] dst_hex_string The destination hex string
-   * @param[in] src_cgbn_mem The source CGBN memory
-   * @param[in] count The number of limbs
-  */
-  __host__ void hex_string_from_cgbn_memory(
-    char *dst_hex_string,
-    evm_word_t &src_cgbn_mem,
-    uint32_t count = CGBN_LIMBS);
-  /*
-    * Get a pretty hex string from the CGBn memory.
-    * The hex string is in Big Endian format.
-    * The hex string must be allocated by the caller.
-    * @param[out] dst_hex_string The destination hex string
-    * @param[in] src_cgbn_mem The source CGBN memory
-    * @param[in] count The number of limbs
-  */
-  __host__ void pretty_hex_string_from_cgbn_memory(
-    char *dst_hex_string,
-    evm_word_t &src_cgbn_mem,
-    uint32_t count = CGBN_LIMBS);
-
-  /**
-   * Get a CGBN memory from a hex string.
-   * The hex string is in Big Endian format.
-   * @param[out] dst_cgbn_memory The destination CGBN memory
-   * @param[in] src_hex_string The source hex string
-   * @return 1 for overflow, 0 otherwiese
-  */
-  __host__ __device__ int32_t cgbn_memory_from_hex_string(
-    evm_word_t &dst_cgbn_memory,
-    const char *src_hex_string);
-  /**
-   * Set the cgbn memory to the size_t value
-   * @param[out] dst_cgbn_memory The destination CGBN memory
-   * @param[in] src The source size_t
-  */
-  __host__ __device__ void cgbn_memory_from_size_t(
-    evm_word_t &dst_cgbn_memory,
-    size_t src);
-  /**
-   * Print the CGBN memory in hex string format.
-   * The hex string is in Big Endian format.
-   * @param[in] src_cgbn_memory The source CGBN memory
-  */
-  __host__ __device__ void print_cgbn_memory(
-    evm_word_t &src_cgbn_memory);
   /**
    * Get the data at the given index for the given length.
    * If the index is greater than the data size, it returns NULL.
@@ -299,6 +302,11 @@ public:
     bn_t &index,
     bn_t &length,
     size_t &available_size);
+  // temporary need to remove
+  __host__ void pretty_hex_string_from_cgbn_memory(
+    char *dst_hex_string,
+    evm_word_t &src_cgbn_mem,
+    uint32_t count);
 };
 
 
@@ -332,5 +340,13 @@ __host__ void hex_string_from_evm_word_t(
   char *hex_string,
   evm_word_t &evm_word,
   uint32_t count = CGBN_LIMBS);
+  /**
+   * Print the evm word in hex string format.
+   * The hex string is in Big Endian format.
+   * @param[in] evm_word The source evm word
+  */
+  __host__ __device__ void print_evm_word_t(
+    evm_word_t &evm_word);
 }
+
 #endif
