@@ -23,6 +23,19 @@
 #define SHARED_MEMORY
 #endif
 
+#ifdef __CUDA_ARCH__
+#define CUEVM_MALLOC(ptr, type, count) ptr=(type *)std::malloc(count, sizeof(type))
+#define CUEVM_FREE(ptr) std::free(ptr)
+#else
+#ifdef ONLY_CPU
+#define CUEVM_MALLOC(ptr, type, count) ptr=(type *)std::malloc(count, sizeof(type))
+#define CUEVM_FREE(ptr) std::free(ptr)
+#else
+#define CUEVM_MALLOC(ptr, type, count) cuda_check(cudaMallocManaged((void **)&ptr, count * sizeof(type)), "cudaMallocManaged", __FILE__, __LINE__)
+#define CUEVM_FREE(ptr) cuda_check(cudaFree(ptr), "cudaFree", __FILE__, __LINE__)
+#endif
+#endif
+
 #ifdef DEBUG
 #define DEBUG_PRINT(fmt, args...) fprintf(stderr, "DEBUG: %s:%d:%s(): " fmt, \
   __FILE__, __LINE__, __func__, ##args)

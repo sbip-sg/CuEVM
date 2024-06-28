@@ -114,6 +114,39 @@ namespace cuEVM {
             this->from_json(contract_storage_json);
         }
 
+        __host__ __device__ contract_storage_t::~contract_storage_t()
+        {
+            if (storage != nullptr)
+            {
+                delete[] storage;
+                storage = nullptr;
+            }
+            size = 0;
+            capacity = 0;
+        }
+
+        __host__ __device__ contract_storage_t& contract_storage_t::operator=(
+            const contract_storage_t &other)
+        {
+            if (this == &other)
+            {
+                return *this;
+            }
+            if (size != other.size)
+            {
+                if (storage != nullptr)
+                {
+                    delete[] storage;
+                    storage = nullptr;
+                }
+                size = other.size;
+                capacity = other.capacity;
+                storage = new storage_element_t[capacity];
+            }
+            std::copy(other.storage, other.storage + other.size, storage);
+            return *this;
+        }
+
         __host__ __device__ int32_t contract_storage_t::get_value(
             ArithEnv arith,
             const bn_t &key,

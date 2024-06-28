@@ -14,7 +14,7 @@ namespace cuEVM {
       if (size > 0)
         data = new uint8_t[size];
       else
-        data = NULL;
+        data = nullptr;
   }
 
   __host__ __device__ byte_array_t::byte_array_t(
@@ -26,48 +26,25 @@ namespace cuEVM {
         std::copy(data, data + size, this->data);
       }
       else
-        this->data = NULL;
+        this->data = nullptr;
   }
 
   __host__ __device__ byte_array_t::byte_array_t(
     const char *hex_string,
-    uint32_t size,
     int32_t endian,
-    PaddingDirection padding) : size(size) {
-      char *tmp_hex_char;
-      tmp_hex_char = (char *)hex_string;
-      int32_t length = cuEVM::utils::clean_hex_string(&tmp_hex_char);
-      if (size == 0) {
-        if (length <= 0)
-        {
-          data = NULL;
-          return;
-        }
-        size = (length + 1) / 2;
-      }
-      data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
-      int32_t error;
-      if (endian == LITTLE_ENDIAN)
-      {
-        error = this->from_hex_set_le(tmp_hex_char, length);
-      }
-      else
-      {
-        error = this->from_hex_set_be(tmp_hex_char, length, padding);
-      }
-      if (error != 0)
-      {
-        delete[] data;
-        data = NULL;
-        size = 0;
-      }
+    PaddingDirection padding) : size(0), data(nullptr) {
+      from_hex(hex_string, endian, padding, 0);
   }
 
   __host__ __device__ byte_array_t::~byte_array_t() {
-    if (size > 0) {
-      size = 0;
+    if (
+      (size > 0) &&
+      (data != nullptr)
+    ) {
       delete[] data;
+      data = nullptr;
     }
+    size = 0;
   }
 
   __host__ __device__ byte_array_t::byte_array_t(
@@ -78,7 +55,7 @@ namespace cuEVM {
         std::copy(other.data, other.data + size, data);
       }
       else
-        data = NULL;
+        data = nullptr;
   }
 
   __host__ __device__ byte_array_t &byte_array_t::operator=(
@@ -87,7 +64,7 @@ namespace cuEVM {
         return *this;
       if ((size > 0) && (size != other.size)) {
         delete[] data;
-        data = NULL;
+        data = nullptr;
         size = other.size;
         data = new uint8_t[size];
       }
@@ -96,7 +73,7 @@ namespace cuEVM {
         std::copy(other.data, other.data + size, data);
       }
       else
-        data = NULL;
+        data = nullptr;
       return *this;
   }
 
@@ -219,6 +196,50 @@ namespace cuEVM {
     return 0;
   }
 
+  __host__ __device__ int32_t byte_array_t::from_hex(
+    const char *hex_string,
+    int32_t endian,
+    PaddingDirection padding,
+    int32_t managed)
+  {
+    char *tmp_hex_char;
+    tmp_hex_char = (char *)hex_string;
+    int32_t length = cuEVM::utils::clean_hex_string(&tmp_hex_char);
+    if (length <= 0)
+    {
+      data = nullptr;
+      return;
+    }
+    size = (length + 1) / 2;
+    if (managed) {
+      CUDA_CHECK(cudaMallocManaged(
+        (void **)&data,
+        sizeof(uint8_t) * size));
+      memset(data, 0, size);
+    } else {
+      data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
+    }
+    int32_t error;
+    if (endian == LITTLE_ENDIAN)
+    {
+      error = this->from_hex_set_le(tmp_hex_char, length);
+    }
+    else
+    {
+      error = this->from_hex_set_be(tmp_hex_char, length, padding);
+    }
+    if (error != 0)
+    {
+      if (managed) {
+        CUDA_CHECK(cudaFree(data));
+      } else {
+        delete[] data;
+      }
+      data = nullptr;
+      size = 0;
+    }
+  }
+
   __host__ __device__ int32_t byte_array_t::padded_copy_BE(
     const byte_array_t src
   ) {
@@ -260,7 +281,7 @@ namespace cuEVM {
             src_instances[instance].data,
             src_instances[instance].size * sizeof(uint8_t));
         delete[] src_instances[instance].data;
-        src_instances[instance].data = NULL;
+        src_instances[instance].data = nullptr;
       }
     }
 
@@ -271,7 +292,7 @@ namespace cuEVM {
       for (size_t idx = 0; idx < count; idx++)
       {
         cpu_instances[idx].size = 0;
-        cpu_instances[idx].data = NULL;
+        cpu_instances[idx].data = nullptr;
       }
       return cpu_instances;
     }
@@ -284,11 +305,11 @@ namespace cuEVM {
       {
         if (
             (cpu_instances[idx].size > 0) &&
-            (cpu_instances[idx].data != NULL))
+            (cpu_instances[idx].data != nullptr))
         {
           delete[] cpu_instances[idx].data;
           cpu_instances[idx].size = 0;
-          cpu_instances[idx].data = NULL;
+          cpu_instances[idx].data = nullptr;
         }
       }
       delete[] cpu_instances;
@@ -380,7 +401,7 @@ namespace cuEVM {
         }
         else
         {
-          tmp_cpu_instances[idx].data = NULL;
+          tmp_cpu_instances[idx].data = nullptr;
         }
       }
       CUDA_CHECK(cudaMalloc(
@@ -392,14 +413,14 @@ namespace cuEVM {
           sizeof(byte_array_t) * count,
           cudaMemcpyHostToDevice));
       delete[] tmp_cpu_instances;
-      tmp_cpu_instances = NULL;
+      tmp_cpu_instances = nullptr;
 
       // 2. call the kernel to copy the memory between the gpu memories
       transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
       CUDA_CHECK(cudaDeviceSynchronize());
       cudaFree(gpu_instances);
       gpu_instances = tmp_gpu_instances;
-      tmp_gpu_instances = NULL;
+      tmp_gpu_instances = nullptr;
 
       // 3. copy the gpu memories back in the cpu memories
       CUDA_CHECK(cudaMemcpy(
@@ -426,7 +447,7 @@ namespace cuEVM {
         }
         else
         {
-          tmp_cpu_instances[idx].data = NULL;
+          tmp_cpu_instances[idx].data = nullptr;
         }
       }
 
@@ -434,7 +455,7 @@ namespace cuEVM {
       free_gpu_instances(gpu_instances, count);
       delete[] cpu_instances;
       cpu_instances=tmp_cpu_instances;
-      tmp_cpu_instances=NULL;
+      tmp_cpu_instances=nullptr;
       return cpu_instances;
     }
   } // namespace byte_array

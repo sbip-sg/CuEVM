@@ -5,6 +5,7 @@ namespace cuEVM
 {
   namespace account
   {
+
     __global__ void transfer_kernel(
         account_t *dst_instances,
         account_t *src_instances,
@@ -69,6 +70,193 @@ namespace cuEVM
             &dst_instances[instance].address,
             &src_instances[instance].address,
             sizeof(evm_word_t)
+        );
+    }
+
+    __host__ account_t::account_t(
+        const cJSON *account_json,
+        int32_t managed)
+    {
+        from_json(account_json, managed);
+    }
+
+    __host__ __device__ account_t::account_t(
+        const account_t &account)
+    {
+        address = account.address;
+        balance = account.balance;
+        nonce = account.nonce;
+        byte_code = account.byte_code;
+        storage = account.storage;
+    }
+
+    __host__ __device__ account_t::account_t(
+        const account_t &account,
+        const account_flags_t &flags)
+    {
+        address = account.address;
+        balance = account.balance;
+        nonce = account.nonce;
+        if(flags.has_byte_code()) {
+            byte_code = account.byte_code;
+        }
+        if(flags.has_storage()) {
+            storage = account.storage;
+        }
+    }
+
+    __host__ __device__ int32_t account_t::free_internals(
+        int32_t managed)
+    {
+        // TODO:
+        return;
+    }
+
+    __host__ __device__ int32_t account_t::get_storage_value(
+        ArithEnv &arith,
+        const bn_t &key,
+        bn_t &value)
+    {
+        return storage.get_value(arith, key, value);
+    }
+
+    __host__ __device__ int32_t account_t::set_storage_value(
+        ArithEnv &arith,
+        const bn_t &key,
+        const bn_t &value)
+    {
+        return storage.set_value(arith, key, value);
+    }
+
+    __host__ __device__ void account_t::get_address(
+        ArithEnv &arith,
+        bn_t &address)
+    {
+        cgbn_load(arith.env, address, &this->address);
+    }
+
+    __host__ __device__ void account_t::get_balance(
+        ArithEnv &arith,
+        bn_t &balance)
+    {
+        cgbn_load(arith.env, balance, &this->balance);
+    }
+
+    __host__ __device__ void account_t::get_nonce(
+        ArithEnv &arith,
+        bn_t &nonce)
+    {
+        cgbn_load(arith.env, nonce, &this->nonce);
+    }
+
+    __host__ __device__ void account_t::set_nonce(
+        ArithEnv &arith,
+        const bn_t &nonce)
+    {
+        cgbn_store(arith.env, &this->nonce, nonce);
+    }
+
+    __host__ __device__ void account_t::set_balance(
+        ArithEnv &arith,
+        const bn_t &balance)
+    {
+        cgbn_store(arith.env, &this->balance, balance);
+    }
+
+    __host__ __device__ void account_t::set_address(
+        ArithEnv &arith,
+        const bn_t &address)
+    {
+        cgbn_store(arith.env, &this->address, address);
+    }
+
+    __host__ __device__ void account_t::set_byte_code(
+        const byte_array_t &byte_code)
+    {
+        this->byte_code = byte_code;
+    }
+
+    __host__ __device__ int32_t account_t::has_address(
+        ArithEnv &arith,
+        const bn_t &address)
+    {
+        bn_t local_address;
+        cgbn_load(arith.env, local_address, &this->address);
+        return (cgbn_compare(arith.env, local_address, address) == 0);
+    }
+
+    __host__ __device__ int32_t account_t::is_empty(
+        ArithEnv &arith)
+    {
+        bn_t balance, nonce;
+        cgbn_load(arith.env, balance, &this->balance);
+        cgbn_load(arith.env, nonce, &this->nonce);
+        return (
+            (cgbn_compare_ui32(arith.env, balance, 0) == 0) &&
+            (cgbn_compare_ui32(arith.env, nonce, 0) == 0) &&
+            (this->byte_code.size == 0)
+        );
+    }
+
+    __host__ __device__ int32_t account_t::is_empty()
+    {
+        return (
+            (this->balance == 0) &&
+            (this->nonce == 0) &&
+            (this->byte_code.size == 0)
+        );
+    }
+
+    __host__ __device__ void account_t::empty()
+    {
+        memset(this, 0, sizeof(account_t));
+    }
+
+    __host__ void account_t::from_json(
+        const cJSON *account_json,
+        int32_t managed)
+    {
+        cJSON *balance_json, *nonce_json, *code_json, *storage_json, *key_value_json;
+        char *hex_string;
+        
+        address.from_hex(account_json->string);
+
+        // set the balance
+        balance_json = cJSON_GetObjectItemCaseSensitive(
+            account_json,
+            "balance");
+        balance.from_hex(balance_json->valuestring);
+
+        // set the nonce
+        nonce_json = cJSON_GetObjectItemCaseSensitive(
+            account_json,
+            "nonce");
+        nonce.from_hex(nonce_json->valuestring);
+
+        byte_code.from_hex(
+            cJSON_GetObjectItemCaseSensitive(
+                account_json,
+                "code")->valuestring,
+            LITTLE_ENDIAN,
+            NO_PADDING,
+            managed
+        );
+
+        if (managed) {
+            if (byte_code.size > 0) {
+                CUDA_CHECK(cudaMemPrefetchAsync(
+                    (void **)&(byte_code.data),
+                    byte_code.size * sizeof(uint8_t),
+                    0
+                ));
+            }
+        }
+
+        storage.from_json(
+            cJSON_GetObjectItemCaseSensitive(
+                account_json,
+                "storage"),
+            managed
         );
     }
 

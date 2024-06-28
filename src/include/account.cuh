@@ -3,11 +3,143 @@
 
 #include "arith.cuh"
 #include "storage.cuh"
+//#include <bitset>
+
+#define ACCOUNT_NONE_FLAG 0
+#define ACCOUNT_ADDRESS_FLAG (1 << 0)
+#define ACCOUNT_BALANCE_FLAG (1 << 1)
+#define ACCOUNT_NONCE_FLAG   (1 << 2)
+#define ACCOUNT_BYTE_CODE_FLAG  (1 << 3)
+#define ACCOUNT_STORAGE_FLAG (1 << 4)
+#define ACCOUNT_DELETED_FLAG (1 << 5)
 
 namespace cuEVM
 {
   namespace account
   {
+    /**
+     * The account flags.
+     * The flags are used to indicate which fields are used.
+     */
+    struct account_flags_t
+    {
+        // TODO: in some sollution we can use std::bitset<5> flags;
+        int32_t flags; /**< The flags */
+        /**
+         * The default constructor for the account flags.
+         */
+        __host__ __device__ account_flags_t() = default;
+
+        /**
+         * The constructor for the account flags.
+         * @param[in] flags The flags
+         */
+        __host__ __device__ __forceinline__ account_flags_t(
+            int32_t flags) : flags(flags) {}
+        /**
+         * The copy constructor for the account flags.
+         * @param[in] account_flags The account flags
+         */
+        __host__ __device__ __forceinline__  account_flags_t(
+            const account_flags_t &account_flags) : flags(account_flags.flags) {}
+        
+        /**
+         * If the flag for the address is set.
+         * @return If unset 0, otherwise 1
+         */
+        __host__ __device__ __forceinline__  int32_t has_address() const {
+            return flags & ACCOUNT_ADDRESS_FLAG;
+        }
+
+        /**
+         * If the flag for the balance is set.
+         * @return If unset 0, otherwise 1
+         */
+        __host__ __device__ __forceinline__  int32_t has_balance() const {
+            return flags & ACCOUNT_BALANCE_FLAG;
+        }
+
+        /**
+         * If the flag for the nonce is set.
+         * @return If unset 0, otherwise 1
+         */
+        __host__ __device__ __forceinline__  int32_t has_nonce() const {
+            return flags & ACCOUNT_NONCE_FLAG;
+        }
+
+        /**
+         * If the flag for the byte code is set.
+         * @return If unset 0, otherwise 1
+         */
+        __host__ __device__ __forceinline__  int32_t has_byte_code() const {
+            return flags & ACCOUNT_BYTE_CODE_FLAG;
+        }
+
+        /**
+         * If the flag for the storage is set.
+         * @return If unset 0, otherwise 1
+         */
+        __host__ __device__ __forceinline__  int32_t has_storage() const {
+            return flags & ACCOUNT_STORAGE_FLAG;
+        }
+
+        /**
+         * If the flag for the deleted is set.
+         * @return If unset 0, otherwise 1
+         */
+        __host__ __device__ __forceinline__ int32_t has_deleted() const {
+            return flags & ACCOUNT_DELETED_FLAG;
+        }
+
+        /**
+         * Set the flag for the address.
+         */
+        __host__ __device__ __forceinline__  void set_address() {
+            flags |= ACCOUNT_ADDRESS_FLAG;
+        }
+
+        /**
+         * Set the flag for the balance.
+         */
+        __host__ __device__ __forceinline__  void set_balance() {
+            flags |= ACCOUNT_BALANCE_FLAG;
+        }
+
+        /**
+         * Set the flag for the nonce.
+         */
+        __host__ __device__ __forceinline__  void set_nonce() {
+            flags |= ACCOUNT_NONCE_FLAG;
+        }
+
+        /**
+         * Set the flag for the byte code.
+         */
+        __host__ __device__ __forceinline__  void set_byte_code() {
+            flags |= ACCOUNT_BYTE_CODE_FLAG;
+        }
+
+        /**
+         * Set the flag for the storage.
+         */
+        __host__ __device__ __forceinline__  void set_storage() {
+            flags |= ACCOUNT_STORAGE_FLAG;
+        }
+
+        /**
+         * Set the flag for the deleted.
+         */
+        __host__ __device__ __forceinline__ void set_deleted() {
+            flags = ACCOUNT_DELETED_FLAG;
+        }
+
+        /**
+         * Reset all flags
+         */
+        __host__ __device__ __forceinline__ void reset() {
+            flags = ACCOUNT_NONE_FLAG;
+        }
+    };
     /**
      * The account type.
     */
@@ -31,7 +163,7 @@ namespace cuEVM
          */
         __host__ account_t(
             const cJSON *account_json,
-            bool managed = false);
+            int32_t managed = false);
         
         /**
          * The copy constructor for the account data structure.
@@ -40,10 +172,14 @@ namespace cuEVM
         __host__ __device__ account_t(
             const account_t &account);
 
-        
+        /**
+         * The copy constructor for the account data structure with flags.
+         * @param[in] account The account data structure
+         * @param[in] flags The account flags
+         */
         __host__ __device__ account_t(
             const account_t &account,
-            bool with_storage);
+            const account_flags_t &flags);
         
         /**
          * The destructor for the account data structure.
@@ -103,6 +239,40 @@ namespace cuEVM
             bn_t &nonce);
         
         /**
+         * Set the address of the account.
+         * @param[in] arith The arithmetical environment
+         * @param[in] address The address of the account
+         */
+        __host__ __device__ void set_address(
+            ArithEnv &arith,
+            const bn_t &address);
+        
+        /**
+         * Set the balance of the account.
+         * @param[in] arith The arithmetical environment
+         * @param[in] balance The balance of the account
+         */
+        __host__ __device__ void set_balance(
+            ArithEnv &arith,
+            const bn_t &balance);
+        
+        /**
+         * Set the nonce of the account.
+         * @param[in] arith The arithmetical environment
+         * @param[in] nonce The nonce of the account
+         */
+        __host__ __device__ void set_nonce(
+            ArithEnv &arith,
+            const bn_t &nonce);
+        
+        /**
+         * set the byte code of the account.
+         * @param[in] byte_code The byte code of the account
+         */
+        __host__ __device__ void set_byte_code(
+            const byte_array_t &byte_code);
+        
+        /**
          * Verify if the account has the the given address.
          * @param[in] arith The arithmetical environment
          * @param[in] address The address
@@ -111,7 +281,26 @@ namespace cuEVM
         __host__ __device__ int32_t has_address(
             ArithEnv &arith,
             const bn_t &address);
-            
+        
+        /**
+         * Verify if the account is empty using arithmetical environment.
+         * @param[in] arith The arithmetical environment
+         * @return If empty 1, otherwise 0
+         */
+        __host__ __device__ int32_t account_t::is_empty(
+            ArithEnv &arith);
+        
+        /**
+         * Verify if the account is empty.
+         * @return If empty 1, otherwise 0
+         */
+        __host__ __device__ int32_t account_t::is_empty();
+        
+        /**
+         * Make the account completly empty.
+         */
+        __host__ __device__ void account_t::empty();
+
         /**
          * Setup the account data structure from the json object.
          * @param[in] account_json The json object
@@ -119,14 +308,13 @@ namespace cuEVM
          */
         __host__ void from_json(
             const cJSON *account_json,
-            bool managed = false);
+            int32_t managed = false);
         
         /**
          * Generate a JSON object from the account data structure.
          * @return The JSON object
          */
-        __host__ cJSON* to_json(
-            int32_t managed = 0);
+        __host__ cJSON* to_json();
 
         /**
          * Print the account data structure.

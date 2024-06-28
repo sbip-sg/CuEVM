@@ -311,7 +311,7 @@ public:
   __host__ __device__ void trim_to_uint64(bn_t &dst, bn_t &src);
   /**
    * Get the data at the given index for the given length.
-   * If the index is greater than the data size, it returns NULL.
+   * If the index is greater than the data size, it returns nullptr.
    * If the length is greater than the data size - index, it returns
    * the data from index to the end of the data and sets the
    * available size to the data size - index. Otherwise, it returns

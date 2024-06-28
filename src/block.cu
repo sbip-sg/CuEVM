@@ -21,11 +21,11 @@ namespace cuEVM {
         const cJSON *test
     ) : _arith(arith)
     {
-      cJSON *block_json = NULL;
-      cJSON *element_json = NULL;
-      cJSON *previous_blocks_json = NULL;
+      cJSON *block_json = nullptr;
+      cJSON *element_json = nullptr;
+      cJSON *previous_blocks_json = nullptr;
       size_t idx = 0;
-      content = NULL;
+      content = nullptr;
     #ifndef ONLY_CPU
       CUDA_CHECK(cudaMallocManaged(
           (void **)&(content),
@@ -49,7 +49,7 @@ namespace cuEVM {
       content->difficulty.from_hex(element_json->valuestring);
 
       element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentRandom");
-      if (element_json != NULL)
+      if (element_json != nullptr)
       {
         content->prevrandao.from_hex(element_json->valuestring);
       }
@@ -65,7 +65,7 @@ namespace cuEVM {
       content->base_fee.from_hex(element_json->valuestring);
 
       previous_blocks_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHashes");
-      if (previous_blocks_json != NULL and cJSON_IsArray(previous_blocks_json))
+      if (previous_blocks_json != nullptr and cJSON_IsArray(previous_blocks_json))
       {
         idx = 0;
         cJSON_ArrayForEach(element_json, previous_blocks_json)
@@ -86,7 +86,7 @@ namespace cuEVM {
 
         element_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");
 
-        if (element_json != NULL){
+        if (element_json != nullptr){
           content->previous_blocks[0].hash.from_hex(element_json->valuestring);
         } else {
           content->previous_blocks[0].hash.from_size_t(0);
@@ -106,7 +106,7 @@ namespace cuEVM {
 
     __host__ __device__ EVMBlockInfo::~EVMBlockInfo()
     {
-      content = NULL;
+      content = nullptr;
     }
 
 
@@ -117,7 +117,7 @@ namespace cuEVM {
     #else
       delete content;
     #endif
-      content = NULL;
+      content = nullptr;
     }
 
 
@@ -241,9 +241,9 @@ namespace cuEVM {
     {
       uint32_t idx = 0;
       char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-      cJSON *block_json = NULL;
-      cJSON *previous_blocks_json = NULL;
-      cJSON *previous_block_json = NULL;
+      cJSON *block_json = nullptr;
+      cJSON *previous_blocks_json = nullptr;
+      cJSON *previous_block_json = nullptr;
 
       block_json = cJSON_CreateObject();
 
@@ -294,7 +294,7 @@ namespace cuEVM {
       cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
       
       delete[] hex_string_ptr;
-      hex_string_ptr = NULL;
+      hex_string_ptr = nullptr;
       return block_json;
     }
   }

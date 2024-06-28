@@ -31,7 +31,7 @@ namespace cuEVM {
     /**
      * The default constructor.
      */
-    __host__ __device__ byte_array_t() = default;
+    __host__ __device__ byte_array_t() : size(0), data(nullptr) {};
     /**
      * The constructor with the size.
      * @param[in] size The size of the array.
@@ -49,13 +49,11 @@ namespace cuEVM {
     /**
      * The constructor with the hex string.
      * @param[in] hex_string The hex string.
-     * @param[in] size The size of the array.
      * @param[in] endian The endian format.
      * @param[in] padding The padding direction.
      */
     __host__ __device__ byte_array_t(
       const char *hex_string,
-      uint32_t size = 0,
       int32_t endian = LITTLE_ENDIAN,
       PaddingDirection padding = NO_PADDING);
     /**
@@ -93,6 +91,7 @@ namespace cuEVM {
      * Get the byte array from a hex string in Little Endian format.
      * @param[in] clean_hex_string The clean hex string.
      * @param[in] length The length of the clean hex string.
+     * @return The Error code. 0 for success, 1 for failure.
      */
     __host__ __device__ int32_t from_hex_set_le(
       const char *clean_hex_string,
@@ -102,11 +101,26 @@ namespace cuEVM {
      * @param[in] clean_hex_string The clean hex string.
      * @param[in] length The length of the clean hex string.
      * @param[in] padded The padding direction ( 0 for left padding, 1 for right padding)
+     * @return The Error code. 0 for success, 1 for failure.
      */
     __host__ __device__ int32_t from_hex_set_be(
       const char *clean_hex_string,
       int32_t length,
       PaddingDirection padding);
+    
+    /**
+     * Get the byte array from a hex string.
+     * @param[in] hex_string The hex string.
+     * @param[in] endian The endian format.
+     * @param[in] padding The padding direction.
+     * @param[in] managed The managed flag.
+     * @return The Error code. 0 for success, 1 for failure.
+     */
+    __host__ __device__ int32_t from_hex(
+      const char *hex_string,
+      int32_t endian = LITTLE_ENDIAN,
+      PaddingDirection padding = NO_PADDING,
+      int32_t managed = 0);
     /**
      * Copy the source byte array
      * considering a Big Endian format, the extra size

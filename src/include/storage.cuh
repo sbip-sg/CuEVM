@@ -176,7 +176,18 @@ namespace cuEVM
              */
             __host__ __device__ contract_storage_t(
                 const cJSON *contract_storage_json);
-            // i need to set, get and print the storage elements
+            
+            /**
+             * The destructor for the contract storage
+             */
+            __host__ __device__ ~contract_storage_t();
+
+            /**
+             * The assignment operator for the contract storage
+             * @param[in] contract_storage The contract storage to assign
+             */
+            __host__ __device__ contract_storage_t &operator=(
+                const contract_storage_t &contract_storage);
 
             /**
              * The free internal storage

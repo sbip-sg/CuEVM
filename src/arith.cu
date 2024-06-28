@@ -11,20 +11,24 @@ namespace cuEVM {
   __host__ __device__ evm_word_t::evm_word_t(
     const evm_word_t &src)
   {
-    #pragma unroll
-    for (int32_t index = 0; index < CGBN_LIMBS; index++)
-    {
-      _limbs[index] = src._limbs[index];
-    }
-  }
-
-  __host__ __device__ evm_word_t& evm_word_t::operator=(
-    const evm_word_t &src) {
+      /*
     #pragma unroll
     for (int32_t index = 0; index < CGBN_LIMBS; index++) {
       _limbs[index] = src._limbs[index];
     }
-    return *this;
+    return *this;*/
+    std::copy(src._limbs, src._limbs + CGBN_LIMBS, _limbs);
+  }
+
+  __host__ __device__ evm_word_t& evm_word_t::operator=(
+    const evm_word_t &src) {
+      /*
+    #pragma unroll
+    for (int32_t index = 0; index < CGBN_LIMBS; index++) {
+      _limbs[index] = src._limbs[index];
+    }
+    return *this;*/
+    std::copy(src._limbs, src._limbs + CGBN_LIMBS, _limbs);
   }
 
   __host__ __device__ int32_t evm_word_t::operator==(
@@ -69,7 +73,7 @@ namespace cuEVM {
     byte_array_t &byte_array)
   {
     uint8_t *bytes = byte_array.data;
-    if (bytes == NULL)
+    if (bytes == nullptr)
     {
       return 1;
     }
@@ -408,7 +412,7 @@ namespace cuEVM {
         (overflow != 0) ||
         (index_s >= data_content.size))
     {
-        return NULL;
+        return nullptr;
     }
     else
     {
