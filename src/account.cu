@@ -1,5 +1,5 @@
 #include "include/account.cuh"
-#include "include/utils.h"
+#include "include/utils.cuh"
 
 namespace cuEVM
 {
@@ -34,22 +34,25 @@ namespace cuEVM
         }
 
         if (
-            (src_instances[instance].storage != NULL) &&
-            (src_instances[instance].storage_size > 0)
+            (src_instances[instance].storage.storage != NULL) &&
+            (src_instances[instance].storage.capacity > 0) &&
+            (src_instances[instance].storage.size > 0)
         ) {
             memcpy(
-                dst_instances[instance].storage,
-                src_instances[instance].storage,
-                src_instances[instance].storage_size *
-                    sizeof(contract_storage_t)
+                dst_instances[instance].storage.storage,
+                src_instances[instance].storage.storage,
+                src_instances[instance].storage.size *
+                    sizeof(cuEVM::storage::storage_element_t)
             );
-            dst_instances[instance].storage_size = src_instances[instance].storage_size;
-            delete[] src_instances[instance].storage;
-            src_instances[instance].storage = NULL;
-            src_instances[instance].storage_size = 0;
+            dst_instances[instance].storage.size = src_instances[instance].storage.size;
+            delete[] src_instances[instance].storage.storage;
+            src_instances[instance].storage.storage = NULL;
+            src_instances[instance].storage.capacity = 0;
+            src_instances[instance].storage.size = 0;
         } else {
             dst_instances[instance].storage = NULL;
-            dst_instances[instance].storage_size = 0;
+            dst_instances[instance].storage.capacity = 0;
+            dst_instances[instance].storage.size = 0;
         }
         // copy the others not necesary
         memcpy(
@@ -70,23 +73,35 @@ namespace cuEVM
     }
 
     __host__ __device__ void free_internals_account(
-        account_t &account)
+        account_t &account,
+        int32_t managed = 0)
     {
         if (
             (account.byte_code.data != NULL) &&
             (account.byte_code.size > 0)
         ) {
-            delete[] account.byte_code.data;
+            if (managed)
+            {
+                CUDA_CHECK(cudaFree(account.byte_code.data));
+            } else {
+                delete[] account.byte_code.data;
+            }
             account.byte_code.data = NULL;
             account.byte_code.size = 0;
         }
         if (
-            (account.storage != NULL) &&
-            (account.storage_size > 0)
+            (account.storage.storage != NULL) &&
+            (account.storage.capacity > 0)
         ) {
-            delete[] account.storage;
-            account.storage = NULL;
-            account.storage_size = 0;
+            if (managed)
+            {
+                CUDA_CHECK(cudaFree(account.storage.storage));
+            } else {
+                delete[] account.storage.storage;
+            }
+            account.storage.storage = NULL;
+            account.storage.capacity = 0;
+            account.storage.size = 0;
         }
     }
 

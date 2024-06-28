@@ -53,7 +53,28 @@ struct evm_word_t : cgbn_mem_t<EVM_WORD_BITS> {
    */
   __host__ __device__ evm_word_t(
     const evm_word_t &src);
+  
+  /**
+   * The assignment operator.
+   */
+  __host__ __device__ evm_word_t& operator=(
+    const evm_word_t &src);
+  
+  /**
+   * The equality operator.
+   * @param[in] other The other evm_word_t
+   * @return 1 for equal, 0 otherwise
+   */
+  __host__ __device__ int32_t operator==(
+    const evm_word_t &other) const;
 
+  /**
+   * The equality operator for uint32_t
+   * @param[in] value the uint32_t value
+   * @return 1 for equal, 0 otherwise
+   */
+  __host__ __device__ int32_t operator==(
+    const uint32_t &value) const;
   /**
    * Set the evm_word_t from a hex string.
    * The hex string is in Big Endian format.
@@ -95,41 +116,45 @@ struct evm_word_t : cgbn_mem_t<EVM_WORD_BITS> {
   /**
    * Print the evm_word_t.
    */
-  __host__ __device__ void print();
+  __host__ __device__ void print() const;
   /**
    * Get the hex string from the evm_word_t.
    * The hex string is in Big Endian format.
-   * The hex string must be freed by the caller.
+   * If the caller does not provide a hex string, it allocates one.
+   * Note: The caller must free the hex string.
+   * @param[inout] hex_string The destination hex string
+   * @param[in] pretty If the hex string should be left trimmed of zeros
    * @param[in] count The number of the least significant
    * limbs to convert
    * @return The hex string
    */
   __host__ __device__ char* to_hex(
-    uint32_t count = CGBN_LIMBS);
-  /**
-   * Get the pretty hex string from the evm_word_t.
-   * The hex string is in Big Endian format.
-   * The hex string must be freed by the caller.
-   * The hex string has the leading zeroes removed.
-   * @return The hex string
-   */
-  __host__ __device__ char* to_pretty_hex();
+    char *hex_string = nullptr,
+    int32_t pretty = 0,
+    uint32_t count = CGBN_LIMBS) const;
   /**
    * Get the byte array from the evm_word_t.
    * The byte array is in Big Endian format.
-   * The byte array must be freed by the caller.
+   * If the caller does not provide a byte array, it allocates one.
+   * Note: The caller must free the byte array.
+   * @param[out] byte_array The destination byte array
    * @return byte_array The destination byte array
    */
-  __host__ __device__ byte_array_t* to_byte_array_t();
+  __host__ __device__ byte_array_t* to_byte_array_t(
+    byte_array_t *byte_array = nullptr) const;
   /**
    * Get the bit array from the evm_word_t.
    * The bit array is in Big Endian format.
-   * The bit array must be freed by the caller.
+   * If the caller does not provide a byte array, it allocates one.
+   * Note: The caller must free the byte array.
    * @param[out] bit_array The destination bit array
+   * @return bit_array The destination bit array
    */
-  __host__ __device__ byte_array_t* to_bit_array_t();
+  __host__ __device__ byte_array_t* to_bit_array_t(
+    byte_array_t *bit_array = nullptr) const;
 };
 
+typedef cgbn_mem_t<EVM_WORD_BITS>* cgbn_evm_word_t_ptr;
 
 /**
  * The arithmetic environment class is a wrapper around the CGBN library.

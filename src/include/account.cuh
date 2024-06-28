@@ -2,31 +2,138 @@
 #define _CUEVM_ACCOUNT_H_
 
 #include "arith.cuh"
+#include "storage.cuh"
 
 namespace cuEVM
 {
   namespace account
   {
     /**
-     * The storage entry type.
-    */
-    typedef struct
-    {
-        evm_word_t key; /**< The key of the storage */
-        evm_word_t value; /**< The value of the storage for the given key */
-    } contract_storage_t;
-    /**
      * The account type.
     */
-    typedef struct
+    struct account_t
     {
         evm_word_t address; /**< The address of the account (YP: \f$a\f$) */
         evm_word_t balance; /**< The balance of the account (YP: \f$\sigma[a]_{b}\f$) */
         evm_word_t nonce; /**< The nonce of the account (YP: \f$\sigma[a]_{n}\f$) */
         byte_array_t byte_code; /**< The bytecode of the account (YP: \f$b\f$) */
-        uint32_t storage_size; /**< The number of storage entries (YP: \f$|\sigma[a]_{s}|\f$) */
-        contract_storage_t *storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
-    } account_t;
+        cuEVM::storage::contract_storage_t storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
+
+        /**
+         * The default constructor for the account data structure.
+         */
+        __host__ __device__ account_t() = default;
+
+        /**
+         * The constructor for the account data structure.
+         * @param[in] account_json The json object
+         * @param[in] managed The flag to indicate if the memory is managed
+         */
+        __host__ account_t(
+            const cJSON *account_json,
+            bool managed = false);
+        
+        /**
+         * The copy constructor for the account data structure.
+         * @param[in] account The account data structure
+         */
+        __host__ __device__ account_t(
+            const account_t &account);
+
+        
+        __host__ __device__ account_t(
+            const account_t &account,
+            bool with_storage);
+        
+        /**
+         * The destructor for the account data structure.
+         */
+        __host__ __device__ int32_t free_internals(
+            int32_t managed = 0);
+
+
+        /**
+         * Get the storage value for the given key.
+         * @param[in] arith The arithmetical environment
+         * @param[in] key The key
+         * @param[out] value The value
+         * @return If found 1, otherwise 0
+         */
+        __host__ __device__ int32_t get_storage_value(
+            ArithEnv &arith,
+            const bn_t &key,
+            bn_t &value);
+        /**
+         * Set the storage value for the given key.
+         * @param[in] arith The arithmetical environment
+         * @param[in] key The key of the storage
+         * @param[in] value The value of the storage
+         * @return If found succesfull, otherwise 0
+         */
+        __host__ __device__ int32_t set_storage_value(
+            ArithEnv &arith,
+            const bn_t &key,
+            const bn_t &value);
+        
+        /**
+         * Get the address of the account.
+         * @param[in] arith The arithmetical environment
+         * @param[out] address The address of the account
+         */
+        __host__ __device__ void get_address(
+            ArithEnv &arith,
+            bn_t &address);
+        
+        /**
+         * Get the balance of the account.
+         * @param[in] arith The arithmetical environment
+         * @param[out] balance The balance of the account
+         */
+        __host__ __device__ void get_balance(
+            ArithEnv &arith,
+            bn_t &balance);
+        
+        /**
+         * Get the nonce of the account.
+         * @param[in] arith The arithmetical environment
+         * @param[out] nonce The nonce of the account
+         */
+        __host__ __device__ void get_nonce(
+            ArithEnv &arith,
+            bn_t &nonce);
+        
+        /**
+         * Verify if the account has the the given address.
+         * @param[in] arith The arithmetical environment
+         * @param[in] address The address
+         * @return If found 1, otherwise 0
+         */
+        __host__ __device__ int32_t has_address(
+            ArithEnv &arith,
+            const bn_t &address);
+            
+        /**
+         * Setup the account data structure from the json object.
+         * @param[in] account_json The json object
+         * @param[in] managed The flag to indicate if the memory is managed
+         */
+        __host__ void from_json(
+            const cJSON *account_json,
+            bool managed = false);
+        
+        /**
+         * Generate a JSON object from the account data structure.
+         * @return The JSON object
+         */
+        __host__ cJSON* to_json(
+            int32_t managed = 0);
+
+        /**
+         * Print the account data structure.
+         */
+        __host__ __device__ void print();
+
+    };
 
     /**
      * The kernel to copy the account data structures.
@@ -43,9 +150,11 @@ namespace cuEVM
      * Free the memory of the internal byte_code and storage
      * of the account.
      * @param[inout] account The account data structure
+     * @param[in] managed The flag to indicate if the memory is managed
      */
     __host__ __device__ void free_internals_account(
-        account_t &account);
+        account_t &account,
+        int32_t managed = 0);
 
     /**
      * Generate the cpu data structures for the account.

@@ -27,6 +27,32 @@ namespace cuEVM {
     return *this;
   }
 
+  __host__ __device__ int32_t evm_word_t::operator==(
+    const evm_word_t &other) const {
+    #pragma unroll
+    for (int32_t index = 0; index < CGBN_LIMBS; index++) {
+      if (_limbs[index] != other._limbs[index]) {
+        return 0;
+      }
+    }
+    return 1;
+  }
+
+  
+  __host__ __device__ int32_t evm_word_t::operator==(
+    const uint32_t &value) const {
+    #pragma unroll
+    if (_limbs[0] != value) {
+      return 0;
+    }
+    for (int32_t index = 1; index < CGBN_LIMBS; index++) {
+      if (_limbs[index] != 0) {
+        return 0;
+      }
+    }
+    return 1;
+  }
+
   __host__ __device__ int32_t evm_word_t::from_hex(
     const char *hex_string)
   {
@@ -100,17 +126,22 @@ namespace cuEVM {
     _limbs[0] = value;
   }
 
-  __host__ __device__ void evm_word_t::print()
+  __host__ __device__ void evm_word_t::print() const
   {
     for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
       printf("%08x ", _limbs[CGBN_LIMBS - 1 - idx]);
     printf("\n");
   }
-
+  
   __host__ __device__ char* evm_word_t::to_hex(
-    uint32_t count = CGBN_LIMBS)
+    char *hex_string,
+    int32_t pretty,
+    uint32_t count) const
   {
-    char *hex_string = new char[count * 8 + 3];
+    if (hex_string == nullptr)
+    {
+      hex_string = new char[count * 8 + 3];
+    }
     hex_string[0] = '0';
     hex_string[1] = 'x';
     for (uint32_t idx = 0; idx < count; idx++)
@@ -122,18 +153,20 @@ namespace cuEVM {
       );
     }
     hex_string[count * 8 + 2] = '\0';
-  }
-
-  __host__ __device__ char* evm_word_t::to_pretty_hex()
-  {
-    char *hex_string = this->to_hex();
-    cuEVM::utils::hex_string_without_leading_zeros(hex_string);
+    if (pretty)
+    {
+      cuEVM::utils::hex_string_without_leading_zeros(hex_string);
+    }
     return hex_string;
   }
 
-  __host__ __device__ byte_array_t* evm_word_t::to_byte_array_t()
+  __host__ __device__ byte_array_t* evm_word_t::to_byte_array_t(
+    byte_array_t *byte_array) const
   {
-    byte_array_t *byte_array = new byte_array_t(EVM_WORD_SIZE);
+    if (byte_array == nullptr)
+    {
+      byte_array = new byte_array_t(EVM_WORD_SIZE);
+    }
     uint8_t *bytes = byte_array->data + EVM_WORD_SIZE - 1;
     for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
     {
@@ -145,10 +178,14 @@ namespace cuEVM {
     return byte_array;
   }
 
-  __host__ __device__ byte_array_t* evm_word_t::to_bit_array_t()
+  __host__ __device__ byte_array_t* evm_word_t::to_bit_array_t(
+    byte_array_t *bit_array) const
   {
-    byte_array_t *byte_array = new byte_array_t(EVM_WORD_BITS);
-    uint8_t *bytes = byte_array->data + EVM_WORD_BITS - 1;
+    if (bit_array == nullptr)
+    {
+      bit_array = new byte_array_t(EVM_WORD_BITS);
+    }
+    uint8_t *bytes = bit_array->data + EVM_WORD_BITS - 1;
     for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
     {
       for (int bit = 0; bit < 32; bit++)
@@ -156,7 +193,7 @@ namespace cuEVM {
         *(bytes--) = (_limbs[idx] >> bit) & 0x01;
       }
     }
-    return byte_array;
+    return bit_array;
   }
 
 

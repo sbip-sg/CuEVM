@@ -36,6 +36,10 @@ Building without sudo is also possible with extra configuration and modification
 * `cmake -S . -B build ` (to build only CPU version : `-DONLY_CPU=ON for debug -DCMAKE_BUILD_TYPE=Debug)
 * `cmake --build build`
 
+##### Build librarue
+
+* `rm -rf ../install/* && rm -rf ./* && cmake -DCMAKE_BUILD_TYPE=Debug .. && cmake --build . --target install`
+
 
 ## Usage
 `{interpreter}` is `build/cuevm` for CMake build and one of the `out/cpu_interpreter` or `out/interpreter`

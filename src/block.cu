@@ -82,14 +82,14 @@ namespace cuEVM {
       {
         idx = 0;
         // TODO: maybe fill with something else
-        _arith.cgbn_memory_from_size_t(content->previous_blocks[0].number, 0);
+        content->previous_blocks[0].number.from_size_t(0);
 
         element_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");
 
         if (element_json != NULL){
-          _arith.cgbn_memory_from_hex_string(content->previous_blocks[0].hash, element_json->valuestring);
+          content->previous_blocks[0].hash.from_hex(element_json->valuestring);
         } else {
-          _arith.cgbn_memory_from_size_t(content->previous_blocks[0].hash, 0);
+          content->previous_blocks[0].hash.from_size_t(0);
         }
 
         idx++;
@@ -98,8 +98,8 @@ namespace cuEVM {
       // fill the remaing parents with 0
       for (size_t jdx = idx; jdx < 256; jdx++)
       {
-        _arith.cgbn_memory_from_size_t(content->previous_blocks[jdx].number, 0);
-        _arith.cgbn_memory_from_size_t(content->previous_blocks[jdx].hash, 0);
+        content->previous_blocks[jdx].number.from_size_t(0);
+        content->previous_blocks[jdx].hash.from_size_t(0);
       }
     }
 
@@ -208,26 +208,26 @@ namespace cuEVM {
       bn_t number;
       printf("BLOCK: \n");
       printf("COINBASE: ");
-      _arith.print_cgbn_memory(content->coin_base);
+      content->coin_base.print();
       printf("TIMESTAMP: ");
-      _arith.print_cgbn_memory(content->time_stamp);
+      content->time_stamp.print();
       printf("NUMBER: ");
-      _arith.print_cgbn_memory(content->number);
+      content->number.print();
       printf("DIFICULTY: ");
-      _arith.print_cgbn_memory(content->difficulty);
+      content->difficulty.print();
       printf("GASLIMIT: ");
-      _arith.print_cgbn_memory(content->gas_limit);
+      content->gas_limit.print();
       printf("CHAINID: ");
-      _arith.print_cgbn_memory(content->chain_id);
+      content->chain_id.print();
       printf("BASE_FEE: ");
-      _arith.print_cgbn_memory(content->base_fee);
+      content->base_fee.print();
       printf("PREVIOUS_BLOCKS: \n");
       for (idx = 0; idx < 256; idx++)
       {
         printf("NUMBER: ");
-        _arith.print_cgbn_memory(content->previous_blocks[idx].number);
+        content->previous_blocks[idx].number.print();
         printf("HASH: ");
-        _arith.print_cgbn_memory(content->previous_blocks[idx].hash);
+        content->previous_blocks[idx].hash.print();
         printf("\n");
         cgbn_load(_arith.env, number, &(content->previous_blocks[idx].number));
         if (cgbn_compare_ui32(_arith.env, number, 0) == 0)
@@ -247,25 +247,25 @@ namespace cuEVM {
 
       block_json = cJSON_CreateObject();
 
-      _arith.hex_string_from_cgbn_memory(hex_string_ptr, content->coin_base, 5);
+      hex_string_ptr = content->coin_base.to_hex(hex_string_ptr, 0, 5);
       cJSON_AddStringToObject(block_json, "currentCoinbase", hex_string_ptr);
 
-      _arith.hex_string_from_cgbn_memory(hex_string_ptr, content->time_stamp);
+      hex_string_ptr = content->time_stamp.to_hex(hex_string_ptr);
       cJSON_AddStringToObject(block_json, "currentTimestamp", hex_string_ptr);
 
-      _arith.hex_string_from_cgbn_memory(hex_string_ptr, content->number);
+      hex_string_ptr = content->number.to_hex(hex_string_ptr);
       cJSON_AddStringToObject(block_json, "currentNumber", hex_string_ptr);
 
-      _arith.hex_string_from_cgbn_memory(hex_string_ptr, content->difficulty);
+      hex_string_ptr = content->difficulty.to_hex(hex_string_ptr);
       cJSON_AddStringToObject(block_json, "currentDifficulty", hex_string_ptr);
 
-      _arith.hex_string_from_cgbn_memory(hex_string_ptr, content->gas_limit);
+      hex_string_ptr = content->prevrandao.to_hex(hex_string_ptr);
       cJSON_AddStringToObject(block_json, "currentGasLimit", hex_string_ptr);
 
-      _arith.hex_string_from_cgbn_memory(hex_string_ptr, content->chain_id);
+      hex_string_ptr = content->gas_limit.to_hex(hex_string_ptr);
       cJSON_AddStringToObject(block_json, "currentChainId", hex_string_ptr);
 
-      _arith.hex_string_from_cgbn_memory(hex_string_ptr, content->base_fee);
+      hex_string_ptr = content->base_fee.to_hex(hex_string_ptr);
       cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string_ptr);
 
       previous_blocks_json = cJSON_CreateArray();
@@ -274,16 +274,12 @@ namespace cuEVM {
       {
         previous_block_json = cJSON_CreateObject();
 
-        _arith.hex_string_from_cgbn_memory(
-          hex_string_ptr,
-          content->previous_blocks[idx].number
-        );
+        
+        hex_string_ptr = content->previous_blocks[idx].number.to_hex(hex_string_ptr);
         cJSON_AddStringToObject(previous_block_json, "number", hex_string_ptr);
 
-        _arith.hex_string_from_cgbn_memory(
-          hex_string_ptr,
-          content->previous_blocks[idx].hash
-        );
+        
+        hex_string_ptr = content->previous_blocks[idx].hash.to_hex(hex_string_ptr);
         cJSON_AddStringToObject(previous_block_json, "hash", hex_string_ptr);
 
         cJSON_AddItemToArray(previous_blocks_json, previous_block_json);
