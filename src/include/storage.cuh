@@ -168,7 +168,7 @@ namespace cuEVM
             /**
              * The default constructor for the contract storage
              */
-            __host__ __device__ contract_storage_t() = default;
+            __host__ __device__ contract_storage_t() : size(0), capacity(0), storage(nullptr) {};
 
             /**
              * The constructor for the contract storage from a JSON object
@@ -193,8 +193,8 @@ namespace cuEVM
              * The free internal storage
              * @param[in] managed The flag to indicate if the memory is managed
              */
-            __host__ __device__ void free_internals(
-                int32_t managed = 0);
+            // __host__ __device__ void free_internals(
+            //     int32_t managed = 0);
 
             /**
              * Get the value for the given key
@@ -204,7 +204,7 @@ namespace cuEVM
              * @return The error code for the operation (1 means success)
              */
             __host__ __device__ int32_t get_value(
-                ArithEnv arith,
+                ArithEnv &arith,
                 const bn_t &key,
                 bn_t &value) const;
 
@@ -216,9 +216,18 @@ namespace cuEVM
              * @return The error code for the operation (1 means success)
              */
             __host__ __device__ int32_t set_value(
-                ArithEnv arith,
+                ArithEnv &arith,
                 const bn_t &key,
                 const bn_t &value);
+            
+            /**
+             * Update the the current storage with the given storage
+             * @param[in] arith The arithmetic environment
+             * @param[in] other The contract storage with the updates
+             */
+            __host__ __device__ void update(
+                ArithEnv &arith,
+                const contract_storage_t &other);
 
             /**
              * Get the contract stroage from a json object

@@ -6,7 +6,7 @@
 
 #include "include/jump_destinations.cuh"
 #include "include/opcodes.h"
-#include "include/utils.h"
+#include "include/utils.cuh"
 
 namespace cuEVM {
     __host__ __device__ EVMJumpDestinations::EVMJumpDestinations(

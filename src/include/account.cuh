@@ -28,7 +28,7 @@ namespace cuEVM
         /**
          * The default constructor for the account flags.
          */
-        __host__ __device__ account_flags_t() = default;
+        __host__ __device__ account_flags_t() : flags(ACCOUNT_NONE_FLAG) {};
 
         /**
          * The constructor for the account flags.
@@ -43,6 +43,24 @@ namespace cuEVM
         __host__ __device__ __forceinline__  account_flags_t(
             const account_flags_t &account_flags) : flags(account_flags.flags) {}
         
+        /**
+         * The assignment operator for the account flags.
+         * @param[in] account_flags The account flags
+         */
+        __host__ __device__ __forceinline__  account_flags_t &operator=(
+            const account_flags_t &account_flags) {
+            flags = account_flags.flags;
+            return *this;
+        }
+        /**
+         * The assignment operator for the account flags.
+         * @param[in] account_flags The account flags
+         */
+        __host__ __device__ __forceinline__  account_flags_t &operator=(
+            int32_t &other_flags) {
+            flags = other_flags;
+            return *this;
+        }
         /**
          * If the flag for the address is set.
          * @return If unset 0, otherwise 1
@@ -134,10 +152,34 @@ namespace cuEVM
         }
 
         /**
+         * Update the flags with the given flags.
+         */
+        __host__ __device__ __forceinline__ void update(
+            const account_flags_t &other_flags) {
+            flags |= other_flags.flags;
+        }
+        /**
          * Reset all flags
          */
         __host__ __device__ __forceinline__ void reset() {
             flags = ACCOUNT_NONE_FLAG;
+        }
+
+        /**
+         * Print the account flags.
+         */
+        __host__ __device__ __forceinline__ void print() {
+            printf("Account flags: %08x\n", flags);
+        }
+
+        /**
+         * Get the hextring of the account flags.
+         * @param[inout] hex The hex string
+         * @return The hex string
+         */
+        __host__ char *to_hex(char *hex) {
+            sprintf(hex, "%08x", flags);
+            return hex;
         }
     };
     /**
@@ -281,6 +323,28 @@ namespace cuEVM
         __host__ __device__ int32_t has_address(
             ArithEnv &arith,
             const bn_t &address);
+        
+        /**
+         * Verify if the account has the the given address.
+         * @param[in] arith The arithmetical environment
+         * @param[in] address The address as evm word
+         * @return If found 1, otherwise 0
+         */
+        __host__ __device__ int32_t has_address(
+            ArithEnv &arith,
+            const evm_word_t &address);
+        
+        /**
+         * Update the current account with the information
+         * from the given account
+         * @param[in] arith The arithemetic environment
+         * @param[in] other The given account
+         * @param[in] flags The flags to indicate which fields should be updated
+         */
+        __host__ __device__ void update(
+            ArithEnv &arith,
+            const account_t &other,
+            const account_flags_t &flags = ACCOUNT_NONE_FLAG);
         
         /**
          * Verify if the account is empty using arithmetical environment.

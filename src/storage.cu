@@ -111,7 +111,7 @@ namespace cuEVM {
 
         __host__ __device__ contract_storage_t::contract_storage_t(const cJSON *contract_storage_json)
         {
-            this->from_json(contract_storage_json);
+            from_json(contract_storage_json);
         }
 
         __host__ __device__ contract_storage_t::~contract_storage_t()
@@ -148,7 +148,7 @@ namespace cuEVM {
         }
 
         __host__ __device__ int32_t contract_storage_t::get_value(
-            ArithEnv arith,
+            ArithEnv &arith,
             const bn_t &key,
             bn_t &value) const
         {
@@ -165,7 +165,7 @@ namespace cuEVM {
         }
 
         __host__ __device__ int32_t contract_storage_t::set_value(
-            ArithEnv arith,
+            ArithEnv &arith,
             const bn_t &key,
             const bn_t &value)
         {
@@ -197,6 +197,18 @@ namespace cuEVM {
             this->storage[this->size].set_value(arith, value);
             this->size++;
             return 1;
+        }
+
+
+        __host__ __device__ void contract_storage_t::update(
+            ArithEnv &arith,
+            const contract_storage_t &other) {
+            bn_t key, value;
+            for(uint32_t idx = 0; idx < other.size; idx++) {
+                cgbn_load(arith.env, key, (cgbn_evm_word_t_ptr) &other.storage[idx].key);
+                cgbn_load(arith.env, value, (cgbn_evm_word_t_ptr) &other.storage[idx].value);
+                set_value(arith, key, value);
+            }
         }
 
         __host__ int32_t contract_storage_t::from_json(
@@ -267,17 +279,17 @@ namespace cuEVM {
             return contract_storage_json;
         }
 
-        __host__ __device__ void contract_storage_t::free_internals(
-            int32_t managed)
-        {
-            if (managed)
-            {
-                CUDA_CHECK(cudaFree(this->storage));
-            } else {
-                delete[] this->storage;
-            }
-            this->storage = nullptr;
-        }
+        // __host__ __device__ void contract_storage_t::free_internals(
+        //     int32_t managed)
+        // {
+        //     if (managed)
+        //     {
+        //         CUDA_CHECK(cudaFree(this->storage));
+        //     } else {
+        //         delete[] this->storage;
+        //     }
+        //     this->storage = nullptr;
+        // }
 
 
     } // namespace storage
