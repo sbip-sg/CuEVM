@@ -17,7 +17,7 @@ namespace cuEVM
             return;
         
         if (
-            (src_instances[instance].byte_code.data != NULL) &&
+            (src_instances[instance].byte_code.data != nullptr) &&
             (src_instances[instance].byte_code.size > 0)
         ) {
             memcpy(
@@ -27,15 +27,15 @@ namespace cuEVM
             );
             dst_instances[instance].byte_code.size = src_instances[instance].byte_code.size;
             delete[] src_instances[instance].byte_code.data;
-            src_instances[instance].byte_code.data = NULL;
+            src_instances[instance].byte_code.data = nullptr;
             src_instances[instance].byte_code.size = 0;
         } else {
-            dst_instances[instance].byte_code.data = NULL;
+            dst_instances[instance].byte_code.data = nullptr;
             dst_instances[instance].byte_code.size = 0;
         }
 
         if (
-            (src_instances[instance].storage.storage != NULL) &&
+            (src_instances[instance].storage.storage != nullptr) &&
             (src_instances[instance].storage.capacity > 0) &&
             (src_instances[instance].storage.size > 0)
         ) {
@@ -47,11 +47,11 @@ namespace cuEVM
             );
             dst_instances[instance].storage.size = src_instances[instance].storage.size;
             delete[] src_instances[instance].storage.storage;
-            src_instances[instance].storage.storage = NULL;
+            src_instances[instance].storage.storage = nullptr;
             src_instances[instance].storage.capacity = 0;
             src_instances[instance].storage.size = 0;
         } else {
-            dst_instances[instance].storage = NULL;
+            dst_instances[instance].storage = nullptr;
             dst_instances[instance].storage.capacity = 0;
             dst_instances[instance].storage.size = 0;
         }
@@ -185,6 +185,37 @@ namespace cuEVM
         return (cgbn_compare(arith.env, local_address, address) == 0);
     }
 
+    __host__ __device__ int32_t account_t::has_address(
+        ArithEnv &arith,
+        const evm_word_t &address)
+    {
+        bn_t local_address, target_address;
+        cgbn_load(arith.env, local_address, &this->address);
+        cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) &address);
+        return (cgbn_compare(arith.env, local_address, target_address) == 0);
+    }
+
+    __host__ __device__ void account_t::update(
+        ArithEnv &arith,
+        const account_t &other,
+        const account_flags_t &flags) {
+        if(flags.has_address()) {
+            address = other.address;
+        }
+        if(flags.has_balance()) {
+            balance = other.balance;
+        }
+        if(flags.has_nonce()) {
+            nonce = other.nonce;
+        }
+        if(flags.has_byte_code()) {
+            byte_code = other.byte_code;
+        }
+        if(flags.has_storage()) {
+            storage.update(arith, other.storage);
+        }
+    }
+
     __host__ __device__ int32_t account_t::is_empty(
         ArithEnv &arith)
     {
@@ -260,12 +291,47 @@ namespace cuEVM
         );
     }
 
+    __host__ cJSON* account_t::to_json()
+    {
+        cJSON *account_json = cJSON_CreateObject();
+        char *bytes_string = nullptr;
+        char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+        size_t jdx = 0;
+        address.to_hex(hex_string_ptr, 0, 5);
+        cJSON_SetValuestring(account_json, hex_string_ptr);
+        balance.to_hex(hex_string_ptr);
+        cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
+        nonce.to_hex(hex_string_ptr);
+        cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
+        bytes_string = byte_code.to_hex();
+        cJSON_AddStringToObject(account_json, "code", bytes_string);
+        delete[] bytes_string;
+        cJSON_AddItemToObject(account_json, "storage", storage.to_json(1));
+        delete[] hex_string_ptr;
+        hex_string_ptr = nullptr;
+        return account_json;
+    }
+
+    __host__ __device__ void account_t::print()
+    {
+        printf("Account:\n");
+        address.print();
+        printf("Balance: ");
+        balance.print();
+        printf("Nonce: ");
+        nonce.print();
+        printf("Byte code: ");
+        byte_code.print();
+        printf("Storage: \n");
+        storage.print();
+    }
+
     __host__ __device__ void free_internals_account(
         account_t &account,
         int32_t managed = 0)
     {
         if (
-            (account.byte_code.data != NULL) &&
+            (account.byte_code.data != nullptr) &&
             (account.byte_code.size > 0)
         ) {
             if (managed)
@@ -274,11 +340,11 @@ namespace cuEVM
             } else {
                 delete[] account.byte_code.data;
             }
-            account.byte_code.data = NULL;
+            account.byte_code.data = nullptr;
             account.byte_code.size = 0;
         }
         if (
-            (account.storage.storage != NULL) &&
+            (account.storage.storage != nullptr) &&
             (account.storage.capacity > 0)
         ) {
             if (managed)
@@ -287,7 +353,7 @@ namespace cuEVM
             } else {
                 delete[] account.storage.storage;
             }
-            account.storage.storage = NULL;
+            account.storage.storage = nullptr;
             account.storage.capacity = 0;
             account.storage.size = 0;
         }
@@ -299,10 +365,7 @@ namespace cuEVM
         account_t *cpu_instances = new account_t[count];
         for(uint32_t index; index < count; index++)
         {
-            cpu_instances[index].byte_code.data = NULL;
-            cpu_instances[index].byte_code.size = 0;
-            cpu_instances[index].storage = NULL;
-            cpu_instances[index].storage_size = 0;
+            cpu_instances[index].empty();
         }
         return cpu_instances;
     }
@@ -331,7 +394,7 @@ namespace cuEVM
         );
         for(uint32_t index; index < count; index++) {
             if (
-                (tmp_cpu_instances[index].byte_code.data != NULL) &&
+                (tmp_cpu_instances[index].byte_code.data != nullptr) &&
                 (tmp_cpu_instances[index].byte_code.size > 0)
             ) {
                 CUDA_CHECK(cudaMalloc(
@@ -346,19 +409,19 @@ namespace cuEVM
                 ));
             }
             if (
-                (tmp_cpu_instances[index].storage != NULL) &&
-                (tmp_cpu_instances[index].storage_size > 0)
+                (tmp_cpu_instances[index].storage.storage != nullptr) &&
+                (tmp_cpu_instances[index].storage.size > 0)
             ) {
                 CUDA_CHECK(cudaMalloc(
-                    &tmp_cpu_instances[index].storage,
-                    tmp_cpu_instances[index].storage_size *
-                        sizeof(contract_storage_t)
+                    &tmp_cpu_instances[index].storage.storage,
+                    tmp_cpu_instances[index].storage.size *
+                        sizeof(cuEVM::storage::storage_element_t)
                 ));
                 CUDA_CHECK(cudaMemcpy(
-                    tmp_cpu_instances[index].storage,
-                    cpu_instances[index].storage,
-                    cpu_instances[index].storage_size *
-                        sizeof(contract_storage_t),
+                    tmp_cpu_instances[index].storage.storage,
+                    cpu_instances[index].storage.storage,
+                    cpu_instances[index].storage.size *
+                        sizeof(cuEVM::storage::storage_element_t),
                     cudaMemcpyHostToDevice
                 ));
             }
@@ -391,16 +454,16 @@ namespace cuEVM
         for(uint32_t index; index < count; index++)
         {
             if (
-                (tmp_cpu_instances[index].byte_code.data != NULL) &&
+                (tmp_cpu_instances[index].byte_code.data != nullptr) &&
                 (tmp_cpu_instances[index].byte_code.size > 0)
             ) {
                 CUDA_CHECK(cudaFree(tmp_cpu_instances[index].byte_code.data));
             }
             if (
-                (tmp_cpu_instances[index].storage != NULL) &&
-                (tmp_cpu_instances[index].storage_size > 0)
+                (tmp_cpu_instances[index].storage.storage != nullptr) &&
+                (tmp_cpu_instances[index].storage.size > 0)
             ) {
-                CUDA_CHECK(cudaFree(tmp_cpu_instances[index].storage));
+                CUDA_CHECK(cudaFree(tmp_cpu_instances[index].storage.storage));
             }
         }
         delete[] tmp_cpu_instances;
@@ -429,22 +492,22 @@ namespace cuEVM
         for(uint32_t index; index < count; index++)
         {
             if (
-                (tmp_cpu_instances[index].byte_code.data != NULL) &&
+                (tmp_cpu_instances[index].byte_code.data != nullptr) &&
                 (tmp_cpu_instances[index].byte_code.size > 0)
             ) {
                 cpu_instances[index].byte_code.data = new uint8_t[tmp_cpu_instances[index].byte_code.size];
             } else {
-                cpu_instances[index].byte_code.data = NULL;
+                cpu_instances[index].byte_code.data = nullptr;
                 cpu_instances[index].byte_code.size = 0;
             }
             if (
-                (tmp_cpu_instances[index].storage != NULL) &&
-                (tmp_cpu_instances[index].storage_size > 0)
+                (tmp_cpu_instances[index].storage.storage != nullptr) &&
+                (tmp_cpu_instances[index].storage.size > 0)
             ) {
-                cpu_instances[index].storage = new contract_storage_t[tmp_cpu_instances[index].storage_size];
+                cpu_instances[index].storage.storage = new cuEVM::storage::storage_element_t[tmp_cpu_instances[index].storage.size];
             } else {
-                cpu_instances[index].storage = NULL;
-                cpu_instances[index].storage_size = 0;
+                cpu_instances[index].storage.storage = nullptr;
+                cpu_instances[index].storage.size = 0;
             }
         }
         delete[] tmp_cpu_instances;
@@ -477,7 +540,7 @@ namespace cuEVM
         for(uint32_t index; index < count; index++)
         {
             if (
-                (tmp_cpu_instances[index].byte_code.data != NULL) &&
+                (tmp_cpu_instances[index].byte_code.data != nullptr) &&
                 (tmp_cpu_instances[index].byte_code.size > 0)
             ) {
                 CUDA_CHECK(
@@ -490,26 +553,26 @@ namespace cuEVM
                 );
                 cpu_instances[index].byte_code.size = tmp_cpu_instances[index].byte_code.size;
             } else {
-                cpu_instances[index].byte_code.data = NULL;
+                cpu_instances[index].byte_code.data = nullptr;
                 cpu_instances[index].byte_code.size = 0;
             }
             if (
-                (tmp_cpu_instances[index].storage != NULL) &&
-                (tmp_cpu_instances[index].storage_size > 0)
+                (tmp_cpu_instances[index].storage.storage != nullptr) &&
+                (tmp_cpu_instances[index].storage.size > 0)
             ) {
                 CUDA_CHECK(
                     cudaMemcpy(
-                        cpu_instances[index].storage,
-                        tmp_cpu_instances[index].storage,
-                        tmp_cpu_instances[index].storage_size *
-                            sizeof(contract_storage_t),
+                        cpu_instances[index].storage.storage,
+                        tmp_cpu_instances[index].storage.storage,
+                        tmp_cpu_instances[index].storage.size *
+                            sizeof(cuEVM::storage::storage_element_t),
                         cudaMemcpyDeviceToHost
                     )
                 );
-                cpu_instances[index].storage_size = tmp_cpu_instances[index].storage_size;
+                cpu_instances[index].storage.size = tmp_cpu_instances[index].storage.size;
             } else {
-                cpu_instances[index].storage = NULL;
-                cpu_instances[index].storage_size = 0;
+                cpu_instances[index].storage.storage = nullptr;
+                cpu_instances[index].storage.size = 0;
             }
         }
         delete[] tmp_cpu_instances;
@@ -537,20 +600,20 @@ namespace cuEVM
         account_t &managed_instance)
     {
         if (
-            (managed_instance.byte_code.data != NULL) &&
+            (managed_instance.byte_code.data != nullptr) &&
             (managed_instance.byte_code.size > 0)
         ) {
             CUDA_CHECK(cudaFree(managed_instance.byte_code.data));
-            managed_instance.byte_code.data = NULL;
+            managed_instance.byte_code.data = nullptr;
             managed_instance.byte_code.size = 0;
         }
         if (
-            (managed_instance.storage != NULL) &&
-            (managed_instance.storage_size > 0)
+            (managed_instance.storage.storage != nullptr) &&
+            (managed_instance.storage.size > 0)
         ) {
-            CUDA_CHECK(cudaFree(managed_instance.storage));
-            managed_instance.storage = NULL;
-            managed_instance.storage_size = 0;
+            CUDA_CHECK(cudaFree(managed_instance.storage.storage));
+            managed_instance.storage.storage = nullptr;
+            managed_instance.storage.size = 0;
         }
     }
 
@@ -563,273 +626,6 @@ namespace cuEVM
             free_internals_managed_instance(managed_instances[index]);
         }
         CUDA_CHECK(cudaFree(managed_instances));
-    }
-    
-    // UTILITY Functions
-    __host__ void from_json(
-        account_t &account,
-        const cJSON *account_json,
-        bool managed = false)
-    {
-        cJSON *balance_json, *nonce_json, *code_json, *storage_json, *key_value_json;
-        char *hex_string;
-        // set the address
-        evm_word_t_from_hex_string(
-            account.address,
-            account_json->string);
-
-        // set the balance
-        balance_json = cJSON_GetObjectItemCaseSensitive(
-            account_json,
-            "balance");
-        evm_word_t_from_hex_string(
-            account.balance,
-            balance_json->valuestring);
-
-        // set the nonce
-        nonce_json = cJSON_GetObjectItemCaseSensitive(
-            account_json,
-            "nonce");
-        evm_word_t_from_hex_string(
-            account.nonce,
-            nonce_json->valuestring);
-
-        // set the code
-        code_json = cJSON_GetObjectItemCaseSensitive(
-            account_json,
-            "code");
-        hex_string = code_json->valuestring;
-        int32_t length = cuEVM::byte_array::clean_hex_string(&hex_string);
-        if (length < 0)
-        {
-            printf("Error: Invalid hex string\n");
-            exit(EXIT_FAILURE);
-        }
-        account.byte_code.size = (length + 1) / 2;
-        if (account.byte_code.size > 0)
-        {
-            if (managed)
-            {
-                CUDA_CHECK(cudaMallocManaged(
-                    (void **)&(account.byte_code.data),
-                    account.byte_code.size * sizeof(uint8_t)
-                ));
-            }
-            else
-            {
-                account.byte_code.data = new uint8_t[account.byte_code.size];
-            }
-            cuEVM::byte_array::byte_array_t_from_hex_set_le(
-                account.byte_code,
-                hex_string,
-                length
-            );
-            if (managed) {
-                CUDA_CHECK(cudaMemPrefetchAsync(
-                    (void **)&(account.byte_code.data),
-                    account.byte_code.size * sizeof(uint8_t),
-                    0
-                ));
-            }
-        }
-        else
-        {
-            account.byte_code.data = NULL;
-        }
-
-        // set the storage
-        storage_json = cJSON_GetObjectItemCaseSensitive(
-            account_json,
-            "storage");
-        account.storage_size = cJSON_GetArraySize(
-            storage_json);
-        
-        uint32_t index;
-        if (account.storage_size > 0)
-        {
-            if (managed)
-            {
-                CUDA_CHECK(cudaMallocManaged(
-                    (void **)&(account.storage),
-                    account.storage_size * sizeof(contract_storage_t)
-                ));
-            }
-            else
-            {
-                account.storage = new contract_storage_t[account.storage_size];
-            }
-            // iterate through the storage
-            index = 0;
-            cJSON_ArrayForEach(key_value_json, storage_json)
-            {
-                // set the key
-                evm_word_t_from_hex_string(
-                    account.storage[index].key,
-                    key_value_json->string);
-
-                // set the value
-                evm_word_t_from_hex_string(
-                    account.storage[index].value,
-                    key_value_json->valuestring);
-
-                index++;
-            }
-            if (managed) {
-                CUDA_CHECK(cudaMemPrefetchAsync(
-                    (void **)&(account.storage),
-                    account.storage_size * sizeof(contract_storage_t),
-                    0
-                ));
-            }
-        }
-        else
-        {
-            account.storage = NULL;
-        }
-    }
-    
-    __host__ cJSON* json(
-        account_t &account)
-    {
-        cJSON *account_json = NULL;
-        cJSON *storage_json = NULL;
-        char *bytes_string = NULL;
-        char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-        char *value_hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-        size_t jdx = 0;
-        account_json = cJSON_CreateObject();
-        // set the address
-        hex_string_from_evm_word_t(hex_string_ptr, account.address, 5);
-        cJSON_SetValuestring(account_json, hex_string_ptr);
-        // set the balance
-        hex_string_from_evm_word_t(hex_string_ptr, account.balance);
-        cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
-        // set the nonce
-        hex_string_from_evm_word_t(hex_string_ptr, account.nonce);
-        cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
-        // set the code
-        if (account.byte_code.size > 0)
-        {
-            bytes_string = cuEVM::byte_array::hex_from_bytes(account.byte_code.data, account.byte_code.size);
-            cJSON_AddStringToObject(account_json, "code", bytes_string);
-            delete[] bytes_string;
-        }
-        else
-        {
-            cJSON_AddStringToObject(account_json, "code", "0x");
-        }
-        // set the storage
-        storage_json = cJSON_CreateObject();
-        cJSON_AddItemToObject(account_json, "storage", storage_json);
-        if (account.storage_size > 0)
-        {
-            for (jdx = 0; jdx < account.storage_size; jdx++)
-            {
-                hex_string_from_evm_word_t(hex_string_ptr, account.storage[jdx].key);
-                hex_string_from_evm_word_t(value_hex_string_ptr, account.storage[jdx].value);
-                cJSON_AddStringToObject(storage_json, hex_string_ptr, value_hex_string_ptr);
-            }
-        }
-        delete[] hex_string_ptr;
-        hex_string_ptr = NULL;
-        delete[] value_hex_string_ptr;
-        value_hex_string_ptr = NULL;
-        return account_json;
-    }
-    
-    __host__ __device__ void print(
-        account_t &account)
-    {
-        printf("address: ");
-        print_evm_word_t(account.address);
-        printf("balance: ");
-        print_evm_word_t(account.balance);
-        printf("nonce: ");
-        print_evm_word_t(account.nonce);
-        cuEVM::byte_array::print_byte_array_t(account.byte_code);
-        printf("storage_size: %lu\n", account.storage_size);
-        for (size_t idx = 0; idx < account.storage_size; idx++)
-        {
-            printf("storage[%lu].key: ", idx);
-            print_evm_word_t(account.storage[idx].key);
-            printf("storage[%lu].value: ", idx);
-            print_evm_word_t(account.storage[idx].value);
-        }
-    }
-    
-    __host__ __device__ int32_t get_storage_index(
-        int32_t &index,
-        ArithEnv &arith,
-        const account_t &account,
-        bn_t &key)
-    {
-        bn_t local_key;
-        for (index = 0; index < account.storage_size; index++)
-        {
-            cgbn_load(arith.env, local_key, &(account.storage[index].key));
-            if (cgbn_compare(arith.env, local_key, key) == 0)
-            {
-                return 1;
-            }
-        }
-        return 0;
-    }
-    
-    __host__ __device__ void empty(
-        account_t &account)
-    {
-        memset(&account, 0, sizeof(account_t));
-    }
-    
-    __host__ __device__ void duplicate(
-        account_t &dst,
-        const account_t &src,
-        bool with_storage)
-    {
-        memcpy(&dst, &src, sizeof(account_t));
-        if (
-            (src.byte_code.data != NULL) &&
-            (src.byte_code.size > 0)
-        ) {
-            dst.byte_code.data = new uint8_t[src.byte_code.size];
-            memcpy(
-                dst.byte_code.data,
-                src.byte_code.data,
-                src.byte_code.size * sizeof(uint8_t)
-            );
-        } else {
-            dst.byte_code.data = NULL;
-            dst.byte_code.size = 0;
-        }
-        if (
-            (src.storage != NULL) &&
-            (src.storage_size > 0) &&
-            with_storage
-        ) {
-            dst.storage = new contract_storage_t[src.storage_size];
-            memcpy(
-                dst.storage,
-                src.storage,
-                src.storage_size * sizeof(contract_storage_t)
-            );
-        } else {
-            dst.storage = NULL;
-            dst.storage_size = 0;
-        }
-    }
-    
-    __host__ __device__ int32_t is_empty(
-        ArithEnv &arith,
-        account_t &account)
-    {
-        bn_t balance, nonce;
-        cgbn_load(arith.env, balance, &(account.balance));
-        cgbn_load(arith.env, nonce, &(account.nonce));
-        return (
-            (cgbn_compare_ui32(arith.env, balance, 0) == 0) &&
-            (cgbn_compare_ui32(arith.env, nonce, 0) == 0) &&
-            (account.byte_code.size == 0)
-        );
     }
   }
 }
