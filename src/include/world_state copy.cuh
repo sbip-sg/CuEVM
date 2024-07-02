@@ -4,198 +4,27 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#include "include/state.cuh"
-#include "include/utils.cuh"
+#ifndef _WORLD_STATE_H_
+#define _WORLD_STATE_H_
+
+#include "arith.cuh"
+#include <CuCrypto/keccak.cuh>
+
+#define STATE_READ_NONE 0
+#define STATE_READ_BALANCE 1
+#define STATE_READ_NONCE 2
+#define STATE_READ_CODE 4
+#define STATE_READ_STORAGE 8
+#define STATE_WRITE_NONE 0
+#define STATE_WRITE_BALANCE 1
+#define STATE_WRITE_NONCE 2
+#define STATE_WRITE_CODE 4
+#define STATE_WRITE_STORAGE 8
+#define STATE_WRITE_DELETE 16
+#define STATE_STORAGE_CHUNK 32 // allocate storage in chunks of 32
 
 namespace cuEVM {
-    namespace state {
-        __host__ __device__ state_t::~state_t() {
-            free();
-        }
-
-
-        __host__ __device__ state_t::state_t(const state_t &other) {
-            duplicate(other);
-        }
-
-
-        __host__ state_t::state_t(const cJSON *json, int32_t managed ) {
-            from_json(json, managed);
-        }
-
-
-        __host__ __device__ state_t& state_t::operator=(const state_t &other) {
-            if (this != &other) {
-                free();
-                duplicate(other);
-            }
-            return *this;
-        }
-
-        __host__ __device__ void state_t::duplicate(const state_t &other) {
-            no_accounts = other.no_accounts;
-            if (no_accounts > 0) {
-                accounts = new cuEVM::account::account_t[no_accounts];
-                for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                    accounts[idx] = other.accounts[idx];
-                }
-            } else {
-                accounts = nullptr;
-            }
-        }
-
-
-        __host__ __device__ void state_t::free() {
-            if (accounts != nullptr && no_accounts > 0) {
-                delete[] accounts;
-            }
-            no_accounts = 0;
-            accounts = nullptr;
-        }
-        __host__ __device__ int32_t state_t::get_account_index(
-                ArithEnv arith,
-                const bn_t &address,
-                uint32_t &index) {
-            for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                if (accounts[idx].has_address(arith, address)) {
-                    index = idx;
-                    return 1;
-                }
-            }
-            index = 0;
-            return 0;
-        }
-
-
-        __host__ __device__ int32_t state_t::get_account(
-            ArithEnv arith,
-            const bn_t &address,
-            cuEVM::account::account_t &account
-        ) {
-            uint32_t index;
-            if (get_account_index(arith, address, index)) {
-                account = accounts[index];
-                return 1;
-            }
-            return 0;
-        }
-
-
-        __host__ __device__ int32_t state_t::add_account(
-            const cuEVM::account::account_t &account
-        ) {
-            cuEVM::account::account_t *tmp_accounts = new cuEVM::account::account_t[no_accounts + 1];
-            std::copy(accounts, accounts + no_accounts, tmp_accounts);
-            tmp_accounts[no_accounts] = account;
-            if (accounts != nullptr) {
-                delete[] accounts;
-            }
-            accounts = tmp_accounts;
-            no_accounts++;
-            return 1;
-        }
-
-
-        __host__ __device__ int32_t state_t::set_account(
-            ArithEnv arith,
-            const cuEVM::account::account_t &account
-        ) {
-            bn_t target_address;
-            cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) &(account.address));
-            for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                if (accounts[idx].has_address(arith, target_address)) {
-                    accounts[idx] = account;
-                    return 1;
-                }
-            }
-            
-            return add_account(account);
-        }
-
-
-        __host__ __device__ int32_t state_t::has_account(
-            ArithEnv arith,
-            const bn_t &address
-        ) {
-            for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                if (accounts[idx].has_address(arith, address)) {
-                    return 1;
-                }
-            }
-            return 0;
-        }
-
-
-        __host__ __device__ int32_t state_t::update_account(
-            ArithEnv arith,
-            const cuEVM::account::account_t &account
-        ) {
-            bn_t target_address;
-            cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) &(account.address));
-            for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                if (accounts[idx].has_address(arith, target_address)) {
-                    accounts[idx].update(arith, account);
-                    return 1;
-                }
-            }
-            return add_account(account);
-        }
-
-
-        __host__ int32_t state_t::from_json(const cJSON *state_json, int32_t managed) {
-            if (!cJSON_IsArray(state_json)) return 0;
-            free();
-            no_accounts = cJSON_GetArraySize(state_json);
-            if (no_accounts == 0) return 1;
-            if (managed) {
-                CUDA_CHECK(cudaMallocManaged(
-                    (void **)&(accounts),
-                    no_accounts * sizeof(cuEVM::account::account_t)
-                ));
-            } else {
-                accounts = new cuEVM::account::account_t[no_accounts];
-            }
-            uint32_t idx = 0;
-            cJSON *account_json;
-            cJSON_ArrayForEach(account_json, state_json)
-            {
-                accounts[idx++].from_json(account_json, managed);
-            }
-            return 1;
-        }
-
-
-        __host__ __device__ void state_t::print() {
-            printf("no_accounts: %lu\n", no_accounts);
-            for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                printf("accounts[%lu]:\n", idx);
-                accounts[idx].print();
-            }
-        }
-
-
-        __host__ cJSON* state_t::to_json() {
-            cJSON *state_json = nullptr;
-            cJSON *account_json = nullptr;
-            char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-            char *flag_string_ptr = nullptr;
-            state_json = cJSON_CreateObject();
-            for(uint32_t idx = 0; idx < no_accounts; idx++) {
-                accounts[idx].address.to_hex(hex_string_ptr, 0, 5);
-                account_json = accounts[idx].to_json();
-                cJSON_AddItemToObject(
-                    state_json,
-                    hex_string_ptr,
-                    account_json);
-            }
-            delete[] hex_string_ptr;
-            hex_string_ptr = nullptr;
-            return state_json;
-        }
-    }
-}
-
-
+    namespace world_state {
 
 /**
  * Kernel to copy the accounts details and read operations
@@ -258,30 +87,6 @@ __global__ void kernel_touch_state_S2(
 class world_state_t
 {
 public:
-
-    /**
-     * The storage entry type.
-    */
-    typedef struct
-    {
-        evm_word_t key; /**< The key of the storage */
-        evm_word_t value; /**< The value of the storage for the given key */
-    } contract_storage_t;
-
-    /**
-     * The account type.
-    */
-    typedef struct alignas(32)
-    {
-        evm_word_t address; /**< The address of the account (YP: \f$a\f$) */
-        evm_word_t balance; /**< The balance of the account (YP: \f$\sigma[a]_{b}\f$) */
-        evm_word_t nonce; /**< The nonce of the account (YP: \f$\sigma[a]_{n}\f$) */
-        size_t code_size; /**< The size of the bytecode (YP: \f$|b|\f$) */
-        size_t storage_size; /**< The number of storage entries (YP: \f$|\sigma[a]_{s}|\f$) */
-        uint8_t *bytecode; /**< The bytecode of the account (YP: \f$b\f$) */
-        contract_storage_t *storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
-    } account_t;
-
     /**
      * The state data type.
     */
@@ -479,8 +284,8 @@ public:
             // set the storage
             storage_json = cJSON_GetObjectItemCaseSensitive(account_json, "storage");
             _content->accounts[idx].storage_size = cJSON_GetArraySize(storage_json);
-            // round to the next multiple of STORAGE_CHUNK
-            // _content->accounts[idx].storage_size = ((_content->accounts[idx].storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
+            // round to the next multiple of STATE_STORAGE_CHUNK
+            // _content->accounts[idx].storage_size = ((_content->accounts[idx].storage_size + STATE_STORAGE_CHUNK - 1) / STATE_STORAGE_CHUNK) * STATE_STORAGE_CHUNK;
             if (_content->accounts[idx].storage_size > 0)
             {
                 // allocate the storage
@@ -1111,7 +916,7 @@ public:
     {
         uint32_t tmp_error_code = ERR_SUCCESS;
         // get the account (and duplicate it if needed)
-        account_t *account = get_account(address, READ_STORAGE);
+        account_t *account = get_account(address, STATE_READ_STORAGE);
         // get the storage index
         size_t storage_idx = get_storage_index(account, key, tmp_error_code);
         // if storage does not exist, duplicate it from the world state
@@ -2175,7 +1980,7 @@ public:
         bn_t &nonce
     )
     {
-        account_t *account = get_account(address, READ_NONCE);
+        account_t *account = get_account(address, STATE_READ_NONCE);
         cgbn_load(_arith._env, nonce, &(account->nonce));
     }
 
@@ -2189,7 +1994,7 @@ public:
         bn_t &balance
     )
     {
-        account_t *account = get_account(address, READ_BALANCE);
+        account_t *account = get_account(address, STATE_READ_BALANCE);
         cgbn_load(_arith._env, balance, &(account->balance));
     }
 
@@ -2202,7 +2007,7 @@ public:
         bn_t &address
     )
     {
-        account_t *account = get_account(address, READ_CODE);
+        account_t *account = get_account(address, STATE_READ_CODE);
         return account->code_size;
     }
 
@@ -2215,7 +2020,7 @@ public:
         bn_t &address
     )
     {
-        account_t *account = get_account(address, READ_CODE);
+        account_t *account = get_account(address, STATE_READ_CODE);
         return account->bytecode;
     }
 
@@ -2240,7 +2045,7 @@ public:
         size_t &available_size
     )
     {
-        account_t *account = get_account(address, READ_CODE);
+        account_t *account = get_account(address, STATE_READ_CODE);
         cuEVM::byte_array_t code_data;
         code_data.data = account->bytecode;
         code_data.size = account->code_size;
@@ -2297,9 +2102,9 @@ public:
             // search it in the accessed state/global state
             if (tmp_error_code != ERR_SUCCESS)
             {
-                account = _accessed_state->get_account(address, READ_NONE);
+                account = _accessed_state->get_account(address, STATE_READ_NONE);
                 // there is no previous touch, so the account is not touched
-                touch = WRITE_NONE;
+                touch = STATE_WRITE_NONE;
             }
             // add the new account to the list
             account_idx = _content->touch_accounts.no_accounts;
@@ -2383,7 +2188,7 @@ public:
     {
         size_t account_idx = set_account(address);
         cgbn_store(_arith._env, &(_content->touch_accounts.accounts[account_idx].nonce), nonce);
-        _content->touch[account_idx] |= WRITE_NONCE;
+        _content->touch[account_idx] |= STATE_WRITE_NONCE;
     }
 
     /**
@@ -2398,7 +2203,7 @@ public:
     {
         size_t account_idx = set_account(address);
         cgbn_store(_arith._env, &(_content->touch_accounts.accounts[account_idx].balance), balance);
-        _content->touch[account_idx] |= WRITE_BALANCE;
+        _content->touch[account_idx] |= STATE_WRITE_BALANCE;
     }
 
     /**
@@ -2427,7 +2232,7 @@ public:
             );
             _content->touch_accounts.accounts[account_idx].code_size = code_size;
         )
-        _content->touch[account_idx] |= WRITE_CODE;
+        _content->touch[account_idx] |= STATE_WRITE_CODE;
     }
 
     /**
@@ -2669,9 +2474,9 @@ public:
             ONE_THREAD_PER_INSTANCE(
                 /* PERFORMENCE OPTION
                 size_t new_storage_size = ++account->storage_size;
-                if (new_storage_size % STORAGE_CHUNK == 1) {
-                    // Round up to the next multiple of STORAGE_CHUNK
-                    size_t new_capacity = ((new_storage_size + STORAGE_CHUNK - 1) / STORAGE_CHUNK) * STORAGE_CHUNK;
+                if (new_storage_size % STATE_STORAGE_CHUNK == 1) {
+                    // Round up to the next multiple of STATE_STORAGE_CHUNK
+                    size_t new_capacity = ((new_storage_size + STATE_STORAGE_CHUNK - 1) / STATE_STORAGE_CHUNK) * STATE_STORAGE_CHUNK;
                     contract_storage_t *tmp_storage = new contract_storage_t[new_capacity];
                     if (account->storage_size > 0)
                     {
@@ -2703,7 +2508,7 @@ public:
         }
         // set the value
         cgbn_store(_arith._env, &(account->storage[storage_idx].value), value);
-        _content->touch[account_idx] |= WRITE_STORAGE;
+        _content->touch[account_idx] |= STATE_WRITE_STORAGE;
     }
 
     /**
@@ -2715,7 +2520,7 @@ public:
     )
     {
         size_t account_idx = set_account(address);
-        _content->touch[account_idx] |= WRITE_DELETE;
+        _content->touch[account_idx] |= STATE_WRITE_DELETE;
     }
 
     /**
@@ -2729,7 +2534,7 @@ public:
         bn_t &address
     )
     {
-        account_t *account = get_account(address, READ_NONE);
+        account_t *account = get_account(address, STATE_READ_NONE);
         bn_t balance, nonce;
         cgbn_load(_arith._env, balance, &(account->balance));
         cgbn_load(_arith._env, nonce, &(account->nonce));
@@ -2757,7 +2562,7 @@ public:
         // if the account exist in the current touch state
         if (tmp_error_code == ERR_SUCCESS)
         {
-            return (_content->touch[account_idx] & WRITE_DELETE);
+            return (_content->touch[account_idx] & STATE_WRITE_DELETE);
         }
         else
         {
@@ -2771,7 +2576,7 @@ public:
                 account_idx = tmp_parent_state->get_account_index(address, tmp_error_code);
                 if (tmp_error_code == ERR_SUCCESS)
                 {
-                    return (tmp_parent_state->_content->touch[account_idx] & WRITE_DELETE);
+                    return (tmp_parent_state->_content->touch[account_idx] & STATE_WRITE_DELETE);
                 }
                 tmp_parent_state = tmp_parent_state->_parent_state;
             }
@@ -2918,23 +2723,23 @@ public:
             account = &(_content->touch_accounts.accounts[account_idx]);
 
             // if the account balance has been modified in the child touch state
-            if (child._content->touch[idx] & WRITE_BALANCE)
+            if (child._content->touch[idx] & STATE_WRITE_BALANCE)
             {
                 cgbn_load(_arith._env, balance, &(child._content->touch_accounts.accounts[idx].balance));
                 cgbn_store(_arith._env, &(account->balance), balance);
-                _content->touch[account_idx] |= WRITE_BALANCE;
+                _content->touch[account_idx] |= STATE_WRITE_BALANCE;
             }
 
             // if the account nonce has been modified in the child touch state
-            if (child._content->touch[idx] & WRITE_NONCE)
+            if (child._content->touch[idx] & STATE_WRITE_NONCE)
             {
                 cgbn_load(_arith._env, nonce, &(child._content->touch_accounts.accounts[idx].nonce));
                 cgbn_store(_arith._env, &(account->nonce), nonce);
-                _content->touch[account_idx] |= WRITE_NONCE;
+                _content->touch[account_idx] |= STATE_WRITE_NONCE;
             }
 
             // if the account code has been modified in the child touch state
-            if (child._content->touch[idx] & WRITE_CODE)
+            if (child._content->touch[idx] & STATE_WRITE_CODE)
             {
                 ONE_THREAD_PER_INSTANCE(
                     if (account->bytecode != NULL)
@@ -2950,7 +2755,7 @@ public:
                     );
                     account->code_size = child._content->touch_accounts.accounts[idx].code_size;
                 )
-                _content->touch[account_idx] |= WRITE_CODE;
+                _content->touch[account_idx] |= STATE_WRITE_CODE;
             }
 
             // go through all the storage entries of the child account
@@ -2961,14 +2766,14 @@ public:
                 set_value(address, key, value);
             }
             // if the account storage has been modified in the child touch state
-            if (child._content->touch[idx] & WRITE_STORAGE)
+            if (child._content->touch[idx] & STATE_WRITE_STORAGE)
             {
-                _content->touch[account_idx] |= WRITE_STORAGE;
+                _content->touch[account_idx] |= STATE_WRITE_STORAGE;
             }
             // if the account has rgister for delete
-            if (child._content->touch[idx] & WRITE_DELETE)
+            if (child._content->touch[idx] & STATE_WRITE_DELETE)
             {
-                _content->touch[account_idx] |= WRITE_DELETE;
+                _content->touch[account_idx] |= STATE_WRITE_DELETE;
             }
         }
     }
@@ -3657,7 +3462,7 @@ public:
         cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
 
         // set the balance
-        if (touch & WRITE_BALANCE) {
+        if (touch & STATE_WRITE_BALANCE) {
             _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->balance);
         } else {
             _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->balance);
@@ -3666,7 +3471,7 @@ public:
         cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
         
         // set the nonce
-        if (touch & WRITE_NONCE) {
+        if (touch & STATE_WRITE_NONCE) {
             _arith.hex_string_from_cgbn_memory(hex_string_ptr, touch_account->nonce);
         } else {
             _arith.hex_string_from_cgbn_memory(hex_string_ptr, world_account->nonce);
@@ -3676,7 +3481,7 @@ public:
 
         // set the code hash
 
-        if (touch & WRITE_CODE) {
+        if (touch & STATE_WRITE_CODE) {
             code = touch_account->bytecode;
             code_size = touch_account->code_size;
         } else {
@@ -3691,7 +3496,7 @@ public:
         // set the storage
         storage_json = cJSON_CreateArray();
         cJSON_AddItemToObject(account_json, "storage", storage_json);
-        if (touch & WRITE_STORAGE) {
+        if (touch & STATE_WRITE_STORAGE) {
             uint8_t *writen_storage;
             writen_storage = new uint8_t[touch_account->storage_size];
             memset(writen_storage, 0, touch_account->storage_size);
@@ -3798,7 +3603,7 @@ public:
                 writen_accounts[account_idx] = 1;
             }
             account_json = account_root_json(world_account, touch_account, touch);
-            if ( (touch & WRITE_DELETE) == 0)
+            if ( (touch & STATE_WRITE_DELETE) == 0)
                 cJSON_AddItemToArray(accounts_json, account_json);
             else
                 cJSON_Delete(account_json);
@@ -3811,7 +3616,7 @@ public:
                     NULL,
                     0
                 );
-                if ( (_content->touch[idx] & WRITE_DELETE) == 0)
+                if ( (_content->touch[idx] & STATE_WRITE_DELETE) == 0)
                     cJSON_AddItemToArray(accounts_json, account_json);
                 else
                     cJSON_Delete(account_json);

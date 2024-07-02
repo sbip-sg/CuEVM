@@ -232,10 +232,15 @@ namespace cuEVM
     __host__ __device__ int32_t account_t::is_empty()
     {
         return (
-            (this->balance == 0) &&
-            (this->nonce == 0) &&
-            (this->byte_code.size == 0)
+            (balance == 0) &&
+            (nonce == 0) &&
+            (byte_code.size == 0)
         );
+    }
+
+    __host__ __device__ int32_t account_t::is_contract()
+    {
+        return (byte_code.size > 0);
     }
 
     __host__ __device__ void account_t::empty()

@@ -12,6 +12,7 @@
 #define ACCOUNT_BYTE_CODE_FLAG  (1 << 3)
 #define ACCOUNT_STORAGE_FLAG (1 << 4)
 #define ACCOUNT_DELETED_FLAG (1 << 5)
+#define ACCOUNT_ALL_FLAG (ACCOUNT_ADDRESS_FLAG | ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG | ACCOUNT_STORAGE_FLAG)
 
 namespace cuEVM
 {
@@ -117,10 +118,24 @@ namespace cuEVM
         }
 
         /**
+         * Unset the flag for the address.
+         */
+        __host__ __device__ __forceinline__  void unset_address() {
+            flags &= ~ACCOUNT_ADDRESS_FLAG;
+        }
+
+        /**
          * Set the flag for the balance.
          */
         __host__ __device__ __forceinline__  void set_balance() {
             flags |= ACCOUNT_BALANCE_FLAG;
+        }
+
+        /**
+         * Unset the flag for the balance.
+         */
+        __host__ __device__ __forceinline__  void unset_balance() {
+            flags &= ~ACCOUNT_BALANCE_FLAG;
         }
 
         /**
@@ -131,10 +146,24 @@ namespace cuEVM
         }
 
         /**
+         * Unset the flag for the nonce.
+         */
+        __host__ __device__ __forceinline__  void unset_nonce() {
+            flags &= ~ACCOUNT_NONCE_FLAG;
+        }
+
+        /**
          * Set the flag for the byte code.
          */
         __host__ __device__ __forceinline__  void set_byte_code() {
             flags |= ACCOUNT_BYTE_CODE_FLAG;
+        }
+
+        /**
+         * Unset the flag for the byte code.
+         */
+        __host__ __device__ __forceinline__  void unset_byte_code() {
+            flags &= ~ACCOUNT_BYTE_CODE_FLAG;
         }
 
         /**
@@ -145,10 +174,24 @@ namespace cuEVM
         }
 
         /**
+         * Unset the flag for the storage.
+         */
+        __host__ __device__ __forceinline__  void unset_storage() {
+            flags &= ~ACCOUNT_STORAGE_FLAG;
+        }
+
+        /**
          * Set the flag for the deleted.
          */
         __host__ __device__ __forceinline__ void set_deleted() {
             flags = ACCOUNT_DELETED_FLAG;
+        }
+
+        /**
+         * Unset the flag for the deleted.
+         */
+        __host__ __device__ __forceinline__ void unset_deleted() {
+            flags &= ~ACCOUNT_DELETED_FLAG;
         }
 
         /**
@@ -163,6 +206,13 @@ namespace cuEVM
          */
         __host__ __device__ __forceinline__ void reset() {
             flags = ACCOUNT_NONE_FLAG;
+        }
+
+        /**
+         * Set all the flags.
+         */
+        __host__ __device__ __forceinline__ void set_all() {
+            flags = ACCOUNT_ALL_FLAG;
         }
 
         /**
@@ -344,26 +394,32 @@ namespace cuEVM
         __host__ __device__ void update(
             ArithEnv &arith,
             const account_t &other,
-            const account_flags_t &flags = ACCOUNT_NONE_FLAG);
+            const account_flags_t &flags = ACCOUNT_ALL_FLAG);
         
         /**
          * Verify if the account is empty using arithmetical environment.
          * @param[in] arith The arithmetical environment
          * @return If empty 1, otherwise 0
          */
-        __host__ __device__ int32_t account_t::is_empty(
+        __host__ __device__ int32_t is_empty(
             ArithEnv &arith);
         
         /**
          * Verify if the account is empty.
          * @return If empty 1, otherwise 0
          */
-        __host__ __device__ int32_t account_t::is_empty();
+        __host__ __device__ int32_t is_empty();
+
+        /**
+         * Verify if the account is a contract.
+         * @return If contract 1, otherwise 0
+         */
+        __host__ __device__ int32_t is_contract();
         
         /**
          * Make the account completly empty.
          */
-        __host__ __device__ void account_t::empty();
+        __host__ __device__ void empty();
 
         /**
          * Setup the account data structure from the json object.
