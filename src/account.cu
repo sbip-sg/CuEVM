@@ -105,6 +105,21 @@ namespace cuEVM
         }
     }
 
+    __host__ __device__ account_t::account_t(
+        const account_t* &account_ptr,
+        const account_flags_t &flags)
+    {
+        address = account_ptr->address;
+        balance = account_ptr->balance;
+        nonce = account_ptr->nonce;
+        if(flags.has_byte_code()) {
+            byte_code = account_ptr->byte_code;
+        }
+        if(flags.has_storage()) {
+            storage = account_ptr->storage;
+        }
+    }
+
     __host__ __device__ int32_t account_t::free_internals(
         int32_t managed)
     {

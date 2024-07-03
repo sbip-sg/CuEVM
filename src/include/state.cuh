@@ -242,6 +242,16 @@ namespace cuEVM {
                 return 0;
             }
 
+            __host__ __device__ int32_t add_account(
+                const cuEVM::account::account_t &account,
+                cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG) {
+                uint32_t index = 0;
+                add_account(account);
+                index = no_accounts - 1;
+                flags[index] = flag;
+                return 1;
+            }
+
             __host__ __device__ int32_t set_account(
                 ArithEnv &arith,
                 const cuEVM::account::account_t &account,

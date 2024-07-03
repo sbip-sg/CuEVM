@@ -12,6 +12,7 @@
 #define ACCOUNT_BYTE_CODE_FLAG  (1 << 3)
 #define ACCOUNT_STORAGE_FLAG (1 << 4)
 #define ACCOUNT_DELETED_FLAG (1 << 5)
+#define ACCOUNT_NON_STORAGE_FLAG (ACCOUNT_ADDRESS_FLAG | ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG)
 #define ACCOUNT_ALL_FLAG (ACCOUNT_ADDRESS_FLAG | ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG | ACCOUNT_STORAGE_FLAG)
 
 namespace cuEVM
@@ -272,6 +273,24 @@ namespace cuEVM
         __host__ __device__ account_t(
             const account_t &account,
             const account_flags_t &flags);
+
+        /**
+         * The copy constructor from the account ptr structure with flags.
+         * @param[in] account_ptr The account data structure
+         * @param[in] flags The account flags
+         */
+        __host__ __device__ account_t(
+            const account_t* &account_ptr,
+            const account_flags_t &flags);
+        
+        /**
+         * Constructor for an empty account with the given address.
+         * @param[in] arith The arithmetical environment
+         * @param[in] address The address of the account
+         */
+        __host__ __device__ account_t(
+            ArithEnv &arith,
+            const bn_t &address);
         
         /**
          * The destructor for the account data structure.

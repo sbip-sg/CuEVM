@@ -10,6 +10,49 @@ namespace cuEVM {
         private:
             state_access_t* _state;
             WorldState* _world_state;
+            __host__ __device__ int32_t add_duplicate_account(
+                cuEVM::account::account_t* &account_ptr,
+                cuEVM::account::account_t* &src_account_ptr,
+                const cuEVM::account::account_flags_t flag
+            ) {
+                cuEVM::account::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
+                account_ptr = new cuEVM::account::account_t(
+                    *src_account_ptr,
+                    no_storage_copy);
+                return _state->add_account(*account_ptr, flag);
+            }
+            __host__ __device__ int32_t add_new_account(
+                ArithEnv &arith,
+                const bn_t &address,
+                cuEVM::account::account_t* &account_ptr,
+                const cuEVM::account::account_flags_t flag
+            ) {
+                account_ptr = new cuEVM::account::account_t(
+                    arith,
+                    address);
+                return _state->add_account(*account_ptr, flag);
+            }
+
+            __host__ __device__ int32_t add_account(
+                ArithEnv &arith,
+                const bn_t &address,
+                cuEVM::account::account_t* &account_ptr,
+                const cuEVM::account::account_flags_t flag
+            ) {
+                cuEVM::account::account_t* tmp_account_ptr = nullptr;
+                if(_world_state->get_account(arith, address, tmp_account_ptr)) {
+                    return add_duplicate_account(
+                        account_ptr,
+                        tmp_account_ptr,
+                        flag);
+                } else {
+                    return add_new_account(
+                        arith,
+                        address,
+                        account_ptr,
+                        flag);
+                }
+            }
         public:
             __host__ __device__ AccessState() : _state(nullptr), _world_state(nullptr) {}
             __host__ __device__ AccessState(state_access_t* state, WorldState* world_state) : _state(state), _world_state(world_state) {}
@@ -22,30 +65,12 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 cuEVM::account::account_t* &account_ptr,
-                cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG
+                const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG
             ) {
                 if(_state->get_account(arith, address, account_ptr, flag)) {
                     return 1;
                 } else {
-                    cuEVM::account::account_t* tmp_account_ptr = nullptr;
-                    if(_world_state->get_account(arith, address, tmp_account_ptr)) {
-                        cuEVM::account::account_flags_t copy_flag;
-                        copy_flag.set_all();
-                        copy_flag.unset_storage();
-                        cuEVM::account::account_t *new_account = new cuEVM::account::account_t(
-                            *tmp_account_ptr,
-                            copy_flag
-                            );
-                    } else {
-                        cuEVM::account::account_flags_t new_flag;
-                        new_flag.set_all();
-                        new_flag.unset_storage();
-                        account_ptr = new cuEVM::account::account_t(
-                            arith,
-                            new_flag
-                        );
-                    
-                    }
+                    return add_account(arith, address, account_ptr, flag);
                 }
             }
 
@@ -53,24 +78,46 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 const bn_t &key,
-                bn_t &value
+                bn_t &value,
+                int32_t with_transfer = 1
             ) {
                 account::account_t* account_ptr = nullptr;
-                if (_state->get_account(arith, address, account_ptr)) {
-                    return account_ptr->get_storage_value(arith, key, value);
+                if (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG) == 0) {
+                    add_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG);
+                }
+                if (account_ptr->get_storage_value(arith, key, value)) {
+                    return 1;
+                } else {
+                    if (_world_state->get_value(arith, address, key, value) == 0) {
+                        cgbn_set_ui32(arith.env, value, 0);
+                    }
+                    if (with_transfer) {
+                        account_ptr->set_storage_value(arith, key, value);
+                    }
+                }
+                return 1;
+            }
+
+            __host__ __device__ int32_t is_warm_account(
+                ArithEnv &arith,
+                const bn_t &address
+            ) {
+                cuEVM::account::account_t* account_ptr = nullptr;
+                if (_state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG)) {
+                    return 1;
                 }
                 return 0;
             }
 
-            __host__ __device__ int32_t set_value(
+            __host__ __device__ int32_t is_warm_key(
                 ArithEnv &arith,
                 const bn_t &address,
-                const bn_t &key,
-                const bn_t &value
+                const bn_t &key
             ) {
-                account::account_t* account_ptr = nullptr;
-                if (_state->get_account(arith, address, account_ptr)) {
-                    return account_ptr->set_storage_value(arith, key, value);
+                cuEVM::account::account_t* account_ptr = nullptr;
+                if (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)) {
+                    bn_t value;
+                    return account_ptr->get_storage_value(arith, key, value);
                 }
                 return 0;
             }
