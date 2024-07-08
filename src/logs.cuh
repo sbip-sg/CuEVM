@@ -7,7 +7,7 @@
 #ifndef _LOGS_T_H_
 #define _LOGS_T_H_
 
-#include "include/utils.h"
+#include "include/utils.cuh"
 
 /**
  * Kernel to copy the logs details without record data

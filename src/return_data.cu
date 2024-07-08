@@ -5,15 +5,13 @@
 // SPDX-License-Identifier: MIT
 
 #include "include/return_data.cuh"
-#include "include/utils.h"
+#include "include/utils.cuh"
+#include "include/error_codes.h"
 
 namespace cuEVM {
   __host__ __device__ EVMReturnData::EVMReturnData(
       byte_array_t *content) : _content(content) {}
 
-  /**
-   * The cosntrctuor without the content
-  */
   __host__ __device__ EVMReturnData::EVMReturnData()
   {
     SHARED_MEMORY byte_array_t *tmp_content;
@@ -24,9 +22,6 @@ namespace cuEVM {
     _content = tmp_content;
   }
 
-  /**
-   * The destructor
-  */
   __host__ __device__ EVMReturnData::~EVMReturnData()
   {
     ONE_THREAD_PER_INSTANCE(
@@ -44,22 +39,11 @@ namespace cuEVM {
     _content = NULL;
   }
 
-  /**
-   * Get the size of the return data
-   * @return the size of the return data
-  */
   __host__ __device__ size_t EVMReturnData::size()
   {
     return _content->size;
   }
 
-  /**
-   * Get the content of the return data
-   * @param[in] index the index of in the return data
-   * @param[in] size the size of the content
-   * @param[out] error_code the error code
-   * @return the pointer in the return data
-  */
   __host__ __device__ uint8_t* EVMReturnData::get(
       size_t index,
       size_t size,
@@ -82,20 +66,11 @@ namespace cuEVM {
     }
   }
 
-  /**
-   * Get the content of the return data
-   * @return the pointer in the return data
-  */
   __host__ __device__ byte_array_t* EVMReturnData::get_data()
   {
     return _content;
   }
 
-  /**
-   * Set the content of the return data
-   * @param[in] data the data to be set
-   * @param[in] size the size of the data
-  */
   __host__ __device__ void EVMReturnData::set(
       uint8_t *data,
       size_t size)
@@ -128,20 +103,13 @@ namespace cuEVM {
     data_content.size = _content->size;
   }
 
-  /**
-   * Print the return data
-  */
   __host__ __device__ void EVMReturnData::print()
   {
-    byte_array::print_byte_array_t(*_content);
+    _content->print();
   }
 
-  /**
-   * Get the json representation of the return data
-   * @return the json representation of the return data
-  */
   __host__ cJSON* EVMReturnData::json()
   {
-    return byte_array::json_from_byte_array_t(*_content);
+    return _content->to_json();
   }
 }

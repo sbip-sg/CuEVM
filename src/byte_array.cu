@@ -36,6 +36,14 @@ namespace cuEVM {
       from_hex(hex_string, endian, padding, 0);
   }
 
+  __host__ __device__ byte_array_t::byte_array_t(
+    const char *hex_string,
+    uint32_t size,
+    int32_t endian,
+    PaddingDirection padding) : size(size), data(nullptr) {
+      from_hex(hex_string, endian, padding, 0);
+  }
+
   __host__ __device__ byte_array_t::~byte_array_t() {
     if (
       (size > 0) &&

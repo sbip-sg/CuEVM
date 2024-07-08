@@ -197,10 +197,15 @@ namespace cuEVM
 
         /**
          * Update the flags with the given flags.
+         * @param[in] other_flags The other flags
          */
         __host__ __device__ __forceinline__ void update(
             const account_flags_t &other_flags) {
-            flags |= other_flags.flags;
+            flags = (
+                has_deleted() ?
+                other_flags.flags :
+                flags | other_flags.flags
+            );
         }
         /**
          * Reset all flags
@@ -280,7 +285,7 @@ namespace cuEVM
          * @param[in] flags The account flags
          */
         __host__ __device__ account_t(
-            const account_t* &account_ptr,
+            const account_t* account_ptr,
             const account_flags_t &flags);
         
         /**
@@ -549,74 +554,6 @@ namespace cuEVM
     __host__ void free_managed_instances(
         account_t *managed_instances,
         uint32_t count);
-    
-    /**
-     * Fill the account data structure from the json.
-     * @param[out] account The account data structure
-     * @param[in] json The json object
-     * @param[in] managed The flag to indicate if the memory is managed
-     */
-    __host__ void from_json(
-        account_t &account,
-        const cJSON *account_json,
-        bool managed = false);
-    
-    /**
-     * Generate a JSON object from the account data structure.
-     * @param[in] account The account data structure
-     * @return The JSON object
-     */
-    __host__ cJSON* json(
-        account_t &account);
-    
-    /**
-     * Print the account data structure.
-     * @param[in] account The account data structure
-     */
-    __host__ __device__ void print(
-        account_t &account);
-    
-    /**
-     * Get the storage index for the given key.
-     * @param[out] index The index of the storage
-     * @param[in] arith The arithmetical environment
-     * @param[in] account The account data structure
-     * @param[in] key The key
-     * @return If found 1, otherwise 0
-     */
-    __host__ __device__ int32_t get_storage_index(
-        int32_t &index,
-        ArithEnv &arith,
-        const account_t &account,
-        bn_t &key);
-    
-    /**
-     * Make the account empty.
-     * @param[inout] account The account data structure
-     */
-    __host__ __device__ void empty(
-        account_t &account);
-    
-    /**
-     * Duplicate the account data structure.
-     * @param[out] dst The destination account data structure
-     * @param[in] src The source account data structure
-     * @param[in] with_storage The flag to indicate if the storage should be duplicated
-     */
-    __host__ __device__ void duplicate(
-        account_t &dst,
-        const account_t &src,
-        bool with_storage = false);
-    
-    /**
-     * Check if the account is empty.
-     * @param[in] arith The arithmetical environment
-     * @param[in] account The account data structure
-     * @return 1 if the account is empty, 0 otherwise
-     */
-    __host__ __device__ int32_t is_empty(
-        ArithEnv &arith,
-        account_t &account);
-  }
+}
 }
 #endif

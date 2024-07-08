@@ -57,6 +57,18 @@ namespace cuEVM {
       int32_t endian = LITTLE_ENDIAN,
       PaddingDirection padding = NO_PADDING);
     /**
+     * The constructor with the hex string and a fixed size.
+     * @param[in] hex_string The hex string.
+     * @param[in] size the fixed size.
+     * @param[in] endian The endian format.
+     * @param[in] padding The padding direction.
+     */
+    __host__ __device__ byte_array_t(
+      const char *hex_string,
+      uint32_t size,
+      int32_t endian = LITTLE_ENDIAN,
+      PaddingDirection padding = NO_PADDING);
+    /**
      * The destructor.
      */
     __host__ __device__ ~byte_array_t();

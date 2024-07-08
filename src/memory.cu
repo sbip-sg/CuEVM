@@ -4,7 +4,7 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 #include "include/memory.cuh"
-#include "include/utils.h"
+#include "include/utils.cuh"
 #include "include/error_codes.h"
 #include "include/gas_cost.cuh"
 
@@ -239,7 +239,7 @@ namespace cuEVM {
       printf("size=%lu\n", memory_data.size);
       printf("allocated_size=%lu\n", memory_data.allocated_size);
       printf("memory_cost=");
-      arith.print_cgbn_memory(memory_data.memory_cost);
+      memory_data.memory_cost.print();
       if (memory_data.size > 0)
         cuEVM::byte_array::print_bytes(memory_data.data, memory_data.size);
     }
@@ -254,7 +254,7 @@ namespace cuEVM {
       cJSON_AddNumberToObject(memory_json, "size", memory_data.size);
       cJSON_AddNumberToObject(memory_json, "allocated_size", memory_data.allocated_size);
       char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-      arith.hex_string_from_cgbn_memory(hex_string_ptr, memory_data.memory_cost);
+      memory_data.memory_cost.to_hex(hex_string_ptr);
       cJSON_AddStringToObject(memory_json, "memory_cost", hex_string_ptr);
       if (memory_data.size > 0)
       {
@@ -290,7 +290,7 @@ namespace cuEVM {
         content->data = NULL;
       )
       _content = content;
-      _arith.cgbn_memory_from_size_t(_content->memory_cost, 0);
+      _content->memory_cost.from_uint32_t(0);
     }
 
     __host__ __device__ EVMMemory::~EVMMemory()
@@ -304,7 +304,7 @@ namespace cuEVM {
         _content->size = 0;
         _content->data = NULL;
       }
-      _arith.cgbn_memory_from_size_t(_content->memory_cost, 0);
+      _content->memory_cost.from_uint32_t(0);
       ONE_THREAD_PER_INSTANCE(
         delete _content;
       )
@@ -509,7 +509,7 @@ namespace cuEVM {
           dst.data = NULL;
           dst.allocated_size = 0;
           dst.size = 0;
-          _arith.cgbn_memory_from_size_t(dst.memory_cost, 0);
+          dst.memory_cost.from_uint32_t(0);
         }
 
         dst.size = _content->size;

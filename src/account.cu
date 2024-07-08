@@ -106,7 +106,7 @@ namespace cuEVM
     }
 
     __host__ __device__ account_t::account_t(
-        const account_t* &account_ptr,
+        const account_t* account_ptr,
         const account_flags_t &flags)
     {
         address = account_ptr->address;

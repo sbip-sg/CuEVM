@@ -3,6 +3,7 @@
 
 #include "evm_defines.h"
 #include "arith.cuh"
+#include "touch_state.cuh"
 
 #define GAS_ZERO 0
 #define GAS_JUMP_DEST 1
@@ -181,6 +182,43 @@ namespace cuEVM {
             bn_t &gas_used,
             size_t data_size
         );
+
+        /**
+         * Add the cost for the SLOAD operation.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[in] touch_state The touch state
+         * @param[in] address The address of the account
+         * @param[in] key The key of the storage
+         * @return 1 for success, 0 for failure
+         */
+        __host__ __device__ int32_t sload_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            cuEVM::state::AccessState &access_state,
+            const bn_t &address,
+            const bn_t &key);
+        
+        /**
+         * Add the cost and refund for the SSTORE operation.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[inout] gas_refund The refund
+         * @param[in] touch_state The touch state
+         * @param[in] address The address of the account
+         * @param[in] key The key of the storage
+         * @param[in] value The value of the storage
+         * @return 1 for success, 0 for failure
+         */
+        __host__ __device__ int32_t sstore_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            bn_t &gas_refund,
+            cuEVM::state::TouchState &touch_state,
+            cuEVM::state::AccessState &access_state,
+            const bn_t &address,
+            const bn_t &key,
+            const bn_t &value);
     } // namespace gas_cost
 } // namespace cuEVM
 

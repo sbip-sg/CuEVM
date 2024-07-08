@@ -104,5 +104,87 @@ namespace cuEVM {
             cgbn_mul_ui32(arith.env, temp, temp, GAS_PRECOMPILE_ECPAIRING_PAIR);
             cgbn_add(arith.env, gas_used, gas_used, temp);
         }
+
+        __host__ __device__ int32_t sload_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            cuEVM::state::AccessState &access_state,
+            const bn_t &address,
+            const bn_t &key) {
+            // get the key warm
+            if (access_state.is_warm_key(arith, address, key)) {
+                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
+            } else {
+                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_SLOAD);
+            }
+
+            return 1;
+
+        }
+        __host__ __device__ int32_t sstore_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            bn_t &gas_refund,
+            cuEVM::state::TouchState &touch_state,
+            cuEVM::state::AccessState &access_state,
+            const bn_t &address,
+            const bn_t &key,
+            const bn_t &new_value) {
+            // get the key warm
+            if (access_state.is_warm_key(arith, address, key) == 0) {
+                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_SLOAD);
+            }
+            bn_t original_value, current_value;
+            access_state.poke_value(arith, address, key, original_value);
+            touch_state.poke_value(arith, address, key, current_value);
+
+            // EIP-2200
+            if (cgbn_compare(arith.env, new_value, current_value) == 0)
+            {
+                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SLOAD);
+            }
+            else
+            {
+                if (cgbn_compare(arith.env, current_value, original_value) == 0)
+                {
+                    if (cgbn_compare_ui32(arith.env, original_value, 0) == 0)
+                    {
+                        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_STORAGE_SET);
+                    }
+                    else
+                    {
+                        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SSTORE_RESET);
+                        if (cgbn_compare_ui32(arith.env, new_value, 0)==0){
+                            cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_SSTORE_CLEARS_SCHEDULE);
+                        }
+                    }
+                }
+                else
+                {
+                    cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SLOAD);
+                    if (cgbn_compare_ui32(arith.env, original_value, 0) != 0)
+                    {
+                        if (cgbn_compare_ui32(arith.env, current_value, 0) == 0)
+                        {
+                            cgbn_sub_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
+                        }else if (cgbn_compare_ui32(arith.env, new_value, 0) == 0)
+                        {
+                            cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
+                        }
+                    }
+                    if (cgbn_compare(arith.env, original_value, new_value) == 0)
+                    {
+                        if (cgbn_compare_ui32(arith.env, original_value, 0) == 0)
+                        {
+                            cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_SET - GAS_SLOAD);
+                        }
+                        else
+                        {
+                            cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_RESET - GAS_SLOAD);
+                        }
+                    }
+                }
+            }
+        }
     } // namespace gas_cost
 } // namespace cuEVM

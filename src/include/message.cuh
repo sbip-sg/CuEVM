@@ -7,10 +7,81 @@
 #ifndef _MESSAGE_H_
 #define _MESSAGE_H_
 
-#include "include/utils.cuh"
+#include "arith.cuh"
+#include "utils.cuh"
 #include "state.cuh"
-#include "include/jump_destinations.cuh"
+#include "jump_destinations.cuh"
 #include <CuCrypto/keccak.cuh>
+
+namespace cuEVM {
+  struct evm_message_t {
+    evm_word_t sender;           /**< The sender address YP: \f$s\f$ */
+    evm_word_t recipient;        /**< The recipient address YP: \f$r\f$ also \f$I_{a}\f$ */
+    evm_word_t contract_address; /**< The contract address YP: \f$c\f$ */
+    evm_word_t gas_limit;        /**< The gas limit YP: \f$g\f$ */
+    evm_word_t value;            /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
+    uint32_t depth;              /**< The depth YP: \f$e\f$ */
+    uint32_t call_type;           /**< The call type internal has the opcode */
+    evm_word_t storage_address;  /**< The storage address YP: \f$a\f$ */
+    cuEVM::byte_array_t data;         /**< The data YP: \f$d\f$ */
+    cuEVM::byte_array_t byte_code;    /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
+    evm_word_t return_data_offset; /**< The return data offset in memory */
+    evm_word_t return_data_size;   /**< The return data size in memory */
+    uint32_t static_env;         /**< The static flag (STATICCALL) YP: \f$w\f$ */
+    cuEVM::EVMJumpDestinations *jump_destinations; /**< The jump destinations */
+
+
+    __host__ __device__ __forceinline__ evm_message_t(
+        ArithEnv &arith,
+        bn_t &sender,
+        bn_t &recipient,
+        bn_t &contract_address,
+        bn_t &gas_limit,
+        bn_t &value,
+        uint32_t depth,
+        uint8_t call_type,
+        bn_t &storage_address,
+        uint8_t *data,
+        size_t data_size,
+        uint8_t *byte_code,
+        size_t byte_code_size,
+        bn_t &return_data_offset,
+        bn_t &return_data_size,
+        uint32_t static_env = 0
+        ) {
+      cgbn_store(arith._env, &this->sender, sender);
+      cgbn_store(arith._env, &this->recipient, recipient);
+      cgbn_store(arith._env, &this->contract_address, contract_address);
+      cgbn_store(arith._env, &this->gas_limit, gas_limit);
+      cgbn_store(arith._env, &this->value, value);
+      this->depth = depth;
+      this->call_type = call_type;
+      cgbn_store(arith._env, &this->storage_address, storage_address);
+      this->data.size = data_size;
+      this->byte_code.size = byte_code_size;
+      if (data_size > 0) {
+        this->data.data = new uint8_t[data_size];
+        memcpy(this->data.data, data, sizeof(uint8_t) * data_size);
+      } else {
+        this->data.data = NULL;
+      }
+      if (byte_code_size > 0) {
+        this->byte_code.data = new uint8_t[byte_code_size];
+        memcpy(this->byte_code.data, byte_code, sizeof(uint8_t) * byte_code_size);
+      } else {
+        this->byte_code.data = NULL;
+      }
+      cgbn_store(arith._env, &this->return_data_offset, return_data_offset);
+      cgbn_store(arith._env, &this->return_data_size, return_data_size);
+      this->static_env = static_env;
+
+      // create the jump destinations
+      this->jump_destinations = new cuEVM::EVMJumpDestinations(
+          this->byte_code.data,
+          this->byte_code.size);
+    }
+  };
+}
 
 /**
  * The message call class.

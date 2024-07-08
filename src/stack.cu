@@ -6,7 +6,7 @@
 
 
 #include "include/stack.cuh"
-#include "include/utils.h"
+#include "include/utils.cuh"
 #include "include/evm_defines.h"
 #include "include/error_codes.h"
 
@@ -218,7 +218,7 @@ namespace cuEVM {
       printf("Stack size: %d, data:\n", stack_data.stack_offset);
       for (uint32_t idx = 0; idx < stack_data.stack_offset; idx++)
       {
-        arith.print_cgbn_memory(stack_data.stack_base[idx]);
+        stack_data.stack_base[idx].print();
       }
     }
 
@@ -232,7 +232,7 @@ namespace cuEVM {
       cJSON *stack_data_json = cJSON_CreateArray();
       for (uint32_t idx = 0; idx < stack_data.stack_offset; idx++)
       {
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, stack_data.stack_base[idx]);
+        stack_data.stack_base[idx].to_hex(hex_string_ptr);
         cJSON_AddItemToArray(stack_data_json, cJSON_CreateString(hex_string_ptr));
       }
       cJSON_AddItemToObject(stack_json, "data", stack_data_json);
@@ -411,7 +411,7 @@ namespace cuEVM {
       uint32_t print_size = full ? EVM_MAX_STACK_SIZE : size();
       for (uint32_t idx = 0; idx < print_size; idx++)
       {
-        _arith.print_cgbn_memory(_content->stack_base[idx]);
+        _content->stack_base[idx].print();
       }
     }
 
@@ -429,7 +429,7 @@ namespace cuEVM {
       uint32_t print_size = full ? EVM_MAX_STACK_SIZE : size();
       for (uint32_t idx = 0; idx < print_size; idx++)
       {
-        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->stack_base[idx]);
+        _content->stack_base[idx].to_hex(hex_string_ptr);
         cJSON_AddItemToArray(stack_data_json, cJSON_CreateString(hex_string_ptr));
       }
       cJSON_AddItemToObject(stack_json, "data", stack_data_json);
