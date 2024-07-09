@@ -186,5 +186,46 @@ namespace cuEVM {
                 }
             }
         }
+
+        __host__ __device__ int32_t transaction_intrinsic_gas(
+            ArithEnv &arith,
+            const cuEVM::transaction::transaction_t &transaction,
+            bn_t &gas_intrinsic) {
+            
+            // gas_intrinsic = GAS_TRANSACTION
+            cgbn_set_ui32(arith.env, gas_intrinsic, GAS_TRANSACTION);
+
+            // gas_intrinsic += GAS_TRANSACTION_CREATE if transaction.create
+            if (transaction.is_contract_creation(arith)) {
+                cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_TX_CREATE);
+            }
+
+            // gas_intrinsic += GAS_TX_DATA_ZERO/GAS_TX_DATA_NONZERO for each byte in transaction.data
+            for (uint32_t idx = 0; idx < transaction.data_init.size; idx++) {
+                if (transaction.data_init.data[idx] == 0) {
+                    cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_TX_DATA_ZERO);
+                } else {
+                    cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_TX_DATA_NONZERO);
+                }
+            }
+
+            // if transaction type is 1 it might have access list
+            if (transaction.type == 1) {
+                // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for each address in transaction.access_list
+                for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
+                    cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_ACCESS_LIST_ADDRESS);
+                    cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count);
+                }
+            }
+
+            #ifdef EIP_3860
+            // gas_intrinsic += GAS_INITCODE_COST if create transaction
+            if (transaction.is_contract_creation(arith)) {
+                bn_t initcode_length;
+                cgbn_set_ui32(arith.env, initcode_length, transaction.data_init.size);
+                initcode_cost(arith, gas_intrinsic, initcode_length);
+            }
+            #endif
+        }
     } // namespace gas_cost
 } // namespace cuEVM

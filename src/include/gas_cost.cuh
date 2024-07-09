@@ -3,7 +3,9 @@
 
 #include "evm_defines.h"
 #include "arith.cuh"
+#include "access_state.cuh"
 #include "touch_state.cuh"
+#include "transaction.cuh"
 
 #define GAS_ZERO 0
 #define GAS_JUMP_DEST 1
@@ -219,6 +221,18 @@ namespace cuEVM {
             const bn_t &address,
             const bn_t &key,
             const bn_t &value);
+        
+        /**
+         * Get the transaction intrinsic gas.
+         * @param[in] arith The arithmetic environment
+         * @param[in] transaction The transaction
+         * @param[out] gas_intrinsic The intrinsic gas
+         * @return 1 for success, 0 for failure
+         */
+        __host__ __device__ int32_t transaction_intrinsic_gas(
+            ArithEnv &arith,
+            const cuEVM::transaction::transaction_t &transaction,
+            bn_t &gas_intrinsic);
     } // namespace gas_cost
 } // namespace cuEVM
 

@@ -36,4 +36,7 @@
 // CGBN parameters
 #define CGBN_TPI 32
 
+// CUEVM parameters
+#define CUEVM_MAX_TRANSACTIONS_COUNT 10000
+
 #endif
