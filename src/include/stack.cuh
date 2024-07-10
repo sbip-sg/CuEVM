@@ -4,221 +4,216 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _STACK_H_
-#define _STACK_H_
+#ifndef _CUEVM_STACK_H_
+#define _CUEVM_STACK_H_
 
 #include "arith.cuh"
 
 namespace cuEVM
 {
   namespace stack {
-    /**
-     * The stack data structure.
-     */
-    typedef struct
-    {
+    constexpr uint32_t max_size = EVM_MAX_STACK_SIZE; /**< The maximum stack size*/
+    constexpr uint32_t alligment = sizeof(evm_word_t); /**< The alligment of the stack*/
+    constexpr uint32_t initial_capacity = 16U; /**< The initial capacity of the stack can be change for performence reasons*/
+
+    struct evm_stack_t {
       evm_word_t *stack_base; /**< The stack YP: (YP: \f$\mu_{s}\f$)*/
       uint32_t stack_offset; /**< The stack offset (YP: \f$|\mu_{s}|\f$)*/
-    } stack_data_t;
-
-    /**
-     * The kernel to copy the stack data structures.
-     * @param[out] dst The destination stack data structure
-     * @param[in] src The source stack data structure
-     * @param[in] count The number of instances
-    */
-    __global__ void transfer_kernel(
-      stack_data_t *dst,
-      stack_data_t *src,
-      uint32_t count);
-    
-    /**
-     * Generate the cpu data structures for the stack.
-     * @param[in] count The number of instances
-     * @return The cpu data structures
-    */
-    __host__ stack_data_t *get_cpu_instances(
-        uint32_t count);
-
-    /**
-     * Free the cpu data structures for the stack.
-     * @param[in] cpu_instances The cpu data structures
-     * @param[in] count The number of instances
-    */
-    __host__ void free_cpu_instances(
-        stack_data_t *cpu_instances,
-        uint32_t count);
-    /**
-     * Generate the gpu data structures for the stack.
-     * @param[in] cpu_instances The cpu data structures
-     * @param[in] count The number of instances
-     * @return The gpu data structures
-    */
-    __host__ stack_data_t *get_gpu_instances_from_cpu_instances(
-        stack_data_t *cpu_instances,
-        uint32_t count);
-    /**
-     * Free the gpu data structures for the stack.
-     * @param[in] gpu_instances The gpu data structures
-     * @param[in] count The number of instances
-    */
-    __host__ void free_gpu_instances(
-        stack_data_t *gpu_instances,
-        uint32_t count);
-    /**
-     * Generate the cpu data structures for the stack from the gpu data structures.
-     * @param[in] gpu_instances The gpu data structures
-     * @param[in] count The number of instances
-     * @return The cpu data structures
-    */
-    __host__ stack_data_t *get_cpu_instances_from_gpu_instances(
-        stack_data_t *gpu_instances,
-        uint32_t count);
-
-    /**
-     * Print the stack data structure.
-     * @param[in] arith The arithmetical environment
-     * @param[in] stack_data The stack data structure
-    */
-    __host__ __device__ void print_stack_data_t(
-        ArithEnv &arith,
-        stack_data_t &stack_data);
-
-
-    /**
-     * Generate a JSON object from a stack data structure.
-     * @param[in] arith The arithmetical environment
-     * @param[in] stack_data The stack data structure
-     * @return The JSON object
-    */
-    __host__ cJSON *json_from_stack_data_t(
-        ArithEnv &arith,
-        stack_data_t &stack_data);
-
-    /**
-     * The stack class (YP: \f$\mu_{s}\f$)
-    */
-    class EVMStack{
-    public:
-
-
-      stack_data_t *_content; /**< The conent of the stack*/
-      ArithEnv _arith; /**< The arithmetical environment*/
+      uint32_t capacity; /**< The capacity of the stack*/
 
       /**
-       * The constructor of the stack given the arithmetical environment
-       * and the stack data structure.
-       * @param[in] arith The arithmetical environment
-       * @param[in] content The stack data structure
-      */
-      __host__ __device__ EVMStack(
-          ArithEnv arith,
-          stack_data_t *content);
+       * The default constructor
+       */
+      __host__ __device__ evm_stack_t();
 
       /**
-       * The constructor of the stack given the arithmetical environment.
-       * @param[in] arith The arithmetical environment
-      */
-      __host__ __device__ EVMStack(
-          ArithEnv arith);
+       * The destructor
+       */
+      __host__ __device__ ~evm_stack_t();
 
       /**
-       * The destructor of the stack.
-      */
-      __host__ __device__ ~EVMStack();
+       * The copy constructor
+       * @param[in] other The other stack
+       */
+      __host__ __device__ evm_stack_t(const evm_stack_t &other);
 
       /**
-       * Get the size of the stack.
+       * Free the memory
+       */
+      __host__ __device__ void free();
+
+      /**
+       * Clear the content
+       */
+      __host__ __device__ void clear();
+
+      /**
+       * The assignment operator
+       * @param[in] other The other stack
+       * @return The reference to the stack
+       */
+      __host__ __device__ evm_stack_t &operator=(const evm_stack_t &other);
+
+      /**
+       * Duplicate the stack
+       * @param[in] other The other stack
+       */
+      __host__ __device__ void duplicate(
+        const evm_stack_t &other);
+
+      /**
+       * Grow the stack
+       * @return 1 if the stack is grown, 0 otherwise
+       */
+      __host__ __device__ int32_t grow();
+
+      /**
+       * Get the size of the stack
        * @return The size of the stack
-      */
+       */
       __host__ __device__ uint32_t size();
 
       /**
-       * Get the top of the stack.
+       * Get the top of the stack
        * @return The top of the stack pointer
-      */
+       */
       __host__ __device__ evm_word_t *top();
+    
+      /**
+       * Push a value to the stack
+       * @param[in] arith The arithmetical environment
+       * @param[in] value The value to be pushed
+       * @return 1 if the value is pushed, 0 otherwise
+       */
+      __host__ __device__ int32_t push(
+        ArithEnv &arith,
+        const bn_t &value);
 
       /**
-       * Push a value on the stack.
-       * @param[in] value The value to be pushed on the stack
-       * @param[out] error_code The error code
-      */
-      __host__ __device__ void push(const bn_t &value, uint32_t &error_code);
-
-      /**
-       * Pop a value from the stack.
+       * Pop a value from the stack
+       * @param[in] arith The arithmetical environment
        * @param[out] y The value popped from the stack
-       * @param[out] error_code The error code
-      */
-      __host__ __device__ void pop(bn_t &y, uint32_t &error_code);
+       * @return 1 if the value is popped, 0 otherwise
+       */
+      __host__ __device__ int32_t pop(
+        ArithEnv &arith,
+        bn_t &y);
 
       /**
-       * Push a value on the stack given by a byte array.
-       * If the size of the byte array is smaller than x,
-       * the value is padded with zeros for the least
-       * significant bytes.
-       * @param[in] x The number of bytes to be pushed on the stack
-       * @param[out] error_code The error code
-       * @param[in] src_byte_data The byte array
-       * @param[in] src_byte_size The size of the byte array
-      */
-      __host__ __device__ void pushx(
-          uint8_t x,
-          uint32_t &error_code,
-          uint8_t *src_byte_data,
-          uint8_t src_byte_size);
+       * Push a value to the stack from a byte array
+       * @param[in] arith The arithmetical environment
+       * @param[in] x the number of bytes of the value
+       * @param[in] src_byte_data The source byte data
+       * @param[in] src_byte_size The size of the source byte data
+       * @return 1 if the value is pushed, 0 otherwise
+       */
+      __host__ __device__ int32_t pushx(
+        ArithEnv &arith,
+        uint8_t x,
+        uint8_t *src_byte_data,
+        uint8_t src_byte_size);
 
       /**
-       * Get the pointer to the stack element at a given index from the top.
-       * @param[in] index The index from the top of the stack
-       * @param[out] error_code The error code
-       * @return The pointer to the stack element
-      */
-      __host__ __device__ evm_word_t *get_index(
+       * Get the value from the stack at the given index
+       * @param[in] arith The arithmetical environment
+       * @param[in] index The index of the value
+       * @param[out] y The value at the given index
+       * @return 1 if the value is found, 0 otherwise
+       */
+      __host__ __device__ int32_t get_index(
+        ArithEnv &arith,
         uint32_t index,
-        uint32_t &error_code
-      );
+        bn_t &y);
 
       /**
-       * Duplicate the stack element at a given index from the top,
-       * and push it on the stack.
-       * @param[in] index The index from the top of the stack
-       * @param[out] error_code The error code
-      */
-      __host__ __device__ void dupx(
-          uint8_t x,
-          uint32_t &error_code);
+       * Duplicvate the value at the given index and push
+       * it at the top of the stack.
+       * @param[in] arith The arithmetical environment
+       * @param[in] x The index of the value
+       * @return 1 if the value is duplicated, 0 otherwise
+       */
+      __host__ __device__ int32_t dupx(
+        ArithEnv &arith,
+        uint32_t x);
 
       /**
-       * Swap the stack element at a given index from the top with the top element.
-       * @param[in] index The index from the top of the stack
-       * @param[out] error_code The error code
-      */
-      __host__ __device__ void swapx(
-        uint32_t index,
-        uint32_t &error_code);
+       * Swap the values at the given index with the top of the stack
+       * @param[in] arith The arithmetical environment
+       * @param[in] x The index of the value
+       * @return 1 if the values are swapped, 0 otherwise
+       */
+      __host__ __device__ int32_t swapx(
+        ArithEnv &arith,
+        uint32_t x);
 
       /**
-       * Copy the stack to a stack data structure.
-       * @param[out] dst The stack data structure
-      */
-      __host__ __device__ void to_stack_data_t(
-          stack_data_t &dst);
+       * Print the stack
+       */
+      __host__ __device__ void print();
 
       /**
-       * Print the stack.
-       * @param[in] full If false, prints only active stack elements, otherwise prints the entire stack
-      */
-      __host__ __device__ void print(
-          bool full = false);
-
-      /**
-       * Generate a JSON object from the stack.
-       * @param[in] full If false, prints only active stack elements, otherwise prints the entire stack
-      */
-      __host__ cJSON *json(bool full = false);
+       * Get the JSON object from the stack
+       * @return The JSON object
+       */
+      __host__ cJSON *to_json();
     };
+
+    /**
+     * The kernel to transfer the stack from the CPU to the GPU
+     * @param[in] dst The destination stack
+     * @param[in] src The source stack
+     * @param[in] count The number of instances
+     */
+    __global__ void transfer_kernel(
+      evm_stack_t *dst,
+      evm_stack_t *src,
+      uint32_t count);
+
+    /**
+     * Geenrat ethe stack cpu instances
+     * @param[in] count The number of instances
+     * @return The stack cpu instances
+     */
+    __host__ evm_stack_t *get_cpu(
+        uint32_t count);
+
+    /**
+     * Free the stack cpu instances
+     * @param[in] instances The stack cpu instances
+     * @param[in] count The number of instances
+     */
+    __host__ void cpu_free(
+        evm_stack_t *instances,
+        uint32_t count);
+
+    /**
+     * Generate the stack gpu instances from the stack cpu instances
+     * @param[in] cpu_instances The stack cpu instances
+     * @param[in] count The number of instances
+     * @return The stack gpu instances
+     */
+    __host__ evm_stack_t *get_gpu_from_cpu(
+        evm_stack_t *cpu_instances,
+        uint32_t count);
+
+    /**
+     * Free the stack gpu instances
+     * @param[in] gpu_instances The stack gpu instances
+     * @param[in] count The number of instances
+     */
+    __host__ void gpu_free(
+        evm_stack_t *gpu_instances,
+        uint32_t count);
+
+    /**
+     * Generate the stack cpu instances from the stack gpu instances
+     * @param[in] gpu_instances The stack gpu instances
+     * @param[in] count The number of instances
+     * @return The stack cpu instances
+     */
+    __host__ evm_stack_t *get_cpu_from_gpu(
+        evm_stack_t *gpu_instances,
+        uint32_t count);
   } // namespace stack
 } // namespace cuEVM
 

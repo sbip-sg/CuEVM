@@ -69,6 +69,7 @@
         "thread": "cpp",
         "variant": "cpp",
         "__threading_support": "cpp",
-        "__config": "cpp"
+        "__config": "cpp",
+        "bitset": "cpp"
     }
 }

@@ -163,7 +163,7 @@ namespace cuEVM {
      * @param[in] count the number of instances
      * @return the cpu instances
     */
-    __host__ byte_array_t *get_cpu_instances(
+    __host__ byte_array_t *get_cpu(
         uint32_t count);
 
     /**
@@ -171,7 +171,7 @@ namespace cuEVM {
      * @param[in] cpu_instances the cpu instances
      * @param[in] count the number of instances
     */
-    __host__ void free_cpu_instances(
+    __host__ void cpu_free(
         byte_array_t *cpu_instances,
         uint32_t count);
 
@@ -181,7 +181,7 @@ namespace cuEVM {
      * @param[in] count the number of instances
      * @return the gpu instances
     */
-    __host__ byte_array_t *get_gpu_instances_from_cpu_instances(
+    __host__ byte_array_t *gpu_from_cpu(
         byte_array_t *cpu_instances,
         uint32_t count);
 
@@ -190,7 +190,7 @@ namespace cuEVM {
      * @param[in] gpu_instances the gpu instances
      * @param[in] count the number of instances
     */
-    __host__ void free_gpu_instances(
+    __host__ void gpu_free(
         byte_array_t *gpu_instances,
         uint32_t count);
 
@@ -200,7 +200,7 @@ namespace cuEVM {
      * @param[in] count the number of instances
      * @return the cpu instances
     */
-    __host__ byte_array_t *get_cpu_instances_from_gpu_instances(
+    __host__ byte_array_t *cpu_from_gpu(
         byte_array_t *gpu_instances,
         uint32_t count);
   }

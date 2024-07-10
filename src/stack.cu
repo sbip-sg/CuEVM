@@ -1,173 +1,334 @@
 // cuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
-// Data: 2024-06-21
+// Data: 2023-11-30
 // SPDX-License-Identifier: MIT
-
 
 #include "include/stack.cuh"
 #include "include/utils.cuh"
-#include "include/evm_defines.h"
-#include "include/error_codes.h"
 
-namespace cuEVM {
+namespace cuEVM
+{
   namespace stack {
+
+      __host__ __device__ evm_stack_t::evm_stack_t() : stack_base(nullptr), stack_offset(0), capacity(0) {
+      }
+
+      __host__ __device__ evm_stack_t::~evm_stack_t() {
+        free();
+      }
+
+      __host__ __device__ evm_stack_t::evm_stack_t(const evm_stack_t &other) {
+        //free();
+        duplicate(other);
+      }
+
+      __host__ __device__ void evm_stack_t::free() {
+        if (stack_base != nullptr) {
+          std::free(stack_base);
+        }
+        clear();
+      }
+
+      __host__ __device__ void evm_stack_t::clear() {
+        stack_offset = 0;
+        capacity = 0;
+        stack_base = nullptr;
+      }
+
+      __host__ __device__ evm_stack_t &evm_stack_t::operator=(const evm_stack_t &other) {
+        if (this != &other) {
+          free();
+          duplicate(other);
+        }
+        return *this;
+      }
+
+      __host__ __device__ void evm_stack_t::duplicate(
+        const evm_stack_t &other) {
+        stack_base = static_cast<evm_word_t*>(
+          std::aligned_alloc(
+            alligment,
+            other.stack_offset * sizeof(evm_word_t)
+          )
+        );
+        if (stack_base != nullptr) {
+          std::copy(other.stack_base, other.stack_base + other.stack_offset, stack_base);
+          stack_offset = other.stack_offset;
+          capacity = other.stack_offset;
+        }
+      }
+
+      __host__ __device__ int32_t evm_stack_t::grow() {
+        capacity = (capacity == 0) ? initial_capacity : capacity * 2;
+        if (capacity > max_size) {
+          return 0;
+        }
+        evm_word_t *new_stack_base = static_cast<evm_word_t*>(
+          std::aligned_alloc(
+            alligment,
+            capacity * sizeof(evm_word_t)
+          )
+        );
+        if (new_stack_base == nullptr) {
+          return 0;
+        }
+        if (stack_base != nullptr) {
+          std::copy(stack_base, stack_base + stack_offset, new_stack_base);
+          std::free(stack_base);
+        }
+        stack_base = new_stack_base;
+        return 1;
+      }
+
+      __host__ __device__ uint32_t evm_stack_t::size() {
+        return stack_offset;
+      }
+
+      __host__ __device__ evm_word_t *evm_stack_t::top() {
+        return stack_base + stack_offset;
+      }
+
+      __host__ __device__ int32_t evm_stack_t::push(
+        ArithEnv &arith,
+        const bn_t &value) {
+        if (size() >= capacity) {
+          if (!grow()) {
+            return 0;
+          }
+        }
+        cgbn_store(arith.env, top(), value);
+        stack_offset++;
+        return 1;
+      }
+
+      __host__ __device__ int32_t evm_stack_t::pop(
+        ArithEnv &arith,
+        bn_t &y) {
+        if (size() == 0) {
+          // TODO: delete maybe?
+          cgbn_set_ui32(arith.env, y, 0);
+          return 0;
+        }
+        stack_offset--;
+        cgbn_load(arith.env, y, top());
+        return 1;
+      }
+
+      __host__ __device__ int32_t evm_stack_t::pushx(
+        ArithEnv &arith,
+        uint8_t x,
+        uint8_t *src_byte_data,
+        uint8_t src_byte_size) {
+        // TODO:: for sure is something more efficient here
+        if (x > 32)
+        {
+          return 0;
+        }
+        bn_t r;
+        cgbn_set_ui32(arith.env, r, 0);
+        for (uint8_t idx = (x - src_byte_size); idx < x; idx++)
+        {
+          cgbn_insert_bits_ui32(
+              arith.env,
+              r,
+              r,
+              idx * 8,
+              8,
+              src_byte_data[x - 1 - idx]);
+        }
+        return push(arith, r);
+      }
+
+      __host__ __device__ int32_t evm_stack_t::get_index(
+        ArithEnv &arith,
+        uint32_t index,
+        bn_t &y) {
+        if (index > size()) {
+          return 0;
+        }
+        cgbn_load(arith.env, y, stack_base + size() - index);
+        return 1;
+      }
+
+      __host__ __device__ int32_t evm_stack_t::dupx(
+        ArithEnv &arith,
+        uint32_t x) {
+        if ((x > 16) || (x < 1)) {
+          return 0;
+        }
+        bn_t r;
+        if (!get_index(arith, x, r)) {
+          return 0;
+        }
+        return push(arith, r);
+      }
+
+      __host__ __device__ int32_t evm_stack_t::swapx(
+        ArithEnv &arith,
+        uint32_t x) {
+        if ((x > 16) || (x < 1)) {
+          return 0;
+        }
+        bn_t a, b;
+        if (!get_index(arith, 1, a) || !get_index(arith, x + 1, b)) {
+          return 0;
+        }
+        cgbn_store(arith.env, stack_base + size() - x - 1, a);
+        cgbn_store(arith.env, stack_base + size() - 1, b);
+        return 1;
+      }
+
+      __host__ __device__ void evm_stack_t::print() {
+        printf("Stack size: %d, data:\n", size());
+        for (uint32_t idx = 0; idx < size(); idx++)
+        {
+          stack_base[idx].print();
+        }
+      }
+
+      __host__ cJSON *evm_stack_t::to_json() {
+        cJSON *json = cJSON_CreateObject();
+        char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+        cJSON *stack = cJSON_CreateArray();
+        for (uint32_t idx = 0; idx < size(); idx++)
+        {
+          stack_base[idx].to_hex(hex_string_ptr);
+          cJSON_AddItemToArray(stack, cJSON_CreateString(hex_string_ptr));
+        }
+        cJSON_AddItemToObject(json, "data", stack);
+        delete[] hex_string_ptr;
+        return json;
+      }
+
     __global__ void transfer_kernel(
-      stack_data_t *dst,
-      stack_data_t *src,
-      uint32_t count)
-    {
+      evm_stack_t *dst,
+      evm_stack_t *src,
+      uint32_t count) {
       uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
       if (instance >= count)
       {
         return;
       }
       dst[instance].stack_offset = src[instance].stack_offset;
-      if (dst[instance].stack_offset > 0)
-      {
-        memcpy(
-            dst[instance].stack_base,
-            src[instance].stack_base,
-            sizeof(evm_word_t) * src[instance].stack_offset);
-        delete[] src[instance].stack_base;
-        src[instance].stack_base = NULL;
-        src[instance].stack_offset = 0;
-      }
+      std::copy(src[instance].stack_base, src[instance].stack_base + src[instance].stack_offset, dst[instance].stack_base);
+      src[instance].free();
     }
 
-    __host__ stack_data_t *get_cpu_instances(
-        uint32_t count)
-    {
-      stack_data_t *cpu_instances = new stack_data_t[count];
+    __host__ evm_stack_t *get_cpu(
+        uint32_t count) {
+      evm_stack_t *instances = new evm_stack_t[count];
+      return instances;
+    }
+
+    __host__ void cpu_free(
+        evm_stack_t *instances,
+        uint32_t count) {
       for (uint32_t idx = 0; idx < count; idx++)
       {
-        cpu_instances[idx].stack_base = NULL;
-        cpu_instances[idx].stack_offset = 0;
+        instances[idx].free();
       }
-      return cpu_instances;
+      delete[] instances;
     }
 
-    __host__ void free_cpu_instances(
-        stack_data_t *cpu_instances,
-        uint32_t count)
-    {
-      for (int index = 0; index < count; index++)
-      {
-        if (cpu_instances[index].stack_base != NULL)
-        {
-          delete[] cpu_instances[index].stack_base;
-          cpu_instances[index].stack_base = NULL;
-        }
-        cpu_instances[index].stack_offset = 0;
-      }
-      delete[] cpu_instances;
-    }
-
-    __host__ stack_data_t *get_gpu_instances_from_cpu_instances(
-        stack_data_t *cpu_instances,
-        uint32_t count)
-    {
-      stack_data_t *gpu_instances, *tmp_cpu_instances;
-      tmp_cpu_instances = new stack_data_t[count];
-      memcpy(
-          tmp_cpu_instances,
-          cpu_instances,
-          sizeof(stack_data_t) * count);
+    __host__ evm_stack_t *get_gpu_from_cpu(
+        evm_stack_t *cpu_instances,
+        uint32_t count) {
+      evm_stack_t *gpu_instances, *tmp_gpu_instances;
+      tmp_gpu_instances = new evm_stack_t[count];
+      std::copy(cpu_instances, cpu_instances + count, tmp_gpu_instances);
       for (uint32_t idx = 0; idx < count; idx++)
       {
-        if (cpu_instances[idx].stack_offset > 0)
+        if (cpu_instances[idx].stack_base != nullptr)
         {
           CUDA_CHECK(cudaMalloc(
-              (void **)&tmp_cpu_instances[idx].stack_base,
-              sizeof(evm_word_t) * cpu_instances[idx].stack_offset));
+            &tmp_gpu_instances[idx].stack_base,
+            cpu_instances[idx].capacity * sizeof(evm_word_t)));
           CUDA_CHECK(cudaMemcpy(
-              tmp_cpu_instances[idx].stack_base,
-              cpu_instances[idx].stack_base,
-              sizeof(evm_word_t) * cpu_instances[idx].stack_offset,
-              cudaMemcpyHostToDevice));
-        }
-        else
-        {
-          tmp_cpu_instances[idx].stack_base = NULL;
+            tmp_gpu_instances[idx].stack_base,
+            cpu_instances[idx].stack_base,
+            cpu_instances[idx].stack_offset * sizeof(evm_word_t),
+            cudaMemcpyHostToDevice));
+        } else {
+          tmp_gpu_instances[idx].stack_base = nullptr;
         }
       }
       CUDA_CHECK(cudaMalloc(
-          (void **)&gpu_instances,
-          sizeof(stack_data_t) * count));
+        &gpu_instances,
+        count * sizeof(evm_stack_t)));
       CUDA_CHECK(cudaMemcpy(
-          gpu_instances,
-          tmp_cpu_instances,
-          sizeof(stack_data_t) * count,
-          cudaMemcpyHostToDevice));
-      delete[] tmp_cpu_instances;
-      tmp_cpu_instances = NULL;
+        gpu_instances,
+        tmp_gpu_instances,
+        count * sizeof(evm_stack_t),
+        cudaMemcpyHostToDevice));
+      for (uint32_t idx = 0; idx < count; idx++)
+      {
+        tmp_gpu_instances[idx].clear();
+      }
+      delete[] tmp_gpu_instances;
       return gpu_instances;
     }
 
-    __host__ void free_gpu_instances(
-        stack_data_t *gpu_instances,
-        uint32_t count)
-    {
-      stack_data_t *tmp_cpu_instances;
-      tmp_cpu_instances = new stack_data_t[count];
+    __host__ void gpu_free(
+        evm_stack_t *gpu_instances,
+        uint32_t count) {
+      evm_stack_t *tmp_gpu_instances = new evm_stack_t[count];
       CUDA_CHECK(cudaMemcpy(
-          tmp_cpu_instances,
-          gpu_instances,
-          sizeof(stack_data_t) * count,
-          cudaMemcpyDeviceToHost));
+        tmp_gpu_instances,
+        gpu_instances,
+        count * sizeof(evm_stack_t),
+        cudaMemcpyDeviceToHost));
       for (uint32_t idx = 0; idx < count; idx++)
       {
-        if (tmp_cpu_instances[idx].stack_base != NULL)
-          CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].stack_base));
+        if (tmp_gpu_instances[idx].stack_base != nullptr)
+        {
+          CUDA_CHECK(cudaFree(tmp_gpu_instances[idx].stack_base));
+        }
+          tmp_gpu_instances[idx].clear();
       }
-      delete[] tmp_cpu_instances;
+      delete[] tmp_gpu_instances;
       CUDA_CHECK(cudaFree(gpu_instances));
     }
 
-    __host__ stack_data_t *get_cpu_instances_from_gpu_instances(
-        stack_data_t *gpu_instances,
-        uint32_t count)
-    {
-      stack_data_t *cpu_instances, *tmp_cpu_instances, *tmp_gpu_instances;
-      cpu_instances = new stack_data_t[count];
-      tmp_cpu_instances = new stack_data_t[count];
+    __host__ evm_stack_t *get_cpu_from_gpu(
+        evm_stack_t *gpu_instances,
+        uint32_t count) {
+      evm_stack_t *cpu_instances = new evm_stack_t[count];
+      evm_stack_t *tmp_gpu_instances = new evm_stack_t[count];
+      evm_stack_t *tmp_cpu_instances = nullptr;
       CUDA_CHECK(cudaMemcpy(
-          cpu_instances,
-          gpu_instances,
-          sizeof(stack_data_t) * count,
-          cudaMemcpyDeviceToHost));
-      memcpy(
-          tmp_cpu_instances,
-          cpu_instances,
-          sizeof(stack_data_t) * count);
+        cpu_instances,
+        gpu_instances,
+        count * sizeof(evm_stack_t),
+        cudaMemcpyDeviceToHost));
+      std::copy(cpu_instances, cpu_instances + count, tmp_cpu_instances);
       for (uint32_t idx = 0; idx < count; idx++)
       {
-        tmp_cpu_instances[idx].stack_offset = cpu_instances[idx].stack_offset;
         if (cpu_instances[idx].stack_offset > 0)
         {
-          CUDA_CHECK(cudaMalloc(
-              (void **)&tmp_cpu_instances[idx].stack_base,
-              sizeof(evm_word_t) * cpu_instances[idx].stack_offset));
-        }
-        else
-        {
-          tmp_cpu_instances[idx].stack_base = NULL;
+          CUDA_CHECK(cudaMallocHost(
+            &tmp_cpu_instances[idx].stack_base,
+            cpu_instances[idx].stack_offset * sizeof(evm_word_t)));
+        } else {
+          tmp_cpu_instances[idx].stack_base = nullptr;
         }
       }
       CUDA_CHECK(cudaMalloc(
-          (void **)&tmp_gpu_instances,
-          sizeof(stack_data_t) * count));
+        &tmp_gpu_instances,
+        count * sizeof(evm_stack_t)));
       CUDA_CHECK(cudaMemcpy(
-          tmp_gpu_instances,
-          tmp_cpu_instances,
-          sizeof(stack_data_t) * count,
-          cudaMemcpyHostToDevice));
+        tmp_gpu_instances,
+        tmp_cpu_instances,
+        count * sizeof(evm_stack_t),
+        cudaMemcpyHostToDevice));
+      for (uint32_t idx = 0; idx < count; idx++) {
+        tmp_cpu_instances[idx].clear();
+      }
       delete[] tmp_cpu_instances;
-      tmp_cpu_instances = NULL;
-      transfer_kernel<<<count, 1>>>(
-          tmp_gpu_instances,
-          gpu_instances,
-          count);
+      cuEVM::stack::transfer_kernel<<<count, 1>>>(
+        tmp_gpu_instances,
+        gpu_instances,
+        count);
       CUDA_CHECK(cudaDeviceSynchronize());
       CUDA_CHECK(cudaFree(gpu_instances));
       gpu_instances = tmp_gpu_instances;
@@ -175,17 +336,16 @@ namespace cuEVM {
       CUDA_CHECK(cudaMemcpy(
           cpu_instances,
           gpu_instances,
-          sizeof(stack_data_t) * count,
+          sizeof(evm_stack_t) * count,
           cudaMemcpyDeviceToHost));
-      tmp_cpu_instances = new stack_data_t[count];
+      tmp_cpu_instances = new evm_stack_t[count];
       memcpy(
           tmp_cpu_instances,
           cpu_instances,
-          sizeof(stack_data_t) * count);
+          sizeof(evm_stack_t) * count);
 
       for (uint32_t idx = 0; idx < count; idx++)
       {
-        tmp_cpu_instances[idx].stack_offset = cpu_instances[idx].stack_offset;
         if (cpu_instances[idx].stack_offset > 0)
         {
           tmp_cpu_instances[idx].stack_base = new evm_word_t[cpu_instances[idx].stack_offset];
@@ -201,241 +361,16 @@ namespace cuEVM {
         }
       }
 
-      memcpy(
-          cpu_instances,
-          tmp_cpu_instances,
-          sizeof(stack_data_t) * count);
+      std::copy(tmp_cpu_instances, tmp_cpu_instances + count, cpu_instances);
+
+      for (uint32_t idx = 0; idx < count; idx++)
+      {
+        tmp_cpu_instances[idx].clear();
+      }
       delete[] tmp_cpu_instances;
       tmp_cpu_instances = NULL;
-      free_gpu_instances(gpu_instances, count);
+      cuEVM::stack::gpu_free(gpu_instances, count);
       return cpu_instances;
     }
-
-    __host__ __device__ void print_stack_data_t(
-        ArithEnv &arith,
-        stack_data_t &stack_data)
-    {
-      printf("Stack size: %d, data:\n", stack_data.stack_offset);
-      for (uint32_t idx = 0; idx < stack_data.stack_offset; idx++)
-      {
-        stack_data.stack_base[idx].print();
-      }
-    }
-
-    __host__ cJSON *json_from_stack_data_t(
-        ArithEnv &arith,
-        stack_data_t &stack_data)
-    {
-      char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-      cJSON *stack_json = cJSON_CreateObject();
-
-      cJSON *stack_data_json = cJSON_CreateArray();
-      for (uint32_t idx = 0; idx < stack_data.stack_offset; idx++)
-      {
-        stack_data.stack_base[idx].to_hex(hex_string_ptr);
-        cJSON_AddItemToArray(stack_data_json, cJSON_CreateString(hex_string_ptr));
-      }
-      cJSON_AddItemToObject(stack_json, "data", stack_data_json);
-      delete[] hex_string_ptr;
-      return stack_json;
-    }
-
-    __host__ __device__ EVMStack::EVMStack(
-          ArithEnv arith,
-          stack_data_t *content) : _arith(arith),
-                                  _content(content)
-    {
-    }
-
-    __host__ __device__ EVMStack::EVMStack(
-        ArithEnv arith) : _arith(arith)
-    {
-      SHARED_MEMORY stack_data_t *content;
-      ONE_THREAD_PER_INSTANCE(
-          content = new stack_data_t;
-          content->stack_base = new evm_word_t[EVM_MAX_STACK_SIZE];
-          content->stack_offset = 0;)
-      _content = content;
-    }
-      
-    __host__ __device__ EVMStack::~EVMStack()
-    {
-      ONE_THREAD_PER_INSTANCE(
-          if (_content->stack_base != NULL) {
-            delete[] _content->stack_base;
-            _content->stack_base = NULL;
-            _content->stack_offset = 0;
-          } if (_content != NULL) {
-            delete _content;
-          })
-      _content = NULL;
-    }
-
-    __host__ __device__ uint32_t EVMStack::size()
-    {
-      return _content->stack_offset;
-    }
-
-    __host__ __device__ evm_word_t* EVMStack::top()
-    {
-      return _content->stack_base + _content->stack_offset;
-    }
-
-    __host__ __device__ void EVMStack::push(const bn_t &value, uint32_t &error_code)
-    {
-      if (size() >= EVM_MAX_STACK_SIZE)
-      {
-        error_code = ERR_STACK_OVERFLOW;
-        return;
-      }
-      cgbn_store(_arith.env, top(), value);
-      _content->stack_offset++;
-    }
-
-    __host__ __device__ void EVMStack::pop(bn_t &y, uint32_t &error_code)
-    {
-      if (size() == 0)
-      {
-        error_code = ERR_STACK_UNDERFLOW;
-        cgbn_set_ui32(_arith.env, y, 0);
-        return;
-      }
-      _content->stack_offset--;
-      cgbn_load(_arith.env, y, top());
-    }
-
-    __host__ __device__ void EVMStack::pushx(
-        uint8_t x,
-        uint32_t &error_code,
-        uint8_t *src_byte_data,
-        uint8_t src_byte_size)
-    {
-      if (x > 32)
-      {
-        error_code = ERROR_STACK_INVALID_PUSHX_X;
-        return;
-      }
-      bn_t r;
-      cgbn_set_ui32(_arith.env, r, 0);
-      for (uint8_t idx = (x - src_byte_size); idx < x; idx++)
-      {
-        cgbn_insert_bits_ui32(
-            _arith.env,
-            r,
-            r,
-            idx * 8,
-            8,
-            src_byte_data[x - 1 - idx]);
-      }
-      push(r, error_code);
-    }
-
-    __host__ __device__ evm_word_t * EVMStack::get_index(
-      uint32_t index,
-      uint32_t &error_code
-    )
-    {
-      if (size() < index)
-      {
-        error_code = ERR_STACK_UNDERFLOW;
-        return NULL;
-      }
-      return _content->stack_base + (size() - index);
-    }
-
-    __host__ __device__ void EVMStack::dupx(
-        uint8_t x,
-        uint32_t &error_code)
-    {
-      if ((x < 1) || (x > 16))
-      {
-        error_code = ERROR_STACK_INVALID_DUPX_X;
-        return;
-      }
-      bn_t r;
-      evm_word_t *value = get_index(x, error_code);
-      if (value == NULL)
-      {
-        return;
-      }
-      cgbn_load(_arith.env, r, value);
-      push(r, error_code);
-    }
-
-    __host__ __device__ void EVMStack::swapx(
-      uint32_t index,
-      uint32_t &error_code)
-    {
-      if ((index < 1) || (index > 16))
-      {
-        error_code = ERR_STACK_INVALID_SIZE;
-        return;
-      }
-      bn_t a, b;
-      evm_word_t *value_a = get_index(1, error_code);
-      evm_word_t *value_b = get_index(index + 1, error_code);
-      if ((value_a == NULL) || (value_b == NULL))
-      {
-        return;
-      }
-      cgbn_load(_arith.env, a, value_b);
-      cgbn_load(_arith.env, b, value_a);
-      cgbn_store(_arith.env, value_a, a);
-      cgbn_store(_arith.env, value_b, b);
-    }
-
-    __host__ __device__ void EVMStack::to_stack_data_t(
-        stack_data_t &dst)
-    {
-      ONE_THREAD_PER_INSTANCE(
-          if (
-              (dst.stack_offset > 0) &&
-              (dst.stack_base != NULL)) {
-            delete[] dst.stack_base;
-            dst.stack_base = NULL;
-          } dst.stack_offset = _content->stack_offset;
-          if (dst.stack_offset == 0) {
-            dst.stack_base = NULL;
-          } else {
-            dst.stack_base = new evm_word_t[dst.stack_offset];
-            memcpy(
-                dst.stack_base,
-                _content->stack_base,
-                sizeof(evm_word_t) * dst.stack_offset);
-          })
-    }
-    __host__ __device__ void EVMStack::print(
-        bool full)
-    {
-      printf("Stack size: %d, data:\n", size());
-      uint32_t print_size = full ? EVM_MAX_STACK_SIZE : size();
-      for (uint32_t idx = 0; idx < print_size; idx++)
-      {
-        _content->stack_base[idx].print();
-      }
-    }
-
-      
-    /**
-     * Generate a JSON object from the stack.
-     * @param[in] full If false, prints only active stack elements, otherwise prints the entire stack
-    */
-    __host__ cJSON * EVMStack::json(bool full)
-    {
-      char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-      cJSON *stack_json = cJSON_CreateObject();
-
-      cJSON *stack_data_json = cJSON_CreateArray();
-      uint32_t print_size = full ? EVM_MAX_STACK_SIZE : size();
-      for (uint32_t idx = 0; idx < print_size; idx++)
-      {
-        _content->stack_base[idx].to_hex(hex_string_ptr);
-        cJSON_AddItemToArray(stack_data_json, cJSON_CreateString(hex_string_ptr));
-      }
-      cJSON_AddItemToObject(stack_json, "data", stack_data_json);
-      delete[] hex_string_ptr;
-      return stack_json;
-    }
-  }
-}
-
+  } // namespace stack
+} // namespace cuEVM

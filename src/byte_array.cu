@@ -293,7 +293,7 @@ namespace cuEVM {
       }
     }
 
-    __host__ byte_array_t *get_cpu_instances(
+    __host__ byte_array_t *get_cpu(
         uint32_t count)
     {
       byte_array_t *cpu_instances = new byte_array_t[count];
@@ -305,7 +305,7 @@ namespace cuEVM {
       return cpu_instances;
     }
 
-    __host__ void free_cpu_instances(
+    __host__ void cpu_free(
         byte_array_t *cpu_instances,
         uint32_t count)
     {
@@ -323,7 +323,7 @@ namespace cuEVM {
       delete[] cpu_instances;
     }
 
-    __host__ byte_array_t *get_gpu_instances_from_cpu_instances(
+    __host__ byte_array_t *gpu_from_cpu(
         byte_array_t *cpu_instances,
         uint32_t count)
     {
@@ -359,7 +359,7 @@ namespace cuEVM {
       return gpu_instances;
     }
 
-    __host__ void free_gpu_instances(
+    __host__ void gpu_free(
         byte_array_t *gpu_instances,
         uint32_t count)
     {
@@ -380,7 +380,7 @@ namespace cuEVM {
       CUDA_CHECK(cudaFree(gpu_instances));
     }
 
-    __host__ byte_array_t *get_cpu_instances_from_gpu_instances(
+    __host__ byte_array_t *cpu_from_gpu(
         byte_array_t *gpu_instances,
         uint32_t count)
     {
@@ -424,7 +424,7 @@ namespace cuEVM {
       tmp_cpu_instances = nullptr;
 
       // 2. call the kernel to copy the memory between the gpu memories
-      transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+      cuEVM::byte_array::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
       CUDA_CHECK(cudaDeviceSynchronize());
       cudaFree(gpu_instances);
       gpu_instances = tmp_gpu_instances;
@@ -460,7 +460,7 @@ namespace cuEVM {
       }
 
       // 4. free the temporary allocated memory
-      free_gpu_instances(gpu_instances, count);
+      cuEVM::byte_array::gpu_free(gpu_instances, count);
       delete[] cpu_instances;
       cpu_instances=tmp_cpu_instances;
       tmp_cpu_instances=nullptr;
