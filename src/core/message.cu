@@ -1,4 +1,10 @@
-#include "include/message.cuh"
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2024-07-12
+// SPDX-License-Identifier: MIT
+
+#include "../include/core/message.cuh"
 
 namespace cuEVM {
     __host__ __device__ evm_message_call_t::evm_message_call_t(
@@ -31,7 +37,7 @@ namespace cuEVM {
       cgbn_store(arith.env, &this->return_data_size, return_data_size);
       this->static_env = static_env;
       // create the jump destinations
-      this->jump_destinations = new cuEVM::EVMJumpDestinations(
+      this->jump_destinations = new cuEVM::jump_destinations_t(
           this->byte_code.data,
           this->byte_code.size);
     }
@@ -206,7 +212,7 @@ namespace cuEVM {
         delete jump_destinations;
         jump_destinations = NULL;
       }
-      jump_destinations = new cuEVM::EVMJumpDestinations(
+      jump_destinations = new cuEVM::jump_destinations_t(
           byte_code.data,
           byte_code.size);
     }
@@ -237,7 +243,7 @@ namespace cuEVM {
      * Get the jump destinations.
      * @return The jump destinations.
      */
-    __host__ __device__ cuEVM::EVMJumpDestinations* evm_message_call_t::get_jump_destinations() {
+    __host__ __device__ cuEVM::jump_destinations_t* evm_message_call_t::get_jump_destinations() {
       return jump_destinations;
     }
 

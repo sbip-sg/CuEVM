@@ -227,5 +227,63 @@ namespace cuEVM {
             }
             #endif
         }
+
+        __host__ __device__ int32_t memory_grow_cost(
+            ArithEnv &arith,
+            cuEVM::memory::evm_memory_t &memory,
+            const bn_t &index,
+            const bn_t &length,
+            bn_t &memory_expansion_cost,
+            bn_t &gas_used
+        ) {
+            do {
+                if (cgbn_compare_ui32(arith.env, length, 0) <= 0)
+                {
+                    return 0;
+                }
+                bn_t offset;
+                uint32_t offset_ui32;
+                if (cgbn_add(arith.env, offset, index, length) != 0) {
+                    break;
+                }
+                if (arith.uint32_t_from_cgbn(arith.env, offset_ui32, offset) != 0) {
+                    break;
+                }
+                bn_t old_memory_cost;
+                memory.get_memory_cost(arith, old_memory_cost);
+                // memort_size_word = (offset + 31) / 32
+                bn_t memory_size_word;
+                if (cgbn_add_ui32(arith.env, memory_size_word, offset, 31) != 0) {
+                    break;
+                }
+                cgbn_div_ui32(arith.env, memory_size_word, memory_size_word, 32);
+                // memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word
+                bn_t memory_cost;
+                if (cgbn_mul(arith.env, memory_cost, memory_size_word, memory_size_word) != 0) {
+                    break;
+                }
+                cgbn_div_ui32(arith.env, memory_cost, memory_cost, 512);
+                bn_t tmp;
+                if (cgbn_mul_ui32(arith.env, tmp, memory_size_word, GAS_MEMORY) != 0) {
+                    break;
+                }
+                if (cgbn_add(arith.env, memory_cost, memory_cost, tmp) != 0) {
+                    break;
+                }
+                //  gas_used = gas_used + memory_cost - old_memory_cost
+                if (cgbn_sub(arith.env, memory_expansion_cost, memory_cost, old_memory_cost) != 0) {
+                    cgbn_set_ui32(arith.env, memory_expansion_cost, 0);
+                }
+                if (cgbn_add(arith.env, gas_used, gas_used, memory_expansion_cost) != 0) {
+                    break;
+                }
+                // size is always a multiple of 32
+                if (cgbn_mul_ui32(arith.env, offset, memory_size_word, 32) != 0) {
+                    break;
+                }
+                return 0;
+            } while (0);
+            return ERR_MEMORY_INVALID_OFFSET;
+        }
     } // namespace gas_cost
 } // namespace cuEVM

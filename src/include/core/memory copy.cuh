@@ -4,15 +4,17 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _MEMORY_H_
-#define _MEMORY_H_
+#ifndef _CUEVM_MEMORY_H_
+#define _CUEVM_MEMORY_H_
 
-#include "arith.cuh"
+#include "../utils/cuda_utils.cuh"
+#include "../utils/arith.cuh"
+#include "byte_array.cuh"
 
 namespace cuEVM {
   namespace memory {
     // to change for making more optimal memory allocation current 1KB
-    const size_t PAGE_SIZE = 1024U;
+    constexpr CONSTANT uint32_t page_size = 1024U;
     /**
      * The memory data structure.
     */

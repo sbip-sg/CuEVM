@@ -4,8 +4,8 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#include "include/arith.cuh"
-#include "include/utils.cuh"
+#include "../include/utils/arith.cuh"
+#include "../include/utils/evm_utils.cuh"
 
 namespace cuEVM {
   __host__ __device__ evm_word_t::evm_word_t(
@@ -13,28 +13,28 @@ namespace cuEVM {
   {
       /*
     #pragma unroll
-    for (int32_t index = 0; index < CGBN_LIMBS; index++) {
+    for (int32_t index = 0; index < cuEVM::cgbn_limbs; index++) {
       _limbs[index] = src._limbs[index];
     }
     return *this;*/
-    std::copy(src._limbs, src._limbs + CGBN_LIMBS, _limbs);
+    std::copy(src._limbs, src._limbs + cuEVM::cgbn_limbs, _limbs);
   }
 
   __host__ __device__ evm_word_t& evm_word_t::operator=(
     const evm_word_t &src) {
       /*
     #pragma unroll
-    for (int32_t index = 0; index < CGBN_LIMBS; index++) {
+    for (int32_t index = 0; index < cuEVM::cgbn_limbs; index++) {
       _limbs[index] = src._limbs[index];
     }
     return *this;*/
-    std::copy(src._limbs, src._limbs + CGBN_LIMBS, _limbs);
+    std::copy(src._limbs, src._limbs + cuEVM::cgbn_limbs, _limbs);
   }
 
   __host__ __device__ int32_t evm_word_t::operator==(
     const evm_word_t &other) const {
     #pragma unroll
-    for (int32_t index = 0; index < CGBN_LIMBS; index++) {
+    for (int32_t index = 0; index < cuEVM::cgbn_limbs; index++) {
       if (_limbs[index] != other._limbs[index]) {
         return 0;
       }
@@ -49,7 +49,7 @@ namespace cuEVM {
     if (_limbs[0] != value) {
       return 0;
     }
-    for (int32_t index = 1; index < CGBN_LIMBS; index++) {
+    for (int32_t index = 1; index < cuEVM::cgbn_limbs; index++) {
       if (_limbs[index] != 0) {
         return 0;
       }
@@ -62,7 +62,7 @@ namespace cuEVM {
   {
     cuEVM::byte_array_t byte_array(
       hex_string,
-      EVM_WORD_SIZE,
+      cuEVM::word_size,
       BIG_ENDIAN,
       cuEVM::PaddingDirection::LEFT_PADDING
     );
@@ -78,7 +78,7 @@ namespace cuEVM {
       return 1;
     }
     #pragma unroll
-    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+    for (uint32_t idx = 0; idx < cuEVM::cgbn_limbs; idx++)
     {
       _limbs[idx] = (
         *(bytes++) |
@@ -111,7 +111,7 @@ namespace cuEVM {
     uint64_t value)
   {
     #pragma unroll
-    for (uint32_t idx = 2; idx < CGBN_LIMBS; idx++)
+    for (uint32_t idx = 2; idx < cuEVM::cgbn_limbs; idx++)
     {
       _limbs[idx] = 0;
     }
@@ -123,7 +123,7 @@ namespace cuEVM {
     uint32_t value)
   {
     #pragma unroll
-    for (uint32_t idx = 1; idx < CGBN_LIMBS; idx++)
+    for (uint32_t idx = 1; idx < cuEVM::cgbn_limbs; idx++)
     {
       _limbs[idx] = 0;
     }
@@ -132,8 +132,8 @@ namespace cuEVM {
 
   __host__ __device__ void evm_word_t::print() const
   {
-    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
-      printf("%08x ", _limbs[CGBN_LIMBS - 1 - idx]);
+    for (uint32_t idx = 0; idx < cuEVM::cgbn_limbs; idx++)
+      printf("%08x ", _limbs[cuEVM::cgbn_limbs - 1 - idx]);
     printf("\n");
   }
   
@@ -169,10 +169,10 @@ namespace cuEVM {
   {
     if (byte_array == nullptr)
     {
-      byte_array = new byte_array_t(EVM_WORD_SIZE);
+      byte_array = new byte_array_t(cuEVM::word_size);
     }
-    uint8_t *bytes = byte_array->data + EVM_WORD_SIZE - 1;
-    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+    uint8_t *bytes = byte_array->data + cuEVM::word_size - 1;
+    for (uint32_t idx = 0; idx < cuEVM::cgbn_limbs; idx++)
     {
       *(bytes--) = _limbs[idx] & 0xFF;
       *(bytes--) = (_limbs[idx] >> 8) & 0xFF;
@@ -190,7 +190,7 @@ namespace cuEVM {
       bit_array = new byte_array_t(EVM_WORD_BITS);
     }
     uint8_t *bytes = bit_array->data + EVM_WORD_BITS - 1;
-    for (uint32_t idx = 0; idx < CGBN_LIMBS; idx++)
+    for (uint32_t idx = 0; idx < cuEVM::cgbn_limbs; idx++)
     {
       for (int bit = 0; bit < 32; bit++)
       {
@@ -243,7 +243,7 @@ namespace cuEVM {
   )
   {
     cgbn_set_ui32(env, dst, 0);
-    for (uint8_t idx = (EVM_WORD_SIZE - size); idx < EVM_WORD_SIZE; idx++)
+    for (uint8_t idx = (cuEVM::word_size - size); idx < cuEVM::word_size; idx++)
     {
       cgbn_insert_bits_ui32(
           env,
@@ -251,7 +251,7 @@ namespace cuEVM {
           dst,
           idx * 8,
           8,
-          src[EVM_WORD_SIZE - 1 - idx]);
+          src[cuEVM::word_size - 1 - idx]);
     }
   }
 
@@ -303,7 +303,7 @@ namespace cuEVM {
 
   __host__ __device__ int32_t ArithEnv::uint32_t_from_cgbn(
     uint32_t &dst,
-    bn_t &src) {
+    const bn_t &src) {
     bn_t tmp;
     cgbn_bitwise_mask_and(env, tmp, src, -(EVM_WORD_BITS - 32));
     dst = cgbn_get_ui32(env, src);
@@ -334,7 +334,7 @@ namespace cuEVM {
     uint8_t *dst_array,
     size_t &array_length,
     evm_word_t &src_cgbn_mem,
-    size_t limb_count = CGBN_LIMBS) {
+    size_t limb_count = cuEVM::cgbn_limbs) {
     size_t current_limb;
     array_length = limb_count * 4; // Each limb has 4 bytes
 

@@ -4,11 +4,10 @@
 // Data: 2024-06-20
 // SPDX-License-Identifier: MIT
 
-#include "include/byte_array.cuh"
-#include "include/utils.cuh"
+#include "../include/core/byte_array.cuh"
+#include "../include/utils/evm_utils.cuh"
 
 namespace cuEVM {
-
   __host__ __device__ byte_array_t::byte_array_t(
     uint32_t size) : size(size) {
       if (size > 0)
@@ -66,7 +65,7 @@ namespace cuEVM {
         data = nullptr;
   }
 
-  __host__ __device__ byte_array_t &byte_array_t::operator=(
+  __host__ __device__ byte_array_t& byte_array_t::operator=(
     const byte_array_t &other) {
       if (this == &other)
         return *this;
@@ -83,6 +82,30 @@ namespace cuEVM {
       else
         data = nullptr;
       return *this;
+  }
+
+
+  __host__ __device__ int32_t byte_array_t::grow(
+    uint32_t new_size,
+    int32_t zero_padding) {
+      if (new_size == size)
+        return 0;
+      uint8_t *new_data = new uint8_t[new_size];
+      if (size > 0)
+      {
+        if (new_size > size)
+        {
+          std::copy(data, data + size, new_data);
+          if (zero_padding)
+            std::fill(new_data + size, new_data + new_size, 0);
+        }
+        else
+          std::copy(data, data + new_size, new_data);
+        delete[] data;
+      }
+      data = new_data;
+      size = new_size;
+      return 1;
   }
 
   __host__ __device__ void byte_array_t::print() {

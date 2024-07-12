@@ -1,68 +1,45 @@
+#ifndef _CUEVM_EVM_UTILS_H_
+#define _CUEVM_EVM_UTILS_H_
 
-#ifndef _UTILS_H_
-#define _UTILS_H_
-
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <cuda.h>
-#include <cjson/cJSON.h>
-#include <CGBN/cgbn.h>
-#include <gmp.h>
-
-#ifdef __CUDA_ARCH__
-#ifndef MULTIPLE_THREADS_PER_INSTANCE
-#define MULTIPLE_THREADS_PER_INSTANCE
-#endif
-#endif
-#ifdef MULTIPLE_THREADS_PER_INSTANCE
-#define ONE_THREAD_PER_INSTANCE(X) __syncthreads(); if (threadIdx.x == 0) { X } __syncthreads();
-#define SHARED_MEMORY __shared__
-#else
-#define ONE_THREAD_PER_INSTANCE(X) X
-#define SHARED_MEMORY
-#endif
-
-#ifdef __CUDA_ARCH__
-#define CUEVM_MALLOC(ptr, type, count) ptr=(type *)std::malloc(count, sizeof(type))
-#define CUEVM_FREE(ptr) std::free(ptr)
-#else
-#ifdef ONLY_CPU
-#define CUEVM_MALLOC(ptr, type, count) ptr=(type *)std::malloc(count, sizeof(type))
-#define CUEVM_FREE(ptr) std::free(ptr)
-#else
-#define CUEVM_MALLOC(ptr, type, count) cuda_check(cudaMallocManaged((void **)&ptr, count * sizeof(type)), "cudaMallocManaged", __FILE__, __LINE__)
-#define CUEVM_FREE(ptr) cuda_check(cudaFree(ptr), "cudaFree", __FILE__, __LINE__)
-#endif
-#endif
-
-#ifdef DEBUG
-#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "DEBUG: %s:%d:%s(): " fmt, \
-  __FILE__, __LINE__, __func__, ##args)
-#else
-#define DEBUG_PRINT(fmt, args...) /* Don't do anything in release builds */
-#endif
-
-#ifdef __CUDA_ARCH__
-#define CONSTANT __device__ __constant__ const
-#else
-#define CONSTANT const
-#endif
-
-#define CUDA_CHECK(action) cuda_check(action, #action, __FILE__, __LINE__)
-#define CGBN_CHECK(report) cgbn_check(report, __FILE__, __LINE__)
-
-
-__host__ size_t adjusted_length(char** hex_string);
-__host__ void hex_to_bytes(const char *hex_string, uint8_t *byte_array, size_t length);
-void cuda_check(cudaError_t status, const char *action=NULL, const char *file=NULL, int32_t line=0);
-void cgbn_check(cgbn_error_report_t *report, const char *file=NULL, int32_t line=0);
-__host__ void from_mpz(uint32_t *words, uint32_t count, mpz_t value);
-__host__ void to_mpz(mpz_t r, uint32_t *x, uint32_t count);
-__host__ cJSON *get_json_from_file(const char *filepath);
+#include "arith.cuh"
+#include "../core/byte_array.cuh"
 
 namespace cuEVM {
-  namespace utils {
+    namespace utils {
+
+    /**
+     * Get the contract address from the sender address and the sender nonce.
+     * For the simple CREATE operation.
+     * @param[in] arith The arithmetic environment
+     * @param[out] contract_address The contract address
+     * @param[in] sender_address The sender address
+     * @param[in] sender_nonce The sender nonce
+     */
+    __host__ __device__ int32_t get_contract_address_create(
+        ArithEnv &arith,
+        bn_t &contract_address,
+        const bn_t &sender_address,
+        const bn_t &sender_nonce);
+
+    /**
+     * Get the contract address from the sender address, the salt, and the init code.
+     * For the CREATE2 operation.
+     * @param[in] arith The arithmetic environment
+     * @param[out] contract_address The contract address
+     * @param[in] sender_address The sender address
+     * @param[in] salt The salt
+     * @param[in] init_code The init code
+     */
+    __host__ __device__ int32_t get_contract_address_create2(
+      ArithEnv &arith,
+      bn_t &contract_address,
+      const bn_t &sender_address,
+      const bn_t &salt,
+      const cuEVM::byte_array_t &init_code);
+    
+
     /**
      * If it is a hex character.
      * @param[in] hex The character.
@@ -128,7 +105,15 @@ namespace cuEVM {
      */
     __host__ __device__ int32_t hex_string_without_leading_zeros(
       char *hex_string);
-  }
-}
+    
 
-#endif
+    /**
+     * Get the json object from a file.
+     * @param[in] filepath The file path.
+     * @return The json object.
+     */
+    __host__ cJSON *get_json_from_file(const char *filepath);
+    } // namespace utils
+} // namespace cuEVM
+
+#endif // _CUEVM_EVM_UTILS_H_

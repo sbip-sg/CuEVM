@@ -4,16 +4,15 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _BLOCK_H_
-#define _BLOCK_H_
+#ifndef _CUEVM_BLOCK_INFO_H_
+#define _CUEVM_BLOCK_INFO_H_
 
-#include "arith.cuh"
 #include <cjson/cJSON.h>
 #include <cuda.h>
 #include <stdint.h>
+#include "../utils/arith.cuh"
 
 namespace cuEVM {
-  namespace block {
     /**
      * The previous block hash information.
      *  (YP: \f$P(h, n, a)\f$)
@@ -191,6 +190,5 @@ namespace cuEVM {
         block_info_t* &block_info_ptr,
         int32_t managed = 0);
       
-  }
-}
+} // namespace cuEVM
 #endif

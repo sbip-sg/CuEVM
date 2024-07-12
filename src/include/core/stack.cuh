@@ -7,7 +7,7 @@
 #ifndef _CUEVM_STACK_H_
 #define _CUEVM_STACK_H_
 
-#include "arith.cuh"
+#include "../utils/arith.cuh"
 
 namespace cuEVM
 {

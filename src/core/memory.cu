@@ -350,61 +350,6 @@ namespace cuEVM {
       )
     }
 
-    __host__ __device__ void EVMMemory::grow_cost(
-      bn_t &index,
-      bn_t &length,
-      bn_t &gas_used,
-      uint32_t &error_code
-    )
-    {
-      //
-      if (cgbn_compare_ui32(_arith.env, length, 0) > 0)
-      {
-        bn_t offset;
-        int32_t overflow;
-        size_t last_offset;
-        // first overflow check
-        overflow = cgbn_add(_arith.env, offset, index, length);
-        overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
-
-        bn_t old_memory_cost;
-        cgbn_load(_arith.env, old_memory_cost, &(_content->memory_cost));
-        // memort_size_word = (offset + 31) / 32
-        bn_t memory_size_word;
-        cgbn_add_ui32(_arith.env, memory_size_word, offset, 31);
-        cgbn_div_ui32(_arith.env, memory_size_word, memory_size_word, 32);
-        // memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word
-        bn_t memory_cost;
-        cgbn_mul(_arith.env, memory_cost, memory_size_word, memory_size_word);
-        cgbn_div_ui32(_arith.env, memory_cost, memory_cost, 512);
-        bn_t tmp;
-        cgbn_mul_ui32(_arith.env, tmp, memory_size_word, GAS_MEMORY);
-        cgbn_add(_arith.env, memory_cost, memory_cost, tmp);
-        //  gas_used = gas_used + memory_cost - old_memory_cost
-        bn_t memory_expansion_cost;
-        if (cgbn_compare(_arith.env, memory_cost, old_memory_cost) == 1)
-        {
-          cgbn_sub(_arith.env, memory_expansion_cost, memory_cost, old_memory_cost);
-          // set the new memory cost
-          cgbn_store(_arith.env, &(_content->memory_cost), memory_cost);
-        }
-        else
-        {
-          cgbn_set_ui32(_arith.env, memory_expansion_cost, 0);
-        }
-        cgbn_add(_arith.env, gas_used, gas_used, memory_expansion_cost);
-
-        // size is always a multiple of 32
-        cgbn_mul_ui32(_arith.env, offset, memory_size_word, 32);
-        // get the new size
-        overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
-        if (overflow != 0)
-        {
-          error_code = ERR_MEMORY_INVALID_OFFSET;
-        }
-      }
-    }
-
     __host__ __device__ size_t EVMMemory::get_last_offset(
       bn_t &index,
       bn_t &length,

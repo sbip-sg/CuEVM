@@ -4,20 +4,18 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _ARITH_H_
-#define _ARITH_H_
+#ifndef _CUEVM_ARITH_H_
+#define _CUEVM_ARITH_H_
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <cuda.h>
 #include <CGBN/cgbn.h>
-#include "evm_defines.h"
-#include "byte_array.cuh"
+#include "evm_defines.cuh"
+#include "../core/byte_array.cuh"
 
 
 namespace cuEVM {
-#define CGBN_LIMBS ((EVM_WORD_BITS + 31) / 32)
+constexpr CONSTANT uint32_t cgbn_limbs = ((cuEVM::word_bits + 31) / 32);
 /**
  * The CGBN context type.  This is a template type that takes
  * the number of threads per instance and the
@@ -43,7 +41,7 @@ using bn_wide_t = env_t::cgbn_wide_t;
 /**
  * The EVM word type. also use for store CGBN base type.
 */
-struct evm_word_t : cgbn_mem_t<EVM_WORD_BITS> {
+struct evm_word_t : cgbn_mem_t<cuEVM::word_bits> {
   /**
    * The default constructor.
    */
@@ -131,7 +129,7 @@ struct evm_word_t : cgbn_mem_t<EVM_WORD_BITS> {
   __host__ __device__ char* to_hex(
     char *hex_string = nullptr,
     int32_t pretty = 0,
-    uint32_t count = CGBN_LIMBS) const;
+    uint32_t count = cuEVM::cgbn_limbs) const;
   /**
    * Get the byte array from the evm_word_t.
    * The byte array is in Big Endian format.
@@ -154,7 +152,7 @@ struct evm_word_t : cgbn_mem_t<EVM_WORD_BITS> {
     byte_array_t *bit_array = nullptr) const;
 };
 
-typedef cgbn_mem_t<EVM_WORD_BITS>* cgbn_evm_word_t_ptr;
+typedef cgbn_mem_t<cuEVM::word_bits>* cgbn_evm_word_t_ptr;
 
 /**
  * The arithmetic environment class is a wrapper around the CGBN library.
@@ -261,7 +259,7 @@ public:
 
   __host__ __device__ int32_t uint32_t_from_cgbn(
     uint32_t &dst,
-    bn_t &src);
+    const bn_t &src);
 
   /**
    * Get an array of maximum 256 bytes, each having value 1 or 0 indicating bit set or not.
@@ -275,7 +273,7 @@ public:
     uint8_t *dst_array,
     uint32_t &array_length,
     evm_word_t &src_cgbn_mem,
-    uint32_t limb_count = CGBN_LIMBS);
+    uint32_t limb_count = cuEVM::cgbn_limbs);
 
   /**
    * Get an array of bytes from CGBN memory.
@@ -289,7 +287,7 @@ public:
     uint8_t *dst_array,
     size_t &array_length,
     evm_word_t &src_cgbn_mem,
-    size_t limb_count = CGBN_LIMBS);
+    size_t limb_count = cuEVM::cgbn_limbs);
 
   /**
    * Print the byte array as hex. Utility for debugging
@@ -364,7 +362,7 @@ __host__ __device__ int32_t evm_word_t_from_hex_string(
 __host__ void hex_string_from_evm_word_t(
   char *hex_string,
   evm_word_t &evm_word,
-  uint32_t count = CGBN_LIMBS);
+  uint32_t count = cuEVM::cgbn_limbs);
   /**
    * Print the evm word in hex string format.
    * The hex string is in Big Endian format.

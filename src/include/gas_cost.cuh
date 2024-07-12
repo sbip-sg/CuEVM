@@ -1,11 +1,12 @@
 #ifndef __GAS_COST_H__
 #define __GAS_COST_H__
 
-#include "evm_defines.h"
-#include "arith.cuh"
-#include "access_state.cuh"
-#include "touch_state.cuh"
-#include "transaction.cuh"
+#include "utils/evm_defines.cuh"
+#include "utils/arith.cuh"
+#include "state/access_state.cuh"
+#include "state/touch_state.cuh"
+#include "core/transaction.cuh"
+#include "core/memory.cuh"
 
 #define GAS_ZERO 0
 #define GAS_JUMP_DEST 1
@@ -233,6 +234,15 @@ namespace cuEVM {
             ArithEnv &arith,
             const cuEVM::transaction::transaction_t &transaction,
             bn_t &gas_intrinsic);
+        
+        __host__ __device__ int32_t memory_grow_cost(
+            ArithEnv &arith,
+            cuEVM::memory::evm_memory_t &memory,
+            const bn_t &index,
+            const bn_t &length,
+            bn_t &gas_used
+        );
+
     } // namespace gas_cost
 } // namespace cuEVM
 

@@ -3,12 +3,10 @@
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
 // SPDX-License-Identifier: MIT
-#include "include/block_info.cuh"
-#include "include/error_codes.h"
-#include "include/utils.cuh"
+
+#include "../include/core/block_info.cuh"
 
 namespace cuEVM {
-  namespace block {
     __host__ __device__ block_info_t::block_info_t()
     {
       coin_base.from_uint32_t(0);
@@ -240,7 +238,7 @@ namespace cuEVM {
     __host__ cJSON * block_info_t::to_json()
     {
       uint32_t idx = 0;
-      char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+      char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
       cJSON *block_json = nullptr;
       cJSON *previous_blocks_json = nullptr;
       cJSON *previous_block_json = nullptr;
@@ -321,5 +319,4 @@ namespace cuEVM {
       }
       return 1;
     }
-  }
 }

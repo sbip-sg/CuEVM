@@ -1,5 +1,5 @@
-#ifndef _EVM_ERRORCODES_H_
-#define _EVM_ERRORCODES_H_
+#ifndef _CUEVM_ERRORCODES_H_
+#define _CUEVM_ERRORCODES_H_
 
 // error codes
 #define ERR_NONE 0x00

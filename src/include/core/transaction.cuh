@@ -1,11 +1,16 @@
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2024-07-12
+// SPDX-License-Identifier: MIT
 #ifndef _CUEVM_TRANSACTION_H_
 #define _CUEVM_TRANSACTION_H_
 
-#include "arith.cuh"
+#include "../utils/arith.cuh"
 #include "byte_array.cuh"
-#include "block.cuh"
-#include "access_state.cuh"
-#include "touch_state.cuh"
+#include "block_info.cuh"
+#include "../state/access_state.cuh"
+#include "../state/touch_state.cuh"
 #include "message.cuh"
 #include <cjson/cJSON.h>
 
@@ -175,7 +180,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t get_gas_price(
                 ArithEnv &arith,
-                cuEVM::block::EVMBlockInfo &block_info,
+                cuEVM::block_info_t &block_info,
                 bn_t &gas_price) const;
 
             /**
@@ -208,7 +213,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t get_transaction_fees(
                 ArithEnv &arith,
-                cuEVM::block::EVMBlockInfo &block_info,
+                cuEVM::block_info_t &block_info,
                 bn_t &gas_value,
                 bn_t &gas_limit,
                 bn_t &gas_price,
@@ -233,7 +238,7 @@ namespace cuEVM {
                 ArithEnv &arith,
                 cuEVM::state::AccessState &access_state,
                 cuEVM::state::TouchState &touch_state,
-                cuEVM::block::EVMBlockInfo &block_info,
+                cuEVM::block_info_t &block_info,
                 bn_t &gas_used,
                 bn_t &gas_price,
                 bn_t &gas_priority_fee) const;

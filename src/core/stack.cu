@@ -4,8 +4,7 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#include "include/stack.cuh"
-#include "include/utils.cuh"
+#include "../include/core/stack.cuh"
 
 namespace cuEVM
 {

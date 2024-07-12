@@ -81,8 +81,18 @@ namespace cuEVM {
     /**
      * The assignment operator.
      */
-    __host__ __device__ byte_array_t &operator=(
+    __host__ __device__ byte_array_t& operator=(
       const byte_array_t &other);
+
+    /**
+     * Grow the size of the byte array with or without zero padding.
+     * @param[in] new_size The new size of the byte array.
+     * @param[in] zero_padding The zero padding flag.
+     * @return The Error code. 0 for success, 1 for failure.
+     */
+    __host__ __device__ int32_t grow(
+      uint32_t new_size,
+      int32_t zero_padding = 0);
 
     /**
      * Print the byte array.

@@ -4,13 +4,16 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _MESSAGE_H_
-#define _MESSAGE_H_
+#ifndef _CUEVM_MESSAGE_H_
+#define _CUEVM_MESSAGE_H_
 
-#include "arith.cuh"
-#include "utils.cuh"
-#include "state.cuh"
+#include <CuCrypto/keccak.cuh>
+
+#include "../utils/arith.cuh"
+#include "byte_array.cuh"
 #include "jump_destinations.cuh"
+#include "../state/state.cuh"
+
 #include <CuCrypto/keccak.cuh>
 
 namespace cuEVM {
@@ -32,7 +35,7 @@ namespace cuEVM {
     evm_word_t return_data_offset; /**< The return data offset in memory */
     evm_word_t return_data_size;   /**< The return data size in memory */
     uint32_t static_env;         /**< The static flag (STATICCALL) YP: \f$w\f$ */
-    cuEVM::EVMJumpDestinations *jump_destinations; /**< The jump destinations */
+    cuEVM::jump_destinations_t *jump_destinations; /**< The jump destinations */
 
 
     /**
@@ -215,7 +218,7 @@ namespace cuEVM {
      * Get the jump destinations.
      * @return The jump destinations.
      */
-    __host__ __device__ cuEVM::EVMJumpDestinations* get_jump_destinations();
+    __host__ __device__ cuEVM::jump_destinations_t* get_jump_destinations();
 
     /**
      * Print the message.

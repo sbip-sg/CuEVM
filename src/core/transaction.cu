@@ -1,8 +1,13 @@
-#include "include/transaction.cuh"
-#include "include/gas_cost.cuh"
-#include "include/utils.cuh"
-#include "include/opcodes.h"
-#include "include/evm_utils.cuh"
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2024-07-12
+// SPDX-License-Identifier: MIT
+
+#include "../include/core/transaction.cuh"
+#include "../include/gas_cost.cuh"
+#include "../include/utils/opcodes.cuh"
+#include "../include/utils/evm_utils.cuh"
 
 namespace cuEVM {
     namespace transaction {
@@ -183,7 +188,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t transaction_t::get_gas_price(
                 ArithEnv &arith,
-                cuEVM::block::EVMBlockInfo &block_info,
+                cuEVM::block_info_t &block_info,
                 bn_t &gas_price) const {
                 if ((type == 0) || (type == 1)) {
                     // \f$p = T_{p}\f$
@@ -197,7 +202,7 @@ namespace cuEVM {
                     get_max_priority_fee_per_gas(arith, max_priority_fee_per_gas);
                     get_max_fee_per_gas(arith, max_fee_per_gas);
                     bn_t block_base_fee; // YP: \f$H_{f}\f$
-                    block_info.get_base_fee(block_base_fee);
+                    block_info.get_base_fee(arith, block_base_fee);
                     // \f$T_{m} - H_{f}\f$
                     cgbn_sub(
                         arith.env,
@@ -252,7 +257,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t transaction_t::get_transaction_fees(
                 ArithEnv &arith,
-                cuEVM::block::EVMBlockInfo &block_info,
+                cuEVM::block_info_t &block_info,
                 bn_t &gas_value,
                 bn_t &gas_limit,
                 bn_t &gas_price,
@@ -267,7 +272,7 @@ namespace cuEVM {
                 get_gas_limit(arith, gas_limit);
                 get_gas_price(arith, block_info, gas_price);
                 bn_t block_base_fee; // YP: \f$H_{f}\f$
-                block_info.get_base_fee(block_base_fee);
+                block_info.get_base_fee(arith, block_base_fee);
 
             // \f$f = T_{p} - H_{f}\f$ //type 0 and 1
             // \f$p = f + H_{f}\f$ // type 2
@@ -325,7 +330,7 @@ namespace cuEVM {
                 ArithEnv &arith,
                 cuEVM::state::AccessState &access_state,
                 cuEVM::state::TouchState &touch_state,
-                cuEVM::block::EVMBlockInfo &block_info,
+                cuEVM::block_info_t &block_info,
                 bn_t &gas_used,
                 bn_t &gas_price,
                 bn_t &gas_priority_fee) const {
@@ -379,7 +384,7 @@ namespace cuEVM {
                 }
                 // gas fee is less than than block base fee YP: \f$m \geq H_{f}\f$
                 bn_t block_base_fee;
-                block_info.get_base_fee(block_base_fee);
+                block_info.get_base_fee(arith, block_base_fee);
                 if (cgbn_compare(arith.env, m, block_base_fee) < 0) {
                     return 0;
                 }
@@ -391,7 +396,7 @@ namespace cuEVM {
                 // YP: \f$T_{g} \leq H_{l}\f$ ... different because it takes in account
                 // previous transactions
                 bn_t block_gas_limit;
-                block_info.get_gas_limit(block_gas_limit);
+                block_info.get_gas_limit(arith, block_gas_limit);
                 if (cgbn_compare(arith.env, gas_limit, block_gas_limit) > 0) {
                     return 0;
                 }
@@ -515,7 +520,7 @@ namespace cuEVM {
 
             __host__ cJSON* transaction_t::to_json() {
                 cJSON* json = cJSON_CreateObject();
-                char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+                char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
                 char *bytes_string = nullptr;
                 cJSON_AddNumberToObject(json, "type", type);
                 nonce.to_hex(hex_string_ptr);
@@ -586,7 +591,7 @@ namespace cuEVM {
             uint32_t original_count;
             original_count = available_transactions - start_index;
             transactions_count = (original_count > clones) ? original_count : original_count*(clones/original_count);
-            transactions_count = (transactions_count > CUEVM_MAX_TRANSACTIONS_COUNT) ? CUEVM_MAX_TRANSACTIONS_COUNT : transactions_count;
+            transactions_count = (transactions_count > cuEVM::max_transactions_count) ? cuEVM::max_transactions_count : transactions_count;
 
             if (managed) {
                 CUDA_CHECK(cudaMallocManaged(
