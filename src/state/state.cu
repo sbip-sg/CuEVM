@@ -4,8 +4,8 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#include "include/state.cuh"
-#include "include/utils.cuh"
+#include "../include/state/state.cuh"
+#include <CuCrypto/keccak.cuh>
 
 namespace cuEVM {
     namespace state {
@@ -177,7 +177,7 @@ namespace cuEVM {
         __host__ cJSON* state_t::to_json() {
             cJSON *state_json = nullptr;
             cJSON *account_json = nullptr;
-            char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+            char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
             char *flag_string_ptr = nullptr;
             state_json = cJSON_CreateObject();
             for(uint32_t idx = 0; idx < no_accounts; idx++) {
@@ -327,7 +327,7 @@ namespace cuEVM {
         __host__ cJSON* state_access_t::to_json() {
             cJSON *state_json = nullptr;
             cJSON *account_json = nullptr;
-            char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+            char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
             char *flag_string_ptr = new char[sizeof(uint32_t) * 2 + 3];
             state_json = cJSON_CreateObject();
             for(uint32_t idx = 0; idx < no_accounts; idx++) {

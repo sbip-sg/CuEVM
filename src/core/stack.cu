@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "../include/core/stack.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM
 {
@@ -61,7 +62,7 @@ namespace cuEVM
       __host__ __device__ int32_t evm_stack_t::grow() {
         capacity = (capacity == 0) ? initial_capacity : capacity * 2;
         if (capacity > max_size) {
-          return 0;
+          return ERROR_STACK_OVERFLOW;
         }
         evm_word_t *new_stack_base = static_cast<evm_word_t*>(
           std::aligned_alloc(
@@ -70,14 +71,14 @@ namespace cuEVM
           )
         );
         if (new_stack_base == nullptr) {
-          return 0;
+          return ERROR_MEMORY_ALLOCATION_FAILED;
         }
         if (stack_base != nullptr) {
           std::copy(stack_base, stack_base + stack_offset, new_stack_base);
           std::free(stack_base);
         }
         stack_base = new_stack_base;
-        return 1;
+        return ERROR_SUCCESS;
       }
 
       __host__ __device__ uint32_t evm_stack_t::size() {
@@ -91,14 +92,10 @@ namespace cuEVM
       __host__ __device__ int32_t evm_stack_t::push(
         ArithEnv &arith,
         const bn_t &value) {
-        if (size() >= capacity) {
-          if (!grow()) {
-            return 0;
-          }
-        }
+        int32_t error_code = (size() > capacity) ? grow() : ERROR_SUCCESS;
         cgbn_store(arith.env, top(), value);
         stack_offset++;
-        return 1;
+        return error_code;
       }
 
       __host__ __device__ int32_t evm_stack_t::pop(
@@ -107,11 +104,11 @@ namespace cuEVM
         if (size() == 0) {
           // TODO: delete maybe?
           cgbn_set_ui32(arith.env, y, 0);
-          return 0;
+          return ERROR_STACK_UNDERFLOW;
         }
         stack_offset--;
         cgbn_load(arith.env, y, top());
-        return 1;
+        return ERROR_SUCCESS;
       }
 
       __host__ __device__ int32_t evm_stack_t::pushx(
@@ -122,7 +119,7 @@ namespace cuEVM
         // TODO:: for sure is something more efficient here
         if (x > 32)
         {
-          return 0;
+          return ERROR_STACK_INVALID_SIZE;
         }
         bn_t r;
         cgbn_set_ui32(arith.env, r, 0);
@@ -144,38 +141,28 @@ namespace cuEVM
         uint32_t index,
         bn_t &y) {
         if (index > size()) {
-          return 0;
+          return ERROR_STACK_INVALID_INDEX;
         }
         cgbn_load(arith.env, y, stack_base + size() - index);
-        return 1;
+        return ERROR_SUCCESS;
       }
 
       __host__ __device__ int32_t evm_stack_t::dupx(
         ArithEnv &arith,
         uint32_t x) {
-        if ((x > 16) || (x < 1)) {
-          return 0;
-        }
         bn_t r;
-        if (!get_index(arith, x, r)) {
-          return 0;
-        }
-        return push(arith, r);
+        int32_t error_code = ((x > 16) || (x < 1)) ? ERROR_STACK_INVALID_SIZE : get_index(arith, x, r);
+        return error_code | push(arith, r);
       }
 
       __host__ __device__ int32_t evm_stack_t::swapx(
         ArithEnv &arith,
         uint32_t x) {
-        if ((x > 16) || (x < 1)) {
-          return 0;
-        }
         bn_t a, b;
-        if (!get_index(arith, 1, a) || !get_index(arith, x + 1, b)) {
-          return 0;
-        }
+        int32_t error_code = ((x > 16) || (x < 1)) ? ERROR_STACK_INVALID_SIZE : (get_index(arith, 1, a) | get_index(arith, x + 1, b));
         cgbn_store(arith.env, stack_base + size() - x - 1, a);
         cgbn_store(arith.env, stack_base + size() - 1, b);
-        return 1;
+        return error_code;
       }
 
       __host__ __device__ void evm_stack_t::print() {
@@ -188,7 +175,7 @@ namespace cuEVM
 
       __host__ cJSON *evm_stack_t::to_json() {
         cJSON *json = cJSON_CreateObject();
-        char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
         cJSON *stack = cJSON_CreateArray();
         for (uint32_t idx = 0; idx < size(); idx++)
         {

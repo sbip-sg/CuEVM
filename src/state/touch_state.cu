@@ -1,5 +1,9 @@
-
-#include "include/touch_state.cuh"
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2024-06-20
+// SPDX-License-Identifier: MIT
+#include "../include/state/touch_state.cuh"
 
 namespace cuEVM {
     namespace state {
@@ -69,8 +73,7 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 const bn_t &key,
-                bn_t &value
-            ) {
+                bn_t &value) const {
                 account::account_t* account_ptr = nullptr;
                 if (_state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG)) {
                     if (account_ptr->get_storage_value(arith, key, value)) {

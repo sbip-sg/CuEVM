@@ -77,14 +77,12 @@ namespace cuEVM {
          * @param[in] arith The arithmetic environment
          * @param[in] gas_limit The gas limit
          * @param[in] gas_used The gas used
-         * @param[inout] error_code The error code
-         * @return 1 for enough gas and no previous errors, 0 otherwise
+         * @return 0 for enough gas, 1 for not enough gas or error
          */
         __host__ __device__ int32_t has_gas(
             ArithEnv &arith,
-            bn_t &gas_limit,
-            bn_t &gas_used,
-            uint32_t &error_code);
+            const bn_t &gas_limit,
+            const bn_t &gas_used);
         /**
          * Compute the max gas call.
          * @param[in] arith The arithmetic environment
@@ -95,8 +93,8 @@ namespace cuEVM {
         __host__ __device__ void max_gas_call(
             ArithEnv &arith,
             bn_t &gas_capped,
-            bn_t &gas_limit,
-            bn_t &gas_used);
+            const bn_t &gas_limit,
+            const bn_t &gas_used);
         /**
          * Add the gas cost for the given length of bytes, but considering
          * evm words.
@@ -109,8 +107,8 @@ namespace cuEVM {
         (
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length,
-            uint32_t gas_per_word);
+            const bn_t &length,
+            const uint32_t gas_per_word);
         /**
          * Add the cost for initiliasation code.
          * EIP-3860: https://eips.ethereum.org/EIPS/eip-3860
@@ -121,7 +119,7 @@ namespace cuEVM {
         __host__ __device__ void initcode_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &initcode_length);
+            const bn_t &initcode_length);
         /**
          * Add the cost for keccak hashing.
          * @param[in] arith The arithmetic environment
@@ -131,7 +129,7 @@ namespace cuEVM {
         __host__ __device__ void keccak_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length);
+            const bn_t &length);
         /**
          * Add the cost for memory operation on call data/return data.
          * @param[in] arith The arithmetic environment
@@ -141,7 +139,7 @@ namespace cuEVM {
         __host__ __device__ void memory_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length);
+            const bn_t &length);
         /**
          * Add the cost for sha256 hashing.
          * @param[in] arith The arithmetic environment
@@ -151,7 +149,7 @@ namespace cuEVM {
         __host__ __device__ void sha256_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length);
+            const bn_t &length);
         /**
          * Add the dynamic cost for ripemd160 hashing.
          * @param[in] arith The arithmetic environment
@@ -161,7 +159,7 @@ namespace cuEVM {
         __host__ __device__ void ripemd160_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length);
+            const bn_t &length);
 
         /**
          * Add the dynamics cost for blake2 hashing.
@@ -172,13 +170,14 @@ namespace cuEVM {
         __host__ __device__ void blake2_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            uint32_t rounds);
+            const uint32_t rounds);
 
         /**
          * Add the pairing cost to the gas used.
          * @param[in] arith The arithmetic environment
          * @param[inout] gas_used The gas used
          * @param[in] data_size The size of the data in bytes
+         * TODO: verifi if size_t necessary
          */
         __host__ __device__ void ecpairing_cost(
             ArithEnv &arith,
@@ -187,18 +186,33 @@ namespace cuEVM {
         );
 
         /**
+         * Add the cost for accessing account information
+         * as balance, nonce, code
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[in] access_state The access state
+         * @param[in] address The address of the account
+         * @return 0 for success, 1 for failure
+         */
+        __host__ __device__ int32_t access_account_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const cuEVM::state::AccessState &access_state,
+            const bn_t &address);
+
+        /**
          * Add the cost for the SLOAD operation.
          * @param[in] arith The arithmetic environment
          * @param[inout] gas_used The gas used
-         * @param[in] touch_state The touch state
+         * @param[in] access_state The access state
          * @param[in] address The address of the account
          * @param[in] key The key of the storage
-         * @return 1 for success, 0 for failure
+         * @return 0 for success, 1 for failure
          */
         __host__ __device__ int32_t sload_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            cuEVM::state::AccessState &access_state,
+            const cuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key);
         
@@ -208,17 +222,18 @@ namespace cuEVM {
          * @param[inout] gas_used The gas used
          * @param[inout] gas_refund The refund
          * @param[in] touch_state The touch state
+         * @param[in] access_state The access state
          * @param[in] address The address of the account
          * @param[in] key The key of the storage
          * @param[in] value The value of the storage
-         * @return 1 for success, 0 for failure
+         * @return 0 for success, 1 for failure
          */
         __host__ __device__ int32_t sstore_cost(
             ArithEnv &arith,
             bn_t &gas_used,
             bn_t &gas_refund,
-            cuEVM::state::TouchState &touch_state,
-            cuEVM::state::AccessState &access_state,
+            const cuEVM::state::TouchState &touch_state,
+            const cuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key,
             const bn_t &value);
@@ -228,20 +243,30 @@ namespace cuEVM {
          * @param[in] arith The arithmetic environment
          * @param[in] transaction The transaction
          * @param[out] gas_intrinsic The intrinsic gas
-         * @return 1 for success, 0 for failure
+         * @return 0 for success, 1 for failure
          */
         __host__ __device__ int32_t transaction_intrinsic_gas(
             ArithEnv &arith,
             const cuEVM::transaction::transaction_t &transaction,
             bn_t &gas_intrinsic);
         
+        /**
+         * Get the memory grow cost.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] memory The memory
+         * @param[in] index The index of the memory access
+         * @param[in] length The length of the memory access
+         * @param[out] memory_expansion_cost The memory expansion cost
+         * @param[out] gas_used The gas used
+         * @return 0 for success, 1 for failure
+         */
         __host__ __device__ int32_t memory_grow_cost(
             ArithEnv &arith,
-            cuEVM::memory::evm_memory_t &memory,
+            const cuEVM::memory::evm_memory_t &memory,
             const bn_t &index,
             const bn_t &length,
-            bn_t &gas_used
-        );
+            bn_t &memory_expansion_cost,
+            bn_t &gas_used);
 
     } // namespace gas_cost
 } // namespace cuEVM

@@ -3,8 +3,7 @@
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
 // SPDX-License-Identifier: MIT
-#include "include/storage.cuh"
-#include "include/utils.cuh"
+#include "../include/state/storage.cuh"
 
 namespace cuEVM {
     namespace storage {
@@ -77,12 +76,12 @@ namespace cuEVM {
             char *tmp_value_string_ptr = nullptr;
             if (key_string_ptr == nullptr)
             {
-                tmp_key_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+                tmp_key_string_ptr = new char[cuEVM::word_size * 2 + 3];
                 key_string_ptr = tmp_key_string_ptr;
             }
             if (value_string_ptr == nullptr)
             {
-                tmp_value_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+                tmp_value_string_ptr = new char[cuEVM::word_size * 2 + 3];
                 value_string_ptr = tmp_value_string_ptr;
             }
             key_string_ptr = key.to_hex(key_string_ptr, pretty);
@@ -264,8 +263,8 @@ namespace cuEVM {
                 return contract_storage_json;
             }
             uint32_t idx = 0;
-            char *key_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-            char *value_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+            char *key_string_ptr = new char[cuEVM::word_size * 2 + 3];
+            char *value_string_ptr = new char[cuEVM::word_size * 2 + 3];
             for (idx = 0; idx < this->size; idx++)
             {
                 this->storage[idx].add_to_json(

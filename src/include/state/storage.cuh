@@ -1,7 +1,7 @@
 #ifndef _CUEVM_STORAGE_H_
 #define _CUEVM_STORAGE_H_
 
-#include "arith.cuh"
+#include "../utils/arith.cuh"
 #include <cjson/cJSON.h>
 
 namespace cuEVM

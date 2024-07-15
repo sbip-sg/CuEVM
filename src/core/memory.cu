@@ -3,189 +3,250 @@
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
-#include "include/memory.cuh"
-#include "include/utils.cuh"
-#include "include/error_codes.h"
-#include "include/gas_cost.cuh"
+#include "../include/core/memory.cuh"
 
 namespace cuEVM {
   namespace memory {
+    __host__ __device__ void evm_memory_t::print() const {
+      printf("Memory data: \n");
+      printf("Size: %d\n", size);
+      printf("Memory cost: ");
+      memory_cost.print();
+      printf("\n");
+      data.print();
+    }
+    
+    __host__ cJSON* evm_memory_t::to_json() const {
+      cJSON *json = cJSON_CreateObject();
+      cJSON_AddItemToObject(json, "size", cJSON_CreateNumber(size));
+      char *hex_string_ptr = memory_cost.to_hex();
+      cJSON_AddStringToObject(json, "memory_cost", hex_string_ptr);
+      delete[] hex_string_ptr;
+      cJSON_AddItemToObject(json, "data", data.to_json());
+      return json;
+    }
+
+    __host__ __device__ void evm_memory_t::get_memory_cost(
+      ArithEnv &arith,
+      bn_t &cost) const {
+        cgbn_load(
+          arith.env,
+          cost,
+          (cuEVM::cgbn_evm_word_t_ptr) &memory_cost
+        );
+    }
+
+    __host__ __device__ void evm_memory_t::increase_memory_cost(
+      ArithEnv &arith,
+      const bn_t &memory_expansion_cost) {
+        bn_t cuurent_cost;
+        cgbn_load(
+          arith.env,
+          cuurent_cost,
+          (cuEVM::cgbn_evm_word_t_ptr) &memory_cost
+        );
+        cgbn_add(
+          arith.env,
+          cuurent_cost,
+          cuurent_cost,
+          memory_expansion_cost
+        );
+        cgbn_store(
+          arith.env,
+          (cuEVM::cgbn_evm_word_t_ptr) &memory_cost,
+          cuurent_cost
+        );
+      }
+
+    __host__ __device__ int32_t evm_memory_t::allocate_pages(
+      uint32_t new_size
+    )  {
+      if (new_size < data.size) {
+        return 0;
+      }
+      uint32_t new_page_count = (new_size / cuEVM::memory::page_size) + 1;
+      return data.grow(new_page_count * cuEVM::memory::page_size);
+    }
+
+    __host__ __device__ int32_t evm_memory_t::get_last_offset(
+      ArithEnv &arith,
+      const bn_t &index,
+      const bn_t &length,
+      uint32_t &offset
+    ) const {
+      int32_t overflow = 0;
+      bn_t offset_bn;
+      overflow = cgbn_add(arith.env, offset_bn, index, length);
+      overflow |= arith.uint32_t_from_cgbn(offset, offset_bn);
+      bn_t memory_size;
+      overflow |= cgbn_add_ui32(arith.env, memory_size, offset_bn, 31);
+      cgbn_div_ui32(arith.env, memory_size, memory_size, 32);
+      overflow |= cgbn_mul_ui32(arith.env, offset_bn, memory_size, 32);
+      overflow |= arith.uint32_t_from_cgbn(offset, offset_bn);
+  
+      return overflow;
+    }
+
+    __host__ __device__ int32_t evm_memory_t::grow(
+      ArithEnv &arith,
+      const bn_t &index,
+      const bn_t &length) {
+      uint32_t offset;
+      if(get_last_offset(arith, index, length, offset) != 0) {
+        return 1;
+      }
+      if (offset >= size) {
+        if(allocate_pages(offset) != 0) {
+          return 1;
+        }
+        size = offset;
+      }
+      return 0;
+    }
+
+    __host__ __device__ int32_t evm_memory_t::get(
+      ArithEnv &arith,
+      const bn_t &index,
+      const bn_t &length,
+      cuEVM::byte_array_t &data) {
+      
+      do {
+        if (cgbn_compare_ui32(arith.env, length, 0) >= 0) {
+          break;
+        } 
+        if (grow(arith, index, length) != 0) {
+          break;
+        }
+        uint32_t index_u32, length_u32;
+        arith.uint32_t_from_cgbn(index_u32, index);
+        arith.uint32_t_from_cgbn(length_u32, length);
+        data = cuEVM::byte_array_t(this->data.data + index_u32, length_u32);
+        return 0;
+      } while (0);
+      data = cuEVM::byte_array_t();
+      return 1;
+    }
+
+  __host__ __device__ int32_t evm_memory_t::set(
+      ArithEnv &arith,
+      const cuEVM::byte_array_t &data,
+      const bn_t &index,
+      const bn_t &length) {
+      
+      do {
+        if (cgbn_compare_ui32(arith.env, length, 0) >= 0) {
+          break;
+        }
+        if (grow(arith, index, length) != 0) {
+          break;
+        }
+        uint32_t index_u32;
+        arith.uint32_t_from_cgbn(index_u32, index);
+        if (data.size > 0) {
+          std::copy(data.data, data.data + data.size, this->data.data + index_u32);
+        }
+        return 0;
+      } while (0);
+      return 1;
+    }
+
     __global__ void transfer_kernel(
-      memory_data_t *dst_instances,
-      memory_data_t *src_instances,
+      evm_memory_t *dst_instances,
+      evm_memory_t *src_instances,
       uint32_t instance_count
     ) {
       uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
       if (instance >= instance_count)
         return;
 
-      if (src_instances[instance].size > 0)
+      if (src_instances[instance].data.size > 0)
       {
         memcpy(
-          dst_instances[instance].data,
-          src_instances[instance].data,
-          src_instances[instance].size * sizeof(uint8_t)
+          dst_instances[instance].data.data,
+          src_instances[instance].data.data,
+          src_instances[instance].data.size * sizeof(uint8_t)
         );
-        delete[] src_instances[instance].data;
-        src_instances[instance].data = NULL;
+        delete[] src_instances[instance].data.data;
+        src_instances[instance].data.data = nullptr;
       }
     }
 
-    __host__ memory_data_t *get_cpu_instances(
+    __host__ evm_memory_t *get_cpu(
         uint32_t count
-    )
-    {
-        memory_data_t *instances;
-        instances = new memory_data_t[count];
-        memset(instances, 0, sizeof(memory_data_t) * count);
-        return instances;
+    ) {
+        return new evm_memory_t[count];
     }
 
-    __host__ void free_cpu_instances(
-        memory_data_t *instances,
+
+    __host__ void cpu_free(
+        evm_memory_t* instances,
         uint32_t count
-    )
-    {
-      for (uint32_t idx = 0; idx < count; idx++)
-      {
-        if (
-          (instances[idx].data != NULL) &&
-          (instances[idx].allocated_size > 0)
-        )
-        {
-          delete[] instances[idx].data;
-          instances[idx].data = NULL;
-          instances[idx].allocated_size = 0;
-        }
-      }
+    ) {
       delete[] instances;
     }
 
-    __host__ memory_data_t *get_gpu_instances_from_cpu_instances(
-        memory_data_t *cpu_instances,
+    __host__ evm_memory_t *get_gpu_from_cpu(
+        evm_memory_t *cpu_instances,
         uint32_t count
-    )
-    {
-        memory_data_t *gpu_instances;
-        memory_data_t *tmp_cpu_instances;
-        tmp_cpu_instances = new memory_data_t[count];
-        memcpy(tmp_cpu_instances, cpu_instances, sizeof(memory_data_t) * count);
-        for (size_t idx = 0; idx < count; idx++)
-        {
-          if (
-            (tmp_cpu_instances[idx].allocated_size > 0) &&
-            (tmp_cpu_instances[idx].data != NULL)
-          )
-          {
-            CUDA_CHECK(cudaMalloc(
-              (void **)&tmp_cpu_instances[idx].data,
-              sizeof(uint8_t) * tmp_cpu_instances[idx].allocated_size
-            ));
-            CUDA_CHECK(cudaMemcpy(
-              tmp_cpu_instances[idx].data,
-              cpu_instances[idx].data,
-              sizeof(uint8_t) * tmp_cpu_instances[idx].allocated_size,
-              cudaMemcpyHostToDevice
-            ));
-          }
-          else
-          {
-            tmp_cpu_instances[idx].data = NULL;
-          }
+    ) {
+        evm_memory_t *gpu_instances, *tmp_cpu_instances;
+        CUDA_CHECK(cudaMalloc((void **)&gpu_instances, count * sizeof(evm_memory_t)));
+        tmp_cpu_instances = new evm_memory_t[count];
+        std::copy(cpu_instances, cpu_instances + count, tmp_cpu_instances);
+        for (uint32_t i = 0; i < count; i++) {
+            if (cpu_instances[i].data.size > 0) {
+                CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[i].data.data, cpu_instances[i].data.size));
+                CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[i].data.data, cpu_instances[i].data.data, cpu_instances[i].data.size, cudaMemcpyHostToDevice));
+            }
         }
-        CUDA_CHECK(cudaMalloc(
-          (void **)&gpu_instances,
-          sizeof(memory_data_t) * count
-        ));
-        CUDA_CHECK(cudaMemcpy(
-          gpu_instances,
-          tmp_cpu_instances,
-          sizeof(memory_data_t) * count, cudaMemcpyHostToDevice
-        ));
+        CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, tmp_cpu_instances, count * sizeof(evm_memory_t), cudaMemcpyHostToDevice));
         delete[] tmp_cpu_instances;
-        tmp_cpu_instances = NULL;
         return gpu_instances;
     }
 
-    __host__ void free_gpu_instances(
-        memory_data_t *gpu_instances,
+    __host__ void gpu_free(
+        evm_memory_t *gpu_instances,
         uint32_t count
-    )
-    {
-        memory_data_t *tmp_cpu_instances;
-        tmp_cpu_instances = new memory_data_t[count];
-        CUDA_CHECK(cudaMemcpy(
-          tmp_cpu_instances,
-          gpu_instances,
-          sizeof(memory_data_t) * count, cudaMemcpyDeviceToHost
-        ));
-        for (size_t idx = 0; idx < count; idx++)
-        {
-          if (
-            (tmp_cpu_instances[idx].allocated_size > 0) &&
-            (tmp_cpu_instances[idx].data != NULL)
-          )
-          {
-            CUDA_CHECK(cudaFree(tmp_cpu_instances[idx].data));
-          }
+    ) {
+        evm_memory_t *tmp_cpu_instances = new evm_memory_t[count];
+        CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances, count * sizeof(evm_memory_t), cudaMemcpyDeviceToHost));
+        for (uint32_t i = 0; i < count; i++) {
+            if (tmp_cpu_instances[i].data.size > 0) {
+                CUDA_CHECK(cudaFree(tmp_cpu_instances[i].data.data));
+            }
         }
-        CUDA_CHECK(cudaFree(gpu_instances));
         delete[] tmp_cpu_instances;
-        tmp_cpu_instances = NULL;
+        CUDA_CHECK(cudaFree(gpu_instances));
     }
 
-    __host__ memory_data_t *get_cpu_instances_from_gpu_instances(
-      memory_data_t *gpu_instances,
+    __host__ evm_memory_t *get_cpu_from_gpu(
+      evm_memory_t *gpu_instances,
       uint32_t count
-    )
-    {
-      memory_data_t *cpu_instances;
-      cpu_instances = new memory_data_t[count];
-      CUDA_CHECK(cudaMemcpy(
-        cpu_instances,
-        gpu_instances,
-        sizeof(memory_data_t) * count,
-        cudaMemcpyDeviceToHost
-      ));
-
-      // 1. alocate the memory for gpu memory as memory which can be addressed by the cpu
-      memory_data_t *tmp_cpu_instances, *tmp_gpu_instances;
-      tmp_cpu_instances = new memory_data_t[count];
-      memcpy(
-        tmp_cpu_instances,
-        cpu_instances,
-        sizeof(memory_data_t) * count
-      );
-      for (size_t idx = 0; idx < count; idx++)
-      {
+    ) {
+      evm_memory_t *cpu_instances = new evm_memory_t[count];
+      evm_memory_t *tmp_cpu_instances = new evm_memory_t[count];
+      evm_memory_t* tmp_gpu_instances = nullptr;
+      CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, count * sizeof(evm_memory_t), cudaMemcpyDeviceToHost));
+      std::copy(cpu_instances, cpu_instances + count, tmp_cpu_instances);
+      for (uint32_t idx = 0; idx < count; idx++) {
         if (tmp_cpu_instances[idx].size > 0)
         {
           CUDA_CHECK(cudaMalloc(
-            (void **)&tmp_cpu_instances[idx].data,
-            sizeof(uint8_t) * tmp_cpu_instances[idx].size
+            (void **)&tmp_cpu_instances[idx].data.data,
+            sizeof(uint8_t) * tmp_cpu_instances[idx].data.size
           ));
         }
         else
         {
-          tmp_cpu_instances[idx].data = NULL;
+          tmp_cpu_instances[idx].data.data = nullptr;
         }
-        tmp_cpu_instances[idx].allocated_size = tmp_cpu_instances[idx].size;
+        tmp_cpu_instances[idx].size = tmp_cpu_instances[idx].size;
       }
-      CUDA_CHECK(cudaMalloc(
-        (void **)&tmp_gpu_instances,
-        sizeof(memory_data_t) * count
-      ));
-      CUDA_CHECK(cudaMemcpy(
-        tmp_gpu_instances,
-        tmp_cpu_instances,
-        sizeof(memory_data_t) * count,
-        cudaMemcpyHostToDevice
-      ));
+      CUDA_CHECK(cudaMalloc((void **)&tmp_gpu_instances, count * sizeof(evm_memory_t)));
+      CUDA_CHECK(cudaMemcpy(tmp_gpu_instances, tmp_cpu_instances, count * sizeof(evm_memory_t), cudaMemcpyHostToDevice));
       delete[] tmp_cpu_instances;
-      tmp_cpu_instances = NULL;
-
       // 2. call the kernel to copy the memory between the gpu memories
-      transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+      cuEVM::memory::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
       CUDA_CHECK(cudaDeviceSynchronize());
       CUDA_CHECK(cudaFree(gpu_instances));
       gpu_instances = tmp_gpu_instances;
@@ -194,296 +255,33 @@ namespace cuEVM {
       CUDA_CHECK(cudaMemcpy(
         cpu_instances,
         gpu_instances,
-        sizeof(memory_data_t) * count,
+        sizeof(evm_memory_t) * count,
         cudaMemcpyDeviceToHost
       ));
-      tmp_cpu_instances = new memory_data_t[count];
-      memcpy(
-        tmp_cpu_instances,
-        cpu_instances,
-        sizeof(memory_data_t) * count
-      );
+      tmp_cpu_instances = new evm_memory_t[count];
+      std::copy(cpu_instances, cpu_instances + count, tmp_cpu_instances);
       for (size_t idx = 0; idx < count; idx++)
       {
-        if (tmp_cpu_instances[idx].size > 0)
+        if (tmp_cpu_instances[idx].data.size > 0)
         {
-          tmp_cpu_instances[idx].data = new uint8_t[tmp_cpu_instances[idx].size];
+          tmp_cpu_instances[idx].data.data = new uint8_t[tmp_cpu_instances[idx].data.size];
           CUDA_CHECK(cudaMemcpy(
-            tmp_cpu_instances[idx].data,
-            cpu_instances[idx].data,
-            sizeof(uint8_t) * tmp_cpu_instances[idx].size,
+            tmp_cpu_instances[idx].data.data,
+            cpu_instances[idx].data.data,
+            sizeof(uint8_t) * tmp_cpu_instances[idx].data.size,
             cudaMemcpyDeviceToHost
           ));
         }
         else
         {
-          tmp_cpu_instances[idx].data = NULL;
+          tmp_cpu_instances[idx].data.data = nullptr;
         }
       }
-      free_gpu_instances(gpu_instances, count);
-      memcpy(
-        cpu_instances,
-        tmp_cpu_instances,
-        sizeof(memory_data_t) * count
-      );
+      gpu_free(gpu_instances, count);
+      std::copy(tmp_cpu_instances, tmp_cpu_instances + count, cpu_instances);
       delete[] tmp_cpu_instances;
       tmp_cpu_instances = NULL;
       return cpu_instances;
     }
-
-    __host__ __device__ void print_memory_data_t(
-      ArithEnv &arith,
-      memory_data_t &memory_data
-    )
-    {
-      printf("size=%lu\n", memory_data.size);
-      printf("allocated_size=%lu\n", memory_data.allocated_size);
-      printf("memory_cost=");
-      memory_data.memory_cost.print();
-      if (memory_data.size > 0)
-        cuEVM::byte_array::print_bytes(memory_data.data, memory_data.size);
-    }
-
-
-    __host__ cJSON *json_from_memory_data_t(
-      ArithEnv &arith,
-      memory_data_t &memory_data
-    )
-    {
-      cJSON *memory_json = cJSON_CreateObject();
-      cJSON_AddNumberToObject(memory_json, "size", memory_data.size);
-      cJSON_AddNumberToObject(memory_json, "allocated_size", memory_data.allocated_size);
-      char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
-      memory_data.memory_cost.to_hex(hex_string_ptr);
-      cJSON_AddStringToObject(memory_json, "memory_cost", hex_string_ptr);
-      if (memory_data.size > 0)
-      {
-        char *bytes_string = cuEVM::byte_array::hex_from_bytes(memory_data.data, memory_data.size);
-        cJSON_AddStringToObject(memory_json, "data", bytes_string);
-        delete[] bytes_string;
-      }
-      else
-      {
-        cJSON_AddStringToObject(memory_json, "data", "0x");
-      }
-      delete[] hex_string_ptr;
-      hex_string_ptr = NULL;
-      return memory_json;
-    }
-
-    __host__ EVMMemory::EVMMemory(
-      ArithEnv arith,
-      memory_data_t *content
-    ) : _arith(arith),
-        _content(content)
-    {
-    }
-    __host__ __device__ EVMMemory::EVMMemory(
-      ArithEnv arith
-    ) : _arith(arith)
-    {
-      SHARED_MEMORY memory_data_t *content;
-      ONE_THREAD_PER_INSTANCE(
-        content = new memory_data_t;
-        content->size = 0;
-        content->allocated_size = 0;
-        content->data = NULL;
-      )
-      _content = content;
-      _content->memory_cost.from_uint32_t(0);
-    }
-
-    __host__ __device__ EVMMemory::~EVMMemory()
-    {
-      if ((_content->allocated_size > 0) && (_content->data != NULL))
-      {
-        ONE_THREAD_PER_INSTANCE(
-          delete[] _content->data;
-        )
-        _content->allocated_size = 0;
-        _content->size = 0;
-        _content->data = NULL;
-      }
-      _content->memory_cost.from_uint32_t(0);
-      ONE_THREAD_PER_INSTANCE(
-        delete _content;
-      )
-      _content = NULL;
-    }
-
-    __host__ __device__ size_t EVMMemory::size()
-    {
-      return _content->size;
-    }
-
-    __host__ __device__ void EVMMemory::allocate_pages(
-      size_t new_size,
-      uint32_t &error_code
-    )
-    {
-      if (new_size <= _content->allocated_size)
-      {
-        return;
-      }
-      size_t no_pages = (new_size / PAGE_SIZE) + 1;
-      SHARED_MEMORY uint8_t *new_data;
-      ONE_THREAD_PER_INSTANCE(
-        new_data = new uint8_t[no_pages * PAGE_SIZE];
-        if (new_data == NULL) {
-          error_code = ERR_MEMORY_INVALID_ALLOCATION;
-          return;
-        }
-        // 0 all the data
-        memset(new_data, 0, no_pages * PAGE_SIZE);
-        if (
-          (_content->allocated_size > 0) &&
-          (_content->data != NULL)
-        )
-        {
-          memcpy(new_data, _content->data, _content->allocated_size);
-          delete[] _content->data;
-          _content->data = NULL;
-          _content->allocated_size = 0;
-        }
-        _content->allocated_size = no_pages * PAGE_SIZE;
-        _content->data = new_data;
-      )
-    }
-
-    __host__ __device__ size_t EVMMemory::get_last_offset(
-      bn_t &index,
-      bn_t &length,
-      uint32_t &error_code
-    )
-    {
-      bn_t offset;
-      int32_t overflow;
-      size_t last_offset;
-      // first overflow check
-      overflow = cgbn_add(_arith.env, offset, index, length);
-      overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
-      bn_t memory_size_word;
-      cgbn_add_ui32(_arith.env, memory_size_word, offset, 31);
-      cgbn_div_ui32(_arith.env, memory_size_word, memory_size_word, 32);
-      cgbn_mul_ui32(_arith.env, offset, memory_size_word, 32);
-      // get the new size
-      overflow = overflow | _arith.size_t_from_cgbn(last_offset, offset);
-      if (overflow != 0)
-      {
-        error_code = ERR_MEMORY_INVALID_OFFSET;
-      }
-      return last_offset;
-    }
-
-    __host__ __device__ void EVMMemory::grow(
-      bn_t &index,
-      bn_t &length,
-      uint32_t &error_code
-    )
-    {
-      size_t offset = get_last_offset(index, length, error_code);
-      if (
-        (error_code == ERR_NONE) &&
-        (offset > _content->size)
-      )
-      {
-        if (offset > _content->allocated_size)
-        {
-          allocate_pages(offset, error_code);
-        }
-        _content->size = offset;
-      }
-    }
-
-    __host__ __device__ uint8_t* EVMMemory::get(
-      bn_t &index,
-      bn_t &length,
-      uint32_t &error_code
-    )
-    {
-      if (cgbn_compare_ui32(_arith.env, length, 0) > 0)
-      {
-        grow(index, length, error_code);
-        size_t index_s;
-        if (error_code == ERR_NONE)
-        {
-          _arith.size_t_from_cgbn(index_s, index);
-          return _content->data + index_s;
-        }
-      }
-      return NULL;
-    }
-
-    __host__ __device__ void EVMMemory::set(
-      uint8_t *data,
-      bn_t &index,
-      bn_t &length,
-      size_t &available_size,
-      uint32_t &error_code
-    )
-    {
-      if (cgbn_compare_ui32(_arith.env, length, 0) > 0)
-      {
-        size_t index_s;
-        grow(index, length, error_code);
-        _arith.size_t_from_cgbn(index_s, index);
-        if (
-          (data != NULL) &&
-          (available_size > 0) &&
-          (error_code == ERR_NONE)
-        )
-        {
-          ONE_THREAD_PER_INSTANCE(
-            memcpy(_content->data + index_s, data, available_size);
-          )
-        }
-      }
-    }
-
-    __host__ __device__ void EVMMemory::to_memory_data_t(memory_data_t &dst)
-    {
-        // free if any memory is allocated
-        if (
-          (dst.allocated_size > 0) &&
-          (dst.data != NULL)
-        )
-        {
-          ONE_THREAD_PER_INSTANCE(
-              delete[] dst.data;
-          )
-          dst.data = NULL;
-          dst.allocated_size = 0;
-          dst.size = 0;
-          dst.memory_cost.from_uint32_t(0);
-        }
-
-        dst.size = _content->size;
-        dst.allocated_size = _content->size;
-        bn_t memory_cost;
-        cgbn_load(_arith.env, memory_cost, &(_content->memory_cost));
-        cgbn_store(_arith.env, &(dst.memory_cost), memory_cost);
-        if (_content->size > 0)
-        {
-          ONE_THREAD_PER_INSTANCE(
-              dst.data = new uint8_t[_content->size];
-              memcpy(dst.data, _content->data, _content->size);
-          )
-        }
-        else
-        {
-          dst.data = NULL;
-        }
-    }
-
-    __host__ __device__ void EVMMemory::print()
-    {
-      print_memory_data_t(_arith, *_content);
-    }
-
-    __host__ cJSON* EVMMemory::json()
-    {
-      return json_from_memory_data_t(_arith, *_content);
-    }
-
   }
 }

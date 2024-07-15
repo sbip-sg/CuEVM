@@ -84,7 +84,7 @@ namespace cuEVM {
     */
     __host__ __device__ void get_sender(
         ArithEnv &arith,
-        bn_t &sender);
+        bn_t &sender) const;
 
     /**
      * Get the recipient address.
@@ -93,7 +93,7 @@ namespace cuEVM {
     */
     __host__ __device__ void get_recipient(
         ArithEnv &arith,
-        bn_t &recipient);
+        bn_t &recipient) const;
 
     /**
      * Get the contract address.
@@ -102,7 +102,7 @@ namespace cuEVM {
     */
     __host__ __device__ void get_contract_address(
         ArithEnv &arith,
-        bn_t &contract_address);
+        bn_t &contract_address) const;
 
     /**
      * Get the gas limit.
@@ -111,7 +111,7 @@ namespace cuEVM {
     */
     __host__ __device__ void get_gas_limit(
         ArithEnv &arith,
-        bn_t &gas_limit);
+        bn_t &gas_limit) const;
     /**
      * Get the value.
      * @param[in] arith The arithmetical environment.
@@ -119,19 +119,19 @@ namespace cuEVM {
      */
     __host__ __device__ void get_value(
         ArithEnv &arith,
-        bn_t &value);
+        bn_t &value) const;
 
     /**
      * Get the depth.
      * @return The depth YP: \f$e\f$.
     */
-    __host__ __device__ uint32_t get_depth();
+    __host__ __device__ uint32_t get_depth() const;
 
     /**
      * Get the call type.
      * @return The call type internal has the opcode YP: \f$w\f$.
     */
-    __host__ __device__ uint32_t get_call_type();
+    __host__ __device__ uint32_t get_call_type() const;
 
     /**
      * Get the storage address.
@@ -140,19 +140,19 @@ namespace cuEVM {
     */
     __host__ __device__ void get_storage_address(
         ArithEnv &arith,
-        bn_t &storage_address);
+        bn_t &storage_address) const;
 
     /**
      * Get the call/init data.
      * @return The data YP: \f$d\f$.
      */
-    __host__ __device__ cuEVM::byte_array_t get_data();
+    __host__ __device__ cuEVM::byte_array_t get_data() const;
 
     /**
      * Get the byte code.
      * @return The byte code YP: \f$b\f$.
      */
-    __host__ __device__ cuEVM::byte_array_t get_byte_code();
+    __host__ __device__ cuEVM::byte_array_t get_byte_code() const;
 
     /**
      * Get the return data offset.
@@ -161,7 +161,7 @@ namespace cuEVM {
      */
     __host__ __device__ void get_return_data_offset(
         ArithEnv &arith,
-        bn_t &return_data_offset);
+        bn_t &return_data_offset) const;
     /**
      * Get the return data size.
      * @param[in] arith The arithmetical environment.
@@ -169,12 +169,12 @@ namespace cuEVM {
      */
     __host__ __device__ void get_return_data_size(
         ArithEnv &arith,
-        bn_t &return_data_size);
+        bn_t &return_data_size) const;
     /**
      * Get the static flag.
      * @return The static flag (STATICCALL) YP: \f$w\f$.
      */
-    __host__ __device__ uint32_t get_static_env();
+    __host__ __device__ uint32_t get_static_env() const;
     /**
      * Set the gas limit.
      * @param[in] arith The arithmetical environment.
@@ -218,12 +218,12 @@ namespace cuEVM {
      * Get the jump destinations.
      * @return The jump destinations.
      */
-    __host__ __device__ cuEVM::jump_destinations_t* get_jump_destinations();
+    __host__ __device__ cuEVM::jump_destinations_t* get_jump_destinations() const;
 
     /**
      * Print the message.
      */
-    __host__ __device__ void print();
+    __host__ __device__ void print() const;
   };
 
 }

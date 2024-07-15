@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <cuda.h>
 #include <cjson/cJSON.h>
+#include "../utils/arith.cuh"
 
 namespace cuEVM {
   enum PaddingDirection {
@@ -97,18 +98,18 @@ namespace cuEVM {
     /**
      * Print the byte array.
      */
-    __host__ __device__ void print();
+    __host__ __device__ void print() const;
     /**
      * Get the hex string from the byte array.
      * The hex string is allocated on the heap and needs to be freed.
      * @return The hex string.
      */
-    __host__ __device__ char* to_hex();
+    __host__ __device__ char* to_hex() const;
     /**
      * Get the json object from the byte array.
      * @return The json object.
      */
-    __host__ __device__ cJSON *to_json();
+    __host__ __device__ cJSON *to_json() const;
     /**
      * Get the byte array from a hex string in Little Endian format.
      * @param[in] clean_hex_string The clean hex string.
@@ -154,6 +155,11 @@ namespace cuEVM {
     __host__ __device__ int32_t padded_copy_BE(
       const byte_array_t src
     );
+
+    __host__ __device__ int32_t to_bn_t(
+      ArithEnv &arith,
+      bn_t &out
+    ) const;
   };
 
   namespace byte_array {

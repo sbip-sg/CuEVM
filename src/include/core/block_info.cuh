@@ -77,7 +77,7 @@ namespace cuEVM {
       */
       __host__ __device__ void get_coin_base(
           ArithEnv &arith,
-          bn_t &coin_base);
+          bn_t &coin_base) const;
         
       /**
        * Get the time stamp of the block.
@@ -86,7 +86,7 @@ namespace cuEVM {
        */
       __host__ __device__ void get_time_stamp(
           ArithEnv &arith,
-          bn_t &time_stamp);
+          bn_t &time_stamp) const;
       
       /**
        * Get the number of the block.
@@ -95,7 +95,7 @@ namespace cuEVM {
        */
       __host__ __device__ void get_number(
           ArithEnv &arith,
-          bn_t &number);
+          bn_t &number) const;
       
       /**
        * Get the difficulty of the block.
@@ -104,7 +104,7 @@ namespace cuEVM {
        */
       __host__ __device__ void get_difficulty(
           ArithEnv &arith,
-          bn_t &difficulty);
+          bn_t &difficulty) const;
       
       /**
        * Get the prevrandao of the block.
@@ -113,7 +113,7 @@ namespace cuEVM {
        */
       __host__ __device__ void get_prevrandao(
           ArithEnv &arith,
-          bn_t &prevrandao);
+          bn_t &prevrandao) const;
       
       /**
        * Get the gas limit of the block.
@@ -122,7 +122,7 @@ namespace cuEVM {
        */
       __host__ __device__ void get_gas_limit(
           ArithEnv &arith,
-          bn_t &gas_limit);
+          bn_t &gas_limit) const;
       
       /**
        * Get the base fee of the block
@@ -131,7 +131,7 @@ namespace cuEVM {
        */
       __host__ __device__ void get_base_fee(
           ArithEnv &arith,
-          bn_t &base_fee);
+          bn_t &base_fee) const;
 
       /**
        * Get the chain id of the block.
@@ -140,7 +140,7 @@ namespace cuEVM {
        */
       __host__ __device__ void get_chain_id(
           ArithEnv &arith,
-          bn_t &chain_id);
+          bn_t &chain_id) const;
         
       
       /**
@@ -148,23 +148,23 @@ namespace cuEVM {
        * @param[in] arith The arithmetical environment
        * @param[out] previous_hash The previous block hash
        * @param[in] previous_number The number of the previous block
-       * @return 1 if the previous block hash is found, 0 otherwise
+       * @return the error code, 0 if the previous block hash is found
        */
       __host__ __device__ int32_t get_previous_hash(
           ArithEnv &arith,
           bn_t &previous_hash,
-          const bn_t &previous_number);
+          const bn_t &previous_number) const;
         
       /**
        * Print the block information.
        */
-      __host__ __device__ void print();
+      __host__ __device__ void print() const;
 
       /**
        * Get the block information in JSON format.
        * @return The block information in JSON format
        */
-      __host__ cJSON *to_json();
+      __host__ cJSON *to_json() const;
         
     };
 

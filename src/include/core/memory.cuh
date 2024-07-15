@@ -41,33 +41,19 @@ namespace cuEVM {
       /**
        * Print the memory data structure.
        */
-      __host__ __device__ void print() {
-        printf("Memory data: \n");
-        printf("Size: %d\n", size);
-        printf("Memory cost: ");
-        memory_cost.print();
-        printf("\n");
-        data.print();
-      }
+      __host__ __device__ void print() const;
 
       /**
        * Get the json object from the memory data structure.
+       * @return The json object.
        */
-      __host__ cJSON *to_json() {
-        cJSON *json = cJSON_CreateObject();
-        cJSON_AddItemToObject(json, "size", cJSON_CreateNumber(size));
-        char *hex_string_ptr = memory_cost.to_hex();
-        cJSON_AddStringToObject(json, "memory_cost", hex_string_ptr);
-        delete[] hex_string_ptr;
-        cJSON_AddItemToObject(json, "data", data.to_json());
-        return json;
-      }
+      __host__ cJSON *to_json() const;
 
       /**
        * Get the size of the memory. (Last offset reached by the memory access) x 32
        * @return The size of the memory.
        */
-      __host__ __device__ uint32_t get_size() {
+      __host__ __device__ uint32_t get_size() const {
         return size;
       }
 
@@ -78,15 +64,16 @@ namespace cuEVM {
        */
       __host__ __device__ void get_memory_cost(
         ArithEnv &arith,
-        bn_t &cost) {
-          cgbn_load(
-            arith.env,
-            cost,
-            (cuEVM::cgbn_evm_word_t_ptr) &memory_cost
-          );
-      }
-
+        bn_t &cost) const;
       
+      /**
+       * Increase the memory cost.
+       * @param[in] arith The arithmetical environment.
+       * @param[in] memory_expansion_cost The memory expansion cost.
+       */
+      __host__ __device__ void increase_memory_cost(
+        ArithEnv &arith,
+        const bn_t &memory_expansion_cost);
 
       /**
        * Allocates pages for the given offset if needed.
@@ -94,13 +81,7 @@ namespace cuEVM {
        * @return 0 if success, otherwise the error code.
        */
       __host__ __device__ int32_t allocate_pages(
-        uint32_t new_size) {
-        if (new_size < data.size) {
-          return 0;
-        }
-        uint32_t new_page_count = (new_size / cuEVM::memory::page_size) + 1;
-        return data.grow(new_page_count * cuEVM::memory::page_size);
-      }
+        uint32_t new_size);
 
       /**
        * Get the highest offset of the memory access.
@@ -114,20 +95,7 @@ namespace cuEVM {
         ArithEnv &arith,
         const bn_t &index,
         const bn_t &length,
-        uint32_t &offset) const {
-
-        int32_t overflow = 0;
-        bn_t offset_bn;
-        overflow = cgbn_add(arith.env, offset_bn, index, length);
-        overflow |= arith.uint32_t_from_cgbn(offset, offset_bn);
-        bn_t memory_size;
-        overflow |= cgbn_add_ui32(arith.env, memory_size, offset_bn, 31);
-        cgbn_div_ui32(arith.env, memory_size, memory_size, 32);
-        overflow |= cgbn_mul_ui32(arith.env, offset_bn, memory_size, 32);
-        overflow |= arith.uint32_t_from_cgbn(offset, offset_bn);
-    
-        return overflow;
-      }
+        uint32_t &offset) const;
 
       /**
        * Increase the memory for the given offset if needed.
@@ -140,19 +108,7 @@ namespace cuEVM {
       __host__ __device__ int32_t grow(
         ArithEnv &arith,
         const bn_t &index,
-        const bn_t &length) {
-        uint32_t offset;
-        if(get_last_offset(arith, index, length, offset) != 0) {
-          return 1;
-        }
-        if (offset >= size) {
-          if(allocate_pages(offset) != 0) {
-            return 1;
-          }
-          size = offset;
-        }
-        return 0;
-      }
+        const bn_t &length);
 
       /**
        * Get the a pointer to the given memory data.
@@ -217,26 +173,16 @@ namespace cuEVM {
       }
     };
 
+    /**
+     * The kernel to copy the memory between the GPU memories.
+     * @param[out] dst_instances The destination GPU memory data structures.
+     * @param[in] src_instances The source GPU memory data structures.
+     * @param[in] instance_count The number of instances.
+     */
     __global__ void transfer_kernel(
       evm_memory_t *dst_instances,
       evm_memory_t *src_instances,
-      uint32_t instance_count
-    ) {
-      uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-      if (instance >= instance_count)
-        return;
-
-      if (src_instances[instance].data.size > 0)
-      {
-        memcpy(
-          dst_instances[instance].data.data,
-          src_instances[instance].data.data,
-          src_instances[instance].data.size * sizeof(uint8_t)
-        );
-        delete[] src_instances[instance].data.data;
-        src_instances[instance].data.data = nullptr;
-      }
-    }
+      uint32_t instance_count);
 
     /**
      * Allocate the CPU memory data structures for the given number of instances.
@@ -244,10 +190,7 @@ namespace cuEVM {
      * @return The CPU memory data structures.
     */
     __host__ evm_memory_t *get_cpu(
-        uint32_t count
-    ) {
-        return new evm_memory_t[count];
-    }
+        uint32_t count);
 
     /**
      * Free the CPU memory data structures for the given number of instances.
@@ -256,10 +199,7 @@ namespace cuEVM {
     */
     __host__ void cpu_free(
         evm_memory_t* instances,
-        uint32_t count
-    ) {
-      delete[] instances;
-    }
+        uint32_t count);
 
     /**
      * Allocate the GPU memory data structures for the given number of instances.
@@ -269,23 +209,7 @@ namespace cuEVM {
     */
     __host__ evm_memory_t *get_gpu_from_cpu(
         evm_memory_t *cpu_instances,
-        uint32_t count
-    ) {
-        evm_memory_t *gpu_instances, *tmp_cpu_instances;
-        CUDA_CHECK(cudaMalloc((void **)&gpu_instances, count * sizeof(evm_memory_t)));
-        tmp_cpu_instances = new evm_memory_t[count];
-        std::copy(cpu_instances, cpu_instances + count, tmp_cpu_instances);
-        for (uint32_t i = 0; i < count; i++) {
-            if (cpu_instances[i].data.size > 0) {
-                CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[i].data.data, cpu_instances[i].data.size));
-                CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[i].data.data, cpu_instances[i].data.data, cpu_instances[i].data.size, cudaMemcpyHostToDevice));
-            }
-        }
-        CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, tmp_cpu_instances, count * sizeof(evm_memory_t), cudaMemcpyHostToDevice));
-        delete[] tmp_cpu_instances;
-        return gpu_instances;
-    }
-
+        uint32_t count);
     /**
      * Free the GPU memory data structures for the given number of instances.
      * @param[in] gpu_instances The GPU memory data structures.
@@ -293,18 +217,7 @@ namespace cuEVM {
     */
     __host__ void gpu_free(
         evm_memory_t *gpu_instances,
-        uint32_t count
-    ) {
-        evm_memory_t *tmp_cpu_instances = new evm_memory_t[count];
-        CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances, count * sizeof(evm_memory_t), cudaMemcpyDeviceToHost));
-        for (uint32_t i = 0; i < count; i++) {
-            if (tmp_cpu_instances[i].data.size > 0) {
-                CUDA_CHECK(cudaFree(tmp_cpu_instances[i].data.data));
-            }
-        }
-        delete[] tmp_cpu_instances;
-        CUDA_CHECK(cudaFree(gpu_instances));
-    }
+        uint32_t count);
 
     /**
      * Copy the GPU memory data structures to the CPU memory data structures.
@@ -314,68 +227,7 @@ namespace cuEVM {
     */
     __host__ evm_memory_t *get_cpu_from_gpu(
       evm_memory_t *gpu_instances,
-      uint32_t count
-    ) {
-      evm_memory_t *cpu_instances = new evm_memory_t[count];
-      evm_memory_t *tmp_cpu_instances = new evm_memory_t[count];
-      evm_memory_t* tmp_gpu_instances = nullptr;
-      CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, count * sizeof(evm_memory_t), cudaMemcpyDeviceToHost));
-      std::copy(cpu_instances, cpu_instances + count, tmp_cpu_instances);
-      for (uint32_t idx = 0; idx < count; idx++) {
-        if (tmp_cpu_instances[idx].size > 0)
-        {
-          CUDA_CHECK(cudaMalloc(
-            (void **)&tmp_cpu_instances[idx].data.data,
-            sizeof(uint8_t) * tmp_cpu_instances[idx].data.size
-          ));
-        }
-        else
-        {
-          tmp_cpu_instances[idx].data.data = nullptr;
-        }
-        tmp_cpu_instances[idx].size = tmp_cpu_instances[idx].size;
-      }
-      CUDA_CHECK(cudaMalloc((void **)&tmp_gpu_instances, count * sizeof(evm_memory_t)));
-      CUDA_CHECK(cudaMemcpy(tmp_gpu_instances, tmp_cpu_instances, count * sizeof(evm_memory_t), cudaMemcpyHostToDevice));
-      delete[] tmp_cpu_instances;
-      // 2. call the kernel to copy the memory between the gpu memories
-      cuEVM::memory::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
-      CUDA_CHECK(cudaDeviceSynchronize());
-      CUDA_CHECK(cudaFree(gpu_instances));
-      gpu_instances = tmp_gpu_instances;
-
-      // 3. copy the gpu memories back in the cpu memories
-      CUDA_CHECK(cudaMemcpy(
-        cpu_instances,
-        gpu_instances,
-        sizeof(evm_memory_t) * count,
-        cudaMemcpyDeviceToHost
-      ));
-      tmp_cpu_instances = new evm_memory_t[count];
-      std::copy(cpu_instances, cpu_instances + count, tmp_cpu_instances);
-      for (size_t idx = 0; idx < count; idx++)
-      {
-        if (tmp_cpu_instances[idx].data.size > 0)
-        {
-          tmp_cpu_instances[idx].data.data = new uint8_t[tmp_cpu_instances[idx].data.size];
-          CUDA_CHECK(cudaMemcpy(
-            tmp_cpu_instances[idx].data.data,
-            cpu_instances[idx].data.data,
-            sizeof(uint8_t) * tmp_cpu_instances[idx].data.size,
-            cudaMemcpyDeviceToHost
-          ));
-        }
-        else
-        {
-          tmp_cpu_instances[idx].data.data = nullptr;
-        }
-      }
-      gpu_free(gpu_instances, count);
-      std::copy(tmp_cpu_instances, tmp_cpu_instances + count, cpu_instances);
-      delete[] tmp_cpu_instances;
-      tmp_cpu_instances = NULL;
-      return cpu_instances;
-    }
+      uint32_t count);
   }
 }
 

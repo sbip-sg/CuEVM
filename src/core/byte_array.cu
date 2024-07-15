@@ -6,6 +6,7 @@
 
 #include "../include/core/byte_array.cuh"
 #include "../include/utils/evm_utils.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
   __host__ __device__ byte_array_t::byte_array_t(
@@ -108,7 +109,7 @@ namespace cuEVM {
       return 1;
   }
 
-  __host__ __device__ void byte_array_t::print() {
+  __host__ __device__ void byte_array_t::print() const {
       printf("size: %u\n", size);
       printf("data: ");
       for(uint32_t index=0; index<size; index++)
@@ -116,7 +117,7 @@ namespace cuEVM {
       printf("\n");
   }
 
-  __host__ __device__ char *byte_array_t::to_hex() {
+  __host__ __device__ char *byte_array_t::to_hex() const {
     char *hex_string = new char[size*2+3]; // 3 - 0x and \0
     hex_string[0]='0';
     hex_string[1]='x';
@@ -130,7 +131,7 @@ namespace cuEVM {
     return hex_string;
   }
 
-  __host__ __device__ cJSON* byte_array_t::to_json() {
+  __host__ __device__ cJSON* byte_array_t::to_json() const {
     cJSON *data_json = cJSON_CreateObject();
     cJSON_AddNumberToObject(data_json, "size", size);
     if (size > 0)
@@ -289,6 +290,25 @@ namespace cuEVM {
     memcpy(data, src.data, copy_size);
     memset(data + copy_size, 0, size - src.size);
     return size_diff;
+  }
+
+  __host__ __device__ int32_t byte_array_t::to_bn_t(
+    ArithEnv &arith,
+    bn_t &out
+  ) const {
+    if (size != cuEVM::word_size)
+      return ERROR_INVALID_WORD_SIZE;
+    for (uint32_t idx = 0; idx < cuEVM::word_size; idx++)
+    {
+      cgbn_insert_bits_ui32(
+        arith.env,
+        out,
+        out,
+        cuEVM::word_bits - (idx + 1) * 8,
+        8,
+        data[idx]);
+    }
+    return ERROR_SUCCESS;
   }
 
   namespace byte_array {

@@ -88,7 +88,7 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 const bn_t &key,
-                bn_t &value);
+                bn_t &value) const;
 
             /**
              * If an account has beeen accessed, it will be marked as warm.
@@ -98,7 +98,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t is_warm_account(
                 ArithEnv &arith,
-                const bn_t &address);
+                const bn_t &address) const;
 
             /**
              * If a key has been accessed, it will be marked as warm.
@@ -109,7 +109,7 @@ namespace cuEVM {
             __host__ __device__ int32_t is_warm_key(
                 ArithEnv &arith,
                 const bn_t &address,
-                const bn_t &key);
+                const bn_t &key) const;
         };
     }
 }

@@ -38,8 +38,7 @@ namespace cuEVM {
       this->static_env = static_env;
       // create the jump destinations
       this->jump_destinations = new cuEVM::jump_destinations_t(
-          this->byte_code.data,
-          this->byte_code.size);
+          this->byte_code);
     }
 
     __host__ __device__ evm_message_call_t::~evm_message_call_t() {
@@ -56,7 +55,7 @@ namespace cuEVM {
     */
     __host__ __device__ void evm_message_call_t::get_sender(
         ArithEnv &arith,
-        bn_t &sender) {
+        bn_t &sender) const {
       cgbn_load(arith.env, sender, &this->sender);
     }
 
@@ -68,7 +67,7 @@ namespace cuEVM {
     */
     __host__ __device__ void evm_message_call_t::get_recipient(
         ArithEnv &arith,
-        bn_t &recipient) {
+        bn_t &recipient) const {
       cgbn_load(arith.env, recipient, &this->recipient);
     }
 
@@ -80,7 +79,7 @@ namespace cuEVM {
     */
     __host__ __device__ void evm_message_call_t::get_contract_address(
         ArithEnv &arith,
-        bn_t &contract_address) {
+        bn_t &contract_address) const {
       cgbn_load(arith.env, contract_address, &this->contract_address);
     }
 
@@ -92,7 +91,7 @@ namespace cuEVM {
     */
     __host__ __device__ void evm_message_call_t::get_gas_limit(
         ArithEnv &arith,
-        bn_t &gas_limit) {
+        bn_t &gas_limit) const {
       cgbn_load(arith.env, gas_limit, &this->gas_limit);
     }
 
@@ -103,7 +102,7 @@ namespace cuEVM {
      */
     __host__ __device__ void evm_message_call_t::get_value(
         ArithEnv &arith,
-        bn_t &value) {
+        bn_t &value) const {
       cgbn_load(arith.env, value, &this->value);
     }
 
@@ -111,7 +110,7 @@ namespace cuEVM {
      * Get the depth.
      * @return The depth YP: \f$e\f$.
     */
-    __host__ __device__ uint32_t evm_message_call_t::get_depth() {
+    __host__ __device__ uint32_t evm_message_call_t::get_depth() const {
       return this->depth;
     }
 
@@ -119,7 +118,7 @@ namespace cuEVM {
      * Get the call type.
      * @return The call type internal has the opcode YP: \f$w\f$.
     */
-    __host__ __device__ uint32_t evm_message_call_t::get_call_type() {
+    __host__ __device__ uint32_t evm_message_call_t::get_call_type() const {
       return this->call_type;
     }
 
@@ -130,7 +129,7 @@ namespace cuEVM {
     */
     __host__ __device__ void evm_message_call_t::get_storage_address(
         ArithEnv &arith,
-        bn_t &storage_address) {
+        bn_t &storage_address) const {
       cgbn_load(arith.env, storage_address, &this->storage_address);
     }
 
@@ -138,7 +137,7 @@ namespace cuEVM {
      * Get the call/init data.
      * @return The data YP: \f$d\f$.
      */
-    __host__ __device__ cuEVM::byte_array_t evm_message_call_t::get_data() {
+    __host__ __device__ cuEVM::byte_array_t evm_message_call_t::get_data() const {
       return this->data;
     }
 
@@ -146,7 +145,7 @@ namespace cuEVM {
      * Get the byte code.
      * @return The byte code YP: \f$b\f$.
      */
-    __host__ __device__ cuEVM::byte_array_t evm_message_call_t::get_byte_code() {
+    __host__ __device__ cuEVM::byte_array_t evm_message_call_t::get_byte_code() const {
       return this->byte_code;
     }
 
@@ -157,7 +156,7 @@ namespace cuEVM {
      */
     __host__ __device__ void evm_message_call_t::get_return_data_offset(
         ArithEnv &arith,
-        bn_t &return_data_offset) {
+        bn_t &return_data_offset) const {
       cgbn_load(arith.env, return_data_offset, &this->return_data_offset);
     }
 
@@ -168,7 +167,7 @@ namespace cuEVM {
      */
     __host__ __device__ void evm_message_call_t::get_return_data_size(
         ArithEnv &arith,
-        bn_t &return_data_size) {
+        bn_t &return_data_size) const {
       cgbn_load(arith.env, return_data_size, &this->return_data_size);
     }
 
@@ -176,7 +175,7 @@ namespace cuEVM {
      * Get the static flag.
      * @return The static flag (STATICCALL) YP: \f$w\f$.
      */
-    __host__ __device__ uint32_t evm_message_call_t::get_static_env() {
+    __host__ __device__ uint32_t evm_message_call_t::get_static_env() const {
       return this->static_env;
     }
 
@@ -213,8 +212,7 @@ namespace cuEVM {
         jump_destinations = NULL;
       }
       jump_destinations = new cuEVM::jump_destinations_t(
-          byte_code.data,
-          byte_code.size);
+          byte_code);
     }
 
     /**
@@ -243,14 +241,14 @@ namespace cuEVM {
      * Get the jump destinations.
      * @return The jump destinations.
      */
-    __host__ __device__ cuEVM::jump_destinations_t* evm_message_call_t::get_jump_destinations() {
+    __host__ __device__ cuEVM::jump_destinations_t* evm_message_call_t::get_jump_destinations() const {
       return jump_destinations;
     }
 
     /**
      * Print the message.
      */
-    __host__ __device__ void evm_message_call_t::print() {
+    __host__ __device__ void evm_message_call_t::print() const {
       printf("sender: ");
       sender.print();
       printf("\nrecipient: ");

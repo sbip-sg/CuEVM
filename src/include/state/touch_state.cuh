@@ -56,13 +56,50 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address of the account.
              * @param[out] account_ptr The pointer to the account.
-             * @param[in] flag The account access flags. 
+             * @param[in] flag The account access flags.
+             * @return 1 if the account is found, 0 otherwise.
              */          
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
                 const bn_t &address,
                 cuEVM::account::account_t* &account_ptr,
                 const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+            
+            /**
+             * The getter for the balance given by an address.
+             * @param[in] arith The arithmetic environment.
+             * @param[in] address The address of the account.
+             * @param[out] balance The balance of the account.
+             * @return error_code, 0 if success
+             */
+            __host__ __device__ int32_t get_balance(
+                ArithEnv &arith,
+                const bn_t &address,
+                bn_t &balance);
+            
+            /**
+             * The getter for the nonce given by an address.
+             * @param[in] arith The arithmetic environment.
+             * @param[in] address The address of the account.
+             * @param[out] nonce The nonce of the account.
+             * @return error_code, 0 if success
+             */
+            __host__ __device__ int32_t get_nonce(
+                ArithEnv &arith,
+                const bn_t &address,
+                bn_t &nonce);
+            
+            /**
+             * The getter for the code given by an address.
+             * @param[in] arith The arithmetic environment.
+             * @param[in] address The address of the account.
+             * @param[out] byte_code The byte code of the account.
+             * @return error_code, 0 if success
+             */
+            __host__ __device__ int32_t get_code(
+                ArithEnv &arith,
+                const bn_t &address,
+                byte_array_t &byte_code);
 
             /**
              * The getter for the value given by an address and a key.
@@ -90,7 +127,7 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 const bn_t &key,
-                bn_t &value);
+                bn_t &value) const;
 
             /**
              * The setter for the balance given by an address.

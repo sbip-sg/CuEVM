@@ -370,6 +370,6 @@ __host__ void hex_string_from_evm_word_t(
   */
   __host__ __device__ void print_evm_word_t(
     evm_word_t &evm_word);
-}
+} // namespace cuEVM
 
 #endif

@@ -1,24 +1,21 @@
 #include "include/gas_cost.cuh"
-#include "include/error_codes.h"
+#include "include/utils/error_codes.cuh"
 
 
 namespace cuEVM {
     namespace gas_cost {
         __host__ __device__ int32_t has_gas(
             ArithEnv &arith,
-            bn_t &gas_limit,
-            bn_t &gas_used,
-            uint32_t &error_code) {
-            int32_t gas_sign = cgbn_compare(arith.env, gas_limit, gas_used);
-            error_code = (gas_sign < 0) ? ERROR_GAS_LIMIT_EXCEEDED : error_code;
-            return (gas_sign >= 0) && (error_code == ERR_NONE);
+            const bn_t &gas_limit,
+            const bn_t &gas_used) {
+            return (cgbn_compare(arith.env, gas_limit, gas_used) < 0) ? ERROR_GAS_LIMIT_EXCEEDED : ERROR_SUCCESS;
         }
         
         __host__ __device__ void max_gas_call(
             ArithEnv &arith,
             bn_t &gas_capped,
-            bn_t &gas_limit,
-            bn_t &gas_used) {
+            const bn_t &gas_limit,
+            const bn_t &gas_used) {
             // compute the remaining gas
             bn_t gas_left;
             cgbn_sub(arith.env, gas_left, gas_limit, gas_used);
@@ -32,13 +29,13 @@ namespace cuEVM {
         (
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length,
-            uint32_t gas_per_word) {
+            const bn_t &length,
+            const uint32_t gas_per_word) {
             // gas_used += gas_per_word * emv word count of length
             // length = (length + 31) / 32
             bn_t evm_words_gas;
-            cgbn_add_ui32(arith.env, evm_words_gas, length, EVM_WORD_SIZE -1);
-            cgbn_div_ui32(arith.env, evm_words_gas, evm_words_gas, EVM_WORD_SIZE);
+            cgbn_add_ui32(arith.env, evm_words_gas, length, cuEVM::word_size -1);
+            cgbn_div_ui32(arith.env, evm_words_gas, evm_words_gas, cuEVM::word_size);
             cgbn_mul_ui32(arith.env, evm_words_gas, evm_words_gas, gas_per_word);
             cgbn_add(arith.env, gas_used, gas_used, evm_words_gas);
         }
@@ -46,7 +43,7 @@ namespace cuEVM {
         __host__ __device__ void initcode_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &initcode_length
+            const bn_t &initcode_length
         ) {
             // gas_used += GAS_INITCODE_WORD_COST * emv word count of initcode
             // length = (initcode_length + 31) / 32
@@ -56,35 +53,35 @@ namespace cuEVM {
         __host__ __device__ void keccak_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length) {
+            const bn_t &length) {
             evm_words_gas_cost(arith, gas_used, length, GAS_KECCAK256_WORD);
         }
         
         __host__ __device__ void memory_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length) {
+            const bn_t &length) {
             evm_words_gas_cost(arith, gas_used, length, GAS_MEMORY);
         }
         
         __host__ __device__ void sha256_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length) {
+            const bn_t &length) {
             evm_words_gas_cost(arith, gas_used, length, GAS_PRECOMPILE_SHA256_WORD);
         }
         
         __host__ __device__ void ripemd160_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            bn_t &length) {
+            const bn_t &length) {
             evm_words_gas_cost(arith, gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
         }
         
         __host__ __device__ void blake2_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            uint32_t rounds) {
+            const uint32_t rounds) {
             // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
             bn_t temp;
             cgbn_set_ui32(arith.env, temp, rounds);
@@ -105,10 +102,23 @@ namespace cuEVM {
             cgbn_add(arith.env, gas_used, gas_used, temp);
         }
 
+        __host__ __device__ int32_t access_account_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const cuEVM::state::AccessState &access_state,
+            const bn_t &address) {
+            if (access_state.is_warm_account(arith, address)) {
+                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
+            } else {
+                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
+            }
+            return ERROR_SUCCESS;
+        }
+
         __host__ __device__ int32_t sload_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            cuEVM::state::AccessState &access_state,
+            const cuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key) {
             // get the key warm
@@ -118,15 +128,15 @@ namespace cuEVM {
                 cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_SLOAD);
             }
 
-            return 1;
+            return ERROR_SUCCESS;
 
         }
         __host__ __device__ int32_t sstore_cost(
             ArithEnv &arith,
             bn_t &gas_used,
             bn_t &gas_refund,
-            cuEVM::state::TouchState &touch_state,
-            cuEVM::state::AccessState &access_state,
+            const cuEVM::state::TouchState &touch_state,
+            const cuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key,
             const bn_t &new_value) {
@@ -185,6 +195,7 @@ namespace cuEVM {
                     }
                 }
             }
+            return ERROR_SUCCESS;
         }
 
         __host__ __device__ int32_t transaction_intrinsic_gas(
@@ -226,11 +237,12 @@ namespace cuEVM {
                 initcode_cost(arith, gas_intrinsic, initcode_length);
             }
             #endif
+            return ERROR_SUCCESS;
         }
 
         __host__ __device__ int32_t memory_grow_cost(
             ArithEnv &arith,
-            cuEVM::memory::evm_memory_t &memory,
+            const cuEVM::memory::evm_memory_t &memory,
             const bn_t &index,
             const bn_t &length,
             bn_t &memory_expansion_cost,
@@ -239,14 +251,14 @@ namespace cuEVM {
             do {
                 if (cgbn_compare_ui32(arith.env, length, 0) <= 0)
                 {
-                    return 0;
+                    return ERROR_SUCCESS;
                 }
                 bn_t offset;
                 uint32_t offset_ui32;
                 if (cgbn_add(arith.env, offset, index, length) != 0) {
                     break;
                 }
-                if (arith.uint32_t_from_cgbn(arith.env, offset_ui32, offset) != 0) {
+                if (arith.uint32_t_from_cgbn(offset_ui32, offset) != 0) {
                     break;
                 }
                 bn_t old_memory_cost;
@@ -281,7 +293,7 @@ namespace cuEVM {
                 if (cgbn_mul_ui32(arith.env, offset, memory_size_word, 32) != 0) {
                     break;
                 }
-                return 0;
+                return ERROR_SUCCESS;
             } while (0);
             return ERR_MEMORY_INVALID_OFFSET;
         }

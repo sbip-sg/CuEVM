@@ -1,5 +1,9 @@
-#include "include/account.cuh"
-#include "include/utils.cuh"
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2024-06-20
+// SPDX-License-Identifier: MIT
+#include "../include/state/account.cuh"
 
 namespace cuEVM
 {
@@ -315,7 +319,7 @@ namespace cuEVM
     {
         cJSON *account_json = cJSON_CreateObject();
         char *bytes_string = nullptr;
-        char *hex_string_ptr = new char[EVM_WORD_SIZE * 2 + 3];
+        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
         size_t jdx = 0;
         address.to_hex(hex_string_ptr, 0, 5);
         cJSON_SetValuestring(account_json, hex_string_ptr);

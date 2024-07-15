@@ -14,7 +14,7 @@ namespace cuEVM {
     /**
      * The return data class. (YP: \f$H_{return}(\mu)=H(\mu, I)\f$)
     */
-    typedef struct evm_return_data_t byte_array_t;
+    typedef struct byte_array_t evm_return_data_t ;
 }
 
 #endif

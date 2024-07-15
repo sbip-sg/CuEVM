@@ -1,7 +1,7 @@
 #ifndef _CUEVM_ACCOUNT_H_
 #define _CUEVM_ACCOUNT_H_
 
-#include "arith.cuh"
+#include "../utils/arith.cuh"
 #include "storage.cuh"
 //#include <bitset>
 

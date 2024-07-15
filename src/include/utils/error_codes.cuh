@@ -4,18 +4,19 @@
 // error codes
 #define ERR_NONE 0x00
 #define ERR_SUCCESS 0x00
+#define ERROR_SUCCESS 0x00
 #define ERR_RETURN 0x01
 #define ERR_REVERT 0x02
 
 // stack codes
-#define ERR_STACK_UNDERFLOW 0x03
-#define ERR_STACK_OVERFLOW 0x04
-#define ERR_STACK_INVALID_SIZE 0x05
-#define ERR_STACK_INVALID_INDEX 0x06
+#define ERROR_STACK_UNDERFLOW 0x03
+#define ERROR_STACK_OVERFLOW 0x04
+#define ERROR_STACK_INVALID_SIZE 0x05
+#define ERROR_STACK_INVALID_INDEX 0x06
 
 // arithmetic codes
-#define ERR_INVALID_ZERO_DIVIDE 0x07
-#define ERR_INVALID_MODULUS 0x08
+#define ERROR_INVALID_ZERO_DIVIDE 0x07
+#define ERROR_INVALID_MODULUS 0x08
 
 
 // global storage error codes
@@ -30,7 +31,7 @@
 #define ERR_MAX_DEPTH_EXCEEDED 0x0C
 
 // block error codes
-#define ERR_BLOCK_INVALID_NUMBER 0x0D
+#define ERROR_BLOCK_INVALID_NUMBER 0x0D
 
 // message error codes
 #define ERR_MESSAGE_INVALID_INDEX 0x0E
@@ -48,7 +49,7 @@
 #define ERR_STATIC_CALL_CONTEXT 0x14
 
 // gas
-#define ERR_OUT_OF_GAS 0x15
+#define ERROR_OUT_OF_GAS 0x15
 
 // transaction
 #define ERROR_TRANSACTION_TYPE 0x17
@@ -106,6 +107,12 @@
 
 // precompile errors
 #define ERROR_PRECOMPILE_MODEXP_OVERFLOW 0x36
+
+// memory allocation
+#define ERROR_MEMORY_ALLOCATION_FAILED 0x37
+
+// wrong evm word size
+#define ERROR_INVALID_WORD_SIZE 0x38
 
 
 #endif

@@ -8,8 +8,7 @@
 #define _STATE_T_H_
 
 #include "account.cuh"
-#include "arith.cuh"
-#include <CuCrypto/keccak.cuh>
+#include "../utils/arith.cuh"
 #include <cjson/cJSON.h>
 
 namespace cuEVM {

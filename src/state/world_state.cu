@@ -1,4 +1,9 @@
-#include "include/world_state.cuh"
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2024-06-20
+// SPDX-License-Identifier: MIT
+#include "../include/state/world_state.cuh"
 
 namespace cuEVM {
     namespace state {

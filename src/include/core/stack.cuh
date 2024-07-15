@@ -63,7 +63,7 @@ namespace cuEVM
 
       /**
        * Grow the stack
-       * @return 1 if the stack is grown, 0 otherwise
+       * @return 0 if the stack is grown, error code otherwise
        */
       __host__ __device__ int32_t grow();
 
@@ -83,7 +83,7 @@ namespace cuEVM
        * Push a value to the stack
        * @param[in] arith The arithmetical environment
        * @param[in] value The value to be pushed
-       * @return 1 if the value is pushed, 0 otherwise
+       * @return 0 if the value is pushed, error code otherwise
        */
       __host__ __device__ int32_t push(
         ArithEnv &arith,
@@ -93,7 +93,7 @@ namespace cuEVM
        * Pop a value from the stack
        * @param[in] arith The arithmetical environment
        * @param[out] y The value popped from the stack
-       * @return 1 if the value is popped, 0 otherwise
+       * @return 0 if the value is popped, error code otherwise
        */
       __host__ __device__ int32_t pop(
         ArithEnv &arith,
@@ -105,7 +105,7 @@ namespace cuEVM
        * @param[in] x the number of bytes of the value
        * @param[in] src_byte_data The source byte data
        * @param[in] src_byte_size The size of the source byte data
-       * @return 1 if the value is pushed, 0 otherwise
+       * @return 0 if the value is pushed, error code otherwise
        */
       __host__ __device__ int32_t pushx(
         ArithEnv &arith,
@@ -118,7 +118,7 @@ namespace cuEVM
        * @param[in] arith The arithmetical environment
        * @param[in] index The index of the value
        * @param[out] y The value at the given index
-       * @return 1 if the value is found, 0 otherwise
+       * @return 0 if the value is popped, error code otherwise
        */
       __host__ __device__ int32_t get_index(
         ArithEnv &arith,
@@ -130,7 +130,7 @@ namespace cuEVM
        * it at the top of the stack.
        * @param[in] arith The arithmetical environment
        * @param[in] x The index of the value
-       * @return 1 if the value is duplicated, 0 otherwise
+       * @return 0 if the value is duplicated, error code otherwise
        */
       __host__ __device__ int32_t dupx(
         ArithEnv &arith,
@@ -140,7 +140,7 @@ namespace cuEVM
        * Swap the values at the given index with the top of the stack
        * @param[in] arith The arithmetical environment
        * @param[in] x The index of the value
-       * @return 1 if the values are swapped, 0 otherwise
+       * @return 0 if the value is swapped, error code otherwise
        */
       __host__ __device__ int32_t swapx(
         ArithEnv &arith,

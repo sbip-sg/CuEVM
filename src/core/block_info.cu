@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "../include/core/block_info.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
     __host__ __device__ block_info_t::block_info_t()
@@ -114,70 +115,70 @@ namespace cuEVM {
 
 
     __host__ __device__ void block_info_t::get_coin_base(
-        ArithEnv &arith,
-        bn_t &coin_base)
+      ArithEnv &arith,
+      bn_t &coin_base) const
     {
       cgbn_load(arith.env, coin_base, &(this->coin_base));
     }
 
 
     __host__ __device__ void block_info_t::get_time_stamp(
-        ArithEnv &arith,
-        bn_t &time_stamp)
+      ArithEnv &arith,
+      bn_t &time_stamp) const
     {
       cgbn_load(arith.env, time_stamp, &(this->time_stamp));
     }
 
     __host__ __device__ void block_info_t::get_number(
-        ArithEnv &arith,
-      bn_t &number)
+      ArithEnv &arith,
+      bn_t &number) const
     {
       cgbn_load(arith.env, number, &(this->number));
     }
 
 
     __host__ __device__ void block_info_t::get_difficulty(
-        ArithEnv &arith,
-      bn_t &difficulty)
+      ArithEnv &arith,
+      bn_t &difficulty) const
     {
       cgbn_load(arith.env, difficulty, &(this->difficulty));
     }
 
     __host__ __device__ void block_info_t::get_prevrandao(
-        ArithEnv &arith,
-      bn_t &val)
+      ArithEnv &arith,
+      bn_t &val) const
     {
       cgbn_load(arith.env, val, &(this->prevrandao));
     }
 
 
     __host__ __device__ void block_info_t::get_gas_limit(
-        ArithEnv &arith,
-      bn_t &gas_limit)
+      ArithEnv &arith,
+      bn_t &gas_limit) const
     {
       cgbn_load(arith.env, gas_limit, &(this->gas_limit));
     }
 
 
     __host__ __device__ void block_info_t::get_chain_id(
-        ArithEnv &arith,
-      bn_t &chain_id)
+      ArithEnv &arith,
+      bn_t &chain_id) const
     {
       cgbn_load(arith.env, chain_id, &(this->chain_id));
     }
 
 
     __host__ __device__ void block_info_t::get_base_fee(
-        ArithEnv &arith,
-      bn_t &base_fee)
+      ArithEnv &arith,
+      bn_t &base_fee) const
     {
       cgbn_load(arith.env, base_fee, &(this->base_fee));
     }
 
     __host__ __device__ int32_t block_info_t::get_previous_hash(
-        ArithEnv &arith,
-        bn_t &previous_hash,
-        const bn_t &previous_number)
+      ArithEnv &arith,
+      bn_t &previous_hash,
+      const bn_t &previous_number) const
     {
       uint32_t idx = 0;
       bn_t number;
@@ -187,7 +188,7 @@ namespace cuEVM {
       if (cgbn_compare(arith.env, number, previous_number) < 1)
       {
         cgbn_set_ui32(arith.env, previous_hash, 0);
-        return 0;
+        return ERROR_BLOCK_INVALID_NUMBER;
       }
       // get the distance from the current block number to the requested block number
       cgbn_sub(arith.env, number, number, previous_number);
@@ -196,13 +197,13 @@ namespace cuEVM {
       if (idx > 255)
       {
         cgbn_set_ui32(arith.env, previous_hash, 0);
-        return 0;
+        return ERROR_BLOCK_INVALID_NUMBER;
       }
       cgbn_load(arith.env, previous_hash, &(previous_blocks[idx].hash));
-      return 1;
+      return ERROR_SUCCESS;
     }
 
-    __host__ __device__ void block_info_t::print()
+    __host__ __device__ void block_info_t::print() const
     {
       uint32_t idx = 0;
       printf("BLOCK: \n");
@@ -235,7 +236,7 @@ namespace cuEVM {
       }
     }
 
-    __host__ cJSON * block_info_t::to_json()
+    __host__ cJSON * block_info_t::to_json() const
     {
       uint32_t idx = 0;
       char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];

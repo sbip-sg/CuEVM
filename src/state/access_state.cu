@@ -1,4 +1,9 @@
-#include "include/access_state.cuh"
+// cuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
+// Author: Stefan-Dan Ciocirlan
+// Data: 2024-06-20
+// SPDX-License-Identifier: MIT
+#include "../include/state/access_state.cuh"
 
 namespace cuEVM {
     namespace state {
@@ -61,8 +66,7 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 const bn_t &key,
-                bn_t &value
-            ) {
+                bn_t &value) const {
                 account::account_t* account_ptr = nullptr;
                 if (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)) {
                     if (account_ptr->get_storage_value(arith, key, value)) {
@@ -79,8 +83,7 @@ namespace cuEVM {
 
             __host__ __device__ int32_t AccessState::is_warm_account(
                 ArithEnv &arith,
-                const bn_t &address
-            ) {
+                const bn_t &address) const {
                 cuEVM::account::account_t* account_ptr = nullptr;
                 if (_state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG)) {
                     return 1;
@@ -91,8 +94,7 @@ namespace cuEVM {
             __host__ __device__ int32_t AccessState::is_warm_key(
                 ArithEnv &arith,
                 const bn_t &address,
-                const bn_t &key
-            ) {
+                const bn_t &key) const {
                 cuEVM::account::account_t* account_ptr = nullptr;
                 if (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)) {
                     bn_t value;
