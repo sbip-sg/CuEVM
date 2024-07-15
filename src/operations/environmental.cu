@@ -228,7 +228,7 @@ namespace cuEVM::operations {
         bn_t &gas_used,
         uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
-        cuEVM::transaction::transaction_t &transaction)
+        const cuEVM::transaction::transaction_t &transaction)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_BASE);
         int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -238,9 +238,9 @@ namespace cuEVM::operations {
         if (error_code == ERROR_SUCCESS)
         {
             bn_t origin;
-            transaction.get_sender(origin);
+            transaction.get_sender(arith, origin);
 
-            stack.push(origin, error_code);
+            error_code |= stack.push(arith, origin); 
 
             pc = pc + 1;
         }
@@ -263,7 +263,7 @@ namespace cuEVM::operations {
         bn_t &gas_used,
         uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message)
+        const cuEVM::evm_message_call_t &message)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_BASE);
         int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -273,9 +273,9 @@ namespace cuEVM::operations {
         if (error_code == ERROR_SUCCESS)
         {
             bn_t caller;
-            message.get_sender(caller);
+            message.get_sender(arith, caller);
 
-            stack.push(caller, error_code);
+            error_code |= stack.push(arith, caller);
 
             pc = pc + 1;
         }
@@ -297,7 +297,7 @@ namespace cuEVM::operations {
         bn_t &gas_used,
         uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message)
+        const cuEVM::evm_message_call_t &message)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_BASE);
         int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -307,9 +307,9 @@ namespace cuEVM::operations {
         if (error_code == ERROR_SUCCESS)
         {
             bn_t call_value;
-            message.get_value(call_value);
+            message.get_value(arith, call_value);
 
-            stack.push(call_value, error_code);
+            error_code |= stack.push(arith, call_value);
 
             pc = pc + 1;
         }
@@ -335,7 +335,7 @@ namespace cuEVM::operations {
         bn_t &gas_used,
         uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message)
+        const cuEVM::evm_message_call_t &message)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
         int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -345,21 +345,27 @@ namespace cuEVM::operations {
         if (error_code == ERROR_SUCCESS)
         {
             bn_t index;
-            stack.pop(index, error_code);
+            error_code |= stack.pop(arith, index);
             bn_t length;
-            cgbn_set_ui32(arith.env, length, EVM_WORD_SIZE);
+            cgbn_set_ui32(arith.env, length, cuEVM::word_size);
 
-            size_t available_data;
-            uint8_t *data;
-            data = message.get_data(
+            cuEVM::byte_array_t call_data;
+            call_data = message.get_data();
+            cuEVM::byte_array_t data;
+            call_data.get_sub(
+                arith,
                 index,
                 length,
-                available_data);
-
-            stack.pushx(EVM_WORD_SIZE, error_code, data, available_data);
+                data);
+            error_code |= stack.pushx(
+                arith,
+                cuEVM::word_size,
+                data.data,
+                data.size);
 
             pc = pc + 1;
         }
+        return error_code;
     }
 
     /**

@@ -131,7 +131,7 @@ namespace cuEVM::operations {
         bn_t &gas_used,
         uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
-        cuEVM::transaction::transaction_t &transaction);
+        const cuEVM::transaction::transaction_t &transaction);
 
     /**
      * The CALLER operation implementation.
@@ -151,7 +151,7 @@ namespace cuEVM::operations {
         bn_t &gas_used,
         uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message);
+        const cuEVM::evm_message_call_t &message);
 
     /**
      * The CALLVALUE operation implementation.
@@ -170,7 +170,7 @@ namespace cuEVM::operations {
         bn_t &gas_used,
         uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message);
+        const cuEVM::evm_message_call_t &message);
 
     /**
      * The CALLDATALOAD operation implementation.

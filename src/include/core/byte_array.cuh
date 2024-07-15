@@ -156,10 +156,23 @@ namespace cuEVM {
       const byte_array_t src
     );
 
+    /**
+     * Get the cgbn number from the byte array.
+     * @param[in] arith The arithmetic environment.
+     * @param[out] out The cgbn number.
+     * @return The Error code. 0 for success, 1 for failure.
+     */
     __host__ __device__ int32_t to_bn_t(
       ArithEnv &arith,
       bn_t &out
     ) const;
+
+    __host__ __device__ int32_t get_sub(
+      ArithEnv &arith,
+      const bn_t &index,
+      const bn_t &length,
+      byte_array_t &out
+    );
   };
 
   namespace byte_array {
