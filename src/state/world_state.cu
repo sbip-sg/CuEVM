@@ -4,6 +4,7 @@
 // Data: 2024-06-20
 // SPDX-License-Identifier: MIT
 #include "../include/state/world_state.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
     namespace state {
@@ -22,10 +23,11 @@ namespace cuEVM {
             bn_t &value
         ) {
             account::account_t* account_ptr = nullptr;
-            if (_state->get_account(arith, address, account_ptr)) {
-                return account_ptr->get_storage_value(arith, key, value);
-            }
-            return 0;
+            cgbn_set_ui32(arith.env, value, 0);
+            return (
+                _state->get_account(arith, address, account_ptr) ||
+                account_ptr->get_storage_value(arith, key, value)
+            );
         }
     }
 }

@@ -2,11 +2,9 @@
 #define _CUEVM_ERRORCODES_H_
 
 // error codes
-#define ERR_NONE 0x00
-#define ERR_SUCCESS 0x00
 #define ERROR_SUCCESS 0x00
-#define ERR_RETURN 0x01
-#define ERR_REVERT 0x02
+#define ERROR_RETURN 0x01
+#define ERROR_REVERT 0x02
 
 // stack codes
 #define ERROR_STACK_UNDERFLOW 0x03
@@ -20,21 +18,21 @@
 
 
 // global storage error codes
-#define ERR_STATE_INVALID_ADDRESS 0x09
-#define ERR_STATE_INVALID_KEY 0x0A
+#define ERROR_STATE_ADDRESS_NOT_FOUND 0x09
+#define ERROR_STORAGE_KEY_NOT_FOUND 0x0A
 
 
 // operation not implemented
-#define ERR_NOT_IMPLEMENTED 0x0B
+#define ERROR_NOT_IMPLEMENTED 0x0B
 
 // EVM error codes
-#define ERR_MAX_DEPTH_EXCEEDED 0x0C
+#define ERROR_MAX_DEPTH_EXCEEDED 0x0C
 
 // block error codes
 #define ERROR_BLOCK_INVALID_NUMBER 0x0D
 
 // message error codes
-#define ERR_MESSAGE_INVALID_INDEX 0x0E
+#define ERROR_MESSAGE_INVALID_INDEX 0x0E
 
 // memory error codes
 #define ERR_MEMEORY_INVALID_INDEX 0x0F
@@ -42,11 +40,11 @@
 #define ERR_MEMORY_INVALID_OFFSET 0x16
 
 // execution codes
-#define ERR_INVALID_JUMP_DESTINATION 0x11
+#define ERROR_INVALID_JUMP_DESTINATION 0x11
 
 
 // static call error
-#define ERR_STATIC_CALL_CONTEXT 0x14
+#define ERROR_STATIC_CALL_CONTEXT 0x14
 
 // gas
 #define ERROR_OUT_OF_GAS 0x15
@@ -113,6 +111,10 @@
 
 // wrong evm word size
 #define ERROR_INVALID_WORD_SIZE 0x38
+
+// byte array errors
+#define ERROR_BYTE_ARRAY_INVALID_SIZE 0x39
+#define ERROR_BYTE_ARRAY_OVERFLOW_VALUES 0x3A
 
 
 #endif

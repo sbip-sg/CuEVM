@@ -311,6 +311,30 @@ namespace cuEVM {
     return ERROR_SUCCESS;
   }
 
+  __host__ __device__ int32_t byte_array_t::get_sub(
+    ArithEnv &arith,
+    const bn_t &index,
+    const bn_t &length,
+    byte_array_t &out
+  ) const {
+    uint32_t index_value, length_value;
+    index_value = cgbn_get_ui32(arith.env, index);
+    length_value = cgbn_get_ui32(arith.env, length);
+    if (
+      (cgbn_compare_ui32(arith.env, index, index_value) != 0) &&
+      (cgbn_compare_ui32(arith.env, length, length_value) != 0)
+    ) {
+      out = byte_array_t();
+      return ERROR_BYTE_ARRAY_OVERFLOW_VALUES;
+    }
+    if (index_value + length_value > size) {
+      out = byte_array_t();
+      return ERROR_BYTE_ARRAY_INVALID_SIZE;
+    }
+    out = byte_array_t(data + index_value, length_value);
+    return ERROR_SUCCESS;
+  }
+
   namespace byte_array {
 
     // CPU-GPU

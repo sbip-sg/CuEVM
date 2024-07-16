@@ -172,7 +172,7 @@ namespace cuEVM {
       const bn_t &index,
       const bn_t &length,
       byte_array_t &out
-    );
+    ) const;
   };
 
   namespace byte_array {

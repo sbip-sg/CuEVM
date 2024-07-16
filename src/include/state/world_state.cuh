@@ -31,7 +31,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic value to be processed.
              * @param[in] address The address for the account
              * @param[out] account_ptr  The pointer to the account
-             * @return if found 1, otherwise 0.
+             * @return if found 0, otherwise error.
              */
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
@@ -44,7 +44,7 @@ namespace cuEVM {
              * @param[in] address The blockchain address of the account whose storage value is being queried. This parameter specifies the account uniquely.
              * @param[in] key The key corresponding to the storage value within the account's storage to be retrieved.
              * @param[out] value The storage value
-             * @return Returns 1 if the storage value for the given account and key was successfully found and value has been updated accordingly. Returns 0 if the account or the key within the account's storage could not be found and the value is set to 0.
+             * @return Returns 0 if the storage value for the given account and key was successfully found and value has been updated accordingly. Returns error if the account or the key within the account's storage could not be found and the value is set to 0.
              */
             __host__ __device__ int32_t get_value(
                 ArithEnv &arith,

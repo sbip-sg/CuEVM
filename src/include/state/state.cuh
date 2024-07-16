@@ -76,7 +76,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address.
              * @param[out] index The index.
-             * @return If found 1. otherwise 0.
+             * @return If found 0. otherwise error.
              */
             __host__ __device__ int32_t get_account_index(
                 ArithEnv &arith,
@@ -88,7 +88,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address.
              * @param[out] account The account.
-             * @return If found 1. otherwise 0.
+             * @return If found 0. otherwise error.
              */
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
@@ -100,7 +100,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address.
              * @param[out] account_ptr The account pointer.
-             * @return If found 1. otherwise 0.
+             * @return If found 0. otherwise error.
              */
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
@@ -110,7 +110,7 @@ namespace cuEVM {
             /**
              * The add account function.
              * @param[in] account The account.
-             * @return If added 1. otherwise 0.
+             * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_account(
                 const cuEVM::account::account_t &account);
@@ -119,7 +119,7 @@ namespace cuEVM {
              * The set account function.
              * @param[in] arith The arithmetic environment.
              * @param[in] account The account.
-             * @return If set 1. otherwise 0.
+             * @return If set 0. otherwise error.
              */
             __host__ __device__ int32_t set_account(
                 ArithEnv &arith,
@@ -139,7 +139,7 @@ namespace cuEVM {
              * The update account function.
              * @param[in] arith The arithmetic environment.
              * @param[in] account The account.
-             * @return If updated 1. otherwise 0.
+             * @return If updated 0. otherwise error.
              */
             __host__ __device__ int32_t update_account(
                 ArithEnv &arith,
@@ -238,7 +238,7 @@ namespace cuEVM {
              * @param[in] address The address.
              * @param[out] account The account.
              * @param[in] flag The flag access.
-             * @return If found 1. otherwise 0.
+             * @return If found 0. otherwise error.
              */
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
@@ -252,7 +252,7 @@ namespace cuEVM {
              * @param[in] address The address.
              * @param[out] account_ptr The account pointer.
              * @param[in] flag The flag access.
-             * @return If found 1. otherwise 0.
+             * @return If found 0. otherwise error.
              */
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
@@ -264,6 +264,7 @@ namespace cuEVM {
              * The add account function.
              * @param[in] account The account.
              * @param[in] flag The flag access.
+             * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_account(
                 const cuEVM::account::account_t &account,
@@ -274,7 +275,7 @@ namespace cuEVM {
              * @param[out] account_ptr The account pointer.
              * @param[in] src_account_ptr The source account pointer.
              * @param[in] flag The flag access.
-             * @return If added 1. otherwise 0.
+             * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_duplicate_account(
                 cuEVM::account::account_t* &account_ptr,
@@ -287,6 +288,7 @@ namespace cuEVM {
              * @param[in] address The address.
              * @param[out] account_ptr The account pointer.
              * @param[in] flag The flag access.
+             * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_new_account(
                 ArithEnv &arith,
@@ -299,6 +301,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] account The account.
              * @param[in] flag The flag access.
+             * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t set_account(
                 ArithEnv &arith,
@@ -310,6 +313,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] account The account.
              * @param[in] flag The flag access.
+             * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t update_account(
                 ArithEnv &arith,
@@ -320,7 +324,7 @@ namespace cuEVM {
              * The update state function.
              * @param[in] arith The arithmetic environment.
              * @param[in] other The other state access.
-             * @return If updated 1. otherwise 0.
+             * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t update(
                 ArithEnv &arith,

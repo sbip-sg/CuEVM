@@ -309,7 +309,7 @@ namespace cuEVM
          * @param[in] arith The arithmetical environment
          * @param[in] key The key
          * @param[out] value The value
-         * @return If found 1, otherwise 0
+         * @return If found 0, otherwise error code
          */
         __host__ __device__ int32_t get_storage_value(
             ArithEnv &arith,
@@ -320,7 +320,7 @@ namespace cuEVM
          * @param[in] arith The arithmetical environment
          * @param[in] key The key of the storage
          * @param[in] value The value of the storage
-         * @return If found succesfull, otherwise 0
+         * @return If set succesfull 0, otherwise error code
          */
         __host__ __device__ int32_t set_storage_value(
             ArithEnv &arith,

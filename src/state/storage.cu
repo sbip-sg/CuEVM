@@ -4,6 +4,7 @@
 // Data: 2024-06-20
 // SPDX-License-Identifier: MIT
 #include "../include/state/storage.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
     namespace storage {
@@ -157,10 +158,10 @@ namespace cuEVM {
                 if (this->storage[idx].has_key(arith, key))
                 {
                     this->storage[idx].get_value(arith, value);
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
             }
-            return 0;
+            return ERROR_STORAGE_KEY_NOT_FOUND;
         }
 
         __host__ __device__ int32_t contract_storage_t::set_value(
@@ -174,7 +175,7 @@ namespace cuEVM {
                 if (this->storage[idx].has_key(arith, key))
                 {
                     this->storage[idx].set_value(arith, value);
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
             }
             if (this->size >= this->capacity)
@@ -195,7 +196,7 @@ namespace cuEVM {
             this->storage[this->size].set_key(arith, key);
             this->storage[this->size].set_value(arith, value);
             this->size++;
-            return 1;
+            return ERROR_SUCCESS;
         }
 
 

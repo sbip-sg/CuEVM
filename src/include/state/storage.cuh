@@ -201,7 +201,7 @@ namespace cuEVM
              * @param[in] arith The arithmetic environment
              * @param[in] key The key to get the value for
              * @param[out] value The value for the given key
-             * @return The error code for the operation (1 means success)
+             * @return The error code for the operation (0 means success)
              */
             __host__ __device__ int32_t get_value(
                 ArithEnv &arith,
@@ -213,7 +213,7 @@ namespace cuEVM
              * @param[in] arith The arithmetic environment
              * @param[in] key The key to set the value for
              * @param[in] value The value for the given key
-             * @return The error code for the operation (1 means success)
+             * @return The error code for the operation (0 means success)
              */
             __host__ __device__ int32_t set_value(
                 ArithEnv &arith,

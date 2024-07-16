@@ -180,7 +180,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t get_gas_price(
                 ArithEnv &arith,
-                cuEVM::block_info_t &block_info,
+                const cuEVM::block_info_t &block_info,
                 bn_t &gas_price) const;
 
             /**

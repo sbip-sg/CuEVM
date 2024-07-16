@@ -66,6 +66,26 @@ namespace cuEVM {
                 const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
             
             /**
+             * If the account given by address is empty
+             * @param[in] arith The arithmetic environment.
+             * @param[in] address The address of the account.
+             * @return 1 if the account is empty, 0 otherwise.
+             */
+            __host__ __device__ int32_t is_empty_account(
+                ArithEnv &arith,
+                const bn_t &address);
+            
+            /**
+             * If the account given by address is deleted
+             * @param[in] arith The arithmetic environment.
+             * @param[in] address The address of the account.
+             * @return 1 if the account is deleted, 0 otherwise.
+             */
+            __host__ __device__ int32_t is_deleted_account(
+                ArithEnv &arith,
+                const bn_t &address);
+            
+            /**
              * The getter for the balance given by an address.
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address of the account.
@@ -107,7 +127,7 @@ namespace cuEVM {
              * @param[in] address The address of the account.
              * @param[in] key The key of the storage.
              * @param[out] value The value of the storage.
-             * @return 1 if the value is found, 0 otherwise.
+             * @return 0 if the value is found, error otherwise.
              */
             __host__ __device__ int32_t get_value(
                 ArithEnv &arith,
@@ -121,7 +141,7 @@ namespace cuEVM {
              * @param[in] address The address of the account.
              * @param[in] key The key of the storage.
              * @param[out] value The value of the storage.
-             * @return 1 if the value is found, 0 otherwise.
+             * @return 0 if the value is found, error otherwise.
              */
             __host__ __device__ int32_t poke_value(
                 ArithEnv &arith,
@@ -134,7 +154,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address of the account.
              * @param[in] balance The balance of the account.
-             * @return 1 if the balance is set, 0 otherwise.
+             * @return 0 if the balance is set, error otherwise.
              */
             __host__ __device__ int32_t set_balance(
                 ArithEnv &arith,
@@ -146,7 +166,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address of the account.
              * @param[in] nonce The nonce of the account.
-             * @return 1 if the nonce is set, 0 otherwise.
+             * @return 0 if the nonce is set, error otherwise.
              */
             __host__ __device__ int32_t set_nonce(
                 ArithEnv &arith,
@@ -158,6 +178,7 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address of the account.
              * @param[in] byte_code The byte code of the account.
+             * @return 0 if the code is set, error otherwise.
              */
             __host__ __device__ int32_t set_code(
                 ArithEnv &arith,
@@ -170,7 +191,7 @@ namespace cuEVM {
              * @param[in] address The address of the account.
              * @param[in] key The key of the storage.
              * @param[in] value The value of the storage.
-             * @return 1 if the storage value is set, 0 otherwise.
+             * @return 0 if the storage value is set, error otherwise.
              */
             __host__ __device__ int32_t set_storage_value(
                 ArithEnv &arith,
@@ -182,7 +203,7 @@ namespace cuEVM {
              * Delete an account in the state
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address of the account.
-             * @return 1 if the account is deleted, 0 otherwise.
+             * @return 0 if the account is deleted, error otherwise.
              */
             __host__ __device__ int32_t delete_account(
                 ArithEnv &arith,
@@ -192,7 +213,7 @@ namespace cuEVM {
              * Update the touch state.
              * @param[in] arith The arithmetic environment.
              * @param[in] other The other touch state.
-             * @return 1 if the touch state is updated, 0 otherwise.
+             * @return 0 if the touch state is updated, error otherwise.
              */
             __host__ __device__ int32_t update(
                 ArithEnv &arith,

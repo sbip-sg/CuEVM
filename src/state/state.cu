@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "../include/state/state.cuh"
+#include "../include/utils/error_codes.cuh"
 #include <CuCrypto/keccak.cuh>
 
 namespace cuEVM {
@@ -59,11 +60,11 @@ namespace cuEVM {
             for (uint32_t idx = 0; idx < no_accounts; idx++) {
                 if (accounts[idx].has_address(arith, address)) {
                     index = idx;
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
             }
             index = 0;
-            return 0;
+            return ERROR_STATE_ADDRESS_NOT_FOUND;
         }
 
 
@@ -75,9 +76,9 @@ namespace cuEVM {
             uint32_t index;
             if (get_account_index(arith, address, index)) {
                 account = accounts[index];
-                return 1;
+                return ERROR_SUCCESS;
             }
-            return 0;
+            return ERROR_STATE_ADDRESS_NOT_FOUND;
         }
 
 
@@ -92,7 +93,7 @@ namespace cuEVM {
             }
             accounts = tmp_accounts;
             no_accounts++;
-            return 1;
+            return ERROR_SUCCESS;
         }
 
 
@@ -105,7 +106,7 @@ namespace cuEVM {
             for (uint32_t idx = 0; idx < no_accounts; idx++) {
                 if (accounts[idx].has_address(arith, target_address)) {
                     accounts[idx] = account;
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
             }
             
@@ -135,7 +136,7 @@ namespace cuEVM {
             for (uint32_t idx = 0; idx < no_accounts; idx++) {
                 if (accounts[idx].has_address(arith, target_address)) {
                     accounts[idx].update(arith, account);
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
             }
             return add_account(account);
@@ -222,9 +223,9 @@ namespace cuEVM {
             if(state_t::get_account_index(arith, address, index)) {
                 flags[index].update(flag);
                 account = accounts[index];
-                return 1;
+                return ERROR_SUCCESS;
             }
-            return 0;
+            return ERROR_STATE_ADDRESS_NOT_FOUND;
         }
 
 
@@ -237,9 +238,9 @@ namespace cuEVM {
             if(state_t::get_account_index(arith, address, index)) {
                 flags[index].update(flag);
                 account_ptr = &accounts[index];
-                return 1;
+                return ERROR_SUCCESS;
             }
-            return 0;
+            return ERROR_STATE_ADDRESS_NOT_FOUND;
         }
 
         __host__ __device__ int32_t state_access_t::add_account(
@@ -249,7 +250,7 @@ namespace cuEVM {
             state_t::add_account(account);
             index = no_accounts - 1;
             flags[index] = flag;
-            return 1;
+            return ERROR_SUCCESS;
         }
 
         __host__ __device__ int32_t state_access_t::add_duplicate_account(
@@ -278,10 +279,10 @@ namespace cuEVM {
             ArithEnv &arith,
             const cuEVM::account::account_t &account,
             cuEVM::account::account_flags_t flag = ACCOUNT_ALL_FLAG) {
-            if (update_account(arith, account, flag) == 0) {
+            if (update_account(arith, account, flag)) {
                 return add_account(account, flag);
             } else {
-                return 1;
+                return ERROR_SUCCESS;
             }
         }
 
@@ -295,9 +296,9 @@ namespace cuEVM {
             if(state_t::get_account_index(arith, target_address, index)) {
                 accounts[index].update(arith, account, flag);
                 flags[index].update(flag);
-                return 1;
+                return ERROR_SUCCESS;
             }
-            return 0;
+            return ERROR_STATE_ADDRESS_NOT_FOUND;
         }
 
         __host__ __device__ int32_t state_access_t::update(
@@ -309,7 +310,7 @@ namespace cuEVM {
                     flags[no_accounts - 1] = other.flags[i];
                 }
             }
-            return 1;
+            return ERROR_SUCCESS;
         }
 
 
