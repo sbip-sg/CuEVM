@@ -215,6 +215,8 @@ namespace cuEVM
         evm_stack_t *gpu_instances,
         uint32_t count);
   } // namespace stack
+    // Type alias for accessing evm_stack_t directly under the cuEVM namespace
+  using evm_stack_t = stack::evm_stack_t;
 } // namespace cuEVM
 
 #endif

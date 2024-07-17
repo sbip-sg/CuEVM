@@ -39,7 +39,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::state::AccessState &access_state,
         cuEVM::state::TouchState &touch_state,
         const cuEVM::evm_message_call_t &message);
@@ -67,7 +67,7 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         bn_t &gas_refund,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::state::AccessState &access_state,
         cuEVM::state::TouchState &touch_state,
         const cuEVM::evm_message_call_t &message);

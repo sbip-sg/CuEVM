@@ -33,7 +33,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack);
+            cuEVM::evm_stack_t &stack);
 
         /**
          * The PUSH0 operation implementation.
@@ -47,7 +47,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack);
+            cuEVM::evm_stack_t &stack);
 
         /**
          * The PUSHX operation implementation.
@@ -68,7 +68,7 @@ namespace cuEVM {
             const bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &pc,
-            cuEVM::stack::evm_stack_t &stack,
+            cuEVM::evm_stack_t &stack,
             const cuEVM::byte_array_t &byte_code,
             const uint8_t &opcode);
 
@@ -92,7 +92,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack,
+            cuEVM::evm_stack_t &stack,
             const uint8_t &opcode);
 
         /**
@@ -114,7 +114,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack,
+            cuEVM::evm_stack_t &stack,
             const uint8_t &opcode);
     }
 }

@@ -54,7 +54,7 @@ public:
     /**
      * The transaction content data structure.
      */
-    typedef typename transaction_t::transaction_data_t transaction_data_t;
+    typedef typename evm_transaction_t::transaction_data_t transaction_data_t;
 
     /**
      * The message content data structure.
@@ -105,7 +105,7 @@ public:
     cuEVM::ArithEnv _arith; /**< The arithmetical environment*/
     world_state_t *_world_state; /**< The world state*/
     cuEVM::block::EVMBlockInfo *_block; /**< The current block*/
-    transaction_t *_transaction; /**< The current transaction*/
+    evm_transaction_t *_transaction; /**< The current transaction*/
     accessed_state_t *_accessed_state; /**< The accessed state*/
     touch_state_t *_transaction_touch_state; /**< The final touch state of the transaction*/
     log_state_t *_transaction_log_state; /**< The final log state of the transaction*/
@@ -184,7 +184,7 @@ public:
     {
         _world_state = new world_state_t(arith, world_state_data);
         _block = new cuEVM::block::EVMBlockInfo(arith, block_data);
-        _transaction = new transaction_t(arith, transaction_data);
+        _transaction = new evm_transaction_t(arith, transaction_data);
         _accessed_state = new accessed_state_t(_world_state);
         _transaction_touch_state = new touch_state_t(_accessed_state, NULL);
         _transaction_log_state = new log_state_t(arith);
@@ -3241,7 +3241,7 @@ public:
         cpu_block = NULL;
 
         // get the transactions
-        transaction_t::get_transactions(instances.transactions_data, test, instances.count, 0, clones);
+        evm_transaction_t::get_transactions(instances.transactions_data, test, instances.count, 0, clones);
 
         // allocated the memory for accessed states
         instances.accessed_states_data = accessed_state_t::get_cpu_instances(instances.count);
@@ -3351,7 +3351,7 @@ public:
         delete cpu_block;
         cpu_block = NULL;
 
-        transaction_t::free_instances(cpu_instances.transactions_data, cpu_instances.count);
+        evm_transaction_t::free_instances(cpu_instances.transactions_data, cpu_instances.count);
         cpu_instances.transactions_data = NULL;
 
         cuEVM::byte_array::free_cpu_instances(cpu_instances.return_data, cpu_instances.count);
@@ -3409,7 +3409,7 @@ public:
         {
             if (verbose){
                 printf("Instance %lu\n", idx);
-                transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
+                evm_transaction_t::print_transaction_data_t(arith, instances.transactions_data[idx]);
 
                 accessed_state_t::print_accessed_state_data_t(arith, instances.accessed_states_data[idx]);
 
@@ -3582,13 +3582,13 @@ public:
 
         cJSON *instances_json = cJSON_CreateArray();
         cJSON_AddItemToObject(root, "post", instances_json);
-        transaction_t *transaction;
+        evm_transaction_t *transaction;
 
         for (uint32_t idx = 0; idx < instances.count; idx++)
         {
             cJSON *instance_json = cJSON_CreateObject();
             cJSON_AddItemToArray(instances_json, instance_json);
-            transaction = new transaction_t(arith, &(instances.transactions_data[idx]));
+            transaction = new evm_transaction_t(arith, &(instances.transactions_data[idx]));
             cJSON *transaction_json = transaction->json();
             cJSON_AddItemToObject(instance_json, "msg", transaction_json);
             delete transaction;

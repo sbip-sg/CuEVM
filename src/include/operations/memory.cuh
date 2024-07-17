@@ -36,8 +36,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory);
 
     /**
      * The MSTORE operation implementation.
@@ -55,8 +55,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory);
 
     /**
      * The MSTORE8 operation implementation.
@@ -74,8 +74,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory);
 
     /**
      * The MSIZE operation implementation.
@@ -91,8 +91,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory);
 }
 
 #endif

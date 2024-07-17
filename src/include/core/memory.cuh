@@ -229,6 +229,9 @@ namespace cuEVM {
       evm_memory_t *gpu_instances,
       uint32_t count);
   }
+  //alias for evm_mmeory_t
+  using evm_memory_t = memory::evm_memory_t;
+
 }
 
 #endif

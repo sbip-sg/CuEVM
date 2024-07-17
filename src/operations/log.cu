@@ -18,8 +18,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory,
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory,
         const cuEVM::evm_message_call_t &message,
         cuEVM::state::log_state_data_t &log_state,
         const uint8_t &opcode)

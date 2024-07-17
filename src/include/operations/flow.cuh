@@ -39,7 +39,7 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &pc,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message);
     /**
      * The JUMPI operation implementation.
@@ -59,7 +59,7 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &pc,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message);
 
     /**
@@ -77,7 +77,7 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         const uint32_t &pc,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The GAS operation implementation.
@@ -92,7 +92,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The JUMPDEST operation implementation.

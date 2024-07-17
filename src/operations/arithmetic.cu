@@ -14,7 +14,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -38,7 +38,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_LOW);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -62,7 +62,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -86,7 +86,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_LOW);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -114,7 +114,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_LOW);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -174,7 +174,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_LOW);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -202,7 +202,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_LOW);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -249,7 +249,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_MID);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -296,7 +296,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_MID);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -332,7 +332,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack)
+            cuEVM::evm_stack_t &stack)
         {
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_EXP);
             int32_t error_code = cuEVM::gas_cost::has_gas(
@@ -386,7 +386,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::stack::evm_stack_t &stack) {
+            cuEVM::evm_stack_t &stack) {
             /*
             Even if x has more bytes than the value b, the operation consider only the first
             (b+1) bytes of x and the other are considered zero and they don't have any influence

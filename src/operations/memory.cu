@@ -13,8 +13,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory) {
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
         int32_t error_code = cuEVM::gas_cost::has_gas(
             arith,
@@ -60,8 +60,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory) {
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
         int32_t error_code = cuEVM::gas_cost::has_gas(
             arith,
@@ -111,8 +111,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory) {
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
         int32_t error_code = cuEVM::gas_cost::has_gas(
             arith,
@@ -166,8 +166,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory) {
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_BASE);
         int32_t error_code = cuEVM::gas_cost::has_gas(
             arith,

@@ -243,7 +243,7 @@ namespace cuEVM {
 
         __host__ __device__ int32_t transaction_intrinsic_gas(
             ArithEnv &arith,
-            const cuEVM::transaction::transaction_t &transaction,
+            const cuEVM::evm_transaction_t &transaction,
             bn_t &gas_intrinsic) {
             
             // gas_intrinsic = GAS_TRANSACTION
@@ -285,7 +285,7 @@ namespace cuEVM {
 
         __host__ __device__ int32_t memory_grow_cost(
             ArithEnv &arith,
-            const cuEVM::memory::evm_memory_t &memory,
+            const cuEVM::evm_memory_t &memory,
             const bn_t &index,
             const bn_t &length,
             bn_t &memory_expansion_cost,

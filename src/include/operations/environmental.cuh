@@ -63,8 +63,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory);
 
     /**
      * The ADDRESS operation implementation.
@@ -82,7 +82,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message);
 
     /**
@@ -103,7 +103,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::state::AccessState &access_state,
         cuEVM::state::TouchState &touch_state);
 
@@ -122,8 +122,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        const cuEVM::transaction::transaction_t &transaction);
+        cuEVM::evm_stack_t &stack,
+        const cuEVM::evm_transaction_t &transaction);
 
     /**
      * The CALLER operation implementation.
@@ -140,7 +140,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message);
 
     /**
@@ -157,7 +157,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message);
 
     /**
@@ -178,7 +178,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         cuEVM::evm_message_call_t &message);
 
     /**
@@ -195,7 +195,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message);
 
     /**
@@ -222,9 +222,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_memory_t &memory);
 
     /**
      * The CODESIZE operation implementation.
@@ -241,7 +241,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message);
 
     /**
@@ -269,9 +269,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_message_call_t &message,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_memory_t &memory);
 
     /**
      * The GASPRICE operation implementation.
@@ -290,9 +290,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block,
-        const cuEVM::transaction::transaction_t &transaction);
+        const cuEVM::evm_transaction_t &transaction);
 
     /**
      * The EXTCODESIZE operation implementation.
@@ -312,7 +312,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::state::AccessState &access_state,
         cuEVM::state::TouchState &touch_state);
 
@@ -342,10 +342,10 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::state::AccessState &access_state,
         cuEVM::state::TouchState &touch_state,
-        cuEVM::memory::evm_memory_t &memory);
+        cuEVM::evm_memory_t &memory);
 
     /**
      * The RETURNDATASIZE operation implementation.
@@ -362,7 +362,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::evm_return_data_t &return_data);
 
     /**
@@ -389,8 +389,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
-        cuEVM::memory::evm_memory_t &memory,
+        cuEVM::evm_stack_t &stack,
+        cuEVM::evm_memory_t &memory,
         const cuEVM::evm_return_data_t &return_data);
 
     /**
@@ -413,7 +413,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::state::AccessState &access_state,
         cuEVM::state::TouchState &touch_state);
 
@@ -435,7 +435,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         cuEVM::state::TouchState &touch_state,
         const cuEVM::evm_message_call_t &message);
 }

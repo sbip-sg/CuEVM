@@ -101,7 +101,7 @@ namespace cuEVM {
             /**
              * the destructor. TODO: improve it
              */
-            __host__ __device__ transaction_t::~transaction_t() {
+            __host__ __device__ evm_transaction_t::~evm_transaction_t() {
             }
 
             /**
@@ -109,7 +109,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] nonce the nonce of the transaction YP: \f$T_{n}\f$.
              */
-            __host__ __device__ void transaction_t::get_nonce(
+            __host__ __device__ void evm_transaction_t::get_nonce(
                 ArithEnv &arith,
                 bn_t &nonce) const {
                     cgbn_load(arith.env, nonce, (cgbn_evm_word_t_ptr) &(this->nonce));
@@ -120,7 +120,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] gas_limit the gas limit of the transaction YP: \f$T_{g}\f$.
              */
-            __host__ __device__ void transaction_t::get_gas_limit(
+            __host__ __device__ void evm_transaction_t::get_gas_limit(
                 ArithEnv &arith,
                 bn_t &gas_limit) const {
                     cgbn_load(arith.env, gas_limit, (cgbn_evm_word_t_ptr) &(this->gas_limit));
@@ -131,7 +131,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] to the to address of the transaction YP: \f$T_{t}\f$.
              */
-            __host__ __device__ void transaction_t::get_to(
+            __host__ __device__ void evm_transaction_t::get_to(
                 ArithEnv &arith,
                 bn_t &to) const {
                     cgbn_load(arith.env, to, (cgbn_evm_word_t_ptr) &(this->to));
@@ -142,7 +142,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] value the value of the transaction YP: \f$T_{v}\f$.
              */
-            __host__ __device__ void transaction_t::get_value(
+            __host__ __device__ void evm_transaction_t::get_value(
                 ArithEnv &arith,
                 bn_t &value) const {
                     cgbn_load(arith.env, value, (cgbn_evm_word_t_ptr) &(this->value));
@@ -153,7 +153,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] sender the sender address of the transaction YP: \f$T_{s}\f$ or \f$T_{r}\f$.
              */
-            __host__ __device__ void transaction_t::get_sender(
+            __host__ __device__ void evm_transaction_t::get_sender(
                 ArithEnv &arith,
                 bn_t &sender) const {
                     cgbn_load(arith.env, sender, (cgbn_evm_word_t_ptr) &(this->sender));
@@ -164,7 +164,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] max_fee_per_gas the max fee per gas of the transaction YP: \f$T_{m}\f$.
              */
-            __host__ __device__ void transaction_t::get_max_fee_per_gas(
+            __host__ __device__ void evm_transaction_t::get_max_fee_per_gas(
                 ArithEnv &arith,
                 bn_t &max_fee_per_gas) const {
                     cgbn_load(arith.env, max_fee_per_gas, (cgbn_evm_word_t_ptr) &(this->max_fee_per_gas));
@@ -175,7 +175,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] max_priority_fee_per_gas the max priority fee per gas of the transaction YP: \f$T_{f}\f$.
              */
-            __host__ __device__ void transaction_t::get_max_priority_fee_per_gas(
+            __host__ __device__ void evm_transaction_t::get_max_priority_fee_per_gas(
                 ArithEnv &arith,
                 bn_t &max_priority_fee_per_gas) const {
                     cgbn_load(arith.env, max_priority_fee_per_gas, (cgbn_evm_word_t_ptr) &(this->max_priority_fee_per_gas));
@@ -186,7 +186,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] gas_price the gas price of the transaction YP: \f$T_{p}\f$.
              */
-            __host__ __device__ int32_t transaction_t::get_gas_price(
+            __host__ __device__ int32_t evm_transaction_t::get_gas_price(
                 ArithEnv &arith,
                 const cuEVM::block_info_t &block_info,
                 bn_t &gas_price) const {
@@ -226,7 +226,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[out] data_init the data of the transaction YP: \f$T_{i}\f$ or \f$T_{d}\f$.
              */
-            __host__ __device__ void transaction_t::get_data(
+            __host__ __device__ void evm_transaction_t::get_data(
                 ArithEnv &arith,
                 byte_array_t &data_init) const {
                     data_init = this->data_init;
@@ -237,7 +237,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @return 1 if the transaction is a contract creation transaction, 0 otherwise.
              */
-            __host__ __device__ int32_t transaction_t::is_contract_creation(
+            __host__ __device__ int32_t evm_transaction_t::is_contract_creation(
                 ArithEnv &arith) const {
                 bn_t to;
                 get_to(arith, to);
@@ -255,7 +255,7 @@ namespace cuEVM {
              * @param[out] up_front_cost the up front cost YP: \f$v_{0}\f$.
              * @param[out] m the max fee per gas YP: \f$m\f$.
              */
-            __host__ __device__ int32_t transaction_t::get_transaction_fees(
+            __host__ __device__ int32_t evm_transaction_t::get_transaction_fees(
                 ArithEnv &arith,
                 cuEVM::block_info_t &block_info,
                 bn_t &gas_value,
@@ -305,7 +305,7 @@ namespace cuEVM {
              * @param[in] access_state the access state.
              * @return 1 for success, 0 for failure.
              */
-            __host__ __device__ int32_t transaction_t::access_list_warm_up(
+            __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(
                 ArithEnv &arith,
                 cuEVM::state::AccessState &access_state) const {
                 for (uint32_t i = 0; i < access_list.accounts_count; i++) {
@@ -326,7 +326,7 @@ namespace cuEVM {
             /**
              * validate the transaction
              */
-            __host__ __device__ int32_t transaction_t::validate(
+            __host__ __device__ int32_t evm_transaction_t::validate(
                 ArithEnv &arith,
                 cuEVM::state::AccessState &access_state,
                 cuEVM::state::TouchState &touch_state,
@@ -416,6 +416,28 @@ namespace cuEVM {
 
                 // warm up the access list
                 access_list_warm_up(arith, access_state);
+
+                // warmup coinbase and precompile contracts
+                #ifdef EIP_3651
+                bn_t coin_base_address;
+                block_info.get_coin_base(arith, coin_base_address);
+                access_state.get_account(
+                    arith,
+                    coin_base_address,
+                    sender_account,
+                    ACCOUNT_BALANCE_FLAG);
+                #endif
+                bn_t precompile_contract_address;
+                #pragma unroll
+                for (uint32_t idx; idx < cuEVM::no_precompile_contracts; idx++) {
+                    cgbn_set_ui32(arith.env, precompile_contract_address, idx);
+                    access_state.get_account(
+                        arith,
+                        precompile_contract_address,
+                        sender_account,
+                        ACCOUNT_BYTE_CODE_FLAG);
+                }
+
                 return 1;
             }
 
@@ -426,7 +448,7 @@ namespace cuEVM {
              * @param[out] evm_message_call_ptr the message call.
              * @return 1 for success, 0 for failure.
              */
-            __host__ __device__ int32_t transaction_t::get_message_call(
+            __host__ __device__ int32_t evm_transaction_t::get_message_call(
                 ArithEnv &arith,
                 cuEVM::state::AccessState &access_state,
                 cuEVM::evm_message_call_t* &evm_message_call_ptr) const {
@@ -484,7 +506,7 @@ namespace cuEVM {
                 return 1;
             }
 
-            __host__ __device__ void transaction_t::print() {
+            __host__ __device__ void evm_transaction_t::print() {
                 printf("Transaction:\n");
                 printf("Type: %d\n", type);
                 printf("Nonce: ");
@@ -518,7 +540,7 @@ namespace cuEVM {
                 }
             }
 
-            __host__ cJSON* transaction_t::to_json() {
+            __host__ cJSON* evm_transaction_t::to_json() {
                 cJSON* json = cJSON_CreateObject();
                 char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
                 char *bytes_string = nullptr;
@@ -575,7 +597,7 @@ namespace cuEVM {
 
         __host__ int32_t get_transactios(
             ArithEnv &arith,
-            transaction_t* &transactions_ptr,
+            evm_transaction_t* &transactions_ptr,
             const cJSON* json,
             uint32_t &transactions_count,
             int32_t managed = 0,
@@ -596,12 +618,12 @@ namespace cuEVM {
             if (managed) {
                 CUDA_CHECK(cudaMallocManaged(
                     (void **)&(transactions_ptr),
-                    transactions_count * sizeof(transaction_t)));
+                    transactions_count * sizeof(evm_transaction_t)));
             } else {
-                transactions_ptr = new transaction_t[transactions_count];
+                transactions_ptr = new evm_transaction_t[transactions_count];
             }
 
-            transaction_t* template_transaction_ptr = new transaction_t();
+            evm_transaction_t* template_transaction_ptr = new evm_transaction_t();
             uint32_t data_idnex, gas_limit_index, value_index, idx, jdx;
 
             uint32_t type = 0;
@@ -681,7 +703,7 @@ namespace cuEVM {
         }
 
         __host__ int32_t free_instaces(
-            transaction_t* transactions_ptr,
+            evm_transaction_t* transactions_ptr,
             uint32_t transactions_count,
             int32_t managed = 0) {
             if (transactions_ptr != nullptr) {

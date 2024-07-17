@@ -10,17 +10,17 @@
 template<class params>
 __host__ __device__ __forceinline__ void test_message(
     arith_env_t<params> &arith,
-    typename transaction_t<params>::transaction_data_t *transaction_data,
+    typename evm_transaction_t<params>::transaction_data_t *transaction_data,
     uint32_t &instance)
 {
-  typedef transaction_t<params> transaction_t;
+  typedef evm_transaction_t<params> evm_transaction_t;
   typedef message_t<params> message_t;
   typedef arith_env_t<params>             ArithEnv;
   typedef typename ArithEnv::bn_t          bn_t;
 
-  transaction_t *transaction;
+  evm_transaction_t *transaction;
   message_t *message;
-  transaction = new transaction_t(arith, transaction_data);
+  transaction = new evm_transaction_t(arith, transaction_data);
   //transaction->print();
 
   uint8_t type;
@@ -88,7 +88,7 @@ __host__ __device__ __forceinline__ void test_message(
 template<class params>
 __global__ void kernel_message(
   cgbn_error_report_t *report,
-  typename transaction_t<params>::transaction_data_t *transanctions_data,
+  typename evm_transaction_t<params>::transaction_data_t *transanctions_data,
   uint32_t count
 ) {
   uint32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
@@ -104,8 +104,8 @@ __global__ void kernel_message(
 template<class params>
 void run_test() {
   typedef arith_env_t<params> ArithEnv;
-  typedef transaction_t<params> transaction_t;
-  typedef typename transaction_t::transaction_data_t transaction_data_t;
+  typedef evm_transaction_t<params> evm_transaction_t;
+  typedef typename evm_transaction_t::transaction_data_t transaction_data_t;
   
   transaction_data_t            *transactions_data;
   ArithEnv arith(cgbn_report_monitor, 0);
@@ -128,7 +128,7 @@ void run_test() {
 
   printf("Generating transactions\n");
   size_t transactions_count=1;
-  transaction_t::get_transactions(transactions_data, test, transactions_count);
+  evm_transaction_t::get_transactions(transactions_data, test, transactions_count);
   printf("no_transactions: %lu\n", transactions_count);
   printf("Global transactions generated\n");
 
@@ -161,15 +161,15 @@ void run_test() {
   printf("Printing the results stdout/json...\n");
   cJSON_Delete(root);
   root = cJSON_CreateObject();
-  transaction_t *transaction;
+  evm_transaction_t *transaction;
   cJSON *post = cJSON_CreateArray();
   for(uint32_t idx=0; idx<transactions_count; idx++) {
-    transaction = new transaction_t(arith, &(transactions_data[idx]));
+    transaction = new evm_transaction_t(arith, &(transactions_data[idx]));
     cJSON_AddItemToArray(post, transaction->json());
     transaction->print();
     delete transaction;
   }
-  transaction_t::free_instances(transactions_data, transactions_count);
+  evm_transaction_t::free_instances(transactions_data, transactions_count);
   transactions_data = NULL;
   transactions_count = 0;
   transaction = NULL;

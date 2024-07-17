@@ -45,7 +45,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
     /**
@@ -62,7 +62,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
     /**
@@ -79,7 +79,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
     /**
@@ -96,7 +96,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
     /**
@@ -113,7 +113,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
     /**
@@ -130,7 +130,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
     /**
@@ -147,7 +147,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
     /**
@@ -164,7 +164,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack,
+        cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 }
 

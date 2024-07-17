@@ -37,7 +37,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The GT operation implementation.
@@ -55,7 +55,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The SLT operation implementation.
@@ -73,7 +73,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The SGT operation implementation.
@@ -91,7 +91,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The EQ operation implementation.
@@ -108,7 +108,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The ISZERO operation implementation.
@@ -125,7 +125,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 }
 
 #endif

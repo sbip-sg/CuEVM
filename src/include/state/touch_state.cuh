@@ -49,7 +49,19 @@ namespace cuEVM {
              * @param[in] access_state The access state.
              * @param[in] parent The parent state.
              */
-            __host__ __device__ TouchState(state_access_t* state, cuEVM::state::AccessState* access_state, TouchState* parent) : _state(state), _access_state(access_state), parent(parent) {}
+            __host__ __device__ TouchState(state_access_t* state, TouchState* parent) : _state(state), _access_state(parent->_access_state), parent(parent) {}
+
+            /**
+             * the assigment operator
+             * @param[in] other The other touch state.
+             * @return The reference to the touch state.
+             */
+            __host__ __device__ TouchState& operator=(const TouchState& other) {
+                _state = other._state;
+                _access_state = other._access_state;
+                parent = other.parent;
+                return *this;
+            }
 
             /**
              * The getter for the account given by an address.

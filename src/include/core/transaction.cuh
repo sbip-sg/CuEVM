@@ -89,7 +89,7 @@ namespace cuEVM {
          * - yParity (YP: \f$T_{y}\f$)
          * - w (YP: \f$T_{w}\f$)
          */
-        struct transaction_t
+        struct evm_transaction_t
         {
             uint32_t type;                        /**< The transaction type EIP-2718 (YP: YP: \f$\T_{x}\f$) */
             evm_word_t nonce;                    /**< The nonce YP: \f$T_{n}\f$ */
@@ -104,12 +104,12 @@ namespace cuEVM {
             access_list_t access_list;           /**< The state YP: \f$T_{A}\f$ entry are \f$E=(E_{a}, E_{s})\f$*/
 
             // TODO: better constructors and destructors
-            __host__ __device__ transaction_t() : type(), nonce(), gas_limit(), to(), value(), sender(), max_fee_per_gas(), max_priority_fee_per_gas(), gas_price(), data_init(), access_list() {}
+            __host__ __device__ evm_transaction_t() : type(), nonce(), gas_limit(), to(), value(), sender(), max_fee_per_gas(), max_priority_fee_per_gas(), gas_price(), data_init(), access_list() {}
 
             /**
              * the destructor. TODO: improve it
              */
-            __host__ __device__ ~transaction_t();
+            __host__ __device__ ~evm_transaction_t();
 
             /**
              * get the nonce of the transaction
@@ -265,7 +265,7 @@ namespace cuEVM {
 
         __host__ int32_t get_transactios(
             ArithEnv &arith,
-            transaction_t* &transactions_ptr,
+            evm_transaction_t* &transactions_ptr,
             const cJSON* json,
             uint32_t &transactions_count,
             int32_t managed = 0,
@@ -273,10 +273,12 @@ namespace cuEVM {
             uint32_t clones = 1);
 
         __host__ int32_t free_instaces(
-            transaction_t* transactions_ptr,
+            evm_transaction_t* transactions_ptr,
             uint32_t transactions_count,
             int32_t managed = 0);
     }
+    // alias fro transaction
+    using evm_transaction_t = transaction::evm_transaction_t;
 }
 
 #endif

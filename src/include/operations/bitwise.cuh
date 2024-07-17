@@ -36,7 +36,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The OR operation implementation.
@@ -51,7 +51,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The XOR operation implementation.
@@ -66,7 +66,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The NOT operation implementation.
@@ -82,7 +82,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The BYTE operation implementation.
@@ -100,7 +100,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The SHL operation implementation.
@@ -117,7 +117,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The SHR operation implementation.
@@ -134,7 +134,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 
     /**
      * The SAR operation implementation.
@@ -154,7 +154,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::stack::evm_stack_t &stack);
+        cuEVM::evm_stack_t &stack);
 }
 
 #endif
