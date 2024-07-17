@@ -31,14 +31,12 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
     */
     __host__ __device__ int32_t LT(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack);
 
     /**
@@ -51,14 +49,12 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
     */
     __host__ __device__ int32_t GT(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack);
 
     /**
@@ -71,14 +67,12 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
     */
     __host__ __device__ int32_t SLT(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack);
 
     /**
@@ -91,14 +85,12 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
     */
     __host__ __device__ int32_t SGT(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack);
 
     /**
@@ -110,14 +102,12 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
     */
     __host__ __device__ int32_t EQ(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack);
 
     /**
@@ -129,14 +119,12 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
     */
     __host__ __device__ int32_t ISZERO(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack);
 }
 

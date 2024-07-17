@@ -60,7 +60,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
@@ -82,8 +81,6 @@ namespace cuEVM::operations {
             cgbn_set_ui32(arith.env, r, result);
 
             error_code |= stack.push(arith, r);
-
-            pc = pc + 1;
         }
         return error_code;
     }
@@ -92,7 +89,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
@@ -114,8 +110,6 @@ namespace cuEVM::operations {
             cgbn_set_ui32(arith.env, r, result);
 
             error_code |= stack.push(arith, r);
-
-            pc = pc + 1;
         }
         return error_code;
    }
@@ -125,7 +119,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
@@ -147,8 +140,6 @@ namespace cuEVM::operations {
             cgbn_set_ui32(arith.env, r, result);
 
             error_code |= stack.push(arith, r);
-
-            pc = pc + 1;
         }
         return error_code;
     }
@@ -157,7 +148,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
@@ -179,8 +169,6 @@ namespace cuEVM::operations {
             cgbn_set_ui32(arith.env, r, result);
 
             error_code |= stack.push(arith, r);
-
-            pc = pc + 1;
         }
         return error_code;
     }
@@ -189,7 +177,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
@@ -211,8 +198,6 @@ namespace cuEVM::operations {
             cgbn_set_ui32(arith.env, r, result);
 
             error_code |= stack.push(arith, r);
-
-            pc = pc + 1;
         }
         return error_code;
     }
@@ -221,7 +206,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
@@ -246,8 +230,6 @@ namespace cuEVM::operations {
             }
 
             error_code |= stack.push(arith, r);
-
-            pc = pc + 1;
         }
         return error_code;
     }

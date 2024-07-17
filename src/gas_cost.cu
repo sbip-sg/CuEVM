@@ -39,6 +39,32 @@ namespace cuEVM {
             cgbn_mul_ui32(arith.env, evm_words_gas, evm_words_gas, gas_per_word);
             cgbn_add(arith.env, gas_used, gas_used, evm_words_gas);
         }
+
+        __host__ __device__ void evm_bytes_gas_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &length,
+            const uint32_t gas_per_byte) {
+            // gas_used += gas_per_byte * bytes count of length
+            bn_t evm_bytes_gas;
+            cgbn_mul_ui32(arith.env, evm_bytes_gas, length, gas_per_byte);
+            cgbn_add(arith.env, gas_used, gas_used, evm_bytes_gas);
+        }
+
+        __host__ __device__ int32_t exp_bytes_gas_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &exponent) {
+            // dynamic gas calculation (G_expbyte * bytes_in_exponent)
+            int32_t last_bit;
+            last_bit = cuEVM::word_bits - 1 - cgbn_clz(arith.env, exponent);
+            uint32_t exponent_byte_size = (last_bit == -1) ? 0 : (last_bit) / 8 + 1;
+            bn_t dynamic_gas;
+            cgbn_set_ui32(arith.env, dynamic_gas, exponent_byte_size);
+            cgbn_mul_ui32(arith.env, dynamic_gas, dynamic_gas, GAS_EXP_BYTE);
+            cgbn_add(arith.env, gas_used, gas_used, dynamic_gas);
+            return last_bit;
+        }
         
         __host__ __device__ void initcode_cost(
             ArithEnv &arith,
@@ -64,6 +90,23 @@ namespace cuEVM {
             evm_words_gas_cost(arith, gas_used, length, GAS_MEMORY);
         }
         
+        __host__ __device__ void log_record_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &length) {
+            evm_bytes_gas_cost(arith, gas_used, length, GAS_LOG_DATA);
+        }
+
+        __host__ __device__ void log_topics_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const uint32_t &no_topics) {
+            bn_t topic_gas;
+            cgbn_set_ui32(arith.env, topic_gas, GAS_LOG_TOPIC);
+            cgbn_mul_ui32(arith.env, topic_gas, topic_gas, no_topics);
+            cgbn_add(arith.env, gas_used, gas_used, topic_gas);
+        }
+
         __host__ __device__ void sha256_cost(
             ArithEnv &arith,
             bn_t &gas_used,

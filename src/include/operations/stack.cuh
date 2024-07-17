@@ -27,14 +27,12 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[out] stack The stack.
          */
         __host__ __device__ int32_t POP(
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -43,15 +41,12 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[inout] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] error_code The error code.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
         */
         __host__ __device__ int32_t PUSH0(
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -90,7 +85,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @param[in] opcode The opcode.
         */
@@ -98,7 +92,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack,
             const uint8_t &opcode);
 
@@ -114,7 +107,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @param[in] opcode The opcode.
         */
@@ -122,7 +114,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack,
             const uint8_t &opcode);
     }

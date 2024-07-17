@@ -37,7 +37,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[inout] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -46,7 +45,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
@@ -56,7 +54,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -65,7 +62,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
@@ -75,7 +71,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -84,7 +79,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
@@ -94,7 +88,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -103,7 +96,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
@@ -113,7 +105,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -122,7 +113,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
@@ -132,7 +122,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -141,7 +130,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
@@ -151,7 +139,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -160,7 +147,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 
@@ -170,7 +156,6 @@ namespace cuEVM::operations {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
-     * @param[inout] pc The program counter.
      * @param[out] stack The stack.
      * @param[in] block The block.
      * @return The error code. 0 if no error.
@@ -179,7 +164,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::stack::evm_stack_t &stack,
         const cuEVM::block_info_t &block);
 }

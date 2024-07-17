@@ -110,6 +110,31 @@ namespace cuEVM {
             const bn_t &length,
             const uint32_t gas_per_word);
         /**
+         * Add the gas cost for the given length of bytes.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[in] length The length of the bytes
+         * @param[in] gas_per_byte The gas per byte
+         */
+        __host__ __device__ void evm_bytes_gas_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &length,
+            const uint32_t gas_per_byte);
+        
+
+        /**
+         * Add the gas cost for the number of bytes in the exponent.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[in] exponent The exponent
+         * @return the most significant non-zero bit position
+         */
+        __host__ __device__ int32_t exp_bytes_gas_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &exponent);
+        /**
          * Add the cost for initiliasation code.
          * EIP-3860: https://eips.ethereum.org/EIPS/eip-3860
          * @param[in] arith The arithmetic environment
@@ -140,6 +165,26 @@ namespace cuEVM {
             ArithEnv &arith,
             bn_t &gas_used,
             const bn_t &length);
+        /**
+         * Add the cost for log operation on record data.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[in] length The length of the record in bytes
+         */
+        __host__ __device__ void log_record_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &length);
+        /**
+         * Add the cost for log operation on topic.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[in] no_topics The number of topics
+         */
+        __host__ __device__ void log_topics_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const uint32_t &no_topics);
         /**
          * Add the cost for sha256 hashing.
          * @param[in] arith The arithmetic environment

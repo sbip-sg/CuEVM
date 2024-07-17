@@ -34,7 +34,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -42,7 +41,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -52,7 +50,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -60,7 +57,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -70,7 +66,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -78,7 +73,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -90,7 +84,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -98,7 +91,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -111,7 +103,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -119,7 +110,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
         /**
          * The MOD operation implementation.
@@ -131,7 +121,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -139,7 +128,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -152,7 +140,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -160,7 +147,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -173,7 +159,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -181,7 +166,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -196,7 +180,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[in] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -204,7 +187,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
         /**
          * The EXP operation implementation.
@@ -216,7 +198,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[inout] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -224,7 +205,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
 
         /**
@@ -241,7 +221,6 @@ namespace cuEVM {
          * @param[in] arith The arithmetical environment.
          * @param[inout] gas_limit The gas limit.
          * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
          * @param[inout] stack The stack.
          * @return The error code. 0 if no error.
         */
@@ -249,7 +228,6 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack);
     }
 }

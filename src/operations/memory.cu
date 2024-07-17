@@ -8,26 +8,7 @@
 #include "../include/gas_cost.cuh"
 #include "../include/utils/error_codes.cuh"
 
-/**
- * 50s: Memory Operations:
- * - MLOAD
- * - MSTORE
- * - MSTORE8
- * - MSIZE
- */
 namespace cuEVM::operations {
-    /**
-     * The MLOAD operation implementation.
-     * Takes the memory offset from the stack and push the evm word from
-     * the memory at the given memory offset.
-     * Adittional gas cost is added for the memory expansion.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[inout] stack The stack.
-     * @param[in] memory The memory.
-     * @return 0 if the operation was successful, an error code otherwise.
-     */
     __host__ __device__ int32_t MLOAD(
         ArithEnv &arith,
         const bn_t &gas_limit,
@@ -75,18 +56,6 @@ namespace cuEVM::operations {
         }
     }
 
-    /**
-     * The MSTORE operation implementation.
-     * Takes the memory offset and the value from the stack and stores the
-     * value in the memory at the given memory offset.
-     * Adittional gas cost is added for the memory expansion.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[in] stack The stack.
-     * @param[out] memory The memory.
-     * @return 0 if the operation was successful, an error code otherwise.
-     */
     __host__ __device__ int32_t MSTORE(
         ArithEnv &arith,
         const bn_t &gas_limit,
@@ -138,18 +107,6 @@ namespace cuEVM::operations {
         return error_code;
     }
 
-    /**
-     * The MSTORE8 operation implementation.
-     * Takes the memory offset and the value from the stack and stores the
-     * least significant byte of the value in the memory at the given memory offset.
-     * Adittional gas cost is added for the memory expansion.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[in] stack The stack.
-     * @param[out] memory The memory.
-     * @return 0 if the operation was successful, an error code otherwise.
-     */
     __host__ __device__ int32_t MSTORE8(
         ArithEnv &arith,
         const bn_t &gas_limit,
@@ -205,16 +162,6 @@ namespace cuEVM::operations {
         return error_code;
     }
 
-    /**
-     * The MSIZE operation implementation.
-     * Pushes the memory size to the stack.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[out] stack The stack.
-     * @param[in] memory The memory.
-     * @return 0 if the operation was successful, an error code otherwise.
-     */
     __host__ __device__ int32_t MSIZE(
         ArithEnv &arith,
         const bn_t &gas_limit,

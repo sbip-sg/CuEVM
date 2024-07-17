@@ -187,9 +187,9 @@ namespace cuEVM {
   {
     if (bit_array == nullptr)
     {
-      bit_array = new byte_array_t(EVM_WORD_BITS);
+      bit_array = new byte_array_t(cuEVM::word_bits);
     }
-    uint8_t *bytes = bit_array->data + EVM_WORD_BITS - 1;
+    uint8_t *bytes = bit_array->data + cuEVM::word_bits - 1;
     for (uint32_t idx = 0; idx < cuEVM::cgbn_limbs; idx++)
     {
       for (int bit = 0; bit < 32; bit++)
@@ -305,7 +305,7 @@ namespace cuEVM {
     uint32_t &dst,
     const bn_t &src) {
     bn_t tmp;
-    cgbn_bitwise_mask_and(env, tmp, src, -(EVM_WORD_BITS - 32));
+    cgbn_bitwise_mask_and(env, tmp, src, -(cuEVM::word_bits - 32));
     dst = cgbn_get_ui32(env, src);
     return cgbn_compare_ui32(env, tmp, 0);
   }

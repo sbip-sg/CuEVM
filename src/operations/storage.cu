@@ -8,11 +8,6 @@
 #include "../include/gas_cost.cuh"
 #include "../include/utils/error_codes.cuh"
 
-/**
- * 50s: Storage Operations:
- * - SLOAD
- * - SSTORE
- */
 namespace cuEVM::operations {
     __host__ __device__ int32_t SLOAD(
         ArithEnv &arith,
@@ -61,9 +56,9 @@ namespace cuEVM::operations {
     {
         // only if is not a static call
         int32_t error_code = (
-            (message.get_static_env() == 0) ?
-            ERROR_SUCCESS :
-            ERROR_STATIC_CALL_CONTEXT_SSTORE);
+            message.get_static_env() ?
+            ERROR_STATIC_CALL_CONTEXT_SSTORE :
+            ERROR_SUCCESS);
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t gas_left;
         cgbn_sub(arith.env, gas_left, gas_limit, gas_used);

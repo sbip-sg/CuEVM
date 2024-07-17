@@ -8,26 +8,8 @@
 #include "../include/gas_cost.cuh"
 #include "../include/utils/error_codes.cuh"
 
-/**
- * The stack operations class.
- * Contains all the operations that can be performed on the stack.
- * - POP 50: POP
- * - PUSH0 5F: PUSH0
- * - PUSHX 60s & 70s: Push Operations
- * - DUPX 80s: Duplication Operations
- * - SWAPX 90s: Exchange Operations
- */
 namespace cuEVM {
     namespace operations {
-        /**
-         * The POP operation implementation.
-         * It pops the top element from the stack.
-         * @param[in] arith The arithmetical environment.
-         * @param[in] gas_limit The gas limit.
-         * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
-         * @param[out] stack The stack.
-         */
         __host__ __device__ int32_t POP(
             ArithEnv &arith,
             const bn_t &gas_limit,
@@ -46,22 +28,10 @@ namespace cuEVM {
                 bn_t y;
 
                 error_code |= stack.pop(arith, y);
-
-                pc = pc + 1;
             }
             return error_code;
         }
 
-        /**
-         * The PUSH0 operation implementation.
-         * Pushes a zero value to the stack.
-         * @param[in] arith The arithmetical environment.
-         * @param[inout] gas_limit The gas limit.
-         * @param[inout] gas_used The gas used.
-         * @param[inout] error_code The error code.
-         * @param[inout] pc The program counter.
-         * @param[inout] stack The stack.
-        */
         __host__ __device__ int32_t PUSH0(
             ArithEnv &arith,
             const bn_t &gas_limit,
@@ -80,27 +50,10 @@ namespace cuEVM {
                 cgbn_set_ui32(arith.env, r, 0);
 
                 error_code |= stack.push(arith, r);
-
-                pc = pc + 1;
             }
             return error_code;
         }
 
-        /**
-         * The PUSHX operation implementation.
-         * Pushes a value from the bytecode to the stack.
-         * If the bytecode is not long enough to provide the value,
-         * the operation completes with zero bytes for the least
-         * significant bytes.
-         * @param[in] arith The arithmetical environment.
-         * @param[in] gas_limit The gas limit.
-         * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
-         * @param[inout] stack The stack.
-         * @param[in] bytecode The bytecode.
-         * @param[in] code_size The size of the bytecode.
-         * @param[in] opcode The opcode.
-        */
         __host__ __device__ int32_t PUSHX(
             ArithEnv &arith,
             const bn_t &gas_limit,
@@ -129,33 +82,15 @@ namespace cuEVM {
                     byte_data,
                     available_size);
 
-                pc = pc + push_size + 1;
+                pc = pc + push_size;
             }
             return error_code;
         }
 
-        /**
-         * The DUPX operation implementation.
-         * Duplicates a value from the stack and pushes it back to the stack.
-         * The value to be duplicated is given by the opcode.
-         * The opcode is in the range 0x80 - 0x8F.
-         * The index of the value to be duplicated is given
-         * by the opcode - 0x80 + 1.
-         * We consider the least 4 significant bits of the opcode + 1.
-         * The index is from the top of the stack. 1 is the top of the stack.
-         * 2 is the second value from the top of the stack and so on.
-         * @param[in] arith The arithmetical environment.
-         * @param[in] gas_limit The gas limit.
-         * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
-         * @param[inout] stack The stack.
-         * @param[in] opcode The opcode.
-        */
         __host__ __device__ int32_t DUPX(
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            uint32_t &pc,
             cuEVM::stack::evm_stack_t &stack,
             const uint8_t &opcode)
         {
@@ -169,28 +104,10 @@ namespace cuEVM {
                 uint8_t dup_index = (opcode & 0x0F) + 1;
 
                 error_code |= stack.dupx(arith, dup_index);
-
-                pc = pc + 1;
             }
             return error_code;
         }
 
-        /**
-         * The SWAPX operation implementation.
-         * Swaps the top of the stack with a value from the stack.
-         * The index of the value to be swapped is given
-         * by the opcode - 0x90 + 1.
-         * We consider the least 4 significant bits of the opcode + 1.
-         * The index is starts from the first value under the top of the stack.
-         * 1 is the second value from the top of the stack, 2 is the third value
-         * from the top of the stack and so on.
-         * @param[in] arith The arithmetical environment.
-         * @param[in] gas_limit The gas limit.
-         * @param[inout] gas_used The gas used.
-         * @param[inout] pc The program counter.
-         * @param[inout] stack The stack.
-         * @param[in] opcode The opcode.
-        */
         __host__ __device__ int32_t SWAPX(
             ArithEnv &arith,
             const bn_t &gas_limit,
@@ -209,8 +126,6 @@ namespace cuEVM {
                 uint8_t swap_index = (opcode & 0x0F) + 1;
 
                 error_code |= stack.swapx(arith, swap_index);
-
-                pc = pc + 1;
             }
             return error_code;
         }
