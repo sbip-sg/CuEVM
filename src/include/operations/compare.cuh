@@ -11,7 +11,7 @@
 #include "../core/stack.cuh"
 
 /**
- * The comparison operations class.
+ * The comparison operations.
  * Contains the next operations 10s: Comparison Operations:
  * - LT
  * - GT
