@@ -2,6 +2,7 @@
 
 #include "../include/utils/error_codes.cuh"
 #include "../include/utils/opcodes.cuh"
+#include "../include/utils/evm_utils.cuh"
 #include "../include/gas_cost.cuh"
 
 namespace cuEVM::operations
@@ -56,6 +57,17 @@ namespace cuEVM::operations
             ret_size,
             memory_expansion_cost_ret,
             current_state.gas_used);
+        
+        // compute the total memory expansion cost
+        bn_t memory_expansion_cost;
+        if (cgbn_compare(arith.env, memory_expansion_cost_args, memory_expansion_cost_ret) > 0)
+        {
+            cgbn_set(arith.env, memory_expansion_cost, memory_expansion_cost_args);
+        }
+        else
+        {
+            cgbn_set(arith.env, memory_expansion_cost, memory_expansion_cost_ret);
+        }
 
         // adress warm call
         bn_t contract_address;
@@ -86,73 +98,52 @@ namespace cuEVM::operations
                 };
             }
         }
-
-        if (arith.has_gas(gas_limit, gas_used, error_code))
+        // max gas call
+        bn_t gas_capped;
+        cuEVM::gas_cost::max_gas_call(
+            arith,
+            gas_capped,
+            current_state.gas_limit,
+            current_state.gas_used);
+        
+        // limit the gas to the gas capped
+        if (cgbn_compare(arith.env, new_state_ptr->gas_limit, gas_capped) > 0)
         {
-            bn_t gas;
-            new_message.get_gas_limit(gas);
+            cgbn_set(arith.env, new_state_ptr->gas_limit, gas_capped);
+        }
 
-            // gas capped = (63/64) * gas_left
-            bn_t gas_capped;
-            arith.max_gas_call(gas_capped, gas_limit, gas_used);
+        // add the the gas sent to the gas used
+        cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, new_state_ptr->gas_limit);
 
-            if (cgbn_compare(arith._env, gas, gas_capped) > 0)
-            {
-                cgbn_set(arith._env, gas, gas_capped);
-            }
+        // add the gas stippend
+        cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, gas_stippend);
 
-            // add to gas used the sent gas
-            cgbn_add(arith._env, gas_used, gas_used, gas);
 
-            // add the call stippend
-            cgbn_add(arith._env, gas, gas, gas_stippend);
+        error_code |= cuEVM::gas_cost::has_gas(
+            arith,
+            current_state.gas_limit,
+            current_state.gas_used);
 
-            // set the new gas limit
-            new_message.set_gas_limit(gas);
-
+        if (error_code == ERROR_SUCCESS) {
+            // increase the memory cost
+            current_state.memory_ptr->increase_memory_cost(
+                arith,
+                memory_expansion_cost);
             // set the byte code
-            account_t *contract;
-            contract = touch_state.get_account(contract_address, READ_CODE);
+            cuEVM::account::account_t *contract;
+            error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
 
-            new_message.set_byte_code(
-                contract->bytecode,
-                contract->code_size);
-
-            uint8_t *call_data;
-            size_t call_data_size;
-            call_data = memory.get(
+            new_state_ptr->message_ptr->set_byte_code(
+                contract->byte_code);
+            
+            // get/set the call data
+             error_code |= current_state.memory_ptr->get(
+                arith,
                 args_offset,
                 args_size,
-                error_code);
-            arith.size_t_from_cgbn(call_data_size, args_size);
-
-            new_message.set_data(call_data, call_data_size);
-
-            if (valid_CALL(arith, new_message, touch_state))
-            {
-                // new message done
-                // call the child
-                evm.child_CALL(
-                    error_code,
-                    new_message);
-            }
-            else
-            {
-                bn_t child_success;
-                cgbn_set_ui32(arith._env, child_success, 0);
-                stack.push(child_success, error_code);
-                return_data.set(
-                    NULL,
-                    0);
-                // TODO: verify better if contains the GAS STIPPEND
-                cgbn_sub(arith._env, gas_used, gas_used, gas);
-                delete &new_message;
-            }
+                new_state_ptr->message_ptr->data);
         }
-        else
-        {
-            delete &new_message;
-        }
+        return error_code;
     }
 
     /**
@@ -164,103 +155,146 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t generic_CREATE(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        cuEVM::evm_call_state_t* &new_state_ptr,
+        const uint32_t opcode
+        )
     {
+        bn_t value, memory_offset, length;
+        int32_t error_code = current_state.stack_ptr->pop(arith, value);
+        error_code |= current_state.stack_ptr->pop(arith, memory_offset);
+        error_code |= current_state.stack_ptr->pop(arith, length);
+        
+        // create cost
+        cgbn_add_ui32(arith.env, current_state.gas_used, current_state.gas_used, GAS_CREATE);
 
-        #ifdef ONLY_CPU
-        printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
-        #endif
-        if (message.get_static_env())
+        // compute the memory cost
+        bn_t memory_expansion_cost;
+        error_code |= cuEVM::gas_cost::memory_grow_cost(
+            arith,
+            *current_state.memory_ptr,
+            memory_offset,
+            length,
+            memory_expansion_cost,
+            current_state.gas_used);
+        
+        // compute the initcode gas cost
+        cuEVM::gas_cost::initcode_cost(
+            arith,
+            current_state.gas_used,
+            length);
+
+        bn_t salt;
+        if (opcode == OP_CREATE2)
         {
-            error_code = ERROR_STATIC_CALL_CONTEXT_CREATE;
-            delete &new_message;
+            error_code |= current_state.stack_ptr->pop(arith, salt);
+            // compute the keccak gas cost
+            cuEVM::gas_cost::keccak_cost(
+                arith,
+                current_state.gas_used,
+                length);
         }
-        else if (cgbn_compare_ui32(arith._env, args_size, MAX_INIT_CODE_SIZE) >= 0)
-        {
-            // EIP-3860
-            error_code = ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
-            delete &new_message;
-        }
-        else
-        {
-            #ifdef ONLY_CPU
-            printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
-            #endif
-            // set the init code
-            SHARED_MEMORY cuEVM::byte_array_t initialisation_code;
-            arith.size_t_from_cgbn(initialisation_code.size, args_size);
-            initialisation_code.data = memory.get(
-                args_offset,
-                args_size,
-                error_code);
-            new_message.set_byte_code(
-                initialisation_code.data,
-                initialisation_code.size);
+        
+        error_code |= cuEVM::gas_cost::has_gas(
+            arith,
+            current_state.gas_limit,
+            current_state.gas_used);
+        
 
-            // // set the gas limit
-            bn_t gas_capped;
-            arith.max_gas_call(gas_capped, gas_limit, gas_used);
-            new_message.set_gas_limit(gas_capped);
+        if (error_code == ERROR_SUCCESS) {
+            // increase the memory cost
+            current_state.memory_ptr->increase_memory_cost(
+                arith,
+                memory_expansion_cost);
+            // get the initialisation code
+            cuEVM::byte_array_t initialisation_code;
+            current_state.memory_ptr->get(
+                arith,
+                memory_offset,
+                length,
+                initialisation_code);
 
-            // // add to gas used
-            cgbn_add(arith._env, gas_used, gas_used, gas_capped);
-
-            #ifdef ONLY_CPU
-            bn_t pr_gas;
-            cgbn_sub(arith._env, pr_gas, gas_limit, gas_used);
-            printf("GENERIC_CREATE parent unused gas: %d\n", cgbn_get_ui32(arith._env, pr_gas));
-            #endif
-
-            // warm up the contract address
+            bn_t sender_address;
+            current_state.message_ptr->get_recipient(arith, sender_address);
             bn_t contract_address;
-            new_message.get_recipient(contract_address);
-            account_t *account = touch_state.get_account(contract_address, READ_NONE);
 
-            // setup return offset to null
-            bn_t ret_offset, ret_size;
-            cgbn_set_ui32(arith._env, ret_offset, 0);
-            cgbn_set_ui32(arith._env, ret_size, 0);
-            new_message.set_return_data_offset(ret_offset);
-            new_message.set_return_data_size(ret_size);
-
-            if (valid_CREATE(arith, new_message, touch_state))
+            if (opcode == OP_CREATE2)
             {
-                // increase the nonce if the sender is a contract
-                // TODO: seems like an akward think to do
-                // why in the parent and not in the child the nonce
-                // if the contract deployment fails the nonce is still
-                // increased?
-                #ifdef ONLY_CPU
-                printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
-                #endif
-                bn_t sender;
-                new_message.get_sender(sender);
-                if (touch_state.is_contract(sender))
-                {
-                    bn_t sender_nonce;
-                    touch_state.get_account_nonce(sender, sender_nonce);
-                    cgbn_add_ui32(arith._env, sender_nonce, sender_nonce, 1);
-                    touch_state.set_account_nonce(sender, sender_nonce);
-                }
-                // new message done
-                // call the child
-                evm.child_CALL(
-                    error_code,
-                    new_message);
+                 error_code |= cuEVM::utils::get_contract_address_create2(
+                    arith,
+                    contract_address,
+                    sender_address,
+                    salt,
+                    initialisation_code);
             }
             else
             {
-                bn_t child_success;
-                cgbn_set_ui32(arith._env, child_success, 0);
-                stack.push(child_success, error_code);
-                // cgbn_sub(arith._env, gas_used, gas_used, gas_capped);
-                return_data.set(
-                    NULL,
-                    0);
-                delete &new_message;
+                cuEVM::account::account_t *sender_account;
+                access_state.get_account(arith, contract_address, sender_account, ACCOUNT_NONCE_FLAG);
+                bn_t sender_nonce;
+                sender_account->get_nonce(arith, sender_nonce);
+                error_code |= cuEVM::utils::get_contract_address_create(
+                    arith,
+                    contract_address,
+                    sender_address,
+                    sender_nonce);
             }
+            // warm up the contract address
+            cuEVM::account::account_t *contract;
+            error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_NONE_FLAG);
+
+            // gas capped limit
+            bn_t gas_capped;
+            cuEVM::gas_cost::max_gas_call(
+                arith,
+                gas_capped,
+                current_state.gas_limit,
+                current_state.gas_used);
+            // add the gas sent to the gas used
+            cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, gas_capped);
+            // the return data offset and size
+            bn_t ret_offset, ret_size;
+            cgbn_set_ui32(arith.env, ret_offset, 0);
+            cgbn_set_ui32(arith.env, ret_size, 0);
+            // create the new evm call state
+            new_state_ptr = new cuEVM::evm_call_state_t(
+                arith,
+                &current_state,
+                new cuEVM::evm_message_call_t(
+                    arith,
+                    sender_address,
+                    contract_address,
+                    contract_address,
+                    gas_capped,
+                    value,
+                    current_state.message_ptr->get_depth() + 1,
+                    opcode,
+                    contract_address,
+                    new cuEVM::byte_array_t(),
+                    initialisation_code,
+                    ret_offset,
+                    ret_size,
+                    current_state.message_ptr->get_static_env()
+                )
+            );
+            error_code |= (current_state.message_ptr->get_static_env() ?
+                ERROR_STATIC_CALL_CONTEXT_CREATE :
+                #ifdef EIP_3860
+                (cgbn_compare_ui32(arith.env, length, max_initcode_size) >= 0 ?
+                    ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED :
+                    ERROR_SUCCESS
+                )
+                #else
+                ERROR_SUCCESS
+                #endif
+            );
+
         }
+        return error_code;
+
+        // TODO: increase sender nonce if the sender is a contract
+
     }
 
     /**
@@ -284,88 +318,16 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CREATE(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr)
     {
-        bn_t value, memory_offset, length;
-        stack.pop(value, error_code);
-        stack.pop(memory_offset, error_code);
-        stack.pop(length, error_code);
-
-        // // create cost
-        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
-
-        // compute the memory cost
-        memory.grow_cost(
-            memory_offset,
-            length,
-            gas_used,
-            error_code);
-
-            #ifdef ONLY_CPU
-            printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
-            #endif
-        // compute the initcode gas cost
-        arith.initcode_cost(
-            gas_used,
-            length);
-
-            #ifdef ONLY_CPU
-            printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
-            #endif
-        if (arith.has_gas(gas_limit, gas_used, error_code))
-        {
-            #ifdef ONLY_CPU
-            printf("CREATE: gas_used: %d\n", cgbn_get_ui32(arith._env, gas_used));
-            #endif
-            bn_t sender_address;
-            message.get_recipient(sender_address); // I_{a}
-            bn_t sender_nonce;
-            touch_state.get_account_nonce(sender_address, sender_nonce);
-
-            // compute the address
-            bn_t address;
-            message_t::get_create_contract_address(
-                arith,
-                address,
-                sender_address,
-                sender_nonce);
-
-            message_t *new_message = new message_t(
-                arith,
-                sender_address,
-                address,
-                address,
-                gas_limit,
-                value,
-                message.get_depth() + 1,
-                opcode,
-                address,
-                NULL,
-                0,
-                NULL,
-                0,
-                memory_offset,
-                length,
-                message.get_static_env());
-
-            generic_CREATE(
-                arith,
-                gas_limit,
-                gas_used,
-                error_code,
-                stack,
-                message,
-                memory,
-                touch_state,
-                evm,
-                *new_message,
-                memory_offset,
-                length,
-                return_data);
-
-            pc = pc + 1;
-        }
+        return generic_CREATE(
+            arith,
+            access_state,
+            current_state,
+            new_state_ptr,
+            OP_CREATE);
     }
 
     /**
@@ -377,66 +339,63 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CALL(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
-        stack.pop(gas, error_code);
-        stack.pop(address, error_code);
-        stack.pop(value, error_code);
-        stack.pop(args_offset, error_code);
-        stack.pop(args_size, error_code);
-        stack.pop(ret_offset, error_code);
-        stack.pop(ret_size, error_code);
 
-        if (error_code == ERR_NONE)
+        int32_t error_code = current_state.stack_ptr->pop(arith, gas);
+        error_code |= current_state.stack_ptr->pop(arith, address);
+        error_code |= current_state.stack_ptr->pop(arith, value);
+        error_code |= current_state.stack_ptr->pop(arith, args_offset);
+        error_code |= current_state.stack_ptr->pop(arith, args_size);
+        error_code |= current_state.stack_ptr->pop(arith, ret_offset);
+        error_code |= current_state.stack_ptr->pop(arith, ret_size);
+
+        if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            arith.address_conversion(address);
+            cuEVM::evm_address_conversion(arith, address);
             bn_t sender;
-            message.get_recipient(sender); // I_{a}
+            current_state.message_ptr->get_recipient(arith, sender); // I_{a}
             bn_t recipient;
-            cgbn_set(arith._env, recipient, address); // t
+            cgbn_set(arith.env, recipient, address); // t
             bn_t contract_address;
-            cgbn_set(arith._env, contract_address, address); // t
+            cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
-            cgbn_set(arith._env, storage_address, address); // t
+            cgbn_set(arith.env, storage_address, address); // t
 
-            message_t *new_message = new message_t(
+            new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
-                sender,
-                recipient,
-                contract_address,
-                gas,
-                value,
-                message.get_depth() + 1,
-                opcode,
-                storage_address,
-                NULL,
-                0,
-                NULL,
-                0,
-                ret_offset,
-                ret_size,
-                message.get_static_env());
+                &current_state,
+                new cuEVM::evm_message_call_t(
+                    arith,
+                    sender,
+                    recipient,
+                    contract_address,
+                    gas,
+                    value,
+                    current_state.message_ptr->get_depth() + 1,
+                    OP_CALL,
+                    storage_address,
+                    new cuEVM::byte_array_t(),
+                    new cuEVM::byte_array_t(),
+                    ret_offset,
+                    ret_size,
+                    current_state.message_ptr->get_static_env()
+                )
+            );
 
-            generic_CALL(
+            error_code |= generic_CALL(
                 arith,
-                gas_limit,
-                gas_used,
-                error_code,
-                stack,
-                message,
-                memory,
-                touch_state,
-                evm,
-                *new_message,
                 args_offset,
                 args_size,
-                return_data);
-
-            pc = pc + 1;
+                access_state,
+                current_state,
+                new_state_ptr);
         }
+        return error_code;
     }
 
     /**
@@ -448,66 +407,62 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t CALLCODE(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
-        stack.pop(gas, error_code);
-        stack.pop(address, error_code);
-        stack.pop(value, error_code);
-        stack.pop(args_offset, error_code);
-        stack.pop(args_size, error_code);
-        stack.pop(ret_offset, error_code);
-        stack.pop(ret_size, error_code);
+        int32_t error_code = current_state.stack_ptr->pop(arith, gas);
+        error_code |= current_state.stack_ptr->pop(arith, address);
+        error_code |= current_state.stack_ptr->pop(arith, value);
+        error_code |= current_state.stack_ptr->pop(arith, args_offset);
+        error_code |= current_state.stack_ptr->pop(arith, args_size);
+        error_code |= current_state.stack_ptr->pop(arith, ret_offset);
+        error_code |= current_state.stack_ptr->pop(arith, ret_size);
 
-        if (error_code == ERR_NONE)
+        if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            arith.address_conversion(address);
+            cuEVM::evm_address_conversion(arith, address);
             bn_t sender;
-            message.get_recipient(sender); // I_{a}
+            current_state.message_ptr->get_recipient(arith, sender); // I_{a}
             bn_t recipient;
-            cgbn_set(arith._env, recipient, sender); // I_{a}
+            cgbn_set(arith.env, recipient, sender); // I_{a}
             bn_t contract_address;
-            cgbn_set(arith._env, contract_address, address); // t
+            cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
-            cgbn_set(arith._env, storage_address, sender); // I_{a}
+            cgbn_set(arith.env, storage_address, sender); // I_{a}
 
-            message_t *new_message = new message_t(
+            new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
-                sender,
-                recipient,
-                contract_address,
-                gas,
-                value,
-                message.get_depth() + 1,
-                opcode,
-                storage_address,
-                NULL,
-                0,
-                NULL,
-                0,
-                ret_offset,
-                ret_size,
-                message.get_static_env());
+                &current_state,
+                new cuEVM::evm_message_call_t(
+                    arith,
+                    sender,
+                    recipient,
+                    contract_address,
+                    gas,
+                    value,
+                    current_state.message_ptr->get_depth() + 1,
+                    OP_CALLCODE,
+                    storage_address,
+                    new cuEVM::byte_array_t(),
+                    new cuEVM::byte_array_t(),
+                    ret_offset,
+                    ret_size,
+                    current_state.message_ptr->get_static_env()
+                )
+            );
 
-            generic_CALL(
+            error_code |= generic_CALL(
                 arith,
-                gas_limit,
-                gas_used,
-                error_code,
-                stack,
-                message,
-                memory,
-                touch_state,
-                evm,
-                *new_message,
                 args_offset,
                 args_size,
-                return_data);
-
-            pc = pc + 1;
+                access_state,
+                current_state,
+                new_state_ptr);
         }
+        return error_code;
     }
 
     /**
@@ -529,38 +484,38 @@ namespace cuEVM::operations
         cuEVM::evm_return_data_t &return_data)
     {
         bn_t memory_offset, length;
-        stack.pop(memory_offset, error_code);
-        stack.pop(length, error_code);
+        int32_t error_code = stack.pop(arith, memory_offset);
+        error_code |= stack.pop(arith, length);
+
+        bn_t memory_expansion_cost;
+        error_code |= cuEVM::gas_cost::memory_grow_cost(
+            arith,
+            memory,
+            memory_offset,
+            length,
+            memory_expansion_cost,
+            gas_used);
+        
+        error_code |= cuEVM::gas_cost::has_gas(
+            arith,
+            gas_limit,
+            gas_used);
 
         // TODO addback dynamic cost from sub execution
 
-        if (error_code == ERR_NONE)
+        if (error_code == ERROR_SUCCESS)
         {
-            memory.grow_cost(
+            memory.increase_memory_cost(
+                arith,
+                memory_expansion_cost);
+            
+            error_code |= memory.get(
+                arith,
                 memory_offset,
                 length,
-                gas_used,
-                error_code);
-
-            if (arith.has_gas(gas_limit, gas_used, error_code))
-            {
-                uint8_t *data;
-                size_t data_size;
-                data = memory.get(
-                    memory_offset,
-                    length,
-                    error_code);
-                arith.size_t_from_cgbn(data_size, length);
-
-                if (error_code == ERR_NONE)
-                {
-                    return_data.set(
-                        data,
-                        data_size);
-                    error_code = ERR_RETURN;
-                }
-            }
+                return_data) || ERROR_RETURN; 
         }
+        return error_code;
     }
 
     /**
@@ -572,66 +527,62 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t DELEGATECALL(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
-        stack.pop(gas, error_code);
-        stack.pop(address, error_code);
-        message.get_value(value);
-        stack.pop(args_offset, error_code);
-        stack.pop(args_size, error_code);
-        stack.pop(ret_offset, error_code);
-        stack.pop(ret_size, error_code);
-
-        if (error_code == ERR_NONE)
+        int32_t error_code = current_state.stack_ptr->pop(arith, gas);
+        error_code |= current_state.stack_ptr->pop(arith, address);
+        current_state.message_ptr->get_value(arith, value);
+        error_code |= current_state.stack_ptr->pop(arith, args_offset);
+        error_code |= current_state.stack_ptr->pop(arith, args_size);
+        error_code |= current_state.stack_ptr->pop(arith, ret_offset);
+        error_code |= current_state.stack_ptr->pop(arith, ret_size);
+        
+        if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            arith.address_conversion(address);
+            cuEVM::evm_address_conversion(arith, address);
             bn_t sender;
-            message.get_sender(sender); // keep the message call sender I_{s}
+            current_state.message_ptr->get_sender(arith, sender); // keep the message call sender I_{s}
             bn_t recipient;
-            message.get_recipient(recipient); // I_{a}
+            current_state.message_ptr->get_recipient(arith, recipient); // I_{a}
             bn_t contract_address;
-            cgbn_set(arith._env, contract_address, address); // t
+            cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
-            message.get_recipient(storage_address); // I_{a}
+            cgbn_set(arith.env, storage_address, recipient); // I_{a}
 
-            message_t *new_message = new message_t(
+            new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
-                sender,
-                recipient,
-                contract_address,
-                gas,
-                value,
-                message.get_depth() + 1,
-                opcode,
-                storage_address,
-                NULL,
-                0,
-                NULL,
-                0,
-                ret_offset,
-                ret_size,
-                message.get_static_env());
+                &current_state,
+                new cuEVM::evm_message_call_t(
+                    arith,
+                    sender,
+                    recipient,
+                    contract_address,
+                    gas,
+                    value,
+                    current_state.message_ptr->get_depth() + 1,
+                    OP_DELEGATECALL,
+                    storage_address,
+                    new cuEVM::byte_array_t(),
+                    new cuEVM::byte_array_t(),
+                    ret_offset,
+                    ret_size,
+                    current_state.message_ptr->get_static_env()
+                )
+            );
 
-            generic_CALL(
+            error_code |= generic_CALL(
                 arith,
-                gas_limit,
-                gas_used,
-                error_code,
-                stack,
-                message,
-                memory,
-                touch_state,
-                evm,
-                *new_message,
                 args_offset,
                 args_size,
-                return_data);
-
-            pc = pc + 1;
+                access_state,
+                current_state,
+                new_state_ptr);
         }
+        return error_code;
     }
 
     /**
@@ -643,93 +594,16 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CREATE2(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr)
     {
-        bn_t value, memory_offset, length, salt;
-        stack.pop(value, error_code);
-        stack.pop(memory_offset, error_code);
-        stack.pop(length, error_code);
-        stack.pop(salt, error_code);
-
-        // create cost
-        cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_CREATE);
-
-        // compute the keccak gas cost
-        arith.keccak_cost(
-            gas_used,
-            length);
-
-        // compute the memory cost
-        memory.grow_cost(
-            memory_offset,
-            length,
-            gas_used,
-            error_code);
-
-        // compute the initcode gas cost
-        arith.initcode_cost(
-            gas_used,
-            length);
-
-        if (arith.has_gas(gas_limit, gas_used, error_code))
-        {
-            SHARED_MEMORY cuEVM::byte_array_t initialisation_code;
-
-            arith.size_t_from_cgbn(initialisation_code.size, length);
-            initialisation_code.data = memory.get(
-                memory_offset,
-                length,
-                error_code);
-
-            bn_t sender_address;
-            message.get_recipient(sender_address); // I_{a}
-
-            // compute the address
-            bn_t address;
-            message_t::get_create2_contract_address(
-                arith,
-                address,
-                sender_address,
-                salt,
-                initialisation_code);
-
-            // create the message
-            message_t *new_message = new message_t(
-                arith,
-                sender_address,
-                address,
-                address,
-                gas_limit,
-                value,
-                message.get_depth() + 1,
-                opcode,
-                address,
-                NULL,
-                0,
-                NULL,
-                0,
-                memory_offset,
-                length,
-                message.get_static_env());
-
-            generic_CREATE(
-                arith,
-                gas_limit,
-                gas_used,
-                error_code,
-                stack,
-                message,
-                memory,
-                touch_state,
-                evm,
-                *new_message,
-                memory_offset,
-                length,
-                return_data);
-
-            pc = pc + 1;
-        }
+       return generic_CREATE(
+            arith,
+            access_state,
+            current_state,
+            new_state_ptr,
+            OP_CREATE2);
     }
 
     /**
@@ -741,66 +615,63 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t STATICCALL(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
-        stack.pop(gas, error_code);
-        stack.pop(address, error_code);
-        cgbn_set_ui32(arith._env, value, 0);
-        stack.pop(args_offset, error_code);
-        stack.pop(args_size, error_code);
-        stack.pop(ret_offset, error_code);
-        stack.pop(ret_size, error_code);
-
-        if (error_code == ERR_NONE)
+        int32_t error_code = current_state.stack_ptr->pop(arith, gas);
+        error_code |= current_state.stack_ptr->pop(arith, address);
+        cgbn_set_ui32(arith.env, value, 0);
+        error_code |= current_state.stack_ptr->pop(arith, args_offset);
+        error_code |= current_state.stack_ptr->pop(arith, args_size);
+        error_code |= current_state.stack_ptr->pop(arith, ret_offset);
+        error_code |= current_state.stack_ptr->pop(arith, ret_size);
+        
+        if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            arith.address_conversion(address);
+            cuEVM::evm_address_conversion(arith, address);
             bn_t sender;
-            message.get_recipient(sender); // I_{a}
+            current_state.message_ptr->get_recipient(arith, sender); //  I_{a}
             bn_t recipient;
-            cgbn_set(arith._env, recipient, address); // t
+            cgbn_set(arith.env, recipient, address); // t
             bn_t contract_address;
-            cgbn_set(arith._env, contract_address, address); // t
+            cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
-            cgbn_set(arith._env, storage_address, address); // t
+            cgbn_set(arith.env, storage_address, address); // t
 
-            message_t *new_message = new message_t(
+            new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
-                sender,
-                recipient,
-                contract_address,
-                gas,
-                value,
-                message.get_depth() + 1,
-                opcode,
-                storage_address,
-                NULL,
-                0,
-                NULL,
-                0,
-                ret_offset,
-                ret_size,
-                1);
+                &current_state,
+                new cuEVM::evm_message_call_t(
+                    arith,
+                    sender,
+                    recipient,
+                    contract_address,
+                    gas,
+                    value,
+                    current_state.message_ptr->get_depth() + 1,
+                    OP_STATICCALL,
+                    storage_address,
+                    new cuEVM::byte_array_t(),
+                    new cuEVM::byte_array_t(),
+                    ret_offset,
+                    ret_size,
+                    current_state.message_ptr->get_static_env()
+                )
+            );
 
-            generic_CALL(
+            error_code |= generic_CALL(
                 arith,
-                gas_limit,
-                gas_used,
-                error_code,
-                stack,
-                message,
-                memory,
-                touch_state,
-                evm,
-                *new_message,
                 args_offset,
                 args_size,
-                return_data);
-
-            pc = pc + 1;
+                access_state,
+                current_state,
+                new_state_ptr);
         }
+        
+        return error_code;
     }
 
     /**
@@ -821,37 +692,36 @@ namespace cuEVM::operations
         cuEVM::evm_return_data_t &return_data)
     {
         bn_t memory_offset, length;
-        stack.pop(memory_offset, error_code);
-        stack.pop(length, error_code);
+        int32_t error_code = stack.pop(arith, memory_offset);
+        error_code |= stack.pop(arith, length);
 
-        if (error_code == ERR_NONE)
+        bn_t memory_expansion_cost;
+        error_code |= cuEVM::gas_cost::memory_grow_cost(
+            arith,
+            memory,
+            memory_offset,
+            length,
+            memory_expansion_cost,
+            gas_used);
+        
+        error_code |= cuEVM::gas_cost::has_gas(
+            arith,
+            gas_limit,
+            gas_used);
+        
+        if (error_code == ERROR_SUCCESS)
         {
-            memory.grow_cost(
+            memory.increase_memory_cost(
+                arith,
+                memory_expansion_cost);
+            
+            error_code |= memory.get(
+                arith,
                 memory_offset,
                 length,
-                gas_used,
-                error_code);
-
-            if (arith.has_gas(gas_limit, gas_used, error_code))
-            {
-                uint8_t *data;
-                size_t data_size;
-                data = memory.get(
-                    memory_offset,
-                    length,
-                    error_code);
-                arith.size_t_from_cgbn(data_size, length);
-
-                if (error_code == ERR_NONE)
-                {
-                    return_data.set(
-                        data,
-                        data_size);
-
-                    error_code = ERR_REVERT;
-                }
-            }
+                return_data) || ERROR_REVERT; 
         }
+        return error_code;
     }
 
     /**
@@ -883,6 +753,9 @@ namespace cuEVM::operations
         cuEVM::state::TouchState &touch_state,
         cuEVM::evm_return_data_t &return_data)
     {
+        int32_t error_code = ERROR_SUCCESS;
+        return error_code;
+        /*
         if (message.get_static_env())
         {
             error_code = ERROR_STATIC_CALL_CONTEXT_SELFDESTRUCT;
@@ -938,5 +811,6 @@ namespace cuEVM::operations
                 error_code = ERR_RETURN;
             }
         }
+        */
     }
 } // namespace cuEVM::operation

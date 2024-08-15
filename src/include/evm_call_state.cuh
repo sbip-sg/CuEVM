@@ -17,6 +17,7 @@ namespace cuEVM {
         bn_t gas_used; /**< The gas */
         bn_t gas_refund; /**< The gas refund */
         cuEVM::evm_message_call_t* message_ptr; /**< The message that started the execution */
+        bn_t gas_limit; /**< The gas limit */
         cuEVM::evm_stack_t* stack_ptr; /**< The stack */
         cuEVM::evm_memory_t* memory_ptr; /**< The memory */
         cuEVM::state::log_state_data_t* log_state_ptr; /**< The logs state */

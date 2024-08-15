@@ -167,7 +167,7 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory) {
+        const cuEVM::evm_memory_t &memory) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_BASE);
         int32_t error_code = cuEVM::gas_cost::has_gas(
             arith,

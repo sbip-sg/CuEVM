@@ -40,36 +40,42 @@ namespace cuEVM::operations
     /**
      * The CREATE operation. gives the new evm call state
      * @param[in] arith The arithmetical environment.
+     * @param[in] access_state The access state.
      * @param[in] current_state The current state.
      * @param[out] new_state_ptr The new state pointer.
      * @return 0 if the operation is successful, otherwise the error code.
      */
     __host__ __device__ int32_t CREATE(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The CALL operation. gives the new evm call state
      * @param[in] arith The arithmetical environment.
+     * @param[in] access_state The access state.
      * @param[in] current_state The current state.
      * @param[out] new_state_ptr The new state pointer.
      * @return 0 if the operation is successful, otherwise the error code.
      */
     __host__ __device__ int32_t CALL(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The CALLCODE operation. gives the new evm call state
      * @param[in] arith The arithmetical environment.
+     * @param[in] access_state The access state.
      * @param[in] current_state The current state.
      * @param[out] new_state_ptr The new state pointer.
      * @return 0 if the operation is successful, otherwise the error code.
     */
     __host__ __device__ int32_t CALLCODE(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr);
 
@@ -93,36 +99,42 @@ namespace cuEVM::operations
     /**
      * The DELEGATECALL operation. gives the new evm call state
      * @param[in] arith The arithmetical environment.
+     * @param[in] access_state The access state.
      * @param[in] current_state The current state.
      * @param[out] new_state_ptr The new state pointer.
      * @return 0 if the operation is successful, otherwise the error code.
     */
     __host__ __device__ int32_t DELEGATECALL(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The CREATE2 operation. gives the new evm call state
      * @param[in] arith The arithmetical environment.
+     * @param[in] access_state The access state.
      * @param[in] current_state The current state.
      * @param[out] new_state_ptr The new state pointer.
      * @return 0 if the operation is successful, otherwise the error code.
      */
     __host__ __device__ int32_t CREATE2(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The STATICCALL operation. gives the new evm call state
      * @param[in] arith The arithmetical environment.
+     * @param[in] access_state The access state.
      * @param[in] current_state The current state.
      * @param[out] new_state_ptr The new state pointer.
      * @return 0 if the operation is successful, otherwise the error code.
     */
     __host__ __device__ int32_t STATICCALL(
         ArithEnv &arith,
+        cuEVM::state::AccessState &access_state,
         cuEVM::evm_call_state_t &current_state,
         cuEVM::evm_call_state_t* &new_state_ptr);
 

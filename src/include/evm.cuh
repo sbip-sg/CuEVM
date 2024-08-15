@@ -40,6 +40,10 @@ namespace cuEVM {
         __host__ __device__ void run(ArithEnv &arith);
 
     };
+
+    typedef int32_t (*evm_operation_f)(cuEVM::evm_call_state_t* call_state);
+
+    
 }
 
 

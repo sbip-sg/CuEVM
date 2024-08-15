@@ -309,7 +309,7 @@ public:
 
         for (size_t idx = 0; idx < tracer_data.size; idx++)
         {
-            // todo https://eips.ethereum.org/EIPS/eip-3155
+            // TODO: https://eips.ethereum.org/EIPS/eip-3155
             // maintain a tracer data is costly in terms of memory, maybe we print in the each evm step and do not save data
 
           stack_data = tracer_data.stacks[idx];

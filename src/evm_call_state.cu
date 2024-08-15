@@ -25,6 +25,7 @@ namespace cuEVM {
         cgbn_set(arith.env, this->gas_used, gas_used);
         cgbn_set(arith.env, this->gas_refund, gas_refund);
         this->message_ptr = message_ptr;
+        this->message_ptr->get_gas_limit(arith, this->gas_limit);
         this->stack_ptr = stack_ptr;
         this->memory_ptr = memory_ptr;
         this->log_state_ptr = log_state_ptr;
@@ -49,6 +50,7 @@ namespace cuEVM {
         cgbn_set_ui32(arith.env, this->gas_used, 0);
         cgbn_set(arith.env, this->gas_refund, parent->gas_refund);
         this->message_ptr = message_ptr;
+        this->message_ptr->get_gas_limit(arith, this->gas_limit);
         this->stack_ptr = new cuEVM::evm_stack_t();
         this->memory_ptr = new cuEVM::evm_memory_t();
         this->log_state_ptr = new cuEVM::state::log_state_data_t();
@@ -76,6 +78,7 @@ namespace cuEVM {
         cgbn_set_ui32(arith.env, this->gas_used, 0);
         cgbn_set_ui32(arith.env, this->gas_refund, 0);
         this->message_ptr = nullptr;
+        cgbn_set_ui32(arith.env, this->gas_limit, 0);
         this->stack_ptr = stack_ptr;
         this->memory_ptr = memory_ptr;
         this->log_state_ptr = log_state_ptr;

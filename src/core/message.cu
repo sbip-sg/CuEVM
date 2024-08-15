@@ -9,19 +9,19 @@
 namespace cuEVM {
     __host__ __device__ evm_message_call_t::evm_message_call_t(
         ArithEnv &arith,
-        bn_t &sender,
-        bn_t &recipient,
-        bn_t &contract_address,
-        bn_t &gas_limit,
-        bn_t &value,
-        uint32_t depth,
-        uint32_t call_type,
-        bn_t &storage_address,
-        cuEVM::byte_array_t &data,
-        cuEVM::byte_array_t &byte_code,
-        bn_t &return_data_offset,
-        bn_t &return_data_size,
-        uint32_t static_env
+        const bn_t &sender,
+        const bn_t &recipient,
+        const bn_t &contract_address,
+        const bn_t &gas_limit,
+        const bn_t &value,
+        const uint32_t depth,
+        const uint32_t call_type,
+        const bn_t &storage_address,
+        const cuEVM::byte_array_t &data,
+        const cuEVM::byte_array_t &byte_code,
+        const bn_t &return_data_offset,
+        const bn_t &return_data_size,
+        const uint32_t static_env
         ) {
       cgbn_store(arith.env, &this->sender, sender);
       cgbn_store(arith.env, &this->recipient, recipient);

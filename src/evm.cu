@@ -205,10 +205,7 @@ namespace cuEVM {
                 {
                 case OP_STOP:
                     error_code = cuEVM::operations::STOP(
-                        arith,
-                        gas_limit,
-                        call_state_ptr->gas_used,
-                        *call_state_ptr->last_return_data_ptr
+                        *call_state_ptr->parent->last_return_data_ptr
                     );
                     break;
                 case OP_ADD:
@@ -718,9 +715,9 @@ namespace cuEVM {
                         arith,
                         gas_limit,
                         call_state_ptr->gas_used,
-                        *call_state_ptr->stack_ptr,
                         call_state_ptr->pc,
-                        (call_state_ptr->message_ptr)->byte_code
+                        *call_state_ptr->stack_ptr,
+                        *call_state_ptr->message_ptr
                     );
                     break;
                 case OP_JUMPI:
@@ -728,16 +725,144 @@ namespace cuEVM {
                         arith,
                         gas_limit,
                         call_state_ptr->gas_used,
-                        *call_state_ptr->stack_ptr,
                         call_state_ptr->pc,
-                        (call_state_ptr->message_ptr)->byte_code
+                        *call_state_ptr->stack_ptr,
+                        *call_state_ptr->message_ptr
+                    );
+                    break;
+                
+                case OP_PC:
+                    error_code = cuEVM::operations::PC(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                        call_state_ptr->pc,
+                        *call_state_ptr->stack_ptr
+                    );
+                    break;
+                
+                case OP_MSIZE:
+                    error_code = cuEVM::operations::MSIZE(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                        *call_state_ptr->stack_ptr,
+                        *call_state_ptr->memory_ptr
+                    );
+                    break;
+                
+                case OP_GAS:
+                    error_code = cuEVM::operations::GAS(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                        *call_state_ptr->stack_ptr
                     );
                     break;
 
+                case OP_JUMPDEST:
+                    error_code = cuEVM::operations::JUMPDEST(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                    );
+                    break;
+                
+                case OP_PUSH0:
+                    error_code = cuEVM::operations::PUSH0(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                        *call_state_ptr->stack_ptr
+                    );
+                    break;
+                
+                case OP_CREATE:
+                    cuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
+                    error_code = cuEVM::operations::CREATE(
+                        arith,
+                        access_state,
+                        *call_state_ptr,
+                        child_call_state_ptr
+                    );
+
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        start_CALL(arith);
+                    }
+                    break;
+                
+                case OP_CALL:
+                    cuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
+                    error_code = cuEVM::operations::CALL(
+                        arith,
+                        access_state,
+                        *call_state_ptr,
+                        child_call_state_ptr
+                    );
+
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        start_CALL(arith);
+                    }
+                    break;
+                
+                case OP_CALLCODE:
+                    cuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
+                    error_code = cuEVM::operations::CALLCODE(
+                        arith,
+                        access_state,
+                        *call_state_ptr,
+                        child_call_state_ptr
+                    );
+
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        start_CALL(arith);
+                    }
+                    break;
+                
+                case OP_RETURN:
+                    error_code = cuEVM::operations::RETURN(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                        *call_state_ptr->stack_ptr,
+                        *call_state_ptr->memory_ptr,
+                        *call_state_ptr->parent->last_return_data_ptr
+                    );
+                    break;
+                case OP_REVERT:
+                    error_code = cuEVM::operations::REVERT(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                        *call_state_ptr->stack_ptr,
+                        *call_state_ptr->memory_ptr,
+                        *call_state_ptr->parent->last_return_data_ptr
+                    );
+                    break;
+                
+                case OP_SELFDESTRUCT:
+                    error_code = cuEVM::operations::SELFDESTRUCT(
+                        arith,
+                        gas_limit,
+                        call_state_ptr->gas_used,
+                        *call_state_ptr->stack_ptr,
+                        *call_state_ptr->message_ptr,
+                        call_state_ptr->touch_state,
+                        *call_state_ptr->parent->last_return_data_ptr
+                    );
+                    break;
+                
+                
                 default:
+                    error_code = cuEVM::operations::INVALID();
                     break;
                 }
             }
         }
     }
 }
+
+// todo|: make a vector o functions global constants so you can call them
