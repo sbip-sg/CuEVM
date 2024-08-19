@@ -37,6 +37,12 @@ namespace cuEVM {
 
         __host__ __device__ int32_t start_CALL(ArithEnv &arith);
 
+        __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith);
+
+        __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith);
+
+        __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t error_code);
+
         __host__ __device__ void run(ArithEnv &arith);
 
     };

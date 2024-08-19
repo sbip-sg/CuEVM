@@ -764,7 +764,7 @@ namespace cuEVM {
                     error_code = cuEVM::operations::JUMPDEST(
                         arith,
                         gas_limit,
-                        call_state_ptr->gas_used,
+                        call_state_ptr->gas_used
                     );
                     break;
                 
@@ -832,6 +832,52 @@ namespace cuEVM {
                         *call_state_ptr->parent->last_return_data_ptr
                     );
                     break;
+                
+                case OP_DELEGATECALL:
+                    cuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
+                    error_code = cuEVM::operations::DELEGATECALL(
+                        arith,
+                        access_state,
+                        *call_state_ptr,
+                        child_call_state_ptr
+                    );
+
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        start_CALL(arith);
+                    }
+                    break;
+                
+                case OP_CREATE2:
+                    cuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
+                    error_code = cuEVM::operations::CREATE2(
+                        arith,
+                        access_state,
+                        *call_state_ptr,
+                        child_call_state_ptr
+                    );
+
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        start_CALL(arith);
+                    }
+                    break;
+                
+                case OP_STATICCALL:
+                    cuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
+                    error_code = cuEVM::operations::STATICCALL(
+                        arith,
+                        access_state,
+                        *call_state_ptr,
+                        child_call_state_ptr
+                    );
+
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        start_CALL(arith);
+                    }
+                    break;
+
                 case OP_REVERT:
                     error_code = cuEVM::operations::REVERT(
                         arith,
@@ -861,7 +907,103 @@ namespace cuEVM {
                     break;
                 }
             }
+
+            if (error_code != ERROR_SUCCESS) {
+                if (
+                    (error_code == ERROR_RETURN) && 
+                    (call_state_ptr->message_ptr->call_type == OP_CREATE ||
+                    call_state_ptr->message_ptr->call_type == OP_CREATE2)
+                ) {
+                    // TODO: finish create call add the contract to the state
+                    printf("Create call\n");
+                }
+
+                if (call_state_ptr->depth == 0) {
+                    // TODO: finish transaction
+                    printf("Finish transaction\n");
+                } else {
+                    // TODO: finish call
+                    printf("Finish call\n");
+                }
+            }
         }
+    }
+
+    __host__ __device__ int32_t evm_t::finish_TRANSACTION(
+        ArithEnv &arith,
+        int32_t error_code) {
+        // sent the gas value to the block beneficiary
+        bn_t gas_value;
+        bn_t beneficiary;
+        block_info_ptr->get_coin_base(arith, beneficiary);
+
+        if ( (error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) )
+        {
+            bn_t gas_left;
+            // \f$T_{g} - g\f$
+            cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit, call_state_ptr->gas_used);
+
+            // if return add the refund gas
+            if (error_code == ERROR_RETURN) {
+                bn_t capped_refund_gas;
+                // \f$g/5\f$
+                cgbn_div_ui32(arith.env, capped_refund_gas, call_state_ptr->gas_used, 5);
+                // min ( \f$g/5\f$, \f$R_{g}\f$)
+
+                if (cgbn_compare(arith.env, capped_refund_gas, call_state_ptr->gas_refund) > 0)
+                {
+                    cgbn_set(arith.env, capped_refund_gas, call_state_ptr->gas_refund);
+                }
+                // g^{*} = \f$T_{g} - g + min ( \f$g/5\f$, \f$R_{g}\f$)\f$
+                cgbn_add(arith.env, gas_value, gas_left, capped_refund_gas);
+            } else {
+                cgbn_set(arith.env, gas_value, gas_left);
+            }
+            bn_t send_back_gas;
+            cgbn_mul(arith.env, send_back_gas, gas_value, gas_price);
+            // add to sender balance g^{*}
+            bn_t sender_balance;
+            bn_t sender_address;
+            // send back the gas left and gas refund to the sender
+            transaction_ptr->get_sender(arith, sender_address);
+            // deduct transaction value; TODO this probably should be done at some other place
+            // _transaction->get_value(tx_value);
+            // cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
+            // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
+            cgbn_sub(arith.env, gas_value, call_state_ptr->gas_limit, gas_value);
+            cgbn_mul(arith.env, gas_value, gas_value, gas_priority_fee);
+
+
+            // update the transaction state
+            if (error_code == ERROR_RETURN)
+            {
+                call_state_ptr->update(arith, *call_state_ptr->parent);
+            }
+            // sent the value of unused gas to the sender
+            call_state_ptr->parent->touch_state.get_balance(arith, sender_address, sender_balance);
+            cgbn_add(arith.env, sender_balance, sender_balance, send_back_gas);
+            call_state_ptr->parent->touch_state.set_balance(arith, sender_address, sender_balance);
+
+            // set the eror code for a succesfull transaction
+            status = ERROR_SUCCESS;
+        }
+        else
+        {
+            cgbn_mul(arith.env, gas_value, call_state_ptr->gas_limit, gas_priority_fee);
+            // set z to the given error or 1 TODO: 1 in YP
+            status = error_code;
+        }
+        // send the gas value to the beneficiary
+        if (cgbn_compare_ui32(arith.env, gas_value, 0) > 0 ) {
+            bn_t beneficiary_balance;
+            call_state_ptr->parent->touch_state.get_balance(arith, beneficiary, beneficiary_balance);
+            cgbn_add(arith.env, beneficiary_balance, beneficiary_balance, gas_value);
+            call_state_ptr->parent->touch_state.set_balance(arith, beneficiary, beneficiary_balance);
+        }
+
+        call_state_ptr = call_state_ptr->parent;
+        return status;
+
     }
 }
 

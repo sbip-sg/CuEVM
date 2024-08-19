@@ -17,14 +17,35 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 
 add_executable(${PROJECT_NAME}
-    interpreter.cu
-    byte_array.cu
-    arith.cu
-    block.cu
-    stack.cu
-    memory.cu
-    jump_destinations.cu
-    return_data.cu
+    core/block_info.cu
+    core/byte_array.cu
+    core/jump_destinations.cu
+    core/memory.cu
+    core/message.cu
+    core/stack.cu
+    core/transaction.cu
+    operations/arithmetic.cu
+    operations/bitwise.cu
+    operations/compare.cu
+    operations/environment.cu
+    operations/flow.cu
+    operations/log.cu
+    operations/memory.cu
+    operations/stack.cu
+    operations/storage.cu
+    operations/system.cu
+    state/access_state.cu
+    state/account.cu
+    state/logs.cu
+    state/storage.cu
+    state/touch_state.cu
+    state/world_state.cu
+    uitls/arith.cu
+    uitls/cuda_utils.cu
+    uitls/evm_utils.cu
+    evm_call_state.cu
+    gas_cost.cu
+    evm.cu
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
