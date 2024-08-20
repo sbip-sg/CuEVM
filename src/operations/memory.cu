@@ -23,7 +23,6 @@ namespace cuEVM::operations {
 
         bn_t memory_offset, length;
         error_code |= stack.pop(arith, memory_offset);
-        bn_t length;
         cgbn_set_ui32(arith.env, length, cuEVM::word_size);
 
         // get the memory expansion gas cost
@@ -51,7 +50,7 @@ namespace cuEVM::operations {
             
 
             bn_t value;
-            error_code |= data.to_bn_t(arith, value);
+            error_code |= arith.byte_array_to_bn_t(data, value);
             error_code |= stack.push(arith, value);
         }
     }

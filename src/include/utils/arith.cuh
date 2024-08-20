@@ -21,13 +21,13 @@ constexpr CONSTANT uint32_t cgbn_limbs = ((cuEVM::word_bits + 31) / 32);
  * the number of threads per instance and the
  * parameters class as template parameters.
 */
-using context_t = cgbn_context_t<CGBN_TPI, cgbn_default_parameters_t>;
+using context_t = cgbn_context_t<cuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 
 /**
  * The CGBN environment type. This is a template type that takes the
  * context type as a template parameter. It provides the CGBN functions.
 */
-using env_t = cgbn_env_t<context_t, EVM_WORD_BITS>;
+using env_t = cgbn_env_t<context_t, cuEVM::word_bits>;
 
 /**
  * The CGBN base type for the given number of bit in environment.
@@ -45,7 +45,7 @@ struct evm_word_t : cgbn_mem_t<cuEVM::word_bits> {
   /**
    * The default constructor.
    */
-  __host__ __device__ evm_word_t() = default;
+  __host__ __device__ evm_word_t() {}
   /**
    * The copy constructor.
    */
@@ -330,6 +330,32 @@ public:
     char *dst_hex_string,
     evm_word_t &src_cgbn_mem,
     uint32_t count);
+  
+  /**
+   * Get the cgbn number from the byte array.
+   * @param[in] byte_array The byte array.
+   * @param[out] out The cgbn number.
+   * @return The Error code. 0 for success, 1 for failure.
+   */
+  __host__ __device__ int32_t byte_array_to_bn_t(
+    const byte_array_t &byte_array,
+    bn_t &out
+  );
+
+  /**
+   * Get the sub byte array from the byte array.
+   * @param[in] byte_array The byte array.
+   * @param[in] index The index of the sub byte array.
+   * @param[in] length The length of the sub byte array.
+   * @param[out] out The sub byte array.
+   * @return The Error code. 0 for success, 1 for failure.
+   */
+  __host__ __device__ int32_t byte_array_get_sub(
+    const byte_array_t &byte_array,
+    const bn_t &index,
+    const bn_t &length,
+    byte_array_t &out
+  );
 };
 
 

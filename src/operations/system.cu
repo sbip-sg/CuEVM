@@ -257,6 +257,7 @@ namespace cuEVM::operations
             bn_t ret_offset, ret_size;
             cgbn_set_ui32(arith.env, ret_offset, 0);
             cgbn_set_ui32(arith.env, ret_size, 0);
+            cuEVM::byte_array_t call_data;
             // create the new evm call state
             new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
@@ -271,7 +272,7 @@ namespace cuEVM::operations
                     current_state.message_ptr->get_depth() + 1,
                     opcode,
                     contract_address,
-                    new cuEVM::byte_array_t(),
+                    call_data,
                     initialisation_code,
                     ret_offset,
                     ret_size,
@@ -365,6 +366,8 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, address); // t
+            cuEVM::byte_array_t call_data;
+            cuEVM::byte_array_t code;
 
             new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
@@ -379,8 +382,8 @@ namespace cuEVM::operations
                     current_state.message_ptr->get_depth() + 1,
                     OP_CALL,
                     storage_address,
-                    new cuEVM::byte_array_t(),
-                    new cuEVM::byte_array_t(),
+                    call_data,
+                    code,
                     ret_offset,
                     ret_size,
                     current_state.message_ptr->get_static_env()
@@ -432,6 +435,8 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, sender); // I_{a}
+            cuEVM::byte_array_t call_data;
+            cuEVM::byte_array_t code;
 
             new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
@@ -446,8 +451,8 @@ namespace cuEVM::operations
                     current_state.message_ptr->get_depth() + 1,
                     OP_CALLCODE,
                     storage_address,
-                    new cuEVM::byte_array_t(),
-                    new cuEVM::byte_array_t(),
+                    call_data,
+                    code,
                     ret_offset,
                     ret_size,
                     current_state.message_ptr->get_static_env()
@@ -552,6 +557,8 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, recipient); // I_{a}
+            cuEVM::byte_array_t call_data;
+            cuEVM::byte_array_t code;
 
             new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
@@ -566,8 +573,8 @@ namespace cuEVM::operations
                     current_state.message_ptr->get_depth() + 1,
                     OP_DELEGATECALL,
                     storage_address,
-                    new cuEVM::byte_array_t(),
-                    new cuEVM::byte_array_t(),
+                    call_data,
+                    code,
                     ret_offset,
                     ret_size,
                     current_state.message_ptr->get_static_env()
@@ -640,6 +647,8 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, address); // t
+            cuEVM::byte_array_t call_data;
+            cuEVM::byte_array_t code;
 
             new_state_ptr = new cuEVM::evm_call_state_t(
                 arith,
@@ -654,8 +663,8 @@ namespace cuEVM::operations
                     current_state.message_ptr->get_depth() + 1,
                     OP_STATICCALL,
                     storage_address,
-                    new cuEVM::byte_array_t(),
-                    new cuEVM::byte_array_t(),
+                    call_data,
+                    code,
                     ret_offset,
                     ret_size,
                     current_state.message_ptr->get_static_env()

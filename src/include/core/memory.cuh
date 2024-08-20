@@ -122,24 +122,7 @@ namespace cuEVM {
         ArithEnv &arith,
         const bn_t &index,
         const bn_t &length,
-        cuEVM::byte_array_t &data) {
-        
-        do {
-          if (cgbn_compare_ui32(arith.env, length, 0) >= 0) {
-            break;
-          } 
-          if (grow(arith, index, length) != 0) {
-            break;
-          }
-          uint32_t index_u32, length_u32;
-          arith.uint32_t_from_cgbn(index_u32, index);
-          arith.uint32_t_from_cgbn(length_u32, length);
-          data = cuEVM::byte_array_t(this->data.data + index_u32, length_u32);
-          return 0;
-        } while (0);
-        data = cuEVM::byte_array_t();
-        return 1;
-      }
+        cuEVM::byte_array_t &data);
 
       /**
        * Set the given memory data. Outside available_size is 0.
@@ -153,26 +136,8 @@ namespace cuEVM {
         ArithEnv &arith,
         const cuEVM::byte_array_t &data,
         const bn_t &index,
-        const bn_t &length) {
-        
-        do {
-          if (cgbn_compare_ui32(arith.env, length, 0) >= 0) {
-            break;
-          }
-          if (grow(arith, index, length) != 0) {
-            break;
-          }
-          uint32_t index_u32;
-          arith.uint32_t_from_cgbn(index_u32, index);
-          if (data.size > 0) {
-            std::copy(data.data, data.data + data.size, this->data.data + index_u32);
-          }
-          return 0;
-        } while (0);
-        return 1;
-      }
+        const bn_t &length);
     };
-
     /**
      * The kernel to copy the memory between the GPU memories.
      * @param[out] dst_instances The destination GPU memory data structures.

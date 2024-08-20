@@ -81,7 +81,7 @@ namespace cuEVM
         return ERROR_SUCCESS;
       }
 
-      __host__ __device__ uint32_t evm_stack_t::size() {
+      __host__ __device__ uint32_t evm_stack_t::size() const {
         return stack_offset;
       }
 

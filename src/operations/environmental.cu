@@ -68,8 +68,8 @@ namespace cuEVM::operations {
                         hash.data,
                         hash.size);
                     bn_t hash_bn;
-                    hash.to_bn_t(
-                        arith,
+                    error_code |= arith.byte_array_to_bn_t(
+                        hash,
                         hash_bn);
 
                     error_code |= stack.push(arith, hash_bn);
@@ -218,8 +218,8 @@ namespace cuEVM::operations {
             cgbn_set_ui32(arith.env, length, cuEVM::word_size);
 
             cuEVM::byte_array_t data;
-            error_code |= message.get_data().get_sub(
-                arith,
+            error_code |= arith.byte_array_get_sub(
+                message.get_data(),
                 index,
                 length,
                 data);
@@ -297,8 +297,8 @@ namespace cuEVM::operations {
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             cuEVM::byte_array_t data;
-            error_code |= message.get_data().get_sub(
-                arith,
+            error_code |= arith.byte_array_get_sub(
+                message.get_data(),
                 data_offset,
                 length,
                 data);
@@ -378,8 +378,9 @@ namespace cuEVM::operations {
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             cuEVM::byte_array_t data;
-            error_code |= message.get_data().get_sub(
-                arith,
+                
+            error_code |= arith.byte_array_get_sub(
+                message.get_data(),
                 code_offset,
                 length,
                 data);
@@ -501,8 +502,9 @@ namespace cuEVM::operations {
                 address,
                 byte_code);
             cuEVM::byte_array_t data;
-            error_code |= byte_code.get_sub(
-                arith,
+                
+            error_code |= arith.byte_array_get_sub(
+                byte_code,
                 code_offset,
                 length,
                 data);
@@ -580,8 +582,9 @@ namespace cuEVM::operations {
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             cuEVM::byte_array_t data;
-            error_code |= return_data.get_sub(
-                arith,
+            
+            error_code |= arith.byte_array_get_sub(
+                return_data,
                 data_offset,
                 length,
                 data);
@@ -635,7 +638,9 @@ namespace cuEVM::operations {
                 byte_code.size,
                 hash.data,
                 hash.size);
-            error_code |= hash.to_bn_t(arith, hash_bn);
+            error_code |= arith.byte_array_to_bn_t(
+                hash,
+                hash_bn);
         }
         error_code |= stack.push(
             arith,

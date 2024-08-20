@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "../include/state/logs.cuh"
-#include "../utils/error_codes.cuh"
+#include "../include/utils/error_codes.cuh"
 
 
 namespace cuEVM::state {

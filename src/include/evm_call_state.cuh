@@ -23,6 +23,9 @@ namespace cuEVM {
         cuEVM::state::log_state_data_t* log_state_ptr; /**< The logs state */
         cuEVM::state::TouchState touch_state; /**< The touch state */
         cuEVM::evm_return_data_t* last_return_data_ptr; /**< The return data */
+        #ifdef EIP_3155
+        uint32_t trace_idx; /**< The index in the trace */
+        #endif
 
         /**
          * The complete constructor of the evm_state_t

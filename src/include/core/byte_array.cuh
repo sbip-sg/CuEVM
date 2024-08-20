@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <cuda.h>
 #include <cjson/cJSON.h>
-#include "../utils/arith.cuh"
 
 namespace cuEVM {
   enum PaddingDirection {
@@ -109,7 +108,7 @@ namespace cuEVM {
      * Get the json object from the byte array.
      * @return The json object.
      */
-    __host__ __device__ cJSON *to_json() const;
+    __host__ cJSON *to_json() const;
     /**
      * Get the byte array from a hex string in Little Endian format.
      * @param[in] clean_hex_string The clean hex string.
@@ -156,23 +155,6 @@ namespace cuEVM {
       const byte_array_t src
     );
 
-    /**
-     * Get the cgbn number from the byte array.
-     * @param[in] arith The arithmetic environment.
-     * @param[out] out The cgbn number.
-     * @return The Error code. 0 for success, 1 for failure.
-     */
-    __host__ __device__ int32_t to_bn_t(
-      ArithEnv &arith,
-      bn_t &out
-    ) const;
-
-    __host__ __device__ int32_t get_sub(
-      ArithEnv &arith,
-      const bn_t &index,
-      const bn_t &length,
-      byte_array_t &out
-    ) const;
   };
 
   namespace byte_array {

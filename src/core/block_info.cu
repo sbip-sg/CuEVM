@@ -107,18 +107,14 @@ namespace cuEVM {
         previous_blocks[jdx].number.from_uint32_t(0);
         previous_blocks[jdx].hash.from_uint32_t(0);
       }
+      return ERROR_SUCCESS;
     }
-
-
-
-
-
 
     __host__ __device__ void block_info_t::get_coin_base(
       ArithEnv &arith,
       bn_t &coin_base) const
     {
-      cgbn_load(arith.env, coin_base, &(this->coin_base));
+      cgbn_load(arith.env, coin_base, (cgbn_evm_word_t_ptr) &(this->coin_base));
     }
 
 
@@ -126,14 +122,14 @@ namespace cuEVM {
       ArithEnv &arith,
       bn_t &time_stamp) const
     {
-      cgbn_load(arith.env, time_stamp, &(this->time_stamp));
+      cgbn_load(arith.env, time_stamp, (cgbn_evm_word_t_ptr) &(this->time_stamp));
     }
 
     __host__ __device__ void block_info_t::get_number(
       ArithEnv &arith,
       bn_t &number) const
     {
-      cgbn_load(arith.env, number, &(this->number));
+      cgbn_load(arith.env, number, (cgbn_evm_word_t_ptr) &(this->number));
     }
 
 
@@ -141,14 +137,14 @@ namespace cuEVM {
       ArithEnv &arith,
       bn_t &difficulty) const
     {
-      cgbn_load(arith.env, difficulty, &(this->difficulty));
+      cgbn_load(arith.env, difficulty, (cgbn_evm_word_t_ptr) &(this->difficulty));
     }
 
     __host__ __device__ void block_info_t::get_prevrandao(
       ArithEnv &arith,
       bn_t &val) const
     {
-      cgbn_load(arith.env, val, &(this->prevrandao));
+      cgbn_load(arith.env, val, (cgbn_evm_word_t_ptr) &(this->prevrandao));
     }
 
 
@@ -156,7 +152,7 @@ namespace cuEVM {
       ArithEnv &arith,
       bn_t &gas_limit) const
     {
-      cgbn_load(arith.env, gas_limit, &(this->gas_limit));
+      cgbn_load(arith.env, gas_limit, (cgbn_evm_word_t_ptr) &(this->gas_limit));
     }
 
 
@@ -164,7 +160,7 @@ namespace cuEVM {
       ArithEnv &arith,
       bn_t &chain_id) const
     {
-      cgbn_load(arith.env, chain_id, &(this->chain_id));
+      cgbn_load(arith.env, chain_id, (cgbn_evm_word_t_ptr) &(this->chain_id));
     }
 
 
@@ -172,7 +168,7 @@ namespace cuEVM {
       ArithEnv &arith,
       bn_t &base_fee) const
     {
-      cgbn_load(arith.env, base_fee, &(this->base_fee));
+      cgbn_load(arith.env, base_fee, (cgbn_evm_word_t_ptr) &(this->base_fee));
     }
 
     __host__ __device__ int32_t block_info_t::get_previous_hash(
@@ -199,7 +195,7 @@ namespace cuEVM {
         cgbn_set_ui32(arith.env, previous_hash, 0);
         return ERROR_BLOCK_INVALID_NUMBER;
       }
-      cgbn_load(arith.env, previous_hash, &(previous_blocks[idx].hash));
+      cgbn_load(arith.env, previous_hash, (cgbn_evm_word_t_ptr) &(previous_blocks[idx].hash));
       return ERROR_SUCCESS;
     }
 
@@ -268,7 +264,6 @@ namespace cuEVM {
       cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string_ptr);
 
       previous_blocks_json = cJSON_CreateArray();
-      bn_t number;
       for (idx = 0; idx < 256; idx++)
       {
         previous_block_json = cJSON_CreateObject();

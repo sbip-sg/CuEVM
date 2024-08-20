@@ -352,7 +352,7 @@ namespace cuEVM
 
     __host__ __device__ void free_internals_account(
         account_t &account,
-        int32_t managed = 0)
+        int32_t managed)
     {
         if (
             (account.byte_code.data != nullptr) &&

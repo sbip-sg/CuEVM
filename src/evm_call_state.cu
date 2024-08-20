@@ -1,8 +1,8 @@
 
-#include "../include/evm_call_state.cuh"
+#include "include/evm_call_state.cuh"
 
-#include "utils/error_codes.cuh"
-#include "utils/opcodes.cuh"
+#include "include/utils/error_codes.cuh"
+#include "include/utils/opcodes.cuh"
 
 namespace cuEVM {
     __host__ __device__ evm_call_state_t::evm_call_state_t(
@@ -31,6 +31,9 @@ namespace cuEVM {
         this->log_state_ptr = log_state_ptr;
         this->touch_state = touch_state;
         this->last_return_data_ptr = last_return_data_ptr;
+        #ifdef EIP_3155
+        this->trace_idx = 0;
+        #endif
     }
 
     /**
@@ -55,6 +58,9 @@ namespace cuEVM {
         this->memory_ptr = new cuEVM::evm_memory_t();
         this->log_state_ptr = new cuEVM::state::log_state_data_t();
         this->last_return_data_ptr = new cuEVM::evm_return_data_t();
+        #ifdef EIP_3155
+        this->trace_idx = 0;
+        #endif
     }
 
     /**
@@ -83,6 +89,9 @@ namespace cuEVM {
         this->memory_ptr = memory_ptr;
         this->log_state_ptr = log_state_ptr;
         this->last_return_data_ptr = last_return_data_ptr;
+        #ifdef EIP_3155
+        this->trace_idx = 0;
+        #endif
     }
 
     /**

@@ -27,7 +27,7 @@ add_executable(${PROJECT_NAME}
     operations/arithmetic.cu
     operations/bitwise.cu
     operations/compare.cu
-    operations/environment.cu
+    operations/environmental.cu
     operations/flow.cu
     operations/log.cu
     operations/memory.cu
@@ -40,11 +40,12 @@ add_executable(${PROJECT_NAME}
     state/storage.cu
     state/touch_state.cu
     state/world_state.cu
-    uitls/arith.cu
-    uitls/cuda_utils.cu
-    uitls/evm_utils.cu
+    utils/arith.cu
+    utils/cuda_utils.cu
+    utils/evm_utils.cu
     evm_call_state.cu
     gas_cost.cu
+    tracer.cu
     evm.cu
 )
 
@@ -54,7 +55,7 @@ set_target_properties(${PROJECT_NAME}  PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
 #set_target_properties(${PROJECT_NAME}  PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
 
 # Add specific NVCC flags using target_compile_options (if necessary)
-target_compile_options(${PROJECT_NAME}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true>)
+target_compile_options(${PROJECT_NAME}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
 
 # Link libraries
 # target_link_libraries(cuevm CUDA::cudart ${GMP_LIBRARIES} ${cJSON_LIBRARIES})

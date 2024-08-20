@@ -323,11 +323,15 @@ namespace cuEVM {
                 cgbn_div_ui32(arith.env, memory_size_word, memory_size_word, 32);
                 // memory_cost = (memory_size_word * memory_size_word) / 512 + 3 * memory_size_word
                 bn_t memory_cost;
-                if (cgbn_mul(arith.env, memory_cost, memory_size_word, memory_size_word) != 0) {
+                bn_wide_t memory_size_word_wide;
+                cgbn_mul_wide(arith.env, memory_size_word_wide, memory_size_word, memory_size_word);
+                if (cgbn_compare_ui32(arith.env, memory_size_word_wide._high, 0) != 0) {
                     break;
                 }
+                cgbn_set(arith.env, memory_cost, memory_size_word_wide._low);
                 cgbn_div_ui32(arith.env, memory_cost, memory_cost, 512);
                 bn_t tmp;
+                // TODO: verify overflow in another way
                 if (cgbn_mul_ui32(arith.env, tmp, memory_size_word, GAS_MEMORY) != 0) {
                     break;
                 }

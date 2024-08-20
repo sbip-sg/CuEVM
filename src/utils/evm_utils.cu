@@ -1,7 +1,7 @@
 #include <CuCrypto/keccak.cuh>
 #include <CGBN/cgbn.h>
 
-#include "include/utils/evm_utils.cuh"
+#include "../include/utils/evm_utils.cuh"
 
 namespace cuEVM {
     namespace utils {

@@ -12,7 +12,7 @@
 namespace cuEVM
 {
   namespace stack {
-    constexpr uint32_t max_size = EVM_MAX_STACK_SIZE; /**< The maximum stack size*/
+    constexpr uint32_t max_size = cuEVM::max_stack_size; /**< The maximum stack size*/
     constexpr uint32_t alligment = sizeof(evm_word_t); /**< The alligment of the stack*/
     constexpr uint32_t initial_capacity = 16U; /**< The initial capacity of the stack can be change for performence reasons*/
 
@@ -71,7 +71,7 @@ namespace cuEVM
        * Get the size of the stack
        * @return The size of the stack
        */
-      __host__ __device__ uint32_t size();
+      __host__ __device__ uint32_t size() const;
 
       /**
        * Get the top of the stack

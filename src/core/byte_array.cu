@@ -131,7 +131,7 @@ namespace cuEVM {
     return hex_string;
   }
 
-  __host__ __device__ cJSON* byte_array_t::to_json() const {
+  __host__ cJSON* byte_array_t::to_json() const {
     cJSON *data_json = cJSON_CreateObject();
     cJSON_AddNumberToObject(data_json, "size", size);
     if (size > 0)
@@ -194,7 +194,6 @@ namespace cuEVM {
     {
       char *current_char;
       current_char = (char *)clean_hex_string;
-      int32_t index;
       uint8_t *dst_ptr;
       if (padding == PaddingDirection::RIGHT_PADDING) { // right padding
         dst_ptr = data + size - 1;
@@ -240,7 +239,7 @@ namespace cuEVM {
     if (length <= 0)
     {
       data = nullptr;
-      return;
+      return 1; // TODO: error code
     }
     size = (length + 1) / 2;
     if (managed) {
@@ -249,7 +248,9 @@ namespace cuEVM {
         sizeof(uint8_t) * size));
       memset(data, 0, size);
     } else {
-      data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
+      // data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
+      data = new uint8_t[size];
+      memset(data, 0, size);
     }
     int32_t error;
     if (endian == LITTLE_ENDIAN)
@@ -290,49 +291,6 @@ namespace cuEVM {
     memcpy(data, src.data, copy_size);
     memset(data + copy_size, 0, size - src.size);
     return size_diff;
-  }
-
-  __host__ __device__ int32_t byte_array_t::to_bn_t(
-    ArithEnv &arith,
-    bn_t &out
-  ) const {
-    if (size != cuEVM::word_size)
-      return ERROR_INVALID_WORD_SIZE;
-    for (uint32_t idx = 0; idx < cuEVM::word_size; idx++)
-    {
-      cgbn_insert_bits_ui32(
-        arith.env,
-        out,
-        out,
-        cuEVM::word_bits - (idx + 1) * 8,
-        8,
-        data[idx]);
-    }
-    return ERROR_SUCCESS;
-  }
-
-  __host__ __device__ int32_t byte_array_t::get_sub(
-    ArithEnv &arith,
-    const bn_t &index,
-    const bn_t &length,
-    byte_array_t &out
-  ) const {
-    uint32_t index_value, length_value;
-    index_value = cgbn_get_ui32(arith.env, index);
-    length_value = cgbn_get_ui32(arith.env, length);
-    if (
-      (cgbn_compare_ui32(arith.env, index, index_value) != 0) &&
-      (cgbn_compare_ui32(arith.env, length, length_value) != 0)
-    ) {
-      out = byte_array_t();
-      return ERROR_BYTE_ARRAY_OVERFLOW_VALUES;
-    }
-    if (index_value + length_value > size) {
-      out = byte_array_t();
-      return ERROR_BYTE_ARRAY_INVALID_SIZE;
-    }
-    out = byte_array_t(data + index_value, length_value);
-    return ERROR_SUCCESS;
   }
 
   namespace byte_array {

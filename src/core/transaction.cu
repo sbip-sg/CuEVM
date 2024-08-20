@@ -600,9 +600,9 @@ namespace cuEVM {
             evm_transaction_t* &transactions_ptr,
             const cJSON* json,
             uint32_t &transactions_count,
-            int32_t managed = 0,
-            uint32_t start_index = 0,
-            uint32_t clones = 1) {
+            int32_t managed,
+            uint32_t start_index,
+            uint32_t clones) {
             cJSON* transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
             uint32_t available_transactions = no_transactions(json);
             if (start_index >= available_transactions) {
@@ -705,7 +705,7 @@ namespace cuEVM {
         __host__ int32_t free_instaces(
             evm_transaction_t* transactions_ptr,
             uint32_t transactions_count,
-            int32_t managed = 0) {
+            int32_t managed) {
             if (transactions_ptr != nullptr) {
                 transactions_ptr[0].access_list.free(managed);
                 for (uint32_t i = 0; i < transactions_count; i++) {

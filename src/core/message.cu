@@ -56,7 +56,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_sender(
         ArithEnv &arith,
         bn_t &sender) const {
-      cgbn_load(arith.env, sender, &this->sender);
+      cgbn_load(arith.env, sender, (cgbn_evm_word_t_ptr) &this->sender);
     }
 
 
@@ -68,7 +68,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_recipient(
         ArithEnv &arith,
         bn_t &recipient) const {
-      cgbn_load(arith.env, recipient, &this->recipient);
+      cgbn_load(arith.env, recipient, (cgbn_evm_word_t_ptr) &this->recipient);
     }
 
 
@@ -80,7 +80,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_contract_address(
         ArithEnv &arith,
         bn_t &contract_address) const {
-      cgbn_load(arith.env, contract_address, &this->contract_address);
+      cgbn_load(arith.env, contract_address, (cgbn_evm_word_t_ptr) &this->contract_address);
     }
 
 
@@ -92,7 +92,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_gas_limit(
         ArithEnv &arith,
         bn_t &gas_limit) const {
-      cgbn_load(arith.env, gas_limit, &this->gas_limit);
+      cgbn_load(arith.env, gas_limit, (cgbn_evm_word_t_ptr) &this->gas_limit);
     }
 
     /**
@@ -103,7 +103,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_value(
         ArithEnv &arith,
         bn_t &value) const {
-      cgbn_load(arith.env, value, &this->value);
+      cgbn_load(arith.env, value, (cgbn_evm_word_t_ptr) &this->value);
     }
 
     /**
@@ -130,7 +130,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_storage_address(
         ArithEnv &arith,
         bn_t &storage_address) const {
-      cgbn_load(arith.env, storage_address, &this->storage_address);
+      cgbn_load(arith.env, storage_address, (cgbn_evm_word_t_ptr) &this->storage_address);
     }
 
     /**
@@ -157,7 +157,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_return_data_offset(
         ArithEnv &arith,
         bn_t &return_data_offset) const {
-      cgbn_load(arith.env, return_data_offset, &this->return_data_offset);
+      cgbn_load(arith.env, return_data_offset, (cgbn_evm_word_t_ptr) &this->return_data_offset);
     }
 
     /**
@@ -168,7 +168,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::get_return_data_size(
         ArithEnv &arith,
         bn_t &return_data_size) const {
-      cgbn_load(arith.env, return_data_size, &this->return_data_size);
+      cgbn_load(arith.env, return_data_size, (cgbn_evm_word_t_ptr) &this->return_data_size);
     }
 
     /**
@@ -223,7 +223,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::set_return_data_offset(
         ArithEnv &arith,
         bn_t &return_data_offset) {
-      cgbn_store(arith.env, &this->return_data_offset, return_data_offset);
+      cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &this->return_data_offset, return_data_offset);
     }
 
     /**
@@ -234,7 +234,7 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::set_return_data_size(
         ArithEnv &arith,
         bn_t &return_data_size) {
-      cgbn_store(arith.env, &this->return_data_size, return_data_size);
+      cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &this->return_data_size, return_data_size);
     }
 
     /**

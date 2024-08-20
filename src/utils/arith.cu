@@ -6,6 +6,7 @@
 
 #include "../include/utils/arith.cuh"
 #include "../include/utils/evm_utils.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
   __host__ __device__ evm_word_t::evm_word_t(
@@ -334,7 +335,7 @@ namespace cuEVM {
     uint8_t *dst_array,
     size_t &array_length,
     evm_word_t &src_cgbn_mem,
-    size_t limb_count = cuEVM::cgbn_limbs) {
+    size_t limb_count) {
     size_t current_limb;
     array_length = limb_count * 4; // Each limb has 4 bytes
 
@@ -431,5 +432,49 @@ namespace cuEVM {
             return data_content.data + index_s;
         }
     }
+  }
+
+  
+  __host__ __device__ int32_t ArithEnv::byte_array_to_bn_t(
+    const byte_array_t &byte_array,
+    bn_t &out
+  ) {
+    if (byte_array.size != cuEVM::word_size)
+      return ERROR_INVALID_WORD_SIZE;
+    for (uint32_t idx = 0; idx < cuEVM::word_size; idx++)
+    {
+      cgbn_insert_bits_ui32(
+        env,
+        out,
+        out,
+        cuEVM::word_bits - (idx + 1) * 8,
+        8,
+        byte_array.data[idx]);
+    }
+    return ERROR_SUCCESS;
+  }
+
+  __host__ __device__ int32_t ArithEnv::byte_array_get_sub(
+    const byte_array_t &byte_array,
+    const bn_t &index,
+    const bn_t &length,
+    byte_array_t &out
+  ) {
+    uint32_t index_value, length_value;
+    index_value = cgbn_get_ui32(env, index);
+    length_value = cgbn_get_ui32(env, length);
+    if (
+      (cgbn_compare_ui32(env, index, index_value) != 0) &&
+      (cgbn_compare_ui32(env, length, length_value) != 0)
+    ) {
+      out = byte_array_t();
+      return ERROR_BYTE_ARRAY_OVERFLOW_VALUES;
+    }
+    if (index_value + length_value > byte_array.size) {
+      out = byte_array_t();
+      return ERROR_BYTE_ARRAY_INVALID_SIZE;
+    }
+    out = byte_array_t(byte_array.data + index_value, length_value);
+    return ERROR_SUCCESS;
   }
 }
