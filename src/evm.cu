@@ -11,6 +11,7 @@
 #include "include/operations/system.cuh"
 #include "include/operations/compare.cuh"
 #include "include/operations/flow.cuh"
+#include "include/gas_cost.cuh"
 
 #include "include/utils/opcodes.cuh"
 
@@ -916,14 +917,18 @@ namespace cuEVM {
                 ) {
                     // TODO: finish create call add the contract to the state
                     printf("Create call\n");
+                    error_code |= finish_CREATE(arith);
                 }
 
                 if (call_state_ptr->depth == 0) {
                     // TODO: finish transaction
                     printf("Finish transaction\n");
+                    error_code |= finish_CALL(arith, error_code);
+                    error_code |= finish_TRANSACTION(arith, error_code);
                 } else {
                     // TODO: finish call
                     printf("Finish call\n");
+                    error_code |= finish_CALL(arith, error_code);
                 }
             }
         }
@@ -968,7 +973,7 @@ namespace cuEVM {
             transaction_ptr->get_sender(arith, sender_address);
             // deduct transaction value; TODO this probably should be done at some other place
             // _transaction->get_value(tx_value);
-            // cgbn_sub(_arith._env, sender_balance, sender_balance, tx_value);
+            // cgbn_sub(arith.env, sender_balance, sender_balance, tx_value);
             // the gas value for the beneficiary is \f$T_{g} - g^{*}\f$
             cgbn_sub(arith.env, gas_value, call_state_ptr->gas_limit, gas_value);
             cgbn_mul(arith.env, gas_value, gas_value, gas_priority_fee);
@@ -985,7 +990,7 @@ namespace cuEVM {
             call_state_ptr->parent->touch_state.set_balance(arith, sender_address, sender_balance);
 
             // set the eror code for a succesfull transaction
-            status = ERROR_SUCCESS;
+            status = error_code;
         }
         else
         {
@@ -1004,6 +1009,101 @@ namespace cuEVM {
         call_state_ptr = call_state_ptr->parent;
         return status;
 
+    }
+
+    
+    __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_code) {
+        
+        bn_t child_success;
+        // set the child call to failure
+        cgbn_set_ui32(arith.env, child_success, 0);
+        // if the child call return from normal halting
+        // no errors
+        if ( (error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) )
+        {
+            // give back the gas left from the child computation
+            bn_t gas_left;
+            cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit, call_state_ptr->gas_used);
+            cgbn_sub(arith.env, call_state_ptr->parent->gas_used, call_state_ptr->parent->gas_used, gas_left);
+
+            // if is a succesfull call
+            if (error_code == ERROR_RETURN)
+            {
+                // update the parent state with the states of the child
+                call_state_ptr->parent->update(arith, *call_state_ptr);
+                // sum the refund gas
+                cgbn_add(
+                    arith.env,
+                    call_state_ptr->parent->gas_refund,
+                    call_state_ptr->parent->gas_refund,
+                    call_state_ptr->gas_refund);
+                // for CALL operations set the child success to 1
+                cgbn_set_ui32(arith.env, child_success, 1);
+                // if CREATEX operation, set the address of the contract
+                if (
+                    (call_state_ptr->message_ptr->get_call_type() == OP_CREATE) ||
+                    (call_state_ptr->message_ptr->get_call_type() == OP_CREATE2))
+                {
+                    call_state_ptr->message_ptr->get_recipient(arith, child_success);
+                }
+            }
+        }
+        // get the memory offset and size of the return data
+        // in the parent memory
+        bn_t ret_offset, ret_size;
+        call_state_ptr->message_ptr->get_return_data_offset(arith, ret_offset);
+        call_state_ptr->message_ptr->get_return_data_size(arith, ret_size);
+        // reset the error code for the parent
+        error_code = ERROR_SUCCESS;
+
+        // push the result in the parent stack
+        error_code |= call_state_ptr->parent->stack_ptr->push(arith, child_success);
+        // set the parent memory with the return data
+        
+        // write the return data in the memory
+        error_code |= call_state_ptr->parent->memory_ptr->set(
+            arith,
+            *call_state_ptr->parent->last_return_data_ptr,
+            ret_offset,
+            ret_size);
+        
+        return error_code;
+    }
+
+    
+    __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
+        // compute the gas to deposit the contract
+        bn_t code_size;
+        cgbn_set_ui32(arith.env, code_size, call_state_ptr->last_return_data_ptr->size);
+        cuEVM::gas_cost::code_cost(arith, call_state_ptr->gas_used, code_size);
+        int32_t error_code = ERROR_SUCCESS;
+        error_code |= cuEVM::gas_cost::has_gas(
+            arith,
+            call_state_ptr->gas_limit,
+            call_state_ptr->gas_used
+        );
+        if (error_code == ERROR_SUCCESS) {
+            // compute the address of the contract
+            bn_t contract_address;
+            call_state_ptr->message_ptr->get_recipient(arith, contract_address);
+            uint8_t *code = call_state_ptr->last_return_data_ptr->data;
+            uint32_t code_size = call_state_ptr->last_return_data_ptr->size;
+            if (code_size <= cuEVM::max_code_size) {
+                #ifdef EIP_3541
+                if ((code_size > 0) && (code[0] == 0xef)) {
+                    error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
+                }
+                #endif
+                call_state_ptr->touch_state.set_code(
+                    arith,
+                    contract_address,
+                    *call_state_ptr->last_return_data_ptr
+                );
+            } else {
+                error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
+            }
+        }
+        return error_code;
     }
 }
 

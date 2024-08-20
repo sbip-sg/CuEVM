@@ -75,6 +75,15 @@ namespace cuEVM {
             // length = (initcode_length + 31) / 32
             evm_words_gas_cost(arith, gas_used, initcode_length, GAS_INITCODE_WORD_COST);
         }
+
+        
+        __host__ __device__ void code_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &code_length) {
+            // gas_used += GAS_CODE_DEPOSIT * length
+            evm_bytes_gas_cost(arith, gas_used, code_length, GAS_CODE_DEPOSIT);
+        }
         
         __host__ __device__ void keccak_cost(
             ArithEnv &arith,

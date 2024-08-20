@@ -145,6 +145,17 @@ namespace cuEVM {
             ArithEnv &arith,
             bn_t &gas_used,
             const bn_t &initcode_length);
+        
+        /**
+         * Add the cost for code storage.
+         * @param[in] arith The arithmetic environment
+         * @param[inout] gas_used The gas used
+         * @param[in] code_length The length of the code
+         */
+        __host__ __device__ void code_cost(
+            ArithEnv &arith,
+            bn_t &gas_used,
+            const bn_t &code_length);
         /**
          * Add the cost for keccak hashing.
          * @param[in] arith The arithmetic environment
