@@ -279,6 +279,16 @@ namespace cuEVM {
             return contract_storage_json;
         }
 
+        __host__ __device__ void contract_storage_t::print() const
+        {
+            printf("Storage size: %u\n", this->size);
+            for (uint32_t idx = 0; idx < this->size; idx++)
+            {
+                printf("Element %u:\n", idx);
+                this->storage[idx].print();
+            }
+        }
+
         // __host__ __device__ void contract_storage_t::free_internals(
         //     int32_t managed)
         // {

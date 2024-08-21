@@ -355,6 +355,12 @@ namespace cuEVM
             bn_t &nonce);
         
         /**
+         * Get the byte code of the account.
+         * @return The byte code of the account
+         */
+        __host__ __device__ byte_array_t get_byte_code() const;
+        
+        /**
          * Set the address of the account.
          * @param[in] arith The arithmetical environment
          * @param[in] address The address of the account

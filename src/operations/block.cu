@@ -40,7 +40,6 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        uint32_t &pc,
         cuEVM::evm_stack_t &stack,
         const cuEVM::block_info_t &block)
     {

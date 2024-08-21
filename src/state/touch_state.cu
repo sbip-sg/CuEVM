@@ -7,7 +7,7 @@
 #include "../include/utils/error_codes.cuh"
 
 namespace cuEVM::state {
-__host__ __device__ int32_t TouchState::add_account(
+    __host__ __device__ int32_t TouchState::add_account(
         ArithEnv &arith,
         const bn_t &address,
         cuEVM::account::account_t* &account_ptr,
@@ -55,6 +55,44 @@ __host__ __device__ int32_t TouchState::add_account(
                 return ERROR_SUCCESS;
             })() : ERROR_SUCCESS
         );
+    }
+
+    __host__ __device__ int32_t  TouchState::get_balance(
+            ArithEnv &arith,
+            const bn_t &address,
+            bn_t &balance) {
+        account::account_t* account_ptr = nullptr;
+        int32_t error_code = get_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG);
+        if (error_code == ERROR_SUCCESS) {
+            account_ptr->get_balance(arith, balance);
+        }
+        return error_code;
+    }
+
+    __host__ __device__ int32_t TouchState::get_nonce(
+        ArithEnv &arith,
+        const bn_t &address,
+        bn_t &nonce
+    ) {
+        account::account_t* account_ptr = nullptr;
+        int32_t error_code = get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG);
+        if (error_code == ERROR_SUCCESS) {
+            account_ptr->get_nonce(arith, nonce);
+        }
+        return error_code;
+    }
+
+    __host__ __device__ int32_t TouchState::get_code(
+        ArithEnv &arith,
+        const bn_t &address,
+        byte_array_t &byte_code
+    ) {
+        account::account_t* account_ptr = nullptr;
+        int32_t error_code = get_account(arith, address, account_ptr, ACCOUNT_BYTE_CODE_FLAG);
+        if (error_code == ERROR_SUCCESS) {
+            byte_code = account_ptr->get_byte_code();
+        }
+        return error_code;
     }
 
     __host__ __device__ int32_t TouchState::get_value(

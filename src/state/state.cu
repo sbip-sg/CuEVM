@@ -81,6 +81,19 @@ namespace cuEVM {
             return ERROR_STATE_ADDRESS_NOT_FOUND;
         }
 
+        __host__ __device__ int32_t state_t::get_account(
+            ArithEnv &arith,
+            const bn_t &address,
+            cuEVM::account::account_t* &account_ptr) {
+            uint32_t index;
+            if (get_account_index(arith, address, index)) {
+                account_ptr = &accounts[index];
+                return ERROR_SUCCESS;
+            }
+            return ERROR_STATE_ADDRESS_NOT_FOUND;
+
+        }
+
 
         __host__ __device__ int32_t state_t::add_account(
             const cuEVM::account::account_t &account
@@ -218,7 +231,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &address,
             cuEVM::account::account_t &account,
-            cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG) {
+            const cuEVM::account::account_flags_t flag) {
             uint32_t index = 0;
             if(state_t::get_account_index(arith, address, index)) {
                 flags[index].update(flag);
@@ -233,7 +246,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr,
-            cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG) {
+            const cuEVM::account::account_flags_t flag) {
             uint32_t index = 0;
             if(state_t::get_account_index(arith, address, index)) {
                 flags[index].update(flag);
@@ -245,7 +258,7 @@ namespace cuEVM {
 
         __host__ __device__ int32_t state_access_t::add_account(
             const cuEVM::account::account_t &account,
-            cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG) {
+            const cuEVM::account::account_flags_t flag) {
             uint32_t index = 0;
             state_t::add_account(account);
             index = no_accounts - 1;
@@ -256,7 +269,7 @@ namespace cuEVM {
         __host__ __device__ int32_t state_access_t::add_duplicate_account(
             cuEVM::account::account_t* &account_ptr,
             cuEVM::account::account_t* &src_account_ptr,
-            cuEVM::account::account_flags_t flag) {
+            const cuEVM::account::account_flags_t flag) {
             cuEVM::account::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
             account_ptr = new cuEVM::account::account_t(
                 src_account_ptr,
@@ -268,7 +281,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr,
-            cuEVM::account::account_flags_t flag) {
+            const cuEVM::account::account_flags_t flag) {
             account_ptr = new cuEVM::account::account_t(
                 arith,
                 address);
@@ -278,7 +291,7 @@ namespace cuEVM {
         __host__ __device__ int32_t state_access_t::set_account(
             ArithEnv &arith,
             const cuEVM::account::account_t &account,
-            cuEVM::account::account_flags_t flag = ACCOUNT_ALL_FLAG) {
+            const cuEVM::account::account_flags_t flag) {
             if (update_account(arith, account, flag)) {
                 return add_account(account, flag);
             } else {
@@ -289,7 +302,7 @@ namespace cuEVM {
         __host__ __device__ int32_t state_access_t::update_account(
             ArithEnv &arith,
             const cuEVM::account::account_t &account,
-            cuEVM::account::account_flags_t flag = ACCOUNT_ALL_FLAG) {
+            const cuEVM::account::account_flags_t flag) {
             bn_t target_address;
             cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) &(account.address));
             uint32_t index = 0;

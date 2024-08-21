@@ -179,7 +179,7 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         cuEVM::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message);
+        const cuEVM::evm_message_call_t &message);
 
     /**
      * The CALLDATASIZE operation implementation.

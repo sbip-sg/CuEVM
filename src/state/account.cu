@@ -124,6 +124,19 @@ namespace cuEVM
         }
     }
 
+    __host__ __device__ account_t::account_t(
+        ArithEnv &arith,
+        const bn_t &address)
+    {
+        cgbn_store(arith.env, &this->address, address);
+        bn_t tmp;
+        cgbn_set_ui32(arith.env, tmp, 0);
+        cgbn_store(arith.env, &this->balance, tmp);
+        cgbn_store(arith.env, &this->nonce, tmp);
+        byte_code.size = 0;
+        byte_code.data = nullptr;
+    }
+
     __host__ __device__ int32_t account_t::free_internals(
         int32_t managed)
     {
@@ -166,6 +179,11 @@ namespace cuEVM
         bn_t &nonce)
     {
         cgbn_load(arith.env, nonce, &this->nonce);
+    }
+
+    
+    __host__ __device__ byte_array_t  account_t::get_byte_code() const {
+        return byte_code;
     }
 
     __host__ __device__ void account_t::set_nonce(

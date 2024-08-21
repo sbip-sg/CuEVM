@@ -26,6 +26,7 @@ add_executable(${PROJECT_NAME}
     core/transaction.cu
     operations/arithmetic.cu
     operations/bitwise.cu
+    operations/block.cu
     operations/compare.cu
     operations/environmental.cu
     operations/flow.cu
@@ -34,6 +35,7 @@ add_executable(${PROJECT_NAME}
     operations/stack.cu
     operations/storage.cu
     operations/system.cu
+    state/state.cu
     state/access_state.cu
     state/account.cu
     state/logs.cu
@@ -47,6 +49,7 @@ add_executable(${PROJECT_NAME}
     gas_cost.cu
     tracer.cu
     evm.cu
+    interpreter.cu
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

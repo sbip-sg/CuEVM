@@ -477,4 +477,12 @@ namespace cuEVM {
     out = byte_array_t(byte_array.data + index_value, length_value);
     return ERROR_SUCCESS;
   }
+
+  __host__ __device__ void evm_address_conversion(
+    ArithEnv &arith,
+    bn_t &address
+  ) {
+    bn_t tmp;
+    cgbn_bitwise_mask_and(arith.env, address, address, cuEVM::address_bits);
+  }
 }
