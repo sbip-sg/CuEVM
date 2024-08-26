@@ -8,6 +8,7 @@
 #include "state/logs.cuh"
 #include "state/touch_state.cuh"
 #include "core/return_data.cuh"
+#include "utils/evm_defines.cuh"
 
 namespace cuEVM {
     struct evm_call_state_t {

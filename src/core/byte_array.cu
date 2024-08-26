@@ -241,7 +241,7 @@ namespace cuEVM {
       data = nullptr;
       return 1; // TODO: error code
     }
-    size = (length + 1) / 2;
+    size = (size == 0) ? (length + 1) / 2 : size;
     if (managed) {
       CUDA_CHECK(cudaMallocManaged(
         (void **)&data,

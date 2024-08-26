@@ -69,6 +69,25 @@ namespace cuEVM {
         status = error_code;
     }
 
+    __host__ __device__  evm_t::evm_t(
+        ArithEnv &arith,
+        cuEVM::evm_instance_t &evm_instance
+    ) {
+        evm_t(
+            arith,
+            evm_instance.world_state_data_ptr,
+            evm_instance.block_info_ptr,
+            evm_instance.transaction_ptr,
+            evm_instance.access_state_data_ptr,
+            evm_instance.touch_state_data_ptr,
+            evm_instance.log_state_ptr,
+            evm_instance.return_data_ptr
+            #ifdef EIP_3155
+            , evm_instance.tracer_ptr
+            #endif
+        );
+    }
+
     __host__ __device__ evm_t::~evm_t() {
         if (call_state_ptr != nullptr) {
             delete call_state_ptr;
@@ -169,7 +188,7 @@ namespace cuEVM {
             );
             #ifdef EIP_3155
             cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit, call_state_ptr->gas_used);
-            call_state_ptr->tracer_idx = tracer_ptr->push_init(
+            call_state_ptr->trace_idx = tracer_ptr->push_init(
                 arith,
                 call_state_ptr->pc,
                 opcode,
@@ -936,21 +955,21 @@ namespace cuEVM {
             }
 
             #ifdef EIP_3155
-            if (call_state_ptr->tracer_idx > 0 ||
-                (call_state_ptr->tracer_idx == 0 && call_state_ptr->depth == 0) ) {
-            bn_t gas_left_2;
-            cgbn_sub(arith.env, gas_left_2, call_state_ptr->gas_limit, call_state_ptr->gas_used);
-            cgbn_sub(arith.env, gas_left, gas_left, gas_left_2);
-            tracer_ptr->push_final(
-                arith,
-                call_state_ptr->tracer_idx,
-                gas_left,
-                *call_state_ptr->gas_refund
-                #ifdef EIP_3155_OPTIONAL
-                , error_code,
-                call_state_ptr->touch_state
-                #endif
-            );
+            if (call_state_ptr->trace_idx > 0 ||
+                (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 0) ) {
+                bn_t gas_left_2;
+                cgbn_sub(arith.env, gas_left_2, call_state_ptr->gas_limit, call_state_ptr->gas_used);
+                cgbn_sub(arith.env, gas_left, gas_left, gas_left_2);
+                tracer_ptr->push_final(
+                    arith,
+                    call_state_ptr->trace_idx,
+                    gas_left,
+                    call_state_ptr->gas_refund
+                    #ifdef EIP_3155_OPTIONAL
+                    , error_code,
+                    call_state_ptr->touch_state
+                    #endif
+                );
             }
             #endif
             // TODO: to see after calls
@@ -1113,6 +1132,24 @@ namespace cuEVM {
             ret_offset,
             ret_size);
         
+        // trace the call
+        #ifdef EIP_3155
+        if (call_state_ptr->depth > 0) {
+            bn_t gas_left;
+            cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit, call_state_ptr->gas_used);
+            tracer_ptr->push_final(
+                arith,
+                call_state_ptr->trace_idx,
+                gas_left,
+                call_state_ptr->gas_refund
+                #ifdef EIP_3155_OPTIONAL
+                , error_code,
+                call_state_ptr->touch_state
+                #endif
+            );
+        }
+        #endif
+        
         return error_code;
     }
 
@@ -1150,6 +1187,75 @@ namespace cuEVM {
             }
         }
         return error_code;
+    }
+
+    __host__ int32_t get_cpu_evm_instances(
+        ArithEnv &arith,
+        evm_instance_t* &evm_instances,
+        const cJSON* test_json,
+        uint32_t &num_instances
+    ) {
+        // get the world state
+        cuEVM::state::state_t *world_state_data_ptr = nullptr;
+        const cJSON *world_state_json = NULL; // the json for the world state
+        // get the world state json
+        if (cJSON_IsObject(test_json))
+            world_state_json = cJSON_GetObjectItemCaseSensitive(test_json, "pre");
+        else if (cJSON_IsArray(test_json))
+            world_state_json = test_json;
+        else
+            return 1;
+        
+        world_state_data_ptr = new cuEVM::state::state_t(world_state_json);
+
+        // get the block info
+        cuEVM::block_info_t* block_info_ptr = new cuEVM::block_info_t(test_json);
+
+        // get the transaction
+        cuEVM::evm_transaction_t* transactions_ptr = nullptr;
+        uint32_t num_transactions = 0;
+        cuEVM::transaction::get_transactios(
+            arith,
+            transactions_ptr,
+            test_json,
+            num_transactions
+        );
+
+        // generate the evm instances
+        evm_instances = new evm_instance_t[num_transactions];
+        uint32_t index = 0;
+        for (uint32_t index = 0; index < num_transactions; index++) {
+            evm_instances[index].world_state_data_ptr = world_state_data_ptr;
+            evm_instances[index].block_info_ptr = block_info_ptr;
+            evm_instances[index].transaction_ptr = &transactions_ptr[index];
+            evm_instances[index].access_state_data_ptr = new cuEVM::state::state_access_t();
+            evm_instances[index].touch_state_data_ptr = new cuEVM::state::state_access_t();
+            evm_instances[index].log_state_ptr = new cuEVM::state::log_state_data_t();
+            evm_instances[index].return_data_ptr = new cuEVM::evm_return_data_t();
+            #ifdef EIP_3155
+            evm_instances[index].tracer_ptr = new cuEVM::utils::tracer_t();
+            #endif
+        }
+        num_instances = num_transactions;
+    }
+
+    __host__ void free_cpu_evm_instances(
+        evm_instance_t* &evm_instances,
+        uint32_t num_instances
+    ) {
+        delete evm_instances[0].world_state_data_ptr;
+        delete evm_instances[0].block_info_ptr;
+        for (uint32_t index = 0; index < num_instances; index++) {
+            delete evm_instances[index].access_state_data_ptr;
+            delete evm_instances[index].touch_state_data_ptr;
+            delete evm_instances[index].log_state_ptr;
+            delete evm_instances[index].return_data_ptr;
+            #ifdef EIP_3155
+            delete evm_instances[index].tracer_ptr;
+            #endif
+        }
+        delete[] evm_instances[0].transaction_ptr;
+        delete[] evm_instances;
     }
 }
 // todo|: make a vector o functions global constants so you can call them

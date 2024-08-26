@@ -4,6 +4,9 @@
 
 #include "cuda_utils.cuh"
 
+// tracer activated
+#define EIP_3155
+
 #define SHANGHAI
 
 #ifdef CANCUN

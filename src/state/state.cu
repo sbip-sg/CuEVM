@@ -21,6 +21,8 @@ namespace cuEVM {
 
 
         __host__ state_t::state_t(const cJSON *json, int32_t managed ) {
+            no_accounts = 0;
+            accounts = nullptr;
             from_json(json, managed);
         }
 
@@ -157,8 +159,8 @@ namespace cuEVM {
 
 
         __host__ int32_t state_t::from_json(const cJSON *state_json, int32_t managed) {
-            if (!cJSON_IsArray(state_json)) return 0;
             free();
+            //if (!cJSON_IsArray(state_json)) return 0;
             no_accounts = cJSON_GetArraySize(state_json);
             if (no_accounts == 0) return 1;
             if (managed) {
@@ -248,7 +250,7 @@ namespace cuEVM {
             cuEVM::account::account_t* &account_ptr,
             const cuEVM::account::account_flags_t flag) {
             uint32_t index = 0;
-            if(state_t::get_account_index(arith, address, index)) {
+            if(state_t::get_account_index(arith, address, index) == ERROR_SUCCESS) {
                 flags[index].update(flag);
                 account_ptr = &accounts[index];
                 return ERROR_SUCCESS;
@@ -262,6 +264,12 @@ namespace cuEVM {
             uint32_t index = 0;
             state_t::add_account(account);
             index = no_accounts - 1;
+            cuEVM::account::account_flags_t *tmp_flags = new cuEVM::account::account_flags_t[no_accounts];
+            std::copy(flags, flags + no_accounts - 1, tmp_flags);
+            if (flags != nullptr) {
+                delete[] flags;
+            }
+            flags = tmp_flags;
             flags[index] = flag;
             return ERROR_SUCCESS;
         }
