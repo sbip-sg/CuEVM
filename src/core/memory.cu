@@ -4,6 +4,7 @@
 // Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 #include "../include/core/memory.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
   namespace memory {
@@ -62,7 +63,7 @@ namespace cuEVM {
       uint32_t new_size
     )  {
       if (new_size < data.size) {
-        return 0;
+        return ERROR_SUCCESS;
       }
       uint32_t new_page_count = (new_size / cuEVM::memory::page_size) + 1;
       return data.grow(new_page_count * cuEVM::memory::page_size);
@@ -93,15 +94,15 @@ namespace cuEVM {
       const bn_t &length) {
       uint32_t offset;
       if(get_last_offset(arith, index, length, offset) != 0) {
-        return 1;
+        return ERR_MEMORY_INVALID_OFFSET;
       }
       if (offset >= size) {
         if(allocate_pages(offset) != 0) {
-          return 1;
+          return ERR_MEMORY_INVALID_ALLOCATION;
         }
         size = offset;
       }
-      return 0;
+      return ERROR_SUCCESS;
     }
 
     __host__ __device__ int32_t evm_memory_t::get(
@@ -109,22 +110,18 @@ namespace cuEVM {
       const bn_t &index,
       const bn_t &length,
       cuEVM::byte_array_t &data) {
-      
-      do {
-        if (cgbn_compare_ui32(arith.env, length, 0) >= 0) {
-          break;
-        } 
-        if (grow(arith, index, length) != 0) {
-          break;
-        }
+      int32_t error_code = ERROR_SUCCESS;
+      error_code = (cgbn_compare_ui32(arith.env, length, 0) < 0) ? ERR_MEMORY_INVALID_SIZE : error_code;
+      error_code |= grow(arith, index, length);
+      if (error_code == ERROR_SUCCESS) {
         uint32_t index_u32, length_u32;
         arith.uint32_t_from_cgbn(index_u32, index);
         arith.uint32_t_from_cgbn(length_u32, length);
         data = cuEVM::byte_array_t(this->data.data + index_u32, length_u32);
-        return 0;
-      } while (0);
-      data = cuEVM::byte_array_t();
-      return 1;
+      } else {
+        data = cuEVM::byte_array_t();
+      }
+      return error_code;
     }
 
   __host__ __device__ int32_t evm_memory_t::set(
@@ -133,21 +130,17 @@ namespace cuEVM {
       const bn_t &index,
       const bn_t &length) {
       
-      do {
-        if (cgbn_compare_ui32(arith.env, length, 0) >= 0) {
-          break;
-        }
-        if (grow(arith, index, length) != 0) {
-          break;
-        }
+      int32_t error_code = ERROR_SUCCESS;
+      error_code = (cgbn_compare_ui32(arith.env, length, 0) < 0) ? ERR_MEMORY_INVALID_SIZE : error_code;
+      error_code |= grow(arith, index, length);
+      if (error_code == ERROR_SUCCESS) {
         uint32_t index_u32;
         arith.uint32_t_from_cgbn(index_u32, index);
         if (data.size > 0) {
           std::copy(data.data, data.data + data.size, this->data.data + index_u32);
         }
-        return 0;
-      } while (0);
-      return 1;
+      }
+      return error_code;
     }
 
     __global__ void transfer_kernel(

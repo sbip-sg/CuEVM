@@ -3,8 +3,9 @@
 
 // error codes
 #define ERROR_SUCCESS 0x00
-#define ERROR_RETURN 0x01
-#define ERROR_REVERT 0x02
+#define ERROR_FAILED 0xFF
+#define ERROR_RETURN 0xFE
+#define ERROR_REVERT 0xFD
 
 // stack codes
 #define ERROR_STACK_UNDERFLOW 0x03
@@ -38,6 +39,7 @@
 #define ERR_MEMEORY_INVALID_INDEX 0x0F
 #define ERR_MEMORY_INVALID_ALLOCATION 0x10
 #define ERR_MEMORY_INVALID_OFFSET 0x16
+#define ERR_MEMORY_INVALID_SIZE 0x1A
 
 // execution codes
 #define ERROR_INVALID_JUMP_DESTINATION 0x11
@@ -59,6 +61,7 @@
 #define ERROR_TRANSACTION_GAS_PRICE 0x1D
 #define ERROR_TRANSACTION_GAS_PRIORITY 0x1E
 #define ERROR_TRANSACTION_BLOCK_GAS_LIMIT 0x1F
+#define ERROR_TRANSACTION_FEES 0x20
 
 
 // message calls
@@ -119,5 +122,10 @@
 
 // addded errors
 #define ERROR_INSUFFICIENT_FUNDS 0x3B
+
+
+// core errors
+#define ERROR_INVALID_HEX_STRING 0x3C
+
 
 #endif

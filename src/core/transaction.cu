@@ -8,6 +8,7 @@
 #include "../include/gas_cost.cuh"
 #include "../include/utils/opcodes.cuh"
 #include "../include/utils/evm_utils.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
     namespace transaction {
@@ -22,7 +23,7 @@ namespace cuEVM {
                     storage_keys = nullptr;
                     storage_keys_count = 0;
                 }
-                return 1;
+                return ERROR_SUCCESS;
             }
 
             __host__ int32_t access_list_account_t::from_json(
@@ -30,19 +31,19 @@ namespace cuEVM {
                 int32_t managed) {
                 cJSON* address_json = cJSON_GetObjectItemCaseSensitive(json, "address");
                 if (address_json == NULL) {
-                    return 0;
+                    return ERROR_FAILED;
                 }
                 if (!address.from_hex(address_json->valuestring)) {
-                    return 0;
+                    return ERROR_FAILED;
                 }
                 cJSON* storage_keys_json = cJSON_GetObjectItemCaseSensitive(json, "storageKeys");
                 if (storage_keys_json == NULL) {
                     storage_keys_count = 0;
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
                 storage_keys_count = cJSON_GetArraySize(storage_keys_json);
                 if (storage_keys_count == 0) {
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
                 if (managed) {
                         CUDA_CHECK(cudaMallocManaged(
@@ -52,11 +53,11 @@ namespace cuEVM {
                     storage_keys = new evm_word_t[storage_keys_count];
                 }
                 for (uint32_t idx = 0; idx < storage_keys_count; idx++) {
-                    if (!storage_keys[idx].from_hex(cJSON_GetArrayItem(storage_keys_json, idx)->valuestring)) {
-                        return 0;
+                    if (storage_keys[idx].from_hex(cJSON_GetArrayItem(storage_keys_json, idx)->valuestring)) {
+                        return ERROR_FAILED;
                     }
                 }
-                return 1;
+                return ERROR_SUCCESS;
             }
 
             __host__ __device__ int32_t access_list_t::free(
@@ -73,7 +74,7 @@ namespace cuEVM {
                     accounts = nullptr;
                     accounts_count = 0;
                 }
-                return 1;
+                return ERROR_SUCCESS;
             }
 
             __host__ int32_t access_list_t::from_json(
@@ -81,7 +82,7 @@ namespace cuEVM {
                 int32_t managed) {
                 accounts_count = cJSON_GetArraySize(json);
                 if (accounts_count == 0) {
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
                 if (managed) {
                     CUDA_CHECK(cudaMallocManaged(
@@ -92,11 +93,11 @@ namespace cuEVM {
                 }
 
                 for (uint32_t idx = 0; idx < accounts_count; idx++) {
-                    if (!accounts[idx].from_json(cJSON_GetArrayItem(json, idx), managed)) {
-                        return 0;
+                    if (accounts[idx].from_json(cJSON_GetArrayItem(json, idx), managed)) {
+                        return ERROR_FAILED;
                     }
                 }
-                return 1;
+                return ERROR_SUCCESS;
             }
             /**
              * the destructor. TODO: improve it
@@ -104,88 +105,48 @@ namespace cuEVM {
             __host__ __device__ evm_transaction_t::~evm_transaction_t() {
             }
 
-            /**
-             * get the nonce of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] nonce the nonce of the transaction YP: \f$T_{n}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_nonce(
                 ArithEnv &arith,
                 bn_t &nonce) const {
                     cgbn_load(arith.env, nonce, (cgbn_evm_word_t_ptr) &(this->nonce));
             }
             
-            /**
-             * get the gas limit of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] gas_limit the gas limit of the transaction YP: \f$T_{g}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_gas_limit(
                 ArithEnv &arith,
                 bn_t &gas_limit) const {
                     cgbn_load(arith.env, gas_limit, (cgbn_evm_word_t_ptr) &(this->gas_limit));
             }
 
-            /**
-             * get the to address of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] to the to address of the transaction YP: \f$T_{t}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_to(
                 ArithEnv &arith,
                 bn_t &to) const {
                     cgbn_load(arith.env, to, (cgbn_evm_word_t_ptr) &(this->to));
             }
 
-            /**
-             * get the value of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] value the value of the transaction YP: \f$T_{v}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_value(
                 ArithEnv &arith,
                 bn_t &value) const {
                     cgbn_load(arith.env, value, (cgbn_evm_word_t_ptr) &(this->value));
             }
 
-            /**
-             * get the sender address of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] sender the sender address of the transaction YP: \f$T_{s}\f$ or \f$T_{r}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_sender(
                 ArithEnv &arith,
                 bn_t &sender) const {
                     cgbn_load(arith.env, sender, (cgbn_evm_word_t_ptr) &(this->sender));
             }
 
-            /**
-             * get the max fee per gas of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] max_fee_per_gas the max fee per gas of the transaction YP: \f$T_{m}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_max_fee_per_gas(
                 ArithEnv &arith,
                 bn_t &max_fee_per_gas) const {
                     cgbn_load(arith.env, max_fee_per_gas, (cgbn_evm_word_t_ptr) &(this->max_fee_per_gas));
             }
 
-            /**
-             * get the max priority fee per gas of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] max_priority_fee_per_gas the max priority fee per gas of the transaction YP: \f$T_{f}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_max_priority_fee_per_gas(
                 ArithEnv &arith,
                 bn_t &max_priority_fee_per_gas) const {
                     cgbn_load(arith.env, max_priority_fee_per_gas, (cgbn_evm_word_t_ptr) &(this->max_priority_fee_per_gas));
             }
 
-            /**
-             * get the gas price of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] gas_price the gas price of the transaction YP: \f$T_{p}\f$.
-             */
             __host__ __device__ int32_t evm_transaction_t::get_gas_price(
                 ArithEnv &arith,
                 const cuEVM::block_info_t &block_info,
@@ -193,7 +154,6 @@ namespace cuEVM {
                 if ((type == 0) || (type == 1)) {
                     // \f$p = T_{p}\f$
                     cgbn_load(arith.env, gas_price, (cgbn_evm_word_t_ptr) &(this->gas_price));
-                    return 1;
                 } else if (type == 2) {
                     cgbn_set_ui32(arith.env, gas_price, 0);
                     bn_t max_priority_fee_per_gas; // YP: \f$T_{f}\f$
@@ -217,26 +177,17 @@ namespace cuEVM {
                     // \f$p = f + H_{f}\f$
                     cgbn_add(arith.env, gas_price, gas_priority_fee, block_base_fee);
                 } else {
-                    return 0;
+                    return ERROR_TRANSACTION_TYPE;
                 }
+                return ERROR_SUCCESS;
             }
 
-            /**
-             * get the data of the transaction
-             * @param[in] arith the arithmetic environment.
-             * @param[out] data_init the data of the transaction YP: \f$T_{i}\f$ or \f$T_{d}\f$.
-             */
             __host__ __device__ void evm_transaction_t::get_data(
                 ArithEnv &arith,
                 byte_array_t &data_init) const {
                     data_init = this->data_init;
             }
 
-            /**
-             * Get if the is a contract creation transaction
-             * @param[in] arith the arithmetic environment.
-             * @return 1 if the transaction is a contract creation transaction, 0 otherwise.
-             */
             __host__ __device__ int32_t evm_transaction_t::is_contract_creation(
                 ArithEnv &arith) const {
                 bn_t to;
@@ -244,17 +195,6 @@ namespace cuEVM {
                 return cgbn_compare_ui32(arith.env, to, 0) == 0;
             }
 
-            /**
-             * Get the transaction fees
-             * @param[in] arith the arithmetic environment.
-             * @param[in] block_info the block information.
-             * @param[out] gas_value the gas value YP: \f$T_{g} \cdot p\f$.
-             * @param[out] gas_limit the gas limit YP: \f$T_{g}\f$.
-             * @param[out] gas_price the gas price YP: \f$T_{p}\f$.
-             * @param[out] gas_priority_fee the gas priority fee YP: \f$f\f$.
-             * @param[out] up_front_cost the up front cost YP: \f$v_{0}\f$.
-             * @param[out] m the max fee per gas YP: \f$m\f$.
-             */
             __host__ __device__ int32_t evm_transaction_t::get_transaction_fees(
                 ArithEnv &arith,
                 cuEVM::block_info_t &block_info,
@@ -291,20 +231,14 @@ namespace cuEVM {
         // \f$m = T_{m}\f$
                     cgbn_set(arith.env, m, max_fee_per_gas);
                 } else {
-                    return 0;
+                    return ERROR_TRANSACTION_TYPE;
                 }
 
                 // gas value \f$= T_{g} \dot p\f$
                 cgbn_mul(arith.env, gas_value, gas_limit, gas_price);
-                return 1;
+                return ERROR_SUCCESS;
             }
 
-            /**
-             * warm up the access list
-             * @param[in] arith the arithmetic environment.
-             * @param[in] access_state the access state.
-             * @return 1 for success, 0 for failure.
-             */
             __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(
                 ArithEnv &arith,
                 cuEVM::state::AccessState &access_state) const {
@@ -320,12 +254,9 @@ namespace cuEVM {
                         access_state.get_value(arith, address, key, value);
                     }
                 }
-                return 1;
+                return ERROR_SUCCESS;
             }
 
-            /**
-             * validate the transaction
-             */
             __host__ __device__ int32_t evm_transaction_t::validate(
                 ArithEnv &arith,
                 cuEVM::state::AccessState &access_state,
@@ -341,8 +272,8 @@ namespace cuEVM {
                 bn_t gas_value;
                 bn_t up_front_cost;
                 bn_t m;
-                if (!get_transaction_fees(arith, block_info, gas_value, gas_limit, gas_price, gas_priority_fee, up_front_cost, m)) {
-                    return 0;
+                if (get_transaction_fees(arith, block_info, gas_value, gas_limit, gas_price, gas_priority_fee, up_front_cost, m)) {
+                    return ERROR_TRANSACTION_FEES;
                 }
 
                 bn_t sender_address;
@@ -368,29 +299,29 @@ namespace cuEVM {
                     (sender_account->is_empty()) ||
                     (sender_account->is_contract())
                 ) {
-                    return 0;
+                    return ERROR_TRANSACTION_SENDER_EMPTY;
                 }
                 // nonce are different YP: \f$T_{n} \eq \sigma(T_{s})_{n}\f$
                 if (cgbn_compare(arith.env, sender_nonce, transaction_nonce)) {
-                    return 0;
+                    return ERROR_TRANSACTION_NONCE;
                 }
                 // sent gas is less than intrinisec gas YP: \f$T_{g} \geq g_{0}\f$
                 if (cgbn_compare(arith.env, gas_limit, gas_intrinsic) < 0) {
-                    return 0;
+                    return ERROR_TRANSACTION_GAS;
                 }
                 // balance is less than up front cost YP: \f$\sigma(T_{s})_{b} \geq v_{0}\f$
                 if (cgbn_compare(arith.env, sender_balance, up_front_cost) < 0) {
-                    return 0;
+                    return ERROR_TRANSACTION_SENDER_BALANCE;
                 }
                 // gas fee is less than than block base fee YP: \f$m \geq H_{f}\f$
                 bn_t block_base_fee;
                 block_info.get_base_fee(arith, block_base_fee);
                 if (cgbn_compare(arith.env, m, block_base_fee) < 0) {
-                    return 0;
+                    return ERROR_TRANSACTION_GAS_PRICE;
                 }
                 // Max priority fee per gas is higher than max fee per gas YP: \f$T_{m} \geq T_{f}\f$
                 if (cgbn_compare(arith.env, max_fee_per_gas, max_priority_fee_per_gas) < 0) {
-                    return 0;
+                    return ERROR_TRANSACTION_GAS_PRIORITY;
                 }
                 // the other verification is about the block gas limit
                 // YP: \f$T_{g} \leq H_{l}\f$ ... different because it takes in account
@@ -398,7 +329,7 @@ namespace cuEVM {
                 bn_t block_gas_limit;
                 block_info.get_gas_limit(arith, block_gas_limit);
                 if (cgbn_compare(arith.env, gas_limit, block_gas_limit) > 0) {
-                    return 0;
+                    return ERROR_TRANSACTION_BLOCK_GAS_LIMIT;
                 }
 
                 // if transaction is valid update the touch state
@@ -429,7 +360,7 @@ namespace cuEVM {
                 #endif
                 bn_t precompile_contract_address;
                 #pragma unroll
-                for (uint32_t idx; idx < cuEVM::no_precompile_contracts; idx++) {
+                for (uint32_t idx = 0; idx < cuEVM::no_precompile_contracts; idx++) {
                     cgbn_set_ui32(arith.env, precompile_contract_address, idx);
                     access_state.get_account(
                         arith,
@@ -438,7 +369,7 @@ namespace cuEVM {
                         ACCOUNT_BYTE_CODE_FLAG);
                 }
 
-                return 1;
+                return ERROR_SUCCESS;
             }
 
             /**
@@ -471,12 +402,12 @@ namespace cuEVM {
                     // nonce is -1 in YP but here is before validating the transaction
                     // and increasing the nonce
                     sender_account->get_nonce(arith, sender_nonce);
-                    if(!cuEVM::utils::get_contract_address_create(
+                    if(cuEVM::utils::get_contract_address_create(
                         arith,
                         to_address,
                         sender_address,
-                        sender_nonce)) {
-                        return 0;
+                        sender_nonce) != ERROR_SUCCESS) {
+                        return ERROR_FAILED;
                     }
                 } else {
                     cuEVM::account::account_t* to_account = nullptr;
@@ -503,7 +434,7 @@ namespace cuEVM {
                     return_data_offset,
                     return_data_size,
                     static_env);
-                return 1;
+                return ERROR_SUCCESS;
             }
 
             __host__ __device__ void evm_transaction_t::print() {
@@ -608,7 +539,7 @@ namespace cuEVM {
             if (start_index >= available_transactions) {
                 transactions_count = 0;
                 transactions_ptr = nullptr;
-                return 0;
+                return ERROR_FAILED;
             }
             uint32_t original_count;
             original_count = available_transactions - start_index;
@@ -677,7 +608,7 @@ namespace cuEVM {
                 template_transaction_ptr->max_priority_fee_per_gas.from_uint32_t(0);
                 template_transaction_ptr->gas_price.from_hex(gas_price_json->valuestring);
             } else {
-                return 0;
+                return ERROR_TRANSACTION_TYPE;
             }
 
             const cJSON* data_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
@@ -699,7 +630,7 @@ namespace cuEVM {
             }
 
             delete template_transaction_ptr;
-            return 1;
+            return ERROR_SUCCESS;
         }
 
         __host__ int32_t free_instaces(
@@ -718,6 +649,7 @@ namespace cuEVM {
                     delete[] transactions_ptr;
                 }
             }
+            return ERROR_SUCCESS;
         }
     }
 }

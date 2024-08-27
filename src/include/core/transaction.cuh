@@ -34,7 +34,7 @@ namespace cuEVM {
             /**
              * free the storage keys
              * @param[in] managed the managed flag.
-             * @return 1 for success, 0 for failure.
+             * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t free(
                 int32_t managed = 0);
@@ -43,7 +43,7 @@ namespace cuEVM {
              * Get the access list storage keys from json
              * @param[in] json the json object.
              * @param[in] managed the managed flag.
-             * @return 1 for success, 0 for failure.
+             * @return 0 for success, error code for failure.
              */
             __host__ int32_t from_json(
                 const cJSON* json,
@@ -66,7 +66,7 @@ namespace cuEVM {
             /**
              * free the accounts
              * @param[in] managed the managed flag.
-             * @return 1 for success, 0 for failure.
+             * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t free(
                 int32_t managed = 0);
@@ -75,7 +75,7 @@ namespace cuEVM {
              * Get the access list from json
              * @param[in] json the json object.
              * @param[in] managed the managed flag.
-             * @return 1 for success, 0 for failure.
+             * @return 0 for success, error code for failure.
              */
             __host__ int32_t from_json(
                 const cJSON* json,
@@ -177,6 +177,7 @@ namespace cuEVM {
              * get the gas price of the transaction
              * @param[in] arith the arithmetic environment.
              * @param[out] gas_price the gas price of the transaction YP: \f$T_{p}\f$.
+             * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t get_gas_price(
                 ArithEnv &arith,
@@ -210,6 +211,7 @@ namespace cuEVM {
              * @param[out] gas_priority_fee the gas priority fee YP: \f$f\f$.
              * @param[out] up_front_cost the up front cost YP: \f$v_{0}\f$.
              * @param[out] m the max fee per gas YP: \f$m\f$.
+             * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t get_transaction_fees(
                 ArithEnv &arith,
@@ -225,7 +227,7 @@ namespace cuEVM {
              * warm up the access list
              * @param[in] arith the arithmetic environment.
              * @param[in] access_state the access state.
-             * @return 1 for success, 0 for failure.
+             * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t access_list_warm_up(
                 ArithEnv &arith,
@@ -233,6 +235,14 @@ namespace cuEVM {
 
             /**
              * validate the transaction
+             * @param[in] arith the arithmetic environment.
+             * @param[in] access_state the access state.
+             * @param[in] touch_state the touch state.
+             * @param[in] block_info the block information.
+             * @param[out] gas_used the gas used YP: \f$g_{0}\f$.
+             * @param[out] gas_price the gas price YP: \f$p\f$.
+             * @param[out] gas_priority_fee the gas priority fee YP: \f$f\f$.
+             * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t validate(
                 ArithEnv &arith,
@@ -248,7 +258,7 @@ namespace cuEVM {
              * @param[in] arith the arithmetic environment.
              * @param[in] access_state the access state.
              * @param[out] evm_message_call_ptr the message call.
-             * @return 1 for success, 0 for failure.
+             * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t get_message_call(
                 ArithEnv &arith,
@@ -260,9 +270,25 @@ namespace cuEVM {
             __host__ cJSON* to_json();
         };
 
+        /**
+         * Get the number of transactions from json
+         * @param[in] json the json object.
+         * @return the number of transactions.
+         */
         __host__ __device__ uint32_t no_transactions(
             const cJSON* json);
 
+        /**
+         * Get the transactions from json
+         * @param[in] arith the arithmetic environment.
+         * @param[out] transactions_ptr the transactions.
+         * @param[in] json the json object.
+         * @param[in] transactions_count the number of transactions.
+         * @param[in] managed the managed flag.
+         * @param[in] start_index the start index.
+         * @param[in] clones the number of clones.
+         * @return 0 for success, error code for failure.
+         */
         __host__ int32_t get_transactios(
             ArithEnv &arith,
             evm_transaction_t* &transactions_ptr,
@@ -272,6 +298,13 @@ namespace cuEVM {
             uint32_t start_index = 0,
             uint32_t clones = 1);
 
+        /**
+         * free the transactions
+         * @param[in] transactions_ptr the transactions.
+         * @param[in] transactions_count the number of transactions.
+         * @param[in] managed the managed flag.
+         * @return 0 for success, error code for failure.
+         */
         __host__ int32_t free_instaces(
             evm_transaction_t* transactions_ptr,
             uint32_t transactions_count,

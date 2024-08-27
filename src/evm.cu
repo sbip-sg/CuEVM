@@ -72,8 +72,7 @@ namespace cuEVM {
     __host__ __device__  evm_t::evm_t(
         ArithEnv &arith,
         cuEVM::evm_instance_t &evm_instance
-    ) {
-        evm_t(
+    ) : evm_t(
             arith,
             evm_instance.world_state_data_ptr,
             evm_instance.block_info_ptr,
@@ -85,8 +84,7 @@ namespace cuEVM {
             #ifdef EIP_3155
             , evm_instance.tracer_ptr
             #endif
-        );
-    }
+        ) {}
 
     __host__ __device__ evm_t::~evm_t() {
         if (call_state_ptr != nullptr) {
@@ -988,7 +986,7 @@ namespace cuEVM {
                 if (call_state_ptr->depth == 0) {
                     // TODO: finish transaction
                     printf("Finish transaction\n");
-                    error_code |= finish_CALL(arith, error_code);
+                    finish_CALL(arith, error_code);
                     error_code |= finish_TRANSACTION(arith, error_code);
                 } else {
                     // TODO: finish call
@@ -996,6 +994,8 @@ namespace cuEVM {
                     error_code |= finish_CALL(arith, error_code);
                 }
             }
+            // increase program counter
+            call_state_ptr->pc++;
         }
     }
 
@@ -1047,7 +1047,7 @@ namespace cuEVM {
             // update the transaction state
             if (error_code == ERROR_RETURN)
             {
-                call_state_ptr->update(arith, *call_state_ptr->parent);
+                call_state_ptr->parent->update(arith, *call_state_ptr);
             }
             // sent the value of unused gas to the sender
             call_state_ptr->parent->touch_state.get_balance(arith, sender_address, sender_balance);
@@ -1071,6 +1071,7 @@ namespace cuEVM {
             call_state_ptr->parent->touch_state.set_balance(arith, beneficiary, beneficiary_balance);
         }
 
+        delete call_state_ptr;
         call_state_ptr = call_state_ptr->parent;
         return status;
 
@@ -1120,35 +1121,39 @@ namespace cuEVM {
         call_state_ptr->message_ptr->get_return_data_size(arith, ret_size);
         // reset the error code for the parent
         error_code = ERROR_SUCCESS;
-
-        // push the result in the parent stack
-        error_code |= call_state_ptr->parent->stack_ptr->push(arith, child_success);
-        // set the parent memory with the return data
         
-        // write the return data in the memory
-        error_code |= call_state_ptr->parent->memory_ptr->set(
-            arith,
-            *call_state_ptr->parent->last_return_data_ptr,
-            ret_offset,
-            ret_size);
-        
-        // trace the call
-        #ifdef EIP_3155
         if (call_state_ptr->depth > 0) {
-            bn_t gas_left;
-            cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit, call_state_ptr->gas_used);
-            tracer_ptr->push_final(
+            // push the result in the parent stack
+            error_code |= call_state_ptr->parent->stack_ptr->push(arith, child_success);
+
+            // set the parent memory with the return data
+            
+            // write the return data in the memory
+            error_code |= call_state_ptr->parent->memory_ptr->set(
                 arith,
-                call_state_ptr->trace_idx,
-                gas_left,
-                call_state_ptr->gas_refund
-                #ifdef EIP_3155_OPTIONAL
-                , error_code,
-                call_state_ptr->touch_state
-                #endif
-            );
+                *call_state_ptr->parent->last_return_data_ptr,
+                ret_offset,
+                ret_size);
+            
+            // change the call state to the parent
+            delete call_state_ptr;
+            call_state_ptr = call_state_ptr->parent;
+            // trace the call
+            #ifdef EIP_3155
+                bn_t gas_left;
+                cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit, call_state_ptr->gas_used);
+                tracer_ptr->push_final(
+                    arith,
+                    call_state_ptr->trace_idx,
+                    gas_left,
+                    call_state_ptr->gas_refund
+                    #ifdef EIP_3155_OPTIONAL
+                    , error_code,
+                    call_state_ptr->touch_state
+                    #endif
+                );
+            #endif
         }
-        #endif
         
         return error_code;
     }

@@ -10,9 +10,12 @@
 
 namespace cuEVM {
   __host__ __device__ byte_array_t::byte_array_t(
-    uint32_t size) : size(size) {
-      if (size > 0)
+    const uint32_t size) : size(size) {
+      if (size > 0) {
         data = new uint8_t[size];
+        // TODO: maybe delete to get performence boost
+        std::fill(data, data + size, 0);
+      }
       else
         data = nullptr;
   }
@@ -70,11 +73,16 @@ namespace cuEVM {
     const byte_array_t &other) {
       if (this == &other)
         return *this;
-      if ((size > 0) && (size != other.size)) {
-        delete[] data;
+      if (size != other.size)
+      {
+        if (size > 0)
+        {
+          delete[] data;
+        }
         data = nullptr;
         size = other.size;
-        data = new uint8_t[size];
+        if (size > 0)
+          data = new uint8_t[size];
       }
       if (size > 0)
       {
@@ -90,15 +98,18 @@ namespace cuEVM {
     uint32_t new_size,
     int32_t zero_padding) {
       if (new_size == size)
-        return 0;
+        return ERROR_SUCCESS;
       uint8_t *new_data = new uint8_t[new_size];
+      // TODO: fill zeros
+      if (zero_padding)
+        std::fill(new_data, new_data + new_size, 0);
       if (size > 0)
       {
         if (new_size > size)
         {
           std::copy(data, data + size, new_data);
-          if (zero_padding)
-            std::fill(new_data + size, new_data + new_size, 0);
+          // if (zero_padding)
+          //   std::fill(new_data + size, new_data + new_size, 0);
         }
         else
           std::copy(data, data + new_size, new_data);
@@ -106,7 +117,7 @@ namespace cuEVM {
       }
       data = new_data;
       size = new_size;
-      return 1;
+      return ERROR_SUCCESS;
   }
 
   __host__ __device__ void byte_array_t::print() const {
@@ -236,32 +247,34 @@ namespace cuEVM {
     char *tmp_hex_char;
     tmp_hex_char = (char *)hex_string;
     int32_t length = cuEVM::utils::clean_hex_string(&tmp_hex_char);
-    if (length <= 0)
+    if (length < 0)
     {
       data = nullptr;
-      return 1; // TODO: error code
+      return ERROR_INVALID_HEX_STRING;
     }
     size = (size == 0) ? (length + 1) / 2 : size;
-    if (managed) {
-      CUDA_CHECK(cudaMallocManaged(
-        (void **)&data,
-        sizeof(uint8_t) * size));
-      memset(data, 0, size);
-    } else {
-      // data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
-      data = new uint8_t[size];
-      memset(data, 0, size);
+    if (size > 0) {
+      if (managed) {
+        CUDA_CHECK(cudaMallocManaged(
+          (void **)&data,
+          sizeof(uint8_t) * size));
+        memset(data, 0, size);
+      } else {
+        // data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
+        data = new uint8_t[size];
+        memset(data, 0, size);
+      }
     }
-    int32_t error;
+    int32_t error_code = ERROR_SUCCESS;
     if (endian == LITTLE_ENDIAN)
     {
-      error = this->from_hex_set_le(tmp_hex_char, length);
+      error_code = this->from_hex_set_le(tmp_hex_char, length);
     }
     else
     {
-      error = this->from_hex_set_be(tmp_hex_char, length, padding);
+      error_code = this->from_hex_set_be(tmp_hex_char, length, padding);
     }
-    if (error != 0)
+    if (error_code != ERROR_SUCCESS)
     {
       if (managed) {
         CUDA_CHECK(cudaFree(data));
@@ -271,6 +284,7 @@ namespace cuEVM {
       data = nullptr;
       size = 0;
     }
+    return error_code;
   }
 
   __host__ __device__ int32_t byte_array_t::padded_copy_BE(

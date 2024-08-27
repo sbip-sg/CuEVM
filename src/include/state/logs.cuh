@@ -35,17 +35,18 @@ namespace cuEVM::state {
         /**
          * The default constructor of the log state data structure.
          */
-        __host__ __device__ log_state_data_t() : logs(nullptr), no_logs(0) {}
+        __host__ __device__ log_state_data_t() : logs(nullptr), no_logs(0), capacity(0) {}
 
         /**
          * The destructor
          */
         __host__ __device__ ~log_state_data_t() {
-            no_logs = 0;
-            if (logs != nullptr) {
+            if (logs != nullptr && capacity > 0) {
                 delete[] logs;
-                logs = nullptr;
             }
+            logs = nullptr;
+            capacity = 0;
+            no_logs = 0;
         }
 
         /**

@@ -59,19 +59,20 @@ namespace cuEVM::operations {
                     offset,
                     length,
                     memory_input);
-                cuEVM::byte_array_t hash(cuEVM::hash_size);
                 if (error_code == ERROR_SUCCESS)
                 {
+                    cuEVM::byte_array_t *hash;
+                    hash = new cuEVM::byte_array_t(cuEVM::hash_size);
                     CuCrypto::keccak::sha3(
                         memory_input.data,
                         memory_input.size,
-                        hash.data,
-                        hash.size);
+                        hash->data,
+                        hash->size);
                     bn_t hash_bn;
                     error_code |= arith.byte_array_to_bn_t(
-                        hash,
+                        *hash,
                         hash_bn);
-
+                    delete hash;
                     error_code |= stack.push(arith, hash_bn);
                 }
             }

@@ -2,6 +2,7 @@
 #include <CGBN/cgbn.h>
 
 #include "../include/utils/evm_utils.cuh"
+#include "../include/utils/error_codes.cuh"
 
 namespace cuEVM {
     namespace utils {
@@ -80,7 +81,7 @@ namespace cuEVM {
             
             contract_address_word.from_byte_array_t(hash_address_bytes);
             cgbn_load(arith.env, contract_address, &contract_address_word);
-            return 1;
+            return ERROR_SUCCESS;
         }
 
         __host__ __device__ int32_t get_contract_address_create2(
@@ -136,7 +137,7 @@ namespace cuEVM {
             evm_word_t contract_address_word;
             contract_address_word.from_byte_array_t(hash_input_data);
             cgbn_load(arith.env, contract_address, &contract_address_word);
-            return 1;
+            return ERROR_SUCCESS;
         }
 
         __host__ __device__ int32_t is_hex(const char hex) {
@@ -201,7 +202,7 @@ namespace cuEVM {
             current_char = (char *)*hex_string;
             if (current_char == NULL || current_char[0] == '\0')
             {
-                return 1;
+                return -1;
             }
             if (
                 (current_char[0] == '0') &&
@@ -209,6 +210,10 @@ namespace cuEVM {
             ) {
                 current_char += 2; // Skip the "0x" prefix
                 *hex_string += 2;
+            }
+            if (current_char[0] == '\0')
+            {
+                return 0;
             }
             int32_t length = 0;
             int32_t error = 0;

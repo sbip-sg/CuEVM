@@ -76,7 +76,7 @@ namespace cuEVM {
             cuEVM::account::account_t &account
         ) {
             uint32_t index;
-            if (get_account_index(arith, address, index)) {
+            if (get_account_index(arith, address, index) == ERROR_SUCCESS) {
                 account = accounts[index];
                 return ERROR_SUCCESS;
             }
@@ -88,7 +88,7 @@ namespace cuEVM {
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr) {
             uint32_t index;
-            if (get_account_index(arith, address, index)) {
+            if (get_account_index(arith, address, index) == ERROR_SUCCESS) {
                 account_ptr = &accounts[index];
                 return ERROR_SUCCESS;
             }
