@@ -279,7 +279,7 @@ namespace cuEVM {
                 bn_t sender_address;
                 get_sender(arith, sender_address);
                 cuEVM::account::account_t* sender_account = nullptr;
-                access_state.get_account(arith, sender_address, sender_account, ACCOUNT_BALANCE_FLAG);
+                access_state.get_account(arith, sender_address, sender_account, ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
                 bn_t sender_balance;
                 sender_account->get_balance(arith, sender_balance);
                 bn_t sender_nonce;

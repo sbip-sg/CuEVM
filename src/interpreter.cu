@@ -35,11 +35,31 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     // run the evm
     cuEVM::evm_t *evm = nullptr;
     uint32_t tmp_error;
+    cJSON* final_state = nullptr;
     auto cpu_start = std::chrono::high_resolution_clock::now();
     for(uint32_t instance = 0; instance < num_instances; instance++) {
       // printf("Running instance %d\n", instance);
       evm = new cuEVM::evm_t(arith, cpu_instances_data[instance]);
       evm->run(arith);
+      #ifdef EIP_3155
+      evm->tracer_ptr->print_err();
+      #endif
+      printf("DEBUG: CPU EVM instance %d finished - START\n", instance);
+      printf("DEBUG: CPU EVM instance %d world state\n", instance);
+      cpu_instances_data[instance].world_state_data_ptr->print();
+      printf("DEBUG: CPU EVM instance %d touch state\n", instance);
+      cpu_instances_data[instance].touch_state_data_ptr->print();
+      printf("DEBUG: CPU EVM instance %d access state\n", instance);
+      cpu_instances_data[instance].access_state_data_ptr->print();
+      printf("DEBUG: CPU EVM instance %d finished - END\n", instance);
+      final_state = cuEVM::state::state_merge_json(
+        *cpu_instances_data[instance].world_state_data_ptr,
+        *cpu_instances_data[instance].touch_state_data_ptr
+      );
+      char *final_state_root_json_str = cJSON_PrintUnformatted(final_state);
+      fprintf(stderr, "%s\n", final_state_root_json_str);
+      cJSON_Delete(final_state);
+      free(final_state_root_json_str);
       delete evm;
       evm = nullptr;
     }

@@ -98,11 +98,13 @@ namespace cuEVM {
      * The destructor of the evm_call_state_t
      */
     __host__ __device__ evm_call_state_t::~evm_call_state_t() {
-        delete message_ptr;
-        delete stack_ptr;
-        delete memory_ptr;
-        delete log_state_ptr;
-        delete last_return_data_ptr;
+        if (parent != nullptr) {
+            delete message_ptr;
+            delete stack_ptr;
+            delete memory_ptr;
+            delete log_state_ptr;
+            delete last_return_data_ptr;
+        }
     }
 
     __host__ __device__ int32_t evm_call_state_t::update(ArithEnv &arith, evm_call_state_t &other) {

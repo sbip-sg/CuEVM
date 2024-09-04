@@ -59,13 +59,11 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 uint32_t &index) {
-            for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                if (accounts[idx].has_address(arith, address)) {
-                    index = idx;
+            for (index = 0; index < no_accounts; index++) {
+                if (accounts[index].has_address(arith, address)) {
                     return ERROR_SUCCESS;
                 }
             }
-            index = 0;
             return ERROR_STATE_ADDRESS_NOT_FOUND;
         }
 
@@ -248,8 +246,8 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr,
+            uint32_t &index,
             const cuEVM::account::account_flags_t flag) {
-            uint32_t index = 0;
             if(state_t::get_account_index(arith, address, index) == ERROR_SUCCESS) {
                 flags[index].update(flag);
                 account_ptr = &accounts[index];
@@ -260,8 +258,8 @@ namespace cuEVM {
 
         __host__ __device__ int32_t state_access_t::add_account(
             const cuEVM::account::account_t &account,
+            uint32_t &index,
             const cuEVM::account::account_flags_t flag) {
-            uint32_t index = 0;
             state_t::add_account(account);
             index = no_accounts - 1;
             cuEVM::account::account_flags_t *tmp_flags = new cuEVM::account::account_flags_t[no_accounts];
@@ -279,10 +277,11 @@ namespace cuEVM {
             cuEVM::account::account_t* &src_account_ptr,
             const cuEVM::account::account_flags_t flag) {
             cuEVM::account::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
+            uint32_t index = 0;
             account_ptr = new cuEVM::account::account_t(
                 src_account_ptr,
                 no_storage_copy);
-            return add_account(*account_ptr, flag);
+            return add_account(*account_ptr, index, flag);
         }
 
         __host__ __device__ int32_t state_access_t::add_new_account(
@@ -290,18 +289,20 @@ namespace cuEVM {
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr,
             const cuEVM::account::account_flags_t flag) {
+            uint32_t index = 0;
             account_ptr = new cuEVM::account::account_t(
                 arith,
                 address);
-            return add_account(*account_ptr, flag);
+            return add_account(*account_ptr, index, flag);
         }
 
         __host__ __device__ int32_t state_access_t::set_account(
             ArithEnv &arith,
             const cuEVM::account::account_t &account,
             const cuEVM::account::account_flags_t flag) {
+            uint32_t index = 0;
             if (update_account(arith, account, flag)) {
-                return add_account(account, flag);
+                return add_account(account, index, flag);
             } else {
                 return ERROR_SUCCESS;
             }
@@ -325,9 +326,10 @@ namespace cuEVM {
         __host__ __device__ int32_t state_access_t::update(
             ArithEnv &arith,
             const state_access_t &other) {
+            uint32_t index = 0;
             for (uint32_t i = 0; i < other.no_accounts; i++) {
                 if (update_account(arith, other.accounts[i], other.flags[i]) == 0) {
-                    add_account(other.accounts[i]);
+                    add_account(other.accounts[i], index);
                     flags[no_accounts - 1] = other.flags[i];
                 }
             }
@@ -369,6 +371,67 @@ namespace cuEVM {
             hex_string_ptr = nullptr;
             delete[] flag_string_ptr;
             flag_string_ptr = nullptr;
+            return state_json;
+        }
+        
+        __host__ int32_t state_access_t::get_account_index_evm(
+            const evm_word_t &address,
+            uint32_t &index) const {
+            for (index = 0; index < no_accounts; index++) {
+                if (accounts[index].address == address) {
+                    return ERROR_SUCCESS;
+                }
+            }
+            return ERROR_STATE_ADDRESS_NOT_FOUND;
+        }
+
+        __host__ cJSON* state_merge_json(
+            const state_t &state1,
+            const state_access_t &state2
+        ) {
+            cJSON *state_json = nullptr;
+            cJSON *account_json = nullptr;
+            cJSON *accounts_json = nullptr;
+        
+            
+            state_json = cJSON_CreateObject();
+            accounts_json = cJSON_CreateArray();
+            cJSON_AddItemToObject(state_json, "accounts", accounts_json);
+            uint8_t *writen_accounts;
+            writen_accounts = new uint8_t[state2.no_accounts];
+            std::fill(writen_accounts, writen_accounts + state2.no_accounts, 0);
+            const cuEVM::account::account_t *account1_ptr = nullptr;
+            const cuEVM::account::account_t *account2_ptr = nullptr;
+            uint32_t jdx = 0;
+            for (uint32_t idx = 0; idx < state1.no_accounts; idx++) {
+                account1_ptr = &(state1.accounts[idx]);
+                if (state2.get_account_index_evm(account1_ptr->address, jdx) == ERROR_SUCCESS) {
+                    account2_ptr = &(state2.accounts[jdx]);
+                    account_json = cuEVM::account::account_merge_json(
+                        account1_ptr,
+                        account2_ptr,
+                        state2.flags[jdx]);
+                    cJSON_AddItemToArray(accounts_json, account_json);
+                    writen_accounts[jdx] = 1;
+                } else {
+                    account_json = cuEVM::account::account_merge_json(
+                        account1_ptr,
+                        account2_ptr,
+                        ACCOUNT_NONE_FLAG);
+                    cJSON_AddItemToArray(accounts_json, account_json);
+                }
+            }
+            for (jdx = 0; jdx < state2.no_accounts; jdx++) {
+                if (writen_accounts[jdx] == 0) {
+                    account2_ptr = &(state2.accounts[jdx]);
+                    account_json = cuEVM::account::account_merge_json(
+                        account1_ptr,
+                        account2_ptr,
+                        ACCOUNT_ALL_FLAG);
+                    cJSON_AddItemToArray(accounts_json, account_json);
+                }
+            }
+            delete[] writen_accounts;
             return state_json;
         }
     }

@@ -33,7 +33,7 @@ namespace cuEVM {
             cgbn_load(arith.env, key, (cgbn_evm_word_t_ptr) &(this->key));
         }
 
-        __host__ __device__ int32_t storage_element_t::has_key(evm_word_t key) const
+        __host__ __device__ int32_t storage_element_t::has_key(const evm_word_t key) const
         {
             return (this->key == key);
         }
@@ -289,6 +289,19 @@ namespace cuEVM {
             }
         }
 
+        __host__ int32_t contract_storage_t::has_key(
+            const evm_word_t &key,
+            uint32_t &index) const {
+            for (index = 0; index < this->size; index++)
+            {
+                if (this->storage[index].has_key(key))
+                {
+                    return ERROR_SUCCESS;
+                }
+            }
+            return ERROR_STORAGE_KEY_NOT_FOUND;
+        }
+
         // __host__ __device__ void contract_storage_t::free_internals(
         //     int32_t managed)
         // {
@@ -301,6 +314,61 @@ namespace cuEVM {
         //     this->storage = nullptr;
         // }
 
+        __host__ cJSON* storage_merge_json(
+            const contract_storage_t &storage1,
+            const contract_storage_t &storage2,
+            const int32_t pretty) {
+            cJSON *storage_json = cJSON_CreateObject();
+            uint8_t *written = new uint8_t[storage2.size];
+            std::fill(written, written + storage2.size, 0);
+            char *key_string_ptr = new char[cuEVM::word_size * 2 + 3];
+            char *value_string_ptr = new char[cuEVM::word_size * 2 + 3];
+            cJSON *key_value_json = nullptr;
+            for (uint32_t idx = 0; idx < storage1.size; idx++)
+            {
+                key_value_json = cJSON_CreateArray();
+                uint32_t jdx;
+                if (storage2.has_key(storage1.storage[idx].key, jdx) == ERROR_SUCCESS)
+                {
+                    storage2.storage[jdx].key.to_hex(key_string_ptr, pretty);
+                    storage2.storage[jdx].value.to_hex(value_string_ptr, pretty);
+                    written[jdx] = 1;
+                } else {
+                    storage1.storage[idx].key.to_hex(key_string_ptr, pretty);
+                    storage1.storage[idx].value.to_hex(value_string_ptr, pretty);
+                }
+                cJSON_AddItemToArray(key_value_json, cJSON_CreateString(key_string_ptr));
+
+                cJSON_AddItemToArray(key_value_json, cJSON_CreateString(value_string_ptr));
+
+                // if value is different than 0
+                if (value_string_ptr[2] != '0' || value_string_ptr[3] != '\0')
+                {
+                    cJSON_AddItemToObject(storage_json, key_string_ptr, key_value_json);
+                }
+            }
+
+            for (uint32_t jdx; jdx < storage2.size; jdx++)
+            {
+                if (written[jdx] == 0)
+                {
+                    key_value_json = cJSON_CreateArray();
+                    storage2.storage[jdx].key.to_hex(key_string_ptr, pretty);
+                    storage2.storage[jdx].value.to_hex(value_string_ptr, pretty);
+                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(key_string_ptr));
+                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(value_string_ptr));
+                    // if value is different than 0
+                    if (value_string_ptr[2] != '0' || value_string_ptr[3] != '\0')
+                    {
+                        cJSON_AddItemToObject(storage_json, key_string_ptr, key_value_json);
+                    }
+                }
+            }
+            delete[] written;
+            delete[] key_string_ptr;
+            delete[] value_string_ptr;
+            return storage_json;
+        }
 
     } // namespace storage
 } // namespace cuEVM

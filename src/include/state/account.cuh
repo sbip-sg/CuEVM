@@ -464,7 +464,7 @@ namespace cuEVM
          * Generate a JSON object from the account data structure.
          * @return The JSON object
          */
-        __host__ cJSON* to_json();
+        __host__ cJSON* to_json() const;
 
         /**
          * Print the account data structure.
@@ -473,6 +473,17 @@ namespace cuEVM
 
     };
 
+    /**
+     * The json from two account data structures pointers.
+     * @param[in] account1_ptr The first account data structure
+     * @param[in] account2_ptr The second account data structure
+     * @param[in] flags The account flags representig the fields
+     * @return The json object
+     */
+    __host__ cJSON* account_merge_json(
+        const account_t *&account1_ptr,
+        const account_t *&account2_ptr,
+        const account_flags_t &flags);
     /**
      * The kernel to copy the account data structures.
      * @param[out] dst The destination account data structure

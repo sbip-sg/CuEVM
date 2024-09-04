@@ -144,11 +144,11 @@ namespace cuEVM {
         __host__ __device__ void ecpairing_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            size_t data_size) {
+            uint32_t data_size) {
             // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 * GAS_PRECOMPILE_ECPAIRING_PAIR
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_ECPAIRING);
             bn_t temp;
-            arith.cgbn_from_size_t(temp, data_size);
+            cgbn_set_ui32(arith.env, temp, data_size);
             cgbn_div_ui32(arith.env, temp, temp, 192);
             cgbn_mul_ui32(arith.env, temp, temp, GAS_PRECOMPILE_ECPAIRING_PAIR);
             cgbn_add(arith.env, gas_used, gas_used, temp);
@@ -332,6 +332,7 @@ namespace cuEVM {
                 cgbn_div_ui32(arith.env, memory_cost, memory_cost, 512);
                 bn_t tmp;
                 // TODO: verify overflow in another way
+                // LOOK ok from CGBN documentation
                 if (cgbn_mul_ui32(arith.env, tmp, memory_size_word, GAS_MEMORY) != 0) {
                     break;
                 }

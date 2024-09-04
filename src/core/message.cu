@@ -44,7 +44,7 @@ namespace cuEVM {
     __host__ __device__ evm_message_call_t::~evm_message_call_t() {
       // todo maybe to delete the inside vectors who knows
       delete jump_destinations;
-      jump_destinations = NULL;
+      jump_destinations = nullptr;
     }
 
 
@@ -206,10 +206,10 @@ namespace cuEVM {
     __host__ __device__ void evm_message_call_t::set_byte_code(
         cuEVM::byte_array_t &byte_code) {
       this->byte_code = byte_code;
-      if (jump_destinations != NULL)
+      if (jump_destinations != nullptr)
       {
         delete jump_destinations;
-        jump_destinations = NULL;
+        jump_destinations = nullptr;
       }
       jump_destinations = new cuEVM::jump_destinations_t(
           byte_code);

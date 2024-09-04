@@ -87,7 +87,7 @@ namespace cuEVM {
       else
       {
         idx = 0;
-        // TODO: maybe fill with something else
+        // fill the block with number 0 and the hash if given
         previous_blocks[0].number.from_uint32_t(0);
 
         element_json = cJSON_GetObjectItemCaseSensitive(block_json, "previousHash");

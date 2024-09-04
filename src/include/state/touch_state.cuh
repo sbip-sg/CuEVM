@@ -20,14 +20,14 @@ namespace cuEVM::state {
          * @param[in] arith The arithmetic environment.
          * @param[in] address The address of the account.
          * @param[out] account_ptr The pointer to the account.
-         * @param[in] flag The account access flags.
+         * @param[in] acces_state_flag The account access flags.
          * @return 1 if the account is added successfully, 0 otherwise.
          */
         __host__ __device__ int32_t add_account(
             ArithEnv &arith,
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr,
-            const cuEVM::account::account_flags_t flag);
+            const cuEVM::account::account_flags_t acces_state_flag);
         
     public:
         /**
@@ -67,14 +67,14 @@ namespace cuEVM::state {
          * @param[in] arith The arithmetic environment.
          * @param[in] address The address of the account.
          * @param[out] account_ptr The pointer to the account.
-         * @param[in] flag The account access flags.
+         * @param[in] acces_state_flag The account access flags.
          * @return 0 if the account is found, error otherwise.
          */          
         __host__ __device__ int32_t get_account(
             ArithEnv &arith,
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr,
-            const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+            const cuEVM::account::account_flags_t acces_state_flag = ACCOUNT_NONE_FLAG);
         
         /**
          * If the account given by address is empty
@@ -243,6 +243,11 @@ namespace cuEVM::state {
             const bn_t &from,
             const bn_t &to,
             const bn_t &value);
+        
+        /**
+         * print the touch state
+         */
+        __host__ void print() const;
     };
 }
 

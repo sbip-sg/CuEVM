@@ -293,9 +293,6 @@ namespace cuEVM::operations
 
         }
         return error_code;
-
-        // TODO: increase sender nonce if the sender is a contract
-
     }
 
     /**
@@ -505,8 +502,6 @@ namespace cuEVM::operations
             arith,
             gas_limit,
             gas_used);
-
-        // TODO addback dynamic cost from sub execution
 
         if (error_code == ERROR_SUCCESS)
         {

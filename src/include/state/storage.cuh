@@ -105,7 +105,7 @@ namespace cuEVM
              * @param[in] key The key to compare (evm_word_t)
              * @return If the key is equal to the key of the storage element
              */
-            __host__ __device__ int32_t has_key(evm_word_t key) const;
+            __host__ __device__ int32_t has_key(const evm_word_t key) const;
 
             /**
              * Get if the key given (bn_t) is equal to the key of the storage element
@@ -228,6 +228,16 @@ namespace cuEVM
             __host__ __device__ void update(
                 ArithEnv &arith,
                 const contract_storage_t &other);
+            
+            /**
+             * Get the storage element index for the given key
+             * @param[in] key The key to get the index for
+             * @param[out] index The index for the given key
+             * @return The error code for the operation (0 means success)
+             */
+            __host__ int32_t has_key(
+                const evm_word_t &key,
+                uint32_t &index) const;
 
             /**
              * Get the contract stroage from a json object
@@ -252,6 +262,17 @@ namespace cuEVM
              */
             __host__ __device__ void print() const;
         };
+
+        /**
+         * Merge two contract storages
+         * @param[in] storage1 The first contract storage
+         * @param[in] storage2 The second contract storage
+         * @param[in] pretty If the hex string should be left trimmed of zeros
+         */
+        __host__ cJSON* storage_merge_json(
+            const contract_storage_t &storage1,
+            const contract_storage_t &storage2,
+            const int32_t pretty = 0);
 
 
     } // namespace storage

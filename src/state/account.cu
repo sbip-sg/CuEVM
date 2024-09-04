@@ -4,6 +4,7 @@
 // Data: 2024-06-20
 // SPDX-License-Identifier: MIT
 #include "../include/state/account.cuh"
+#include <CuCrypto/keccak.cuh>
 
 namespace cuEVM
 {
@@ -333,7 +334,7 @@ namespace cuEVM
         );
     }
 
-    __host__ cJSON* account_t::to_json()
+    __host__ cJSON* account_t::to_json() const
     {
         cJSON *account_json = cJSON_CreateObject();
         char *bytes_string = nullptr;
@@ -366,6 +367,80 @@ namespace cuEVM
         byte_code.print();
         printf("Storage: \n");
         storage.print();
+    }
+
+    __host__ cJSON* account_merge_json(
+        const account_t *&account1_ptr,
+        const account_t *&account2_ptr,
+        const account_flags_t &flags) {
+        
+        cJSON *account_json = cJSON_CreateObject();
+        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+        account1_ptr->address.to_hex(hex_string_ptr, 0, 5);
+        cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
+
+        if(flags.has_balance()) {
+            account2_ptr->balance.to_hex(hex_string_ptr, 1);
+        } else {
+            account1_ptr->balance.to_hex(hex_string_ptr, 1);
+        }
+        cJSON_AddStringToObject(account_json, "balance", hex_string_ptr);
+
+        if(flags.has_nonce()) {
+            account2_ptr->nonce.to_hex(hex_string_ptr, 1);
+        } else {
+            account1_ptr->nonce.to_hex(hex_string_ptr, 1);
+        }
+        cJSON_AddStringToObject(account_json, "nonce", hex_string_ptr);
+
+        char *code_hash_hex_string_ptr = nullptr;
+        char *code_hex_string_ptr = nullptr;
+        cuEVM::byte_array_t *hash;
+        hash = new cuEVM::byte_array_t(cuEVM::hash_size);
+        if(flags.has_byte_code()) {
+            CuCrypto::keccak::sha3(
+                account2_ptr->byte_code.data,
+                account2_ptr->byte_code.size,
+                hash->data,
+                hash->size
+            );
+            code_hex_string_ptr = account2_ptr->byte_code.to_hex();
+        } else {
+            CuCrypto::keccak::sha3(
+                account1_ptr->byte_code.data,
+                account1_ptr->byte_code.size,
+                hash->data,
+                hash->size
+            );
+            code_hex_string_ptr = account1_ptr->byte_code.to_hex();
+        }
+        cJSON_AddStringToObject(account_json, "code", code_hex_string_ptr);
+        delete[] code_hex_string_ptr;
+        code_hash_hex_string_ptr = hash->to_hex();
+        cJSON_AddStringToObject(account_json, "codeHash", code_hash_hex_string_ptr);
+        delete[] code_hash_hex_string_ptr;
+        delete hash;
+
+        cJSON *storage_json = nullptr;
+        
+        if (flags.has_storage()) {
+            storage_json = cuEVM::storage::storage_merge_json(
+                account1_ptr->storage,
+                account2_ptr->storage,
+                1
+            );
+        } else {
+            storage_json = cuEVM::storage::storage_merge_json(
+                account1_ptr->storage,
+                account1_ptr->storage,
+                1
+            );
+        }
+
+        cJSON_AddItemToObject(account_json, "storage", storage_json);
+
+        delete[] hex_string_ptr;
+        return account_json;
     }
 
     __host__ __device__ void free_internals_account(

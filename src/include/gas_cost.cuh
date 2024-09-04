@@ -233,12 +233,11 @@ namespace cuEVM {
          * @param[in] arith The arithmetic environment
          * @param[inout] gas_used The gas used
          * @param[in] data_size The size of the data in bytes
-         * TODO: verifi if size_t necessary
          */
         __host__ __device__ void ecpairing_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            size_t data_size
+            uint32_t data_size
         );
 
         /**

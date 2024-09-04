@@ -11,7 +11,7 @@ namespace cuEVM::state {
         ArithEnv &arith,
         const bn_t &address,
         cuEVM::account::account_t* &account_ptr,
-        const cuEVM::account::account_flags_t flag
+        const cuEVM::account::account_flags_t acces_state_flag
     ) {
         cuEVM::account::account_t* tmp_account_ptr = nullptr;
         cuEVM::account::account_t *tmp_access_account_ptr = nullptr;
@@ -20,7 +20,7 @@ namespace cuEVM::state {
             arith,
             address,
             tmp_access_account_ptr,
-            flag);
+            acces_state_flag);
         while(
             (tmp != nullptr) && 
             (tmp->_state->get_account(arith, address, tmp_account_ptr))
@@ -32,19 +32,19 @@ namespace cuEVM::state {
                 tmp_account_ptr :
                 tmp_access_account_ptr
             ),
-            flag);
+            ACCOUNT_NONE_FLAG);
     }
     
     __host__ __device__ int32_t TouchState::get_account(
         ArithEnv &arith,
         const bn_t &address,
         cuEVM::account::account_t* &account_ptr,
-        const cuEVM::account::account_flags_t flag
+        const cuEVM::account::account_flags_t acces_state_flag
     ) {
         cuEVM::account::account_t *tmp_ptr;
-        _access_state->get_account(arith, address, tmp_ptr, flag);
+        _access_state->get_account(arith, address, tmp_ptr, acces_state_flag);
         return (
-            _state->get_account(arith, address, account_ptr, flag) ?
+            _state->get_account(arith, address, account_ptr) ?
             ([&]() -> int32_t {
                 TouchState* tmp = parent;
                 while(
@@ -282,4 +282,9 @@ namespace cuEVM::state {
         error_code |= set_balance(arith, to, to_balance);
         return error_code;
     }
+
+    
+        __host__ void TouchState::print() const {
+            _state->print();
+        }
 }
