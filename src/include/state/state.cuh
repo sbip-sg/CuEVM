@@ -251,7 +251,6 @@ namespace cuEVM {
              * @param[in] arith The arithmetic environment.
              * @param[in] address The address.
              * @param[out] account_ptr The account pointer.
-             * @param[out] index The index.
              * @param[in] flag The flag access.
              * @return If found 0. otherwise error.
              */
@@ -259,7 +258,6 @@ namespace cuEVM {
                 ArithEnv &arith,
                 const bn_t &address,
                 cuEVM::account::account_t* &account_ptr,
-                uint32_t &index,
                 const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**
@@ -275,13 +273,11 @@ namespace cuEVM {
             /**
              * The add account function.
              * @param[in] account The account.
-             * @param[out] index The index.
              * @param[in] flag The flag access.
              * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_account(
                 const cuEVM::account::account_t &account,
-                uint32_t &index,
                 const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**

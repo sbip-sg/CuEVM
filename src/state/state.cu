@@ -246,8 +246,8 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &address,
             cuEVM::account::account_t* &account_ptr,
-            uint32_t &index,
             const cuEVM::account::account_flags_t flag) {
+            uint32_t index = 0;
             if(state_t::get_account_index(arith, address, index) == ERROR_SUCCESS) {
                 flags[index].update(flag);
                 account_ptr = &accounts[index];
@@ -258,10 +258,9 @@ namespace cuEVM {
 
         __host__ __device__ int32_t state_access_t::add_account(
             const cuEVM::account::account_t &account,
-            uint32_t &index,
             const cuEVM::account::account_flags_t flag) {
             state_t::add_account(account);
-            index = no_accounts - 1;
+            uint32_t index = no_accounts - 1;
             cuEVM::account::account_flags_t *tmp_flags = new cuEVM::account::account_flags_t[no_accounts];
             std::copy(flags, flags + no_accounts - 1, tmp_flags);
             if (flags != nullptr) {
@@ -281,7 +280,7 @@ namespace cuEVM {
             account_ptr = new cuEVM::account::account_t(
                 src_account_ptr,
                 no_storage_copy);
-            return add_account(*account_ptr, index, flag);
+            return add_account(*account_ptr, flag);
         }
 
         __host__ __device__ int32_t state_access_t::add_new_account(
@@ -293,7 +292,7 @@ namespace cuEVM {
             account_ptr = new cuEVM::account::account_t(
                 arith,
                 address);
-            return add_account(*account_ptr, index, flag);
+            return add_account(*account_ptr, flag);
         }
 
         __host__ __device__ int32_t state_access_t::set_account(
@@ -302,7 +301,7 @@ namespace cuEVM {
             const cuEVM::account::account_flags_t flag) {
             uint32_t index = 0;
             if (update_account(arith, account, flag)) {
-                return add_account(account, index, flag);
+                return add_account(account, flag);
             } else {
                 return ERROR_SUCCESS;
             }

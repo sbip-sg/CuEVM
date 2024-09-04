@@ -149,6 +149,7 @@ namespace cuEVM::state {
         const bn_t &balance
     ) {
         account::account_t* account_ptr = nullptr;
+        _access_state->get_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG);
         if (_state->get_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG)) {
             add_account(
                 arith,
@@ -166,6 +167,7 @@ namespace cuEVM::state {
         const bn_t &nonce
     ) {
         account::account_t* account_ptr = nullptr;
+        _access_state->get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG);
         if (_state->get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG)) {
             add_account(
                 arith,
@@ -183,6 +185,7 @@ namespace cuEVM::state {
         const byte_array_t &byte_code
     ) {
         account::account_t* account_ptr = nullptr;
+        _access_state->get_account(arith, address, account_ptr, ACCOUNT_BYTE_CODE_FLAG);
         if (_state->get_account(arith, address, account_ptr, ACCOUNT_BYTE_CODE_FLAG)) {
             add_account(
                 arith,
@@ -201,6 +204,7 @@ namespace cuEVM::state {
         const bn_t &value
     ) {
         account::account_t* account_ptr = nullptr;
+        _access_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG);
         if (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)) {
             add_account(
                 arith,
