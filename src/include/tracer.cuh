@@ -12,6 +12,7 @@
 #include "core/stack.cuh"
 #include "core/memory.cuh"
 #include "core/return_data.cuh"
+#include "state/touch_state.cuh"
 
 #include <cjson/cJSON.h>
 

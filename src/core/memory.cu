@@ -66,7 +66,7 @@ namespace cuEVM {
         return ERROR_SUCCESS;
       }
       uint32_t new_page_count = (new_size / cuEVM::memory::page_size) + 1;
-      return data.grow(new_page_count * cuEVM::memory::page_size);
+      return data.grow(new_page_count * cuEVM::memory::page_size, 1);
     }
 
     __host__ __device__ int32_t evm_memory_t::get_last_offset(

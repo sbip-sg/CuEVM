@@ -44,14 +44,14 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
       #ifdef EIP_3155
       evm->tracer_ptr->print_err();
       #endif
-      printf("DEBUG: CPU EVM instance %d finished - START\n", instance);
-      printf("DEBUG: CPU EVM instance %d world state\n", instance);
-      cpu_instances_data[instance].world_state_data_ptr->print();
-      printf("DEBUG: CPU EVM instance %d touch state\n", instance);
-      cpu_instances_data[instance].touch_state_data_ptr->print();
-      printf("DEBUG: CPU EVM instance %d access state\n", instance);
-      cpu_instances_data[instance].access_state_data_ptr->print();
-      printf("DEBUG: CPU EVM instance %d finished - END\n", instance);
+      // printf("DEBUG: CPU EVM instance %d finished - START\n", instance);
+      // printf("DEBUG: CPU EVM instance %d world state\n", instance);
+      // cpu_instances_data[instance].world_state_data_ptr->print();
+      // printf("DEBUG: CPU EVM instance %d touch state\n", instance);
+      // cpu_instances_data[instance].touch_state_data_ptr->print();
+      // printf("DEBUG: CPU EVM instance %d access state\n", instance);
+      // cpu_instances_data[instance].access_state_data_ptr->print();
+      // printf("DEBUG: CPU EVM instance %d finished - END\n", instance);
       final_state = cuEVM::state::state_merge_json(
         *cpu_instances_data[instance].world_state_data_ptr,
         *cpu_instances_data[instance].touch_state_data_ptr

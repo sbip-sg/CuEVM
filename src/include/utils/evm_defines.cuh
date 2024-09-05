@@ -6,6 +6,8 @@
 
 // tracer activated
 #define EIP_3155
+// trace optional
+#define EIP_3155_OPTIONAL
 
 #define SHANGHAI
 

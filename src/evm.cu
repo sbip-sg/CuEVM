@@ -61,6 +61,8 @@ namespace cuEVM {
                 call_state_ptr,
                 transaction_call_message_ptr
             );
+            // subtract the gas used by the transaction initialization from the gas limit
+            cgbn_sub(arith.env, child_call_state_ptr->gas_limit, child_call_state_ptr->gas_limit, call_state_ptr->gas_used);
             call_state_ptr = child_call_state_ptr;
         }
         #ifdef EIP_3155

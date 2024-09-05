@@ -75,7 +75,20 @@ namespace cuEVM::utils {
         // TODO: strupid to just show the least significant 32 bits
         // correct way is to show the whole 256 bits
         // fprintf(stderr, "\"refund\":\"%s\"}\n", refund.to_hex(hex_string_ptr, 1));
-        fprintf(stderr, "\"refund\":%u}\n", refund._limbs[0]);
+        fprintf(stderr, "\"refund\":%u", refund._limbs[0]);
+        #ifdef EIP_3155_OPTIONAL
+        fprintf(stderr, ",\"error\":%u,", error_code);
+        fprintf(stderr, ",\"memory\":\"");
+        for (uint32_t j = 0; j < mem_size; j++) {
+            fprintf(stderr, "%02x", memory[j]);
+        }
+        fprintf(stderr, "\"");
+        // fprintf(stderr, ",\"storage\":");
+        // printf("\n");
+        // printf("Touch state: ");
+        // touch_state.print();
+        #endif
+        fprintf(stderr, "}\n");
         if (tmp != nullptr) {
             delete [] tmp;
         }
@@ -198,7 +211,7 @@ namespace cuEVM::utils {
             }
             printf("\n");
             printf("Touch state: ");
-            cuEVM::state::TouchState::print(data[i].touch_state);
+            data[i].touch_state.print();
             #endif
         }
     }

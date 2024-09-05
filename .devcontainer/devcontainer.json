@@ -17,7 +17,8 @@
 				"ms-vscode.cpptools-extension-pack",
 				"ccimage.jsonviewer",
 				"xaver.clang-format",
-				"ms-vscode.makefile-tools"
+				"ms-vscode.makefile-tools",
+				"github.vscode-github-actions"
 			]
 		}
 	}//,
