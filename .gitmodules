@@ -1,15 +1,12 @@
-[submodule "CGBN"]
-	path = CGBN
-	url = https://github.com/NVlabs/CGBN.git
 [submodule "goevmlab"]
 	path = goevmlab
 	url = https://github.com/cassc/goevmlab
 [submodule "tests"]
 	path = tests
 	url = https://github.com/ethereum/tests.git
-[submodule "bigint"]
-	path = bigint
-	url = https://github.com/sbip-sg/bigint.git
+[submodule "libraries/CuBigInt"]
+	path = libraries/CuBigInt
+	url = https://github.com/sdcioc/CuBigInt.git
 [submodule "libraries/CGBN"]
 	path = libraries/CGBN
 	url = https://github.com/sdcioc/CGBN.git
