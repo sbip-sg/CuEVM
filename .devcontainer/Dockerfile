@@ -36,6 +36,12 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y locales && locale
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o sh.rustup.rs && sh sh.rustup.rs -y && rm sh.rustup.rs
 # install tools for documentation
 RUN apt-get update && apt-get install -y doxygen sphinx cmake python3-pip && pip3 install breathe exhale sphinx_rtd_theme sphinx_book_theme
+# install tools for testing
+RUN apt-get update && apt-get install -y libgtest-dev
+# Build GTest library
+RUN cd /usr/src/googletest && \
+    cmake . && \
+    cmake --build . --target install
 
 # Go-evmlab targets
 RUN mkdir /goevmlab

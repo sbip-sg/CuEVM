@@ -3,12 +3,15 @@
         {
             "name": "CUDA",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/libraries/CGBN/CGBN/include/CGBN",
+                "${workspaceFolder}/libraries/CuBigInt/CuBigInt/include/CuBigInt",
+                "${workspaceFolder}/libraries/CuCrypto/CuCrypto/include/CuCrypto",
             ],
             "defines": [],
             "compilerPath": "/usr/local/cuda/bin/nvcc",
             "cStandard": "c17",
-            "cppStandard": "gnu++17",
+            "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-gcc-x64"
         }
     ],
