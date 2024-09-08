@@ -137,7 +137,7 @@ namespace cuEVM {
             uint64_t nonce;
             error_code |= arith.uint64_t_from_cgbn(nonce, sender_nonce) == 1 ?  ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED : ERROR_SUCCESS;
         } else {
-            error_code |= call_state_ptr->depth >= cuEVM::max_depth ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
+            error_code |= call_state_ptr->depth > cuEVM::max_depth ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
             if (account_ptr->byte_code.size == 0) {
                 bn_t contract_address;
                 call_state_ptr->message_ptr->get_contract_address(arith, contract_address);
@@ -956,7 +956,7 @@ namespace cuEVM {
 
             #ifdef EIP_3155
             if (call_state_ptr->trace_idx > 0 ||
-                (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 0) ) {
+                (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1) ) {
                 tracer_ptr->finish_operation(
                     arith,
                     call_state_ptr->trace_idx,
@@ -982,7 +982,7 @@ namespace cuEVM {
                     error_code |= finish_CREATE(arith);
                 }
 
-                if (call_state_ptr->depth == 0) {
+                if (call_state_ptr->depth == 1) {
                     // TODO: finish transaction
                     printf("Finish transaction\n");
                     finish_CALL(arith, error_code);
@@ -1132,7 +1132,7 @@ namespace cuEVM {
         // reset the error code for the parent
         error_code = ERROR_SUCCESS;
         
-        if (call_state_ptr->depth > 0) {
+        if (call_state_ptr->depth > 1) {
             // push the result in the parent stack
             error_code |= call_state_ptr->parent->stack_ptr->push(arith, child_success);
 

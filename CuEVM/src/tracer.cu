@@ -77,7 +77,7 @@ namespace cuEVM::utils {
         // printf("\"refund\":\"%s\"}\n", refund.to_hex(hex_string_ptr, 1));
         printf("\"refund\":%u", refund._limbs[0]);
         #ifdef EIP_3155_OPTIONAL
-        printf(",\"error\":%u,", error_code);
+        printf(",\"error\":%u", error_code);
         printf(",\"memory\":\"");
         for (uint32_t j = 0; j < mem_size; j++) {
             printf("%02x", memory[j]);
@@ -243,7 +243,7 @@ namespace cuEVM::utils {
 
         printf("\"pass\":\"%s\",", (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true" : "false");
 
-        printf("\"fork\":%s,", "\"\"\"\"");
+        // printf("\"fork\":%s,", "\"\"\"\"");
 
         printf("\"time\":%lu}\n", 2);
         delete [] hex_string_ptr;

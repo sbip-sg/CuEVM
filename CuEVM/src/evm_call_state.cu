@@ -47,7 +47,7 @@ namespace cuEVM {
         &parent->touch_state
     ) {
         this->parent = parent;
-        this->depth = (parent->parent == nullptr) ? parent->depth : parent->depth + 1;
+        this->depth = parent->depth + 1;
         this->pc = 0;
         cgbn_set_ui32(arith.env, this->gas_used, 0);
         cgbn_set(arith.env, this->gas_refund, parent->gas_refund);
