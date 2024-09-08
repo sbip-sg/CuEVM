@@ -218,8 +218,8 @@ namespace CuEVM {
         {
             if (
                 cJSON_IsNull(contract_storage_json) ||
-                cJSON_IsInvalid(contract_storage_json) ||
-                (!cJSON_IsArray(contract_storage_json))
+                cJSON_IsInvalid(contract_storage_json) /*||
+                (!cJSON_IsArray(contract_storage_json))*/
             )
             {
                 return 1;
@@ -324,10 +324,10 @@ namespace CuEVM {
             std::fill(written, written + storage2.size, 0);
             char *key_string_ptr = new char[CuEVM::word_size * 2 + 3];
             char *value_string_ptr = new char[CuEVM::word_size * 2 + 3];
-            cJSON *key_value_json = nullptr;
+            // cJSON *key_value_json = nullptr;
             for (uint32_t idx = 0; idx < storage1.size; idx++)
             {
-                key_value_json = cJSON_CreateArray();
+                // key_value_json = cJSON_CreateArray();
                 uint32_t jdx;
                 if (storage2.has_key(storage1.storage[idx].key, jdx) == ERROR_SUCCESS)
                 {
@@ -338,14 +338,17 @@ namespace CuEVM {
                     storage1.storage[idx].key.to_hex(key_string_ptr, pretty);
                     storage1.storage[idx].value.to_hex(value_string_ptr, pretty);
                 }
-                cJSON_AddItemToArray(key_value_json, cJSON_CreateString(key_string_ptr));
 
-                cJSON_AddItemToArray(key_value_json, cJSON_CreateString(value_string_ptr));
+
+                // cJSON_AddItemToArray(key_value_json, cJSON_CreateString(key_string_ptr));
+
+                // cJSON_AddItemToArray(key_value_json, cJSON_CreateString(value_string_ptr));
 
                 // if value is different than 0
                 if (value_string_ptr[2] != '0' || value_string_ptr[3] != '\0')
                 {
-                    cJSON_AddItemToObject(storage_json, key_string_ptr, key_value_json);
+                    // cJSON_AddItemToObject(storage_json, key_string_ptr, key_value_json);
+                    cJSON_AddStringToObject(storage_json, key_string_ptr, value_string_ptr);
                 }
             }
 
@@ -353,15 +356,16 @@ namespace CuEVM {
             {
                 if (written[jdx] == 0)
                 {
-                    key_value_json = cJSON_CreateArray();
+                    // key_value_json = cJSON_CreateArray();
                     storage2.storage[jdx].key.to_hex(key_string_ptr, pretty);
                     storage2.storage[jdx].value.to_hex(value_string_ptr, pretty);
-                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(key_string_ptr));
-                    cJSON_AddItemToArray(key_value_json, cJSON_CreateString(value_string_ptr));
+                    // cJSON_AddItemToArray(key_value_json, cJSON_CreateString(key_string_ptr));
+                    // cJSON_AddItemToArray(key_value_json, cJSON_CreateString(value_string_ptr));
                     // if value is different than 0
                     if (value_string_ptr[2] != '0' || value_string_ptr[3] != '\0')
                     {
-                        cJSON_AddItemToObject(storage_json, key_string_ptr, key_value_json);
+                        // cJSON_AddItemToObject(storage_json, key_string_ptr, key_value_json);
+                        cJSON_AddStringToObject(storage_json, key_string_ptr, value_string_ptr);
                     }
                 }
             }

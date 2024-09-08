@@ -36,7 +36,7 @@ namespace CuEVM::utils {
 
         __host__ cJSON* to_json();
 
-        __host__ __device__ void print_err(char *hex_string_ptr = nullptr);
+        __host__ void print_err(char *hex_string_ptr = nullptr);
     };
 
     struct tracer_t {
@@ -85,7 +85,7 @@ namespace CuEVM::utils {
 
         __host__ __device__ void print(ArithEnv &arith);
 
-        __host__ __device__ void print_err();
+        __host__ void print_err();
 
         __host__ cJSON* to_json();
     };

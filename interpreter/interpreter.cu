@@ -19,9 +19,9 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
   CuEVM::evm_t *evm = nullptr;
   evm = new CuEVM::evm_t(arith, instances[instance]);
   evm->run(arith);
-  #ifdef EIP_3155
-  evm->tracer_ptr->print_err();
-  #endif
+  // #ifdef EIP_3155
+  // evm->tracer_ptr->print_err();
+  // #endif
   delete evm;
   evm = nullptr;
 }
