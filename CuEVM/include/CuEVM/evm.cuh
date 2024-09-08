@@ -73,16 +73,35 @@ namespace cuEVM {
 
     typedef int32_t (*evm_operation_f)(cuEVM::evm_call_state_t* call_state);
 
-    __host__ int32_t get_cpu_evm_instances(
+    /**
+     * @brief Get the CPU EVM instances object
+     * Get the evm instances from the json file
+     * @param[in] arith The arithmetic environment
+     * @param[in] test_json The json object
+     * @param[out] evm_instances The evm instances
+     * @param[out] num_instances The number of instances
+     * @param[in] managed Whether the memory is managed
+     * @return int32_t The error code, 0 if successful
+     */
+    __host__ int32_t get_evm_instances(
         ArithEnv &arith,
         evm_instance_t* &evm_instances,
         const cJSON* test_json,
-        uint32_t &num_instances
+        uint32_t &num_instances,
+        int32_t managed = 0
     );
 
-    __host__ void free_cpu_evm_instances(
+    /**
+     * @brief Free the EVM instances object
+     * Free the evm instances
+     * @param[in] evm_instances The evm instances
+     * @param[in] num_instances The number of instances
+     * @param[in] managed Whether the memory is managed
+     */
+    __host__ void free_evm_instances(
         evm_instance_t* &evm_instances,
-        uint32_t num_instances
+        uint32_t num_instances,
+        int32_t managed = 0
     );
 
 

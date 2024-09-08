@@ -33,7 +33,9 @@ endif()
 
 if(WITH_COMPILE)
     add_subdirectory("${PROJECT_SOURCE_DIR}/CuEVM")
-    add_executable(${PROJECT_NAME}
+    set(CPU_INTERPRETER ${PROJECT_NAME}_CPU)
+    set(GPU_INTERPRETER ${PROJECT_NAME}_GPU)
+    add_executable(${CPU_INTERPRETER}
         "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
         $<TARGET_OBJECTS:CuEVM>
         $<TARGET_OBJECTS:CuCrypto>
@@ -41,7 +43,7 @@ if(WITH_COMPILE)
         $<TARGET_OBJECTS:CuBigInt>
     )
     
-    set_target_properties(${PROJECT_NAME}
+    set_target_properties(${CPU_INTERPRETER}
         PROPERTIES
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_RESOLVE_DEVICE_SYMBOLS ON
@@ -50,22 +52,36 @@ if(WITH_COMPILE)
     
     # Link the library to its dependencies
     # our own libraries first
-    target_link_libraries(${PROJECT_NAME} PRIVATE CGBN CuCrypto CuBigInt CuEVM)
+    target_link_libraries(${CPU_INTERPRETER} PRIVATE CGBN CuCrypto CuBigInt CuEVM)
     # then the external ones
-    target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${CUDA_LIBRARIES})
+    target_link_libraries(${CPU_INTERPRETER} PUBLIC gmp cjson ${CUDA_LIBRARIES})
     
-    target_compile_options(${PROJECT_NAME}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
+    target_compile_options(${CPU_INTERPRETER}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
+
+    # GPU
+    add_executable(${GPU_INTERPRETER}
+        "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
+        $<TARGET_OBJECTS:CuEVM>
+        $<TARGET_OBJECTS:CuCrypto>
+        $<TARGET_OBJECTS:CGBN>
+        $<TARGET_OBJECTS:CuBigInt>
+    )
     
+    set_target_properties(${GPU_INTERPRETER}
+        PROPERTIES
+            CUDA_SEPARABLE_COMPILATION ON
+            CUDA_RESOLVE_DEVICE_SYMBOLS ON
+            POSITION_INDEPENDENT_CODE ON
+    )
     
-    # if(ENABLE_TRACING)
-    #     target_compile_definitions(${PROJECT_NAME} PRIVATE TRACER)
-    # endif()
+    # Link the library to its dependencies
+    # our own libraries first
+    target_link_libraries(${GPU_INTERPRETER} PRIVATE CGBN CuCrypto CuBigInt CuEVM)
+    # then the external ones
+    target_link_libraries(${GPU_INTERPRETER} PUBLIC gmp cjson ${CUDA_LIBRARIES})
     
-    # if(ENABLE_COMPLEX_TRACER)
-    #     target_compile_definitions(${PROJECT_NAME} PRIVATE COMPLEX_TRACER)
-    # endif()
+    target_compile_options(${GPU_INTERPRETER}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
     
-    if(ONLY_CPU)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE ONLY_CPU)
-    endif()    
+    target_compile_definitions(${GPU_INTERPRETER} PRIVATE GPU)
+    
 endif()

@@ -37,7 +37,7 @@ namespace cuEVM::utils {
         return json;
     }
 
-    __host__ void trace_data_t::print_err(char *hex_string_ptr) {
+    __host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
         char *tmp = nullptr;
         if (hex_string_ptr == nullptr) {
             tmp = new char[cuEVM::word_size * 2 + 3];
@@ -57,38 +57,38 @@ namespace cuEVM::utils {
             }
         }
         // std::cerr << "{\"pc\":" << pc << ",\"op\":" << op << ",\"gas\":\"" << gas.to_hex(hex_string_ptr, 1) << "\",\"gasCost\":\"" << gas_cost.to_hex(hex_string_ptr, 1) << "\",\"stack\":[" << stack_str << "],\"depth\":" << depth << ",\"memSize\":" << mem_size << "}\n";
-        // fprintf(stderr, "{\"pc\":%d,\"op\":%d,\"gas\":\"%s\",\"gasCost\":\"%s\",\"memSize\":%u,\"stack\":[%s],\"depth\":%d, \"refund\":%s}\n",
+        // printf("{\"pc\":%d,\"op\":%d,\"gas\":\"%s\",\"gasCost\":\"%s\",\"memSize\":%u,\"stack\":[%s],\"depth\":%d, \"refund\":%s}\n",
         //     pc, op, gas.to_hex(hex_string_ptr, 1), gas_cost.to_hex(hex_string_ptr, 1), mem_size, stack_str.c_str(), depth, refund.to_hex(hex_string_ptr, 1));
         
-        fprintf(stderr, "{\"pc\":%d,\"op\":%d,", pc, op);
+        printf("{\"pc\":%d,\"op\":%d,", pc, op);
 
-        fprintf(stderr, "\"gas\":\"%s\",", gas.to_hex(hex_string_ptr, 1));
+        printf("\"gas\":\"%s\",", gas.to_hex(hex_string_ptr, 1));
 
-        fprintf(stderr, "\"gasCost\":\"%s\",", gas_cost.to_hex(hex_string_ptr, 1));
+        printf("\"gasCost\":\"%s\",", gas_cost.to_hex(hex_string_ptr, 1));
 
-        fprintf(stderr, "\"memSize\":%u,", mem_size);
+        printf("\"memSize\":%u,", mem_size);
 
-        fprintf(stderr, "\"stack\":[%s],", stack_str.c_str());
+        printf("\"stack\":[%s],", stack_str.c_str());
 
-        fprintf(stderr, "\"depth\":%d,", depth);
+        printf("\"depth\":%d,", depth);
 
         // TODO: strupid to just show the least significant 32 bits
         // correct way is to show the whole 256 bits
-        // fprintf(stderr, "\"refund\":\"%s\"}\n", refund.to_hex(hex_string_ptr, 1));
-        fprintf(stderr, "\"refund\":%u", refund._limbs[0]);
+        // printf("\"refund\":\"%s\"}\n", refund.to_hex(hex_string_ptr, 1));
+        printf("\"refund\":%u", refund._limbs[0]);
         #ifdef EIP_3155_OPTIONAL
-        fprintf(stderr, ",\"error\":%u,", error_code);
-        fprintf(stderr, ",\"memory\":\"");
+        printf(",\"error\":%u,", error_code);
+        printf(",\"memory\":\"");
         for (uint32_t j = 0; j < mem_size; j++) {
-            fprintf(stderr, "%02x", memory[j]);
+            printf("%02x", memory[j]);
         }
-        fprintf(stderr, "\"");
-        // fprintf(stderr, ",\"storage\":");
+        printf("\"");
+        // printf(",\"storage\":");
         // printf("\n");
         // printf("Touch state: ");
         // touch_state.print();
         #endif
-        fprintf(stderr, "}\n");
+        printf("}\n");
         if (tmp != nullptr) {
             delete [] tmp;
         }
@@ -216,36 +216,36 @@ namespace cuEVM::utils {
         }
     }
 
-    __host__ void tracer_t::print_err() {
+    __host__ __device__ void tracer_t::print_err() {
         char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
         for (uint32_t i = 0; i < size; i++) {
             data[i].print_err(hex_string_ptr);
         }
-        // fprintf(stderr, "{\"stateRoot\":\"0x\",\"output\":%s,\"gasUsed\":\"%s\",\"pass\":\"%s\",\"fork\":%s,\"time\":%lu}\n",
+        // printf("{\"stateRoot\":\"0x\",\"output\":%s,\"gasUsed\":\"%s\",\"pass\":\"%s\",\"fork\":%s,\"time\":%lu}\n",
         //     return_data.to_hex(), gas_used.to_hex(hex_string_ptr, 1), status == ERROR_SUCCESS ? "true" : "false", "\"\"\"\"", 2);
         
-        fprintf(stderr, "{\"stateRoot\":\"0x\",");
+        printf("{\"stateRoot\":\"0x\",");
 
         char *return_data_hex = return_data.to_hex();
 
         if (return_data_hex != nullptr) {
             if (strlen(return_data_hex) > 2) {
-                fprintf(stderr, "\"output\":\"%s\",", return_data_hex);
+                printf("\"output\":\"%s\",", return_data_hex);
             } else {
-                fprintf(stderr, "\"output\":\"\",");
+                printf("\"output\":\"\",");
             }
             delete [] return_data_hex;
         } else {
-            fprintf(stderr, "\"output\":\"\",");
+            printf("\"output\":\"\",");
         }
 
-        fprintf(stderr, "\"gasUsed\":\"%s\",", gas_used.to_hex(hex_string_ptr, 1));
+        printf("\"gasUsed\":\"%s\",", gas_used.to_hex(hex_string_ptr, 1));
 
-        fprintf(stderr, "\"pass\":\"%s\",", (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true" : "false");
+        printf("\"pass\":\"%s\",", (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true" : "false");
 
-        fprintf(stderr, "\"fork\":%s,", "\"\"\"\"");
+        printf("\"fork\":%s,", "\"\"\"\"");
 
-        fprintf(stderr, "\"time\":%lu}\n", 2);
+        printf("\"time\":%lu}\n", 2);
         delete [] hex_string_ptr;
     }
 

@@ -21,7 +21,11 @@ constexpr CONSTANT uint32_t cgbn_limbs = ((cuEVM::word_bits + 31) / 32);
  * the number of threads per instance and the
  * parameters class as template parameters.
 */
-using context_t = cgbn_context_t<cuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+#if defined(__CUDA_ARCH__)
+  using context_t = cgbn_context_t<cuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+#else
+  using context_t = cgbn_host_context_t<cuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+#endif
 
 /**
  * The CGBN environment type. This is a template type that takes the

@@ -317,15 +317,16 @@ namespace cuEVM
             managed
         );
 
-        if (managed) {
-            if (byte_code.size > 0) {
-                CUDA_CHECK(cudaMemPrefetchAsync(
-                    (void **)&(byte_code.data),
-                    byte_code.size * sizeof(uint8_t),
-                    0
-                ));
-            }
-        }
+        // TODO: check later the device id for gpu
+        // if (managed) {
+        //     if (byte_code.size > 0) {
+        //         CUDA_CHECK(cudaMemPrefetchAsync(
+        //             (void **)&(byte_code.data),
+        //             byte_code.size * sizeof(uint8_t),
+        //             0
+        //         ));
+        //     }
+        // }
 
         storage.from_json(
             cJSON_GetObjectItemCaseSensitive(

@@ -8,7 +8,7 @@
             "name": "CUDA C++: Launch",
             "type": "cuda-gdb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/cuevm",
+            "program": "${workspaceFolder}/build/cuevm_interpreter_CPU",
             "args": "--input ${workspaceFolder}/input/evm_arith.json --output ${workspaceFolder}/output/evm_test.json",
         },
         {

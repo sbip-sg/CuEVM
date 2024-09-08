@@ -195,10 +195,10 @@ namespace cuEVM {
             );
             #endif
             // DEBUG PRINT
-            printf("pc: %d opcode: %d\n", call_state_ptr->pc, opcode);
-            printf("touch state BEGIN BEGIN BEGIN\n");
-            call_state_ptr->touch_state.print();
-            printf("touch state END END END\n");
+            // printf("pc: %d opcode: %d\n", call_state_ptr->pc, opcode);
+            // printf("touch state BEGIN BEGIN BEGIN\n");
+            // call_state_ptr->touch_state.print();
+            // printf("touch state END END END\n");
             if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70))
             {
                 error_code = cuEVM::operations::PUSHX(
@@ -1219,11 +1219,12 @@ namespace cuEVM {
         return error_code;
     }
 
-    __host__ int32_t get_cpu_evm_instances(
+    __host__ int32_t get_evm_instances(
         ArithEnv &arith,
         evm_instance_t* &evm_instances,
         const cJSON* test_json,
-        uint32_t &num_instances
+        uint32_t &num_instances,
+        int32_t managed
     ) {
         // get the world state
         cuEVM::state::state_t *world_state_data_ptr = nullptr;
@@ -1236,10 +1237,11 @@ namespace cuEVM {
         else
             return 1;
         
-        world_state_data_ptr = new cuEVM::state::state_t(world_state_json);
+        world_state_data_ptr = new cuEVM::state::state_t(world_state_json, managed);
 
         // get the block info
-        cuEVM::block_info_t* block_info_ptr = new cuEVM::block_info_t(test_json);
+        cuEVM::block_info_t* block_info_ptr = nullptr;
+        cuEVM::get_block_info(block_info_ptr, test_json, managed);
 
         // get the transaction
         cuEVM::evm_transaction_t* transactions_ptr = nullptr;
@@ -1248,44 +1250,127 @@ namespace cuEVM {
             arith,
             transactions_ptr,
             test_json,
-            num_transactions
+            num_transactions,
+            managed
         );
 
         // generate the evm instances
-        evm_instances = new evm_instance_t[num_transactions];
+        if (managed == 0) {
+            evm_instances = new evm_instance_t[num_transactions];
+        } else {
+            CUDA_CHECK(cudaMallocManaged(
+                &evm_instances,
+                num_transactions * sizeof(evm_instance_t)
+            ));
+        }
         uint32_t index = 0;
         for (uint32_t index = 0; index < num_transactions; index++) {
             evm_instances[index].world_state_data_ptr = world_state_data_ptr;
             evm_instances[index].block_info_ptr = block_info_ptr;
             evm_instances[index].transaction_ptr = &transactions_ptr[index];
-            evm_instances[index].access_state_data_ptr = new cuEVM::state::state_access_t();
-            evm_instances[index].touch_state_data_ptr = new cuEVM::state::state_access_t();
-            evm_instances[index].log_state_ptr = new cuEVM::state::log_state_data_t();
-            evm_instances[index].return_data_ptr = new cuEVM::evm_return_data_t();
-            #ifdef EIP_3155
-            evm_instances[index].tracer_ptr = new cuEVM::utils::tracer_t();
-            #endif
+            if (managed == 0) {
+                evm_instances[index].access_state_data_ptr = new cuEVM::state::state_access_t();
+                evm_instances[index].touch_state_data_ptr = new cuEVM::state::state_access_t();
+                evm_instances[index].log_state_ptr = new cuEVM::state::log_state_data_t();
+                evm_instances[index].return_data_ptr = new cuEVM::evm_return_data_t();
+                #ifdef EIP_3155
+                evm_instances[index].tracer_ptr = new cuEVM::utils::tracer_t();
+                #endif
+            } else {
+                cuEVM::state::state_access_t *access_state = new cuEVM::state::state_access_t();
+                CUDA_CHECK(cudaMallocManaged(
+                    &evm_instances[index].access_state_data_ptr,
+                    sizeof(cuEVM::state::state_access_t)
+                ));
+                memcpy(
+                    evm_instances[index].access_state_data_ptr,
+                    access_state,
+                    sizeof(cuEVM::state::state_access_t)
+                );
+                CUDA_CHECK(cudaMallocManaged(
+                    &evm_instances[index].touch_state_data_ptr,
+                    sizeof(cuEVM::state::state_access_t)
+                ));
+                memcpy(
+                    evm_instances[index].touch_state_data_ptr,
+                    access_state,
+                    sizeof(cuEVM::state::state_access_t)
+                );
+                delete access_state;
+                cuEVM::state::log_state_data_t *log_state = new cuEVM::state::log_state_data_t();
+                CUDA_CHECK(cudaMallocManaged(
+                    &evm_instances[index].log_state_ptr,
+                    sizeof(cuEVM::state::log_state_data_t)
+                ));
+                memcpy(
+                    evm_instances[index].log_state_ptr,
+                    log_state,
+                    sizeof(cuEVM::state::log_state_data_t)
+                );
+                delete log_state;
+                cuEVM::evm_return_data_t *return_data = new cuEVM::evm_return_data_t();
+                CUDA_CHECK(cudaMallocManaged(
+                    &evm_instances[index].return_data_ptr,
+                    sizeof(cuEVM::evm_return_data_t)
+                ));
+                memcpy(
+                    evm_instances[index].return_data_ptr,
+                    return_data,
+                    sizeof(cuEVM::evm_return_data_t)
+                );
+                delete return_data;
+                #ifdef EIP_3155
+                cuEVM::utils::tracer_t *tracer = new cuEVM::utils::tracer_t();
+                CUDA_CHECK(cudaMallocManaged(
+                    &evm_instances[index].tracer_ptr,
+                    sizeof(cuEVM::utils::tracer_t)
+                ));
+                memcpy(
+                    evm_instances[index].tracer_ptr,
+                    tracer,
+                    sizeof(cuEVM::utils::tracer_t)
+                );
+                delete tracer;
+                #endif
+            }
         }
         num_instances = num_transactions;
     }
 
-    __host__ void free_cpu_evm_instances(
+    __host__ void free_evm_instances(
         evm_instance_t* &evm_instances,
-        uint32_t num_instances
+        uint32_t num_instances,
+        int32_t managed
     ) {
-        delete evm_instances[0].world_state_data_ptr;
-        delete evm_instances[0].block_info_ptr;
-        for (uint32_t index = 0; index < num_instances; index++) {
-            delete evm_instances[index].access_state_data_ptr;
-            delete evm_instances[index].touch_state_data_ptr;
-            delete evm_instances[index].log_state_ptr;
-            delete evm_instances[index].return_data_ptr;
-            #ifdef EIP_3155
-            delete evm_instances[index].tracer_ptr;
-            #endif
+        if (managed == 0)  {
+            delete evm_instances[0].world_state_data_ptr;
+            delete evm_instances[0].block_info_ptr;
+            for (uint32_t index = 0; index < num_instances; index++) {
+                delete evm_instances[index].access_state_data_ptr;
+                delete evm_instances[index].touch_state_data_ptr;
+                delete evm_instances[index].log_state_ptr;
+                delete evm_instances[index].return_data_ptr;
+                #ifdef EIP_3155
+                delete evm_instances[index].tracer_ptr;
+                #endif
+            }
+            delete[] evm_instances[0].transaction_ptr;
+            delete[] evm_instances;
+        } else {
+            CUDA_CHECK(cudaFree(evm_instances[0].world_state_data_ptr));
+            CUDA_CHECK(cudaFree(evm_instances[0].block_info_ptr));
+            for (uint32_t index = 0; index < num_instances; index++) {
+                CUDA_CHECK(cudaFree(evm_instances[index].access_state_data_ptr));
+                CUDA_CHECK(cudaFree(evm_instances[index].touch_state_data_ptr));
+                CUDA_CHECK(cudaFree(evm_instances[index].log_state_ptr));
+                CUDA_CHECK(cudaFree(evm_instances[index].return_data_ptr));
+                #ifdef EIP_3155
+                CUDA_CHECK(cudaFree(evm_instances[index].tracer_ptr));
+                #endif
+            }
+            CUDA_CHECK(cudaFree(evm_instances[0].transaction_ptr));
+            CUDA_CHECK(cudaFree(evm_instances));
         }
-        delete[] evm_instances[0].transaction_ptr;
-        delete[] evm_instances;
     }
 }
 // todo|: make a vector o functions global constants so you can call them
