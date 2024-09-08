@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-07-12
@@ -14,7 +14,7 @@
 #include <CuEVM/core/message.cuh>
 #include <cjson/cJSON.h>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace transaction {
         /**
          * The access list account.
@@ -100,7 +100,7 @@ namespace cuEVM {
             evm_word_t max_fee_per_gas;          /**< The max fee per gas YP: \f$T_{m}\f$ */
             evm_word_t max_priority_fee_per_gas; /**< The max priority fee per gas YP: \f$T_{f}\f$ */
             evm_word_t gas_price;                /**< The gas proce YP: \f$T_{p}\f$ */
-            cuEVM::byte_array_t data_init;            /**< The init or data YP:\f$T_{i}\f$ or \f$T_{d}\f$ */
+            CuEVM::byte_array_t data_init;            /**< The init or data YP:\f$T_{i}\f$ or \f$T_{d}\f$ */
             access_list_t access_list;           /**< The state YP: \f$T_{A}\f$ entry are \f$E=(E_{a}, E_{s})\f$*/
 
             // TODO: better constructors and destructors
@@ -181,7 +181,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t get_gas_price(
                 ArithEnv &arith,
-                const cuEVM::block_info_t &block_info,
+                const CuEVM::block_info_t &block_info,
                 bn_t &gas_price) const;
 
             /**
@@ -215,7 +215,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t get_transaction_fees(
                 ArithEnv &arith,
-                cuEVM::block_info_t &block_info,
+                CuEVM::block_info_t &block_info,
                 bn_t &gas_value,
                 bn_t &gas_limit,
                 bn_t &gas_price,
@@ -231,7 +231,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t access_list_warm_up(
                 ArithEnv &arith,
-                cuEVM::state::AccessState &access_state) const;
+                CuEVM::state::AccessState &access_state) const;
 
             /**
              * validate the transaction
@@ -246,9 +246,9 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t validate(
                 ArithEnv &arith,
-                cuEVM::state::AccessState &access_state,
-                cuEVM::state::TouchState &touch_state,
-                cuEVM::block_info_t &block_info,
+                CuEVM::state::AccessState &access_state,
+                CuEVM::state::TouchState &touch_state,
+                CuEVM::block_info_t &block_info,
                 bn_t &gas_used,
                 bn_t &gas_price,
                 bn_t &gas_priority_fee) const;
@@ -262,8 +262,8 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t get_message_call(
                 ArithEnv &arith,
-                cuEVM::state::AccessState &access_state,
-                cuEVM::evm_message_call_t* &evm_message_call_ptr) const;
+                CuEVM::state::AccessState &access_state,
+                CuEVM::evm_message_call_t* &evm_message_call_ptr) const;
 
             __host__ __device__ void print();
 

@@ -6,7 +6,7 @@
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/core/byte_array.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace utils {
 
     /**
@@ -37,7 +37,7 @@ namespace cuEVM {
       bn_t &contract_address,
       const bn_t &sender_address,
       const bn_t &salt,
-      const cuEVM::byte_array_t &init_code);
+      const CuEVM::byte_array_t &init_code);
     
 
     /**
@@ -114,6 +114,6 @@ namespace cuEVM {
      */
     __host__ cJSON *get_json_from_file(const char *filepath);
     } // namespace utils
-} // namespace cuEVM
+} // namespace CuEVM
 
 #endif // _CUEVM_EVM_UTILS_H_

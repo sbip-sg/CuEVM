@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -8,7 +8,7 @@
 
 #include <CuEVM/core/byte_array.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     /**
      * The return data class. (YP: \f$H_{return}(\mu)=H(\mu, I)\f$)
     */

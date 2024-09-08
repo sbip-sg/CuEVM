@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -9,10 +9,10 @@
 
 #include <CuEVM/utils/arith.cuh>
 
-namespace cuEVM
+namespace CuEVM
 {
   namespace stack {
-    constexpr uint32_t max_size = cuEVM::max_stack_size; /**< The maximum stack size*/
+    constexpr uint32_t max_size = CuEVM::max_stack_size; /**< The maximum stack size*/
     constexpr uint32_t alligment = sizeof(evm_word_t); /**< The alligment of the stack*/
     constexpr uint32_t initial_capacity = 16U; /**< The initial capacity of the stack can be change for performence reasons*/
 
@@ -215,8 +215,8 @@ namespace cuEVM
         evm_stack_t *gpu_instances,
         uint32_t count);
   } // namespace stack
-    // Type alias for accessing evm_stack_t directly under the cuEVM namespace
+    // Type alias for accessing evm_stack_t directly under the CuEVM namespace
   using evm_stack_t = stack::evm_stack_t;
-} // namespace cuEVM
+} // namespace CuEVM
 
 #endif

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -8,27 +8,27 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     __host__ __device__ int32_t SLOAD(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state,
-        const cuEVM::evm_message_call_t &message) {
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state,
+        const CuEVM::evm_message_call_t &message) {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t key;
         int32_t error_code = stack.pop(arith, key);
         bn_t storage_address;
         message.get_storage_address(arith, storage_address);
-        error_code |= cuEVM::gas_cost::sload_cost(
+        error_code |= CuEVM::gas_cost::sload_cost(
             arith,
             gas_used,
             access_state,
             storage_address,
             key);
-        error_code |= cuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
@@ -49,10 +49,10 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         bn_t &gas_refund,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state,
-        const cuEVM::evm_message_call_t &message)
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state,
+        const CuEVM::evm_message_call_t &message)
     {
         // only if is not a static call
         int32_t error_code = (
@@ -72,7 +72,7 @@ namespace cuEVM::operations {
         error_code |= stack.pop(arith, value);
         bn_t storage_address;
         message.get_storage_address(arith, storage_address);
-        error_code |= cuEVM::gas_cost::sstore_cost(
+        error_code |= CuEVM::gas_cost::sstore_cost(
             arith,
             gas_used,
             gas_refund,
@@ -81,7 +81,7 @@ namespace cuEVM::operations {
             storage_address,
             key,
             value);
-        error_code |= cuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -42,7 +42,7 @@
  *  - 47: SELFBALANCE
  * SELFBALANCE is moved here from block operations.
 */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The SHA3 operation implementation.
      * Takes the offset and length from the stack and pushes the hash of the
@@ -63,8 +63,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory);
 
     /**
      * The ADDRESS operation implementation.
@@ -82,8 +82,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The BALANCE operation implementation.
@@ -103,9 +103,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state);
 
     /**
      * The ORIGIN operation implementation.
@@ -122,8 +122,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_transaction_t &transaction);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_transaction_t &transaction);
 
     /**
      * The CALLER operation implementation.
@@ -140,8 +140,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The CALLVALUE operation implementation.
@@ -157,8 +157,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The CALLDATALOAD operation implementation.
@@ -178,8 +178,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The CALLDATASIZE operation implementation.
@@ -195,8 +195,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The CALLDATACOPY operation implementation.
@@ -222,9 +222,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message,
-        cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message,
+        CuEVM::evm_memory_t &memory);
 
     /**
      * The CODESIZE operation implementation.
@@ -241,8 +241,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The CODECOPY operation implementation.
@@ -269,9 +269,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message,
-        cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message,
+        CuEVM::evm_memory_t &memory);
 
     /**
      * The GASPRICE operation implementation.
@@ -290,9 +290,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block,
-        const cuEVM::evm_transaction_t &transaction);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block,
+        const CuEVM::evm_transaction_t &transaction);
 
     /**
      * The EXTCODESIZE operation implementation.
@@ -312,9 +312,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state);
 
     /**
      * The EXTCODECOPY operation implementation.
@@ -342,10 +342,10 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state,
-        cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state,
+        CuEVM::evm_memory_t &memory);
 
     /**
      * The RETURNDATASIZE operation implementation.
@@ -362,8 +362,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_return_data_t &return_data);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_return_data_t &return_data);
 
     /**
      * The RETURNDATACOPY operation implementation.
@@ -389,9 +389,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory,
-        const cuEVM::evm_return_data_t &return_data);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory,
+        const CuEVM::evm_return_data_t &return_data);
 
     /**
      * The EXTCODEHASH operation implementation.
@@ -413,9 +413,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state);
 
     /**
      * The SELFBALANCE operation implementation.
@@ -435,9 +435,9 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::state::TouchState &touch_state,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::state::TouchState &touch_state,
+        const CuEVM::evm_message_call_t &message);
 }
 
 #endif

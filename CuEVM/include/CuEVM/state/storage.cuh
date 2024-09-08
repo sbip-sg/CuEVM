@@ -4,7 +4,7 @@
 #include <CuEVM/utils/arith.cuh>
 #include <cjson/cJSON.h>
 
-namespace cuEVM
+namespace CuEVM
 {
     namespace storage {
         struct storage_element_t
@@ -277,6 +277,6 @@ namespace cuEVM
 
     } // namespace storage
 
-} // namespace cuEVM
+} // namespace CuEVM
 
 #endif

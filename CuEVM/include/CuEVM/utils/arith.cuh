@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -14,24 +14,24 @@
 #include <CuEVM/core/byte_array.cuh>
 
 
-namespace cuEVM {
-constexpr CONSTANT uint32_t cgbn_limbs = ((cuEVM::word_bits + 31) / 32);
+namespace CuEVM {
+constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
 /**
  * The CGBN context type.  This is a template type that takes
  * the number of threads per instance and the
  * parameters class as template parameters.
 */
 #if defined(__CUDA_ARCH__)
-  using context_t = cgbn_context_t<cuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+  using context_t = cgbn_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 #else
-  using context_t = cgbn_host_context_t<cuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+  using context_t = cgbn_host_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 #endif
 
 /**
  * The CGBN environment type. This is a template type that takes the
  * context type as a template parameter. It provides the CGBN functions.
 */
-using env_t = cgbn_env_t<context_t, cuEVM::word_bits>;
+using env_t = cgbn_env_t<context_t, CuEVM::word_bits>;
 
 /**
  * The CGBN base type for the given number of bit in environment.
@@ -45,7 +45,7 @@ using bn_wide_t = env_t::cgbn_wide_t;
 /**
  * The EVM word type. also use for store CGBN base type.
 */
-struct evm_word_t : cgbn_mem_t<cuEVM::word_bits> {
+struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
   /**
    * The default constructor.
    */
@@ -133,7 +133,7 @@ struct evm_word_t : cgbn_mem_t<cuEVM::word_bits> {
   __host__ __device__ char* to_hex(
     char *hex_string = nullptr,
     int32_t pretty = 0,
-    uint32_t count = cuEVM::cgbn_limbs) const;
+    uint32_t count = CuEVM::cgbn_limbs) const;
   /**
    * Get the byte array from the evm_word_t.
    * The byte array is in Big Endian format.
@@ -156,7 +156,7 @@ struct evm_word_t : cgbn_mem_t<cuEVM::word_bits> {
     byte_array_t *bit_array = nullptr) const;
 };
 
-typedef cgbn_mem_t<cuEVM::word_bits>* cgbn_evm_word_t_ptr;
+typedef cgbn_mem_t<CuEVM::word_bits>* cgbn_evm_word_t_ptr;
 
 /**
  * The arithmetic environment class is a wrapper around the CGBN library.
@@ -277,7 +277,7 @@ public:
     uint8_t *dst_array,
     uint32_t &array_length,
     evm_word_t &src_cgbn_mem,
-    uint32_t limb_count = cuEVM::cgbn_limbs);
+    uint32_t limb_count = CuEVM::cgbn_limbs);
 
   /**
    * Get an array of bytes from CGBN memory.
@@ -291,7 +291,7 @@ public:
     uint8_t *dst_array,
     size_t &array_length,
     evm_word_t &src_cgbn_mem,
-    size_t limb_count = cuEVM::cgbn_limbs);
+    size_t limb_count = CuEVM::cgbn_limbs);
 
   /**
    * Print the byte array as hex. Utility for debugging
@@ -392,7 +392,7 @@ __host__ __device__ int32_t evm_word_t_from_hex_string(
 __host__ void hex_string_from_evm_word_t(
   char *hex_string,
   evm_word_t &evm_word,
-  uint32_t count = cuEVM::cgbn_limbs);
+  uint32_t count = CuEVM::cgbn_limbs);
   /**
    * Print the evm word in hex string format.
    * The hex string is in Big Endian format.
@@ -400,6 +400,6 @@ __host__ void hex_string_from_evm_word_t(
   */
   __host__ __device__ void print_evm_word_t(
     evm_word_t &evm_word);
-} // namespace cuEVM
+} // namespace CuEVM
 
 #endif

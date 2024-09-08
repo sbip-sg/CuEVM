@@ -4,7 +4,7 @@
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace utils {
         __host__ __device__ int32_t get_contract_address_create(
             ArithEnv &arith,
@@ -19,23 +19,23 @@ namespace cuEVM {
                 sender_address);
             evm_word_t sender_nonce_word;
             cgbn_store(arith.env, &sender_nonce_word, sender_nonce);
-            cuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
+            CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
             sender_address_word.to_byte_array_t(&sender_address_bytes);
             sender_nonce_word.to_byte_array_t(&sender_nonce_bytes);
 
             uint32_t nonce_bytes;
-            for (nonce_bytes = cuEVM::word_size; nonce_bytes > 0; nonce_bytes--) {
-                if (sender_nonce_bytes.data[cuEVM::word_size - nonce_bytes] != 0) {
+            for (nonce_bytes = CuEVM::word_size; nonce_bytes > 0; nonce_bytes--) {
+                if (sender_nonce_bytes.data[CuEVM::word_size - nonce_bytes] != 0) {
                 break;
                 }
             }
-            // TODO: this might work only for cuEVM::word_size == 32
+            // TODO: this might work only for CuEVM::word_size == 32
 
-            uint8_t rlp_list[1 + 1 + cuEVM::address_size + 1 + cuEVM::word_size];
-            rlp_list[1] = 0x80 + cuEVM::address_size;
-            for (uint32_t idx = 0; idx < cuEVM::address_size; idx++)
+            uint8_t rlp_list[1 + 1 + CuEVM::address_size + 1 + CuEVM::word_size];
+            rlp_list[1] = 0x80 + CuEVM::address_size;
+            for (uint32_t idx = 0; idx < CuEVM::address_size; idx++)
             {
-                rlp_list[2 + idx] = sender_address_bytes.data[cuEVM::word_size - cuEVM::address_size + idx];
+                rlp_list[2 + idx] = sender_address_bytes.data[CuEVM::word_size - CuEVM::address_size + idx];
             }
 
             uint32_t rlp_list_length;
@@ -43,14 +43,14 @@ namespace cuEVM {
             // and the 1 byte is the 0x80 + length of the address (20)
             if (cgbn_compare_ui32(arith.env, sender_nonce, 128) < 0)
             {
-                rlp_list_length = 1 + cuEVM::address_size + 1;
+                rlp_list_length = 1 + CuEVM::address_size + 1;
                 if (cgbn_compare_ui32(arith.env, sender_nonce, 0)  == 0)
                 {
-                rlp_list[2 + cuEVM::address_size] = 0x80; // special case for nonce 0
+                rlp_list[2 + CuEVM::address_size] = 0x80; // special case for nonce 0
                 }
                 else
                 {
-                rlp_list[2 + cuEVM::address_size] = sender_nonce_bytes.data[cuEVM::word_size - 1];
+                rlp_list[2 + CuEVM::address_size] = sender_nonce_bytes.data[CuEVM::word_size - 1];
                 }
             }
             else
@@ -58,22 +58,22 @@ namespace cuEVM {
                 // 1 byte for the length of the nonce
                 // 0x80 + length of the nonce
                 rlp_list_length = 21 + 1 + nonce_bytes;
-                rlp_list[2 + cuEVM::address_size] = 0x80 + nonce_bytes;
+                rlp_list[2 + CuEVM::address_size] = 0x80 + nonce_bytes;
                 for (uint8_t idx = 0; idx < nonce_bytes; idx++)
                 {
-                rlp_list[2 + cuEVM::address_size + 1 + idx] = sender_nonce_bytes.data[cuEVM::word_size - nonce_bytes + idx];
+                rlp_list[2 + CuEVM::address_size + 1 + idx] = sender_nonce_bytes.data[CuEVM::word_size - nonce_bytes + idx];
                 }
             }
             rlp_list[0] = 0xc0 + rlp_list_length;
 
-            uint8_t address_bytes[cuEVM::hash_size];
-            cuEVM::byte_array_t hash_address_bytes(cuEVM::hash_size);
+            uint8_t address_bytes[CuEVM::hash_size];
+            CuEVM::byte_array_t hash_address_bytes(CuEVM::hash_size);
             CuCrypto::keccak::sha3(
                 &(rlp_list[0]),
                 rlp_list_length + 1,
                 hash_address_bytes.data,
-                cuEVM::hash_size);
-            for (uint8_t idx = 0; idx < cuEVM::word_size - cuEVM::address_size; idx++)
+                CuEVM::hash_size);
+            for (uint8_t idx = 0; idx < CuEVM::word_size - CuEVM::address_size; idx++)
             {
                 address_bytes[idx] = 0;
             }
@@ -89,47 +89,47 @@ namespace cuEVM {
             bn_t &contract_address,
             const bn_t &sender_address,
             const bn_t &salt,
-            const cuEVM::byte_array_t &init_code) {
+            const CuEVM::byte_array_t &init_code) {
             evm_word_t sender_address_word;
             cgbn_store(arith.env, &sender_address_word, sender_address);
             evm_word_t salt_word;
             cgbn_store(arith.env, &salt_word, salt);
-            cuEVM::byte_array_t sender_address_bytes, salt_bytes;
+            CuEVM::byte_array_t sender_address_bytes, salt_bytes;
             sender_address_word.to_byte_array_t(&sender_address_bytes);
             salt_word.to_byte_array_t(&salt_bytes);
 
-            uint32_t total_bytes = 1 + cuEVM::address_size + cuEVM::word_size + cuEVM::hash_size;
+            uint32_t total_bytes = 1 + CuEVM::address_size + CuEVM::word_size + CuEVM::hash_size;
 
-            cuEVM::byte_array_t hash_code(cuEVM::hash_size);
+            CuEVM::byte_array_t hash_code(CuEVM::hash_size);
             CuCrypto::keccak::sha3(
                 init_code.data,
                 init_code.size,
                 hash_code.data,
-                cuEVM::hash_size);
+                CuEVM::hash_size);
             
-            cuEVM::byte_array_t input_data(total_bytes);
+            CuEVM::byte_array_t input_data(total_bytes);
             input_data.data[0] = 0xff;
-            for (uint32_t idx = 0; idx < cuEVM::address_size; idx++)
+            for (uint32_t idx = 0; idx < CuEVM::address_size; idx++)
             {
-                input_data.data[1 + idx] = sender_address_bytes.data[cuEVM::word_size - cuEVM::address_size + idx];
+                input_data.data[1 + idx] = sender_address_bytes.data[CuEVM::word_size - CuEVM::address_size + idx];
             }
-            for (uint32_t idx = 0; idx < cuEVM::word_size; idx++)
+            for (uint32_t idx = 0; idx < CuEVM::word_size; idx++)
             {
-                input_data.data[1 + cuEVM::address_size + idx] = salt_bytes.data[cuEVM::word_size - cuEVM::word_size + idx];
+                input_data.data[1 + CuEVM::address_size + idx] = salt_bytes.data[CuEVM::word_size - CuEVM::word_size + idx];
             }
-            for (uint32_t idx = 0; idx < cuEVM::hash_size; idx++)
+            for (uint32_t idx = 0; idx < CuEVM::hash_size; idx++)
             {
-                input_data.data[1 + cuEVM::address_size + cuEVM::word_size + idx] = hash_code.data[idx];
+                input_data.data[1 + CuEVM::address_size + CuEVM::word_size + idx] = hash_code.data[idx];
             }
 
-            cuEVM::byte_array_t hash_input_data(cuEVM::hash_size);
+            CuEVM::byte_array_t hash_input_data(CuEVM::hash_size);
             CuCrypto::keccak::sha3(
                 input_data.data,
                 total_bytes,
                 hash_input_data.data,
-                cuEVM::hash_size);
+                CuEVM::hash_size);
             
-            for (uint32_t idx = 0; idx < cuEVM::word_size - cuEVM::address_size; idx++)
+            for (uint32_t idx = 0; idx < CuEVM::word_size - CuEVM::address_size; idx++)
             {
                 hash_input_data.data[idx] = 0;
             }

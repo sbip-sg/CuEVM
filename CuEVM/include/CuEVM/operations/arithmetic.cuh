@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Date: 2024-07-15
@@ -25,7 +25,7 @@
  * - EXP
  * - SIGNEXTEND
  */
-namespace cuEVM {
+namespace CuEVM {
     namespace operations {
         /**
          * The ADD operation implementation.
@@ -41,7 +41,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The MUL operation implementation.
@@ -57,7 +57,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The SUB operation implementation.
@@ -73,7 +73,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The DIV operation implementation.
@@ -91,7 +91,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The SDIV operation implementation.
@@ -110,7 +110,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
         /**
          * The MOD operation implementation.
          * Takes two values from the stack, calculates the remainder
@@ -128,7 +128,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The SMOD operation implementation.
@@ -147,7 +147,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The ADDMOD operation implementation.
@@ -166,7 +166,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The MULMOD operation implementation.
@@ -187,7 +187,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
         /**
          * The EXP operation implementation.
          * Takes two values from the stack, calculates the first value
@@ -205,7 +205,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The SIGNEXTEND operation implementation.
@@ -228,7 +228,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
     }
 }
 

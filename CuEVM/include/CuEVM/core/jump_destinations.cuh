@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -12,7 +12,7 @@
 #include <cuda.h>
 #include <CuEVM/core/byte_array.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     /**
      * The class for keeping the valid jump destination of the code
      * (i.e. the locations of the JUMPDEST opcodes).
@@ -34,7 +34,7 @@ namespace cuEVM {
          * @param[in] byte_code The code
         */
         __host__ __device__ jump_destinations_t(
-            cuEVM::byte_array_t &byte_code
+            CuEVM::byte_array_t &byte_code
         );
 
         /**

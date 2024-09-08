@@ -26,7 +26,7 @@
  * - INVALID
  * - SELFDESTRUCT
  */
-namespace cuEVM::operations
+namespace CuEVM::operations
 {
     /**
      * The STOP operation.
@@ -34,7 +34,7 @@ namespace cuEVM::operations
      * @return return error code.
      */
     __host__ __device__ int32_t STOP(
-        cuEVM::evm_return_data_t &return_data);
+        CuEVM::evm_return_data_t &return_data);
 
     /**
      * The CREATE operation. gives the new evm call state
@@ -46,9 +46,9 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CREATE(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr);
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The CALL operation. gives the new evm call state
@@ -60,9 +60,9 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CALL(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr);
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The CALLCODE operation. gives the new evm call state
@@ -74,9 +74,9 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t CALLCODE(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr);
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The RETURN operation.
@@ -92,9 +92,9 @@ namespace cuEVM::operations
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory,
-        cuEVM::evm_return_data_t &return_data);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory,
+        CuEVM::evm_return_data_t &return_data);
     /**
      * The DELEGATECALL operation. gives the new evm call state
      * @param[in] arith The arithmetical environment.
@@ -105,9 +105,9 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t DELEGATECALL(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr);
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The CREATE2 operation. gives the new evm call state
@@ -119,9 +119,9 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CREATE2(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr);
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The STATICCALL operation. gives the new evm call state
@@ -133,9 +133,9 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t STATICCALL(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr);
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr);
 
     /**
      * The REVERT operation.
@@ -150,9 +150,9 @@ namespace cuEVM::operations
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory,
-        cuEVM::evm_return_data_t &return_data);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory,
+        CuEVM::evm_return_data_t &return_data);
 
     /**
      * The INVALID operation.
@@ -175,10 +175,10 @@ namespace cuEVM::operations
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message,
-        cuEVM::state::TouchState &touch_state,
-        cuEVM::evm_return_data_t &return_data);
-} // namespace cuEVM::operation
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_message_call_t &message,
+        CuEVM::state::TouchState &touch_state,
+        CuEVM::evm_return_data_t &return_data);
+} // namespace CuEVM::operation
 
 #endif

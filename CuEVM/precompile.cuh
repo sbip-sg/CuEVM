@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-03-13
@@ -46,7 +46,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message) {
         // Identity function
 
@@ -90,7 +90,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // static gas
@@ -127,7 +127,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // static gas
@@ -171,7 +171,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // get the size of the base, exponent and modulus
@@ -694,7 +694,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message) {
 
         // expecting 213 bytes inputs
@@ -751,7 +751,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
@@ -812,7 +812,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
         cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_PRECOMPILE_ECADD);
@@ -865,7 +865,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
 
@@ -917,7 +917,7 @@ namespace precompile_operations {
         bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &error_code,
-        cuEVM::EVMReturnData &return_data,
+        CuEVM::EVMReturnData &return_data,
         message_t &message
     ) {
 

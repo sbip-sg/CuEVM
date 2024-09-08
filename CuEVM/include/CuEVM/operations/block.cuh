@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -28,7 +28,7 @@
  * SELFBALANCE is moved to environmental operations because it is
  * not related to the block.
  */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The BLOCKHASH operation implementation.
      * Takes the number from the stack and pushes the hash of the block
@@ -45,8 +45,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 
     /**
      * The COINBASE operation implementation.
@@ -62,8 +62,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 
     /**
      * The TIMESTAMP operation implementation.
@@ -79,8 +79,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 
     /**
      * The NUMBER operation implementation.
@@ -96,8 +96,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 
     /**
      * The DIFFICULTY/PREVRANDAO operation implementation.
@@ -113,8 +113,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 
     /**
      * The GASLIMIT operation implementation.
@@ -130,8 +130,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 
     /**
      * The CHAINID operation implementation.
@@ -147,8 +147,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 
     /**
      * The BASEFEE operation implementation.
@@ -164,8 +164,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::block_info_t &block);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::block_info_t &block);
 }
 
 #endif

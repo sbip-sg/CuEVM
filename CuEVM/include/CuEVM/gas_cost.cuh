@@ -70,7 +70,7 @@
 #define GAS_PRECOMPILE_ECPAIRING_PAIR 34000
 #define GAS_PRECOMPILE_BLAKE2_ROUND 1
 
-namespace cuEVM {
+namespace CuEVM {
     namespace gas_cost {
         /**
          * Verify if is enough gas for the operation.
@@ -252,7 +252,7 @@ namespace cuEVM {
         __host__ __device__ int32_t access_account_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            const cuEVM::state::AccessState &access_state,
+            const CuEVM::state::AccessState &access_state,
             const bn_t &address);
 
         /**
@@ -267,7 +267,7 @@ namespace cuEVM {
         __host__ __device__ int32_t sload_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            const cuEVM::state::AccessState &access_state,
+            const CuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key);
         
@@ -287,8 +287,8 @@ namespace cuEVM {
             ArithEnv &arith,
             bn_t &gas_used,
             bn_t &gas_refund,
-            const cuEVM::state::TouchState &touch_state,
-            const cuEVM::state::AccessState &access_state,
+            const CuEVM::state::TouchState &touch_state,
+            const CuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key,
             const bn_t &value);
@@ -302,7 +302,7 @@ namespace cuEVM {
          */
         __host__ __device__ int32_t transaction_intrinsic_gas(
             ArithEnv &arith,
-            const cuEVM::evm_transaction_t &transaction,
+            const CuEVM::evm_transaction_t &transaction,
             bn_t &gas_intrinsic);
         
         /**
@@ -317,14 +317,14 @@ namespace cuEVM {
          */
         __host__ __device__ int32_t memory_grow_cost(
             ArithEnv &arith,
-            const cuEVM::evm_memory_t &memory,
+            const CuEVM::evm_memory_t &memory,
             const bn_t &index,
             const bn_t &length,
             bn_t &memory_expansion_cost,
             bn_t &gas_used);
 
     } // namespace gas_cost
-} // namespace cuEVM
+} // namespace CuEVM
 
 
 #endif  // __GAS_COST_H__

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -7,7 +7,7 @@
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM
+namespace CuEVM
 {
   namespace stack {
 
@@ -175,7 +175,7 @@ namespace cuEVM
 
       __host__ cJSON *evm_stack_t::to_json() {
         cJSON *json = cJSON_CreateObject();
-        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+        char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
         cJSON *stack = cJSON_CreateArray();
         for (uint32_t idx = 0; idx < size(); idx++)
         {
@@ -311,7 +311,7 @@ namespace cuEVM
         tmp_cpu_instances[idx].clear();
       }
       delete[] tmp_cpu_instances;
-      cuEVM::stack::transfer_kernel<<<count, 1>>>(
+      CuEVM::stack::transfer_kernel<<<count, 1>>>(
         tmp_gpu_instances,
         gpu_instances,
         count);
@@ -355,8 +355,8 @@ namespace cuEVM
       }
       delete[] tmp_cpu_instances;
       tmp_cpu_instances = NULL;
-      cuEVM::stack::gpu_free(gpu_instances, count);
+      CuEVM::stack::gpu_free(gpu_instances, count);
       return cpu_instances;
     }
   } // namespace stack
-} // namespace cuEVM
+} // namespace CuEVM

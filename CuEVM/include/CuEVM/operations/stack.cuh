@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Date: 2023-07-15
@@ -19,7 +19,7 @@
  * - DUPX 80s: Duplication Operations
  * - SWAPX 90s: Exchange Operations
  */
-namespace cuEVM {
+namespace CuEVM {
     namespace operations {
         /**
          * The POP operation implementation.
@@ -33,7 +33,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The PUSH0 operation implementation.
@@ -47,7 +47,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack);
+            CuEVM::evm_stack_t &stack);
 
         /**
          * The PUSHX operation implementation.
@@ -68,8 +68,8 @@ namespace cuEVM {
             const bn_t &gas_limit,
             bn_t &gas_used,
             uint32_t &pc,
-            cuEVM::evm_stack_t &stack,
-            const cuEVM::byte_array_t &byte_code,
+            CuEVM::evm_stack_t &stack,
+            const CuEVM::byte_array_t &byte_code,
             const uint8_t &opcode);
 
         /**
@@ -92,7 +92,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack,
+            CuEVM::evm_stack_t &stack,
             const uint8_t &opcode);
 
         /**
@@ -114,7 +114,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &gas_limit,
             bn_t &gas_used,
-            cuEVM::evm_stack_t &stack,
+            CuEVM::evm_stack_t &stack,
             const uint8_t &opcode);
     }
 }

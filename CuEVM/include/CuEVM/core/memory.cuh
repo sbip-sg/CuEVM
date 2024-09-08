@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -13,7 +13,7 @@
 
 
 
-namespace cuEVM {
+namespace CuEVM {
   namespace memory {
     // to change for making more optimal memory allocation current 1KB
     constexpr CONSTANT uint32_t page_size = 1024U;
@@ -21,7 +21,7 @@ namespace cuEVM {
      * The memory data structure.
     */
     struct evm_memory_t {
-      cuEVM::byte_array_t data; /**< The data of the memory*/
+      CuEVM::byte_array_t data; /**< The data of the memory*/
       evm_word_t memory_cost; /**< The memory cost (YP: \f$M(\mu_{i})\f$)*/
       uint32_t size; /**< The size of the memory acceesed by now (YP: \f$32 \dot \mu_{i}\f$)*/
 
@@ -124,7 +124,7 @@ namespace cuEVM {
         ArithEnv &arith,
         const bn_t &index,
         const bn_t &length,
-        cuEVM::byte_array_t &data);
+        CuEVM::byte_array_t &data);
 
       /**
        * Set the given memory data. Outside available_size is 0.
@@ -136,7 +136,7 @@ namespace cuEVM {
        */
       __host__ __device__ int32_t set(
         ArithEnv &arith,
-        const cuEVM::byte_array_t &data,
+        const CuEVM::byte_array_t &data,
         const bn_t &index,
         const bn_t &length);
     };

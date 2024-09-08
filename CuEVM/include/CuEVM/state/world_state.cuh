@@ -6,7 +6,7 @@
 #include <CuEVM/state/state.cuh>
 
 
-namespace cuEVM {
+namespace CuEVM {
     namespace state {
         /**
          * The world state classs
@@ -39,7 +39,7 @@ namespace cuEVM {
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t* &account_ptr);
+                CuEVM::account::account_t* &account_ptr);
 
             /**
              * Get the value of a storage element

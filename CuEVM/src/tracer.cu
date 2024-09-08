@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -9,9 +9,9 @@
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM::utils {
+namespace CuEVM::utils {
     __host__ cJSON* trace_data_t::to_json() {
-        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+        char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
         cJSON *json = cJSON_CreateObject();
         cJSON_AddNumberToObject(json, "pc", pc);
         cJSON_AddNumberToObject(json, "op", op);
@@ -29,7 +29,7 @@ namespace cuEVM::utils {
         cJSON_AddStringToObject(json, "refund", refund.to_hex(hex_string_ptr));
         #ifdef EIP_3155_OPTIONAL
         cJSON_AddNumberToObject(json, "errorCode", error_code);
-        cuEVM::byte_array_t memory_array(memory, mem_size);
+        CuEVM::byte_array_t memory_array(memory, mem_size);
         cJSON_AddItemToObject(json, "memory", memory_array.to_json());
         //cJSON_AddItemToObject(json, "touchState", touch_state.json());
         #endif
@@ -40,7 +40,7 @@ namespace cuEVM::utils {
     __host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
         char *tmp = nullptr;
         if (hex_string_ptr == nullptr) {
-            tmp = new char[cuEVM::word_size * 2 + 3];
+            tmp = new char[CuEVM::word_size * 2 + 3];
             hex_string_ptr = tmp;
         }
         std::string stack_str;
@@ -122,10 +122,10 @@ namespace cuEVM::utils {
         ArithEnv &arith,
         const uint32_t pc,
         const uint8_t op,
-        const cuEVM::evm_memory_t &memory,
-        const cuEVM::evm_stack_t &stack,
+        const CuEVM::evm_memory_t &memory,
+        const CuEVM::evm_stack_t &stack,
         const uint32_t depth,
-        const cuEVM::evm_return_data_t &return_data,
+        const CuEVM::evm_return_data_t &return_data,
         const bn_t &gas_limit,
         const bn_t &gas_used
     ) {
@@ -160,7 +160,7 @@ namespace cuEVM::utils {
         const bn_t &gas_refund
         #ifdef EIP_3155_OPTIONAL
         , const uint32_t error_code,
-        const cuEVM::state::TouchState &touch_state
+        const CuEVM::state::TouchState &touch_state
         #endif
     ) {
         bn_t gas_cost;
@@ -176,7 +176,7 @@ namespace cuEVM::utils {
 
     __host__ __device__ void tracer_t::finish_transaction(
         ArithEnv &arith,
-        const cuEVM::evm_return_data_t &return_data,
+        const CuEVM::evm_return_data_t &return_data,
         const bn_t &gas_used,
         uint32_t error_code
     ) {
@@ -217,7 +217,7 @@ namespace cuEVM::utils {
     }
 
     __host__ __device__ void tracer_t::print_err() {
-        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+        char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
         for (uint32_t i = 0; i < size; i++) {
             data[i].print_err(hex_string_ptr);
         }

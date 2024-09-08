@@ -1,7 +1,7 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace gas_cost {
         __host__ __device__ int32_t has_gas(
             ArithEnv &arith,
@@ -33,8 +33,8 @@ namespace cuEVM {
             // gas_used += gas_per_word * emv word count of length
             // length = (length + 31) / 32
             bn_t evm_words_gas;
-            cgbn_add_ui32(arith.env, evm_words_gas, length, cuEVM::word_size -1);
-            cgbn_div_ui32(arith.env, evm_words_gas, evm_words_gas, cuEVM::word_size);
+            cgbn_add_ui32(arith.env, evm_words_gas, length, CuEVM::word_size -1);
+            cgbn_div_ui32(arith.env, evm_words_gas, evm_words_gas, CuEVM::word_size);
             cgbn_mul_ui32(arith.env, evm_words_gas, evm_words_gas, gas_per_word);
             cgbn_add(arith.env, gas_used, gas_used, evm_words_gas);
         }
@@ -56,7 +56,7 @@ namespace cuEVM {
             const bn_t &exponent) {
             // dynamic gas calculation (G_expbyte * bytes_in_exponent)
             int32_t last_bit;
-            last_bit = cuEVM::word_bits - 1 - cgbn_clz(arith.env, exponent);
+            last_bit = CuEVM::word_bits - 1 - cgbn_clz(arith.env, exponent);
             uint32_t exponent_byte_size = (last_bit == -1) ? 0 : (last_bit) / 8 + 1;
             bn_t dynamic_gas;
             cgbn_set_ui32(arith.env, dynamic_gas, exponent_byte_size);
@@ -156,7 +156,7 @@ namespace cuEVM {
         __host__ __device__ int32_t access_account_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            const cuEVM::state::AccessState &access_state,
+            const CuEVM::state::AccessState &access_state,
             const bn_t &address) {
             if (access_state.is_warm_account(arith, address)) {
                 cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
@@ -169,7 +169,7 @@ namespace cuEVM {
         __host__ __device__ int32_t sload_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            const cuEVM::state::AccessState &access_state,
+            const CuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key) {
             // get the key warm
@@ -186,8 +186,8 @@ namespace cuEVM {
             ArithEnv &arith,
             bn_t &gas_used,
             bn_t &gas_refund,
-            const cuEVM::state::TouchState &touch_state,
-            const cuEVM::state::AccessState &access_state,
+            const CuEVM::state::TouchState &touch_state,
+            const CuEVM::state::AccessState &access_state,
             const bn_t &address,
             const bn_t &key,
             const bn_t &new_value) {
@@ -251,7 +251,7 @@ namespace cuEVM {
 
         __host__ __device__ int32_t transaction_intrinsic_gas(
             ArithEnv &arith,
-            const cuEVM::evm_transaction_t &transaction,
+            const CuEVM::evm_transaction_t &transaction,
             bn_t &gas_intrinsic) {
             
             // gas_intrinsic = GAS_TRANSACTION
@@ -293,7 +293,7 @@ namespace cuEVM {
 
         __host__ __device__ int32_t memory_grow_cost(
             ArithEnv &arith,
-            const cuEVM::evm_memory_t &memory,
+            const CuEVM::evm_memory_t &memory,
             const bn_t &index,
             const bn_t &length,
             bn_t &memory_expansion_cost,
@@ -354,4 +354,4 @@ namespace cuEVM {
             return ERR_MEMORY_INVALID_OFFSET;
         }
     } // namespace gas_cost
-} // namespace cuEVM
+} // namespace CuEVM

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-07-12
@@ -10,7 +10,7 @@
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace transaction {
             __host__ __device__ int32_t access_list_account_t::free(
                 int32_t managed) {
@@ -149,7 +149,7 @@ namespace cuEVM {
 
             __host__ __device__ int32_t evm_transaction_t::get_gas_price(
                 ArithEnv &arith,
-                const cuEVM::block_info_t &block_info,
+                const CuEVM::block_info_t &block_info,
                 bn_t &gas_price) const {
                 if ((type == 0) || (type == 1)) {
                     // \f$p = T_{p}\f$
@@ -197,7 +197,7 @@ namespace cuEVM {
 
             __host__ __device__ int32_t evm_transaction_t::get_transaction_fees(
                 ArithEnv &arith,
-                cuEVM::block_info_t &block_info,
+                CuEVM::block_info_t &block_info,
                 bn_t &gas_value,
                 bn_t &gas_limit,
                 bn_t &gas_price,
@@ -241,11 +241,11 @@ namespace cuEVM {
 
             __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(
                 ArithEnv &arith,
-                cuEVM::state::AccessState &access_state) const {
+                CuEVM::state::AccessState &access_state) const {
                 for (uint32_t i = 0; i < access_list.accounts_count; i++) {
                     bn_t address;
                     cgbn_load(arith.env, address, (cgbn_evm_word_t_ptr) &(access_list.accounts[i].address));
-                    cuEVM::account::account_t* account_ptr = nullptr;
+                    CuEVM::account::account_t* account_ptr = nullptr;
                     access_state.get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG);
                     for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
                         bn_t key;
@@ -259,15 +259,15 @@ namespace cuEVM {
 
             __host__ __device__ int32_t evm_transaction_t::validate(
                 ArithEnv &arith,
-                cuEVM::state::AccessState &access_state,
-                cuEVM::state::TouchState &touch_state,
-                cuEVM::block_info_t &block_info,
+                CuEVM::state::AccessState &access_state,
+                CuEVM::state::TouchState &touch_state,
+                CuEVM::block_info_t &block_info,
                 bn_t &gas_used,
                 bn_t &gas_price,
                 bn_t &gas_priority_fee) const {
                 
                 bn_t gas_intrinsic;
-                cuEVM::gas_cost::transaction_intrinsic_gas(arith, *this, gas_intrinsic);
+                CuEVM::gas_cost::transaction_intrinsic_gas(arith, *this, gas_intrinsic);
                 bn_t gas_limit;
                 bn_t gas_value;
                 bn_t up_front_cost;
@@ -278,7 +278,7 @@ namespace cuEVM {
 
                 bn_t sender_address;
                 get_sender(arith, sender_address);
-                cuEVM::account::account_t* sender_account = nullptr;
+                CuEVM::account::account_t* sender_account = nullptr;
                 access_state.get_account(arith, sender_address, sender_account, ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
                 bn_t sender_balance;
                 sender_account->get_balance(arith, sender_balance);
@@ -360,7 +360,7 @@ namespace cuEVM {
                 #endif
                 bn_t precompile_contract_address;
                 #pragma unroll
-                for (uint32_t idx = 0; idx < cuEVM::no_precompile_contracts; idx++) {
+                for (uint32_t idx = 0; idx < CuEVM::no_precompile_contracts; idx++) {
                     cgbn_set_ui32(arith.env, precompile_contract_address, idx);
                     access_state.get_account(
                         arith,
@@ -381,8 +381,8 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t evm_transaction_t::get_message_call(
                 ArithEnv &arith,
-                cuEVM::state::AccessState &access_state,
-                cuEVM::evm_message_call_t* &evm_message_call_ptr) const {
+                CuEVM::state::AccessState &access_state,
+                CuEVM::evm_message_call_t* &evm_message_call_ptr) const {
                 bn_t sender_address, to_address, value, gas_limit;
                 get_sender(arith, sender_address);
                 get_to(arith, to_address);
@@ -390,19 +390,19 @@ namespace cuEVM {
                 get_gas_limit(arith, gas_limit);
                 uint32_t depth = 0;
                 uint32_t call_type = OP_CALL;
-                cuEVM::byte_array_t byte_code;
+                CuEVM::byte_array_t byte_code;
                 // if is a contract creation
                 if (is_contract_creation(arith)) {
                     call_type = OP_CREATE;
                     byte_code = data_init;
                     // TODO: code size does not execede the maximul allowed
                     bn_t sender_nonce;
-                    cuEVM::account::account_t* sender_account = nullptr;
+                    CuEVM::account::account_t* sender_account = nullptr;
                     access_state.get_account(arith, sender_address, sender_account, ACCOUNT_NONCE_FLAG);
                     // nonce is -1 in YP but here is before validating the transaction
                     // and increasing the nonce
                     sender_account->get_nonce(arith, sender_nonce);
-                    if(cuEVM::utils::get_contract_address_create(
+                    if(CuEVM::utils::get_contract_address_create(
                         arith,
                         to_address,
                         sender_address,
@@ -410,7 +410,7 @@ namespace cuEVM {
                         return ERROR_FAILED;
                     }
                 } else {
-                    cuEVM::account::account_t* to_account = nullptr;
+                    CuEVM::account::account_t* to_account = nullptr;
                     access_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
                     byte_code = to_account->byte_code;
                 }
@@ -419,7 +419,7 @@ namespace cuEVM {
                 cgbn_set_ui32(arith.env, return_data_offset, 0);
                 bn_t return_data_size;
                 cgbn_set_ui32(arith.env, return_data_size, 0);
-                evm_message_call_ptr = new cuEVM::evm_message_call_t(
+                evm_message_call_ptr = new CuEVM::evm_message_call_t(
                     arith,
                     sender_address,
                     to_address,
@@ -473,7 +473,7 @@ namespace cuEVM {
 
             __host__ cJSON* evm_transaction_t::to_json() {
                 cJSON* json = cJSON_CreateObject();
-                char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+                char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
                 char *bytes_string = nullptr;
                 cJSON_AddNumberToObject(json, "type", type);
                 nonce.to_hex(hex_string_ptr);
@@ -544,7 +544,7 @@ namespace cuEVM {
             uint32_t original_count;
             original_count = available_transactions - start_index;
             transactions_count = (original_count > clones) ? original_count : original_count*(clones/original_count);
-            transactions_count = (transactions_count > cuEVM::max_transactions_count) ? cuEVM::max_transactions_count : transactions_count;
+            transactions_count = (transactions_count > CuEVM::max_transactions_count) ? CuEVM::max_transactions_count : transactions_count;
 
             if (managed) {
                 CUDA_CHECK(cudaMallocManaged(
@@ -624,7 +624,7 @@ namespace cuEVM {
                 gas_limit_index = (index / data_counts) % gas_limit_counts;
                 value_index = (index / (data_counts * gas_limit_counts)) % value_counts;
                 std::copy(template_transaction_ptr, template_transaction_ptr + 1, transactions_ptr + idx);
-                transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_idnex)->valuestring, LITTLE_ENDIAN, cuEVM::PaddingDirection::NO_PADDING, managed);
+                transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_idnex)->valuestring, LITTLE_ENDIAN, CuEVM::PaddingDirection::NO_PADDING, managed);
                 transactions_ptr[idx].gas_limit.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
                 transactions_ptr[idx].value.from_hex(cJSON_GetArrayItem(value_json, value_index)->valuestring);
             }

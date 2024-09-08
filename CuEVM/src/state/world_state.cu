@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
@@ -7,12 +7,12 @@
 #include <CuEVM/state/world_state.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace state {
         __host__ __device__ int32_t WorldState::get_account(
             ArithEnv &arith,
             const bn_t &address,
-            cuEVM::account::account_t* &account_ptr
+            CuEVM::account::account_t* &account_ptr
         ) {
             return _state->get_account(arith, address, account_ptr);
         }

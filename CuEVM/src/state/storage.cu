@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
@@ -7,7 +7,7 @@
 #include <CuEVM/state/storage.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace storage {
         __host__ __device__ storage_element_t::storage_element_t(const cJSON *storage_element_json)
         {
@@ -78,12 +78,12 @@ namespace cuEVM {
             char *tmp_value_string_ptr = nullptr;
             if (key_string_ptr == nullptr)
             {
-                tmp_key_string_ptr = new char[cuEVM::word_size * 2 + 3];
+                tmp_key_string_ptr = new char[CuEVM::word_size * 2 + 3];
                 key_string_ptr = tmp_key_string_ptr;
             }
             if (value_string_ptr == nullptr)
             {
-                tmp_value_string_ptr = new char[cuEVM::word_size * 2 + 3];
+                tmp_value_string_ptr = new char[CuEVM::word_size * 2 + 3];
                 value_string_ptr = tmp_value_string_ptr;
             }
             key_string_ptr = key.to_hex(key_string_ptr, pretty);
@@ -265,8 +265,8 @@ namespace cuEVM {
                 return contract_storage_json;
             }
             uint32_t idx = 0;
-            char *key_string_ptr = new char[cuEVM::word_size * 2 + 3];
-            char *value_string_ptr = new char[cuEVM::word_size * 2 + 3];
+            char *key_string_ptr = new char[CuEVM::word_size * 2 + 3];
+            char *value_string_ptr = new char[CuEVM::word_size * 2 + 3];
             for (idx = 0; idx < this->size; idx++)
             {
                 this->storage[idx].add_to_json(
@@ -322,8 +322,8 @@ namespace cuEVM {
             cJSON *storage_json = cJSON_CreateObject();
             uint8_t *written = new uint8_t[storage2.size];
             std::fill(written, written + storage2.size, 0);
-            char *key_string_ptr = new char[cuEVM::word_size * 2 + 3];
-            char *value_string_ptr = new char[cuEVM::word_size * 2 + 3];
+            char *key_string_ptr = new char[CuEVM::word_size * 2 + 3];
+            char *value_string_ptr = new char[CuEVM::word_size * 2 + 3];
             cJSON *key_value_json = nullptr;
             for (uint32_t idx = 0; idx < storage1.size; idx++)
             {
@@ -372,4 +372,4 @@ namespace cuEVM {
         }
 
     } // namespace storage
-} // namespace cuEVM
+} // namespace CuEVM

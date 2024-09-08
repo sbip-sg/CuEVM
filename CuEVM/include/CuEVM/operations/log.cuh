@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -18,7 +18,7 @@
  * a0s: Logging Operations:
  * - LOGX
  */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The LOGX operation implementation.
      * Takes the memory offset, the memory length and the topics from the stack and
@@ -40,10 +40,10 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory,
-        const cuEVM::evm_message_call_t &message,
-        cuEVM::state::log_state_data_t &log_state,
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory,
+        const CuEVM::evm_message_call_t &message,
+        CuEVM::state::log_state_data_t &log_state,
         const uint8_t &opcode);  
 }
 

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -16,7 +16,7 @@
 
 #include <cjson/cJSON.h>
 
-namespace cuEVM::utils {
+namespace CuEVM::utils {
     struct trace_data_t {
         uint32_t pc; /**< The program counter */
         uint8_t op; /**< The opcode */
@@ -26,12 +26,12 @@ namespace cuEVM::utils {
         evm_word_t *stack; /**< The stack before op*/
         uint32_t stack_size; /**< The size of the stack before op*/
         uint32_t depth; /**< The depth of the call stack */
-        cuEVM::byte_array_t return_data; /**< The return data */
+        CuEVM::byte_array_t return_data; /**< The return data */
         evm_word_t refund; /**< The gas refund */
         #ifdef EIP_3155_OPTIONAL
         uint32_t error_code; /**< The error code */
         uint8_t *memory; /**< The memory before op*/
-        cuEVM::state::TouchState touch_state; /**< The touch state */
+        CuEVM::state::TouchState touch_state; /**< The touch state */
         #endif
 
         __host__ cJSON* to_json();
@@ -41,8 +41,8 @@ namespace cuEVM::utils {
 
     struct tracer_t {
         trace_data_t *data; /**< The trace data */
-        cuEVM::byte_array_t return_data; /**< The return data */
-        cuEVM::evm_word_t gas_used; /**< The gas used */
+        CuEVM::byte_array_t return_data; /**< The return data */
+        CuEVM::evm_word_t gas_used; /**< The gas used */
         uint32_t status; /**< The status of the trace */
         uint32_t size; /**< The size of the trace */
         uint32_t capacity; /**< The capacity of the trace */
@@ -57,10 +57,10 @@ namespace cuEVM::utils {
             ArithEnv &arith,
             const uint32_t pc,
             const uint8_t op,
-            const cuEVM::evm_memory_t &memory,
-            const cuEVM::evm_stack_t &stack,
+            const CuEVM::evm_memory_t &memory,
+            const CuEVM::evm_stack_t &stack,
             const uint32_t depth,
-            const cuEVM::evm_return_data_t &return_data,
+            const CuEVM::evm_return_data_t &return_data,
             const bn_t &gas_limit,
             const bn_t &gas_used
         );
@@ -72,13 +72,13 @@ namespace cuEVM::utils {
             const bn_t &gas_refund
             #ifdef EIP_3155_OPTIONAL
             , const uint32_t error_code,
-            const cuEVM::state::TouchState &touch_state
+            const CuEVM::state::TouchState &touch_state
             #endif
         );
 
         __host__ __device__ void finish_transaction(
             ArithEnv &arith,
-            const cuEVM::byte_array_t &return_data,
+            const CuEVM::byte_array_t &return_data,
             const bn_t &gas_used,
             uint32_t error_code
         );

@@ -7,7 +7,7 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 option(WITH_COMPILE "Doing the nvcc compilation" ON)
 option(WITH_DOCS "Generating the documentation for the code" OFF)
-option(ONLY_CPU "Generating the CPU version of cuEVM " OFF)
+option(ONLY_CPU "Generating the CPU version of CuEVM " OFF)
 option(ENABLE_TRACING "Enable tracer" ON)
 option(ENABLE_OPTIONAL_TRACER "Enable complex tracer" OFF)
 

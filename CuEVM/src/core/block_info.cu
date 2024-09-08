@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
@@ -7,7 +7,7 @@
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     __host__ __device__ block_info_t::block_info_t()
     {
       coin_base.from_uint32_t(0);
@@ -235,7 +235,7 @@ namespace cuEVM {
     __host__ cJSON * block_info_t::to_json() const
     {
       uint32_t idx = 0;
-      char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+      char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
       cJSON *block_json = nullptr;
       cJSON *previous_blocks_json = nullptr;
       cJSON *previous_block_json = nullptr;

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -7,7 +7,7 @@
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/core/memory.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
   namespace memory {
     __host__ __device__ void evm_memory_t::print() const {
       printf("Memory data: \n");
@@ -34,7 +34,7 @@ namespace cuEVM {
         cgbn_load(
           arith.env,
           cost,
-          (cuEVM::cgbn_evm_word_t_ptr) &memory_cost
+          (CuEVM::cgbn_evm_word_t_ptr) &memory_cost
         );
     }
 
@@ -45,7 +45,7 @@ namespace cuEVM {
         cgbn_load(
           arith.env,
           cuurent_cost,
-          (cuEVM::cgbn_evm_word_t_ptr) &memory_cost
+          (CuEVM::cgbn_evm_word_t_ptr) &memory_cost
         );
         cgbn_add(
           arith.env,
@@ -55,7 +55,7 @@ namespace cuEVM {
         );
         cgbn_store(
           arith.env,
-          (cuEVM::cgbn_evm_word_t_ptr) &memory_cost,
+          (CuEVM::cgbn_evm_word_t_ptr) &memory_cost,
           cuurent_cost
         );
       }
@@ -66,8 +66,8 @@ namespace cuEVM {
       if (new_size < data.size) {
         return ERROR_SUCCESS;
       }
-      uint32_t new_page_count = (new_size / cuEVM::memory::page_size) + 1;
-      return data.grow(new_page_count * cuEVM::memory::page_size, 1);
+      uint32_t new_page_count = (new_size / CuEVM::memory::page_size) + 1;
+      return data.grow(new_page_count * CuEVM::memory::page_size, 1);
     }
 
     __host__ __device__ int32_t evm_memory_t::get_last_offset(
@@ -110,7 +110,7 @@ namespace cuEVM {
       ArithEnv &arith,
       const bn_t &index,
       const bn_t &length,
-      cuEVM::byte_array_t &data) {
+      CuEVM::byte_array_t &data) {
       int32_t error_code = ERROR_SUCCESS;
       error_code = (cgbn_compare_ui32(arith.env, length, 0) < 0) ? ERR_MEMORY_INVALID_SIZE : error_code;
       error_code |= grow(arith, index, length);
@@ -118,16 +118,16 @@ namespace cuEVM {
         uint32_t index_u32, length_u32;
         arith.uint32_t_from_cgbn(index_u32, index);
         arith.uint32_t_from_cgbn(length_u32, length);
-        data = cuEVM::byte_array_t(this->data.data + index_u32, length_u32);
+        data = CuEVM::byte_array_t(this->data.data + index_u32, length_u32);
       } else {
-        data = cuEVM::byte_array_t();
+        data = CuEVM::byte_array_t();
       }
       return error_code;
     }
 
   __host__ __device__ int32_t evm_memory_t::set(
       ArithEnv &arith,
-      const cuEVM::byte_array_t &data,
+      const CuEVM::byte_array_t &data,
       const bn_t &index,
       const bn_t &length) {
       
@@ -240,7 +240,7 @@ namespace cuEVM {
       CUDA_CHECK(cudaMemcpy(tmp_gpu_instances, tmp_cpu_instances, count * sizeof(evm_memory_t), cudaMemcpyHostToDevice));
       delete[] tmp_cpu_instances;
       // 2. call the kernel to copy the memory between the gpu memories
-      cuEVM::memory::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+      CuEVM::memory::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
       CUDA_CHECK(cudaDeviceSynchronize());
       CUDA_CHECK(cudaFree(gpu_instances));
       gpu_instances = tmp_gpu_instances;

@@ -6,7 +6,7 @@
 #include <CuEVM/state/state.cuh>
 #include <CuEVM/state/world_state.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace state {
         /**
          * @brief The AccessState class
@@ -28,8 +28,8 @@ namespace cuEVM {
             __host__ __device__ int32_t add_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t* &account_ptr,
-                const cuEVM::account::account_flags_t flag);
+                CuEVM::account::account_t* &account_ptr,
+                const CuEVM::account::account_flags_t flag);
         public:
             /**
              * The default constructor.
@@ -62,8 +62,8 @@ namespace cuEVM {
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t* &account_ptr,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+                CuEVM::account::account_t* &account_ptr,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**
              * Get the value from the state.

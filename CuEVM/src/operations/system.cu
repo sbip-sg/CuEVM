@@ -5,7 +5,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
 
-namespace cuEVM::operations
+namespace CuEVM::operations
 {
     /**
      * Make a generic call.
@@ -18,9 +18,9 @@ namespace cuEVM::operations
         ArithEnv &arith,
         const bn_t args_offset,
         const bn_t args_size,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr)
     {
         // try to send value in call
         bn_t value;
@@ -37,7 +37,7 @@ namespace cuEVM::operations
 
         // memory call data
         bn_t memory_expansion_cost_args;
-        error_code |= cuEVM::gas_cost::memory_grow_cost(
+        error_code |= CuEVM::gas_cost::memory_grow_cost(
             arith,
             *current_state.memory_ptr,
             args_offset,
@@ -50,7 +50,7 @@ namespace cuEVM::operations
         new_state_ptr->message_ptr->get_return_data_offset(arith, ret_offset);
         new_state_ptr->message_ptr->get_return_data_size(arith, ret_size);
         bn_t memory_expansion_cost_ret;
-        error_code |= cuEVM::gas_cost::memory_grow_cost(
+        error_code |= CuEVM::gas_cost::memory_grow_cost(
             arith,
             *current_state.memory_ptr,
             ret_offset,
@@ -72,7 +72,7 @@ namespace cuEVM::operations
         // adress warm call
         bn_t contract_address;
         new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
-        cuEVM::gas_cost::access_account_cost(
+        CuEVM::gas_cost::access_account_cost(
             arith,
             current_state.gas_used,
             access_state,
@@ -100,7 +100,7 @@ namespace cuEVM::operations
         }
         // max gas call
         bn_t gas_capped;
-        cuEVM::gas_cost::max_gas_call(
+        CuEVM::gas_cost::max_gas_call(
             arith,
             gas_capped,
             current_state.gas_limit,
@@ -119,7 +119,7 @@ namespace cuEVM::operations
         cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, gas_stippend);
 
 
-        error_code |= cuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             current_state.gas_limit,
             current_state.gas_used);
@@ -130,7 +130,7 @@ namespace cuEVM::operations
                 arith,
                 memory_expansion_cost);
             // set the byte code
-            cuEVM::account::account_t *contract;
+            CuEVM::account::account_t *contract;
             error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
 
             new_state_ptr->message_ptr->set_byte_code(
@@ -155,9 +155,9 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t generic_CREATE(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr,
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr,
         const uint32_t opcode
         )
     {
@@ -171,7 +171,7 @@ namespace cuEVM::operations
 
         // compute the memory cost
         bn_t memory_expansion_cost;
-        error_code |= cuEVM::gas_cost::memory_grow_cost(
+        error_code |= CuEVM::gas_cost::memory_grow_cost(
             arith,
             *current_state.memory_ptr,
             memory_offset,
@@ -180,7 +180,7 @@ namespace cuEVM::operations
             current_state.gas_used);
         
         // compute the initcode gas cost
-        cuEVM::gas_cost::initcode_cost(
+        CuEVM::gas_cost::initcode_cost(
             arith,
             current_state.gas_used,
             length);
@@ -190,13 +190,13 @@ namespace cuEVM::operations
         {
             error_code |= current_state.stack_ptr->pop(arith, salt);
             // compute the keccak gas cost
-            cuEVM::gas_cost::keccak_cost(
+            CuEVM::gas_cost::keccak_cost(
                 arith,
                 current_state.gas_used,
                 length);
         }
         
-        error_code |= cuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             current_state.gas_limit,
             current_state.gas_used);
@@ -208,7 +208,7 @@ namespace cuEVM::operations
                 arith,
                 memory_expansion_cost);
             // get the initialisation code
-            cuEVM::byte_array_t initialisation_code;
+            CuEVM::byte_array_t initialisation_code;
             current_state.memory_ptr->get(
                 arith,
                 memory_offset,
@@ -221,7 +221,7 @@ namespace cuEVM::operations
 
             if (opcode == OP_CREATE2)
             {
-                 error_code |= cuEVM::utils::get_contract_address_create2(
+                 error_code |= CuEVM::utils::get_contract_address_create2(
                     arith,
                     contract_address,
                     sender_address,
@@ -230,23 +230,23 @@ namespace cuEVM::operations
             }
             else
             {
-                cuEVM::account::account_t *sender_account;
+                CuEVM::account::account_t *sender_account;
                 access_state.get_account(arith, contract_address, sender_account, ACCOUNT_NONCE_FLAG);
                 bn_t sender_nonce;
                 sender_account->get_nonce(arith, sender_nonce);
-                error_code |= cuEVM::utils::get_contract_address_create(
+                error_code |= CuEVM::utils::get_contract_address_create(
                     arith,
                     contract_address,
                     sender_address,
                     sender_nonce);
             }
             // warm up the contract address
-            cuEVM::account::account_t *contract;
+            CuEVM::account::account_t *contract;
             error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_NONE_FLAG);
 
             // gas capped limit
             bn_t gas_capped;
-            cuEVM::gas_cost::max_gas_call(
+            CuEVM::gas_cost::max_gas_call(
                 arith,
                 gas_capped,
                 current_state.gas_limit,
@@ -257,12 +257,12 @@ namespace cuEVM::operations
             bn_t ret_offset, ret_size;
             cgbn_set_ui32(arith.env, ret_offset, 0);
             cgbn_set_ui32(arith.env, ret_size, 0);
-            cuEVM::byte_array_t call_data;
+            CuEVM::byte_array_t call_data;
             // create the new evm call state
-            new_state_ptr = new cuEVM::evm_call_state_t(
+            new_state_ptr = new CuEVM::evm_call_state_t(
                 arith,
                 &current_state,
-                new cuEVM::evm_message_call_t(
+                new CuEVM::evm_message_call_t(
                     arith,
                     sender_address,
                     contract_address,
@@ -301,9 +301,9 @@ namespace cuEVM::operations
      * @return return error code.
      */
     __host__ __device__ int32_t STOP(
-        cuEVM::evm_return_data_t &return_data)
+        CuEVM::evm_return_data_t &return_data)
     {
-        return_data = cuEVM::evm_return_data_t();
+        return_data = CuEVM::evm_return_data_t();
         return ERROR_RETURN;
     }
 
@@ -316,9 +316,9 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CREATE(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr)
     {
         return generic_CREATE(
             arith,
@@ -337,9 +337,9 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CALL(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
 
@@ -354,7 +354,7 @@ namespace cuEVM::operations
         if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            cuEVM::evm_address_conversion(arith, address);
+            CuEVM::evm_address_conversion(arith, address);
             bn_t sender;
             current_state.message_ptr->get_recipient(arith, sender); // I_{a}
             bn_t recipient;
@@ -363,13 +363,13 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, address); // t
-            cuEVM::byte_array_t call_data;
-            cuEVM::byte_array_t code;
+            CuEVM::byte_array_t call_data;
+            CuEVM::byte_array_t code;
 
-            new_state_ptr = new cuEVM::evm_call_state_t(
+            new_state_ptr = new CuEVM::evm_call_state_t(
                 arith,
                 &current_state,
-                new cuEVM::evm_message_call_t(
+                new CuEVM::evm_message_call_t(
                     arith,
                     sender,
                     recipient,
@@ -407,9 +407,9 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t CALLCODE(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
         int32_t error_code = current_state.stack_ptr->pop(arith, gas);
@@ -423,7 +423,7 @@ namespace cuEVM::operations
         if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            cuEVM::evm_address_conversion(arith, address);
+            CuEVM::evm_address_conversion(arith, address);
             bn_t sender;
             current_state.message_ptr->get_recipient(arith, sender); // I_{a}
             bn_t recipient;
@@ -432,13 +432,13 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, sender); // I_{a}
-            cuEVM::byte_array_t call_data;
-            cuEVM::byte_array_t code;
+            CuEVM::byte_array_t call_data;
+            CuEVM::byte_array_t code;
 
-            new_state_ptr = new cuEVM::evm_call_state_t(
+            new_state_ptr = new CuEVM::evm_call_state_t(
                 arith,
                 &current_state,
-                new cuEVM::evm_message_call_t(
+                new CuEVM::evm_message_call_t(
                     arith,
                     sender,
                     recipient,
@@ -481,16 +481,16 @@ namespace cuEVM::operations
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory,
-        cuEVM::evm_return_data_t &return_data)
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory,
+        CuEVM::evm_return_data_t &return_data)
     {
         bn_t memory_offset, length;
         int32_t error_code = stack.pop(arith, memory_offset);
         error_code |= stack.pop(arith, length);
 
         bn_t memory_expansion_cost;
-        error_code |= cuEVM::gas_cost::memory_grow_cost(
+        error_code |= CuEVM::gas_cost::memory_grow_cost(
             arith,
             memory,
             memory_offset,
@@ -498,7 +498,7 @@ namespace cuEVM::operations
             memory_expansion_cost,
             gas_used);
         
-        error_code |= cuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
@@ -527,9 +527,9 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t DELEGATECALL(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
         int32_t error_code = current_state.stack_ptr->pop(arith, gas);
@@ -543,7 +543,7 @@ namespace cuEVM::operations
         if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            cuEVM::evm_address_conversion(arith, address);
+            CuEVM::evm_address_conversion(arith, address);
             bn_t sender;
             current_state.message_ptr->get_sender(arith, sender); // keep the message call sender I_{s}
             bn_t recipient;
@@ -552,13 +552,13 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, recipient); // I_{a}
-            cuEVM::byte_array_t call_data;
-            cuEVM::byte_array_t code;
+            CuEVM::byte_array_t call_data;
+            CuEVM::byte_array_t code;
 
-            new_state_ptr = new cuEVM::evm_call_state_t(
+            new_state_ptr = new CuEVM::evm_call_state_t(
                 arith,
                 &current_state,
-                new cuEVM::evm_message_call_t(
+                new CuEVM::evm_message_call_t(
                     arith,
                     sender,
                     recipient,
@@ -596,9 +596,9 @@ namespace cuEVM::operations
      */
     __host__ __device__ int32_t CREATE2(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr)
     {
        return generic_CREATE(
             arith,
@@ -617,9 +617,9 @@ namespace cuEVM::operations
     */
     __host__ __device__ int32_t STATICCALL(
         ArithEnv &arith,
-        cuEVM::state::AccessState &access_state,
-        cuEVM::evm_call_state_t &current_state,
-        cuEVM::evm_call_state_t* &new_state_ptr)
+        CuEVM::state::AccessState &access_state,
+        CuEVM::evm_call_state_t &current_state,
+        CuEVM::evm_call_state_t* &new_state_ptr)
     {
         bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
         int32_t error_code = current_state.stack_ptr->pop(arith, gas);
@@ -633,7 +633,7 @@ namespace cuEVM::operations
         if (error_code == ERROR_SUCCESS)
         {
             // clean the address
-            cuEVM::evm_address_conversion(arith, address);
+            CuEVM::evm_address_conversion(arith, address);
             bn_t sender;
             current_state.message_ptr->get_recipient(arith, sender); //  I_{a}
             bn_t recipient;
@@ -642,13 +642,13 @@ namespace cuEVM::operations
             cgbn_set(arith.env, contract_address, address); // t
             bn_t storage_address;
             cgbn_set(arith.env, storage_address, address); // t
-            cuEVM::byte_array_t call_data;
-            cuEVM::byte_array_t code;
+            CuEVM::byte_array_t call_data;
+            CuEVM::byte_array_t code;
 
-            new_state_ptr = new cuEVM::evm_call_state_t(
+            new_state_ptr = new CuEVM::evm_call_state_t(
                 arith,
                 &current_state,
-                new cuEVM::evm_message_call_t(
+                new CuEVM::evm_message_call_t(
                     arith,
                     sender,
                     recipient,
@@ -691,16 +691,16 @@ namespace cuEVM::operations
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory,
-        cuEVM::evm_return_data_t &return_data)
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory,
+        CuEVM::evm_return_data_t &return_data)
     {
         bn_t memory_offset, length;
         int32_t error_code = stack.pop(arith, memory_offset);
         error_code |= stack.pop(arith, length);
 
         bn_t memory_expansion_cost;
-        error_code |= cuEVM::gas_cost::memory_grow_cost(
+        error_code |= CuEVM::gas_cost::memory_grow_cost(
             arith,
             memory,
             memory_offset,
@@ -708,7 +708,7 @@ namespace cuEVM::operations
             memory_expansion_cost,
             gas_used);
         
-        error_code |= cuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
@@ -752,10 +752,10 @@ namespace cuEVM::operations
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_message_call_t &message,
-        cuEVM::state::TouchState &touch_state,
-        cuEVM::evm_return_data_t &return_data)
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_message_call_t &message,
+        CuEVM::state::TouchState &touch_state,
+        CuEVM::evm_return_data_t &return_data)
     {
         int32_t error_code = ERROR_SUCCESS;
         return error_code;
@@ -817,4 +817,4 @@ namespace cuEVM::operations
         }
         */
     }
-} // namespace cuEVM::operation
+} // namespace CuEVM::operation

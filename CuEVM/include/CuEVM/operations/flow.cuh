@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -22,7 +22,7 @@
  * - GAS
  * - JUMPDEST
  */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The JUMP operation implementation.
      * Takes the destination from the stack and sets the program counter
@@ -40,8 +40,8 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &pc,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
     /**
      * The JUMPI operation implementation.
      * Takes the destination and the condition from the stack and sets the program counter
@@ -60,8 +60,8 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &pc,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The PC operation implementation.
@@ -78,7 +78,7 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         const uint32_t &pc,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The GAS operation implementation.
@@ -93,7 +93,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The JUMPDEST operation implementation.

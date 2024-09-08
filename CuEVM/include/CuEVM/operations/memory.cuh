@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -18,7 +18,7 @@
  * - MSTORE8
  * - MSIZE
  */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The MLOAD operation implementation.
      * Takes the memory offset from the stack and push the evm word from
@@ -35,8 +35,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory);
 
     /**
      * The MSTORE operation implementation.
@@ -54,8 +54,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory);
 
     /**
      * The MSTORE8 operation implementation.
@@ -73,8 +73,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        CuEVM::evm_memory_t &memory);
 
     /**
      * The MSIZE operation implementation.
@@ -90,8 +90,8 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_memory_t &memory);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_memory_t &memory);
 }
 
 #endif

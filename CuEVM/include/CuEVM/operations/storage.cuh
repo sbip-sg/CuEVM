@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -18,7 +18,7 @@
  * - SLOAD
  * - SSTORE
  */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The SLOAD operation implementation.
      * Takes the key from the stack and push the value from
@@ -39,10 +39,10 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state,
+        const CuEVM::evm_message_call_t &message);
 
     /**
      * The SSTORE operation implementation.
@@ -67,10 +67,10 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         bn_t &gas_refund,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::state::AccessState &access_state,
-        cuEVM::state::TouchState &touch_state,
-        const cuEVM::evm_message_call_t &message);
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::state::AccessState &access_state,
+        CuEVM::state::TouchState &touch_state,
+        const CuEVM::evm_message_call_t &message);
     
 }
 

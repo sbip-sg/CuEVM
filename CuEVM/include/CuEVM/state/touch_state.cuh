@@ -6,7 +6,7 @@
 #include <CuEVM/state/state.cuh>
 #include <CuEVM/state/access_state.cuh>
 
-namespace cuEVM::state {
+namespace CuEVM::state {
     /**
      * @brief The TouchState class
      * 
@@ -14,7 +14,7 @@ namespace cuEVM::state {
     class TouchState {
     private:
         state_access_t* _state; /**< The state access */
-        cuEVM::state::AccessState* _access_state; /**< The access state */
+        CuEVM::state::AccessState* _access_state; /**< The access state */
         TouchState* parent; /**< The parent state */
 
         /**
@@ -28,8 +28,8 @@ namespace cuEVM::state {
         __host__ __device__ int32_t add_account(
             ArithEnv &arith,
             const bn_t &address,
-            cuEVM::account::account_t* &account_ptr,
-            const cuEVM::account::account_flags_t acces_state_flag);
+            CuEVM::account::account_t* &account_ptr,
+            const CuEVM::account::account_flags_t acces_state_flag);
         
     public:
         /**
@@ -42,7 +42,7 @@ namespace cuEVM::state {
          * @param[in] state The state access.
          * @param[in] access_state The access state.
          */
-        __host__ __device__ TouchState(state_access_t* state, cuEVM::state::AccessState* access_state) : _state(state), _access_state(access_state), parent(nullptr) {}
+        __host__ __device__ TouchState(state_access_t* state, CuEVM::state::AccessState* access_state) : _state(state), _access_state(access_state), parent(nullptr) {}
 
         /**
          * The constructor with the state, the access state, and the parent state.
@@ -75,8 +75,8 @@ namespace cuEVM::state {
         __host__ __device__ int32_t get_account(
             ArithEnv &arith,
             const bn_t &address,
-            cuEVM::account::account_t* &account_ptr,
-            const cuEVM::account::account_flags_t acces_state_flag = ACCOUNT_NONE_FLAG);
+            CuEVM::account::account_t* &account_ptr,
+            const CuEVM::account::account_flags_t acces_state_flag = ACCOUNT_NONE_FLAG);
         
         /**
          * If the account given by address is empty

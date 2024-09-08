@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -8,17 +8,17 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     __host__ __device__ int32_t JUMP(
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &pc,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message)
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_MID);
-        int32_t error_code = cuEVM::gas_cost::has_gas(
+        int32_t error_code = CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
@@ -44,11 +44,11 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         uint32_t &pc,
-        cuEVM::evm_stack_t &stack,
-        const cuEVM::evm_message_call_t &message)
+        CuEVM::evm_stack_t &stack,
+        const CuEVM::evm_message_call_t &message)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_HIGH);
-        int32_t error_code = cuEVM::gas_cost::has_gas(
+        int32_t error_code = CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
@@ -82,10 +82,10 @@ namespace cuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         const uint32_t &pc,
-        cuEVM::evm_stack_t &stack)
+        CuEVM::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_BASE);
-        int32_t error_code = cuEVM::gas_cost::has_gas(
+        int32_t error_code = CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
@@ -98,10 +98,10 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack)
+        CuEVM::evm_stack_t &stack)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_BASE);
-        int32_t error_code = cuEVM::gas_cost::has_gas(
+        int32_t error_code = CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
@@ -116,7 +116,7 @@ namespace cuEVM::operations {
         bn_t &gas_used)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_JUMP_DEST);
-        int32_t error_code = cuEVM::gas_cost::has_gas(
+        int32_t error_code = CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);

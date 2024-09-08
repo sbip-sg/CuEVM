@@ -18,7 +18,7 @@
 #define ACCOUNT_NON_STORAGE_FLAG (ACCOUNT_ADDRESS_FLAG | ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG)
 #define ACCOUNT_ALL_FLAG (ACCOUNT_ADDRESS_FLAG | ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG | ACCOUNT_STORAGE_FLAG)
 
-namespace cuEVM
+namespace CuEVM
 {
   namespace account
   {
@@ -250,7 +250,7 @@ namespace cuEVM
         evm_word_t balance; /**< The balance of the account (YP: \f$\sigma[a]_{b}\f$) */
         evm_word_t nonce; /**< The nonce of the account (YP: \f$\sigma[a]_{n}\f$) */
         byte_array_t byte_code; /**< The bytecode of the account (YP: \f$b\f$) */
-        cuEVM::storage::contract_storage_t storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
+        CuEVM::storage::contract_storage_t storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
 
         /**
          * The default constructor for the account data structure.

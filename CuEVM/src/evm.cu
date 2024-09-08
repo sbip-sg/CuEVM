@@ -15,21 +15,21 @@
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     __host__ __device__  evm_t::evm_t(
         ArithEnv &arith,
-        cuEVM::state::state_t *world_state_data_ptr,
-        cuEVM::block_info_t* block_info_ptr,
-        cuEVM::evm_transaction_t* transaction_ptr,
-        cuEVM::state::state_access_t *access_state_data_ptr,
-        cuEVM::state::state_access_t *touch_state_data_ptr,
-        cuEVM::state::log_state_data_t* log_state_ptr,
-        cuEVM::evm_return_data_t* return_data_ptr
+        CuEVM::state::state_t *world_state_data_ptr,
+        CuEVM::block_info_t* block_info_ptr,
+        CuEVM::evm_transaction_t* transaction_ptr,
+        CuEVM::state::state_access_t *access_state_data_ptr,
+        CuEVM::state::state_access_t *touch_state_data_ptr,
+        CuEVM::state::log_state_data_t* log_state_ptr,
+        CuEVM::evm_return_data_t* return_data_ptr
         #ifdef EIP_3155
-        , cuEVM::utils::tracer_t* tracer_ptr
+        , CuEVM::utils::tracer_t* tracer_ptr
         #endif
     ) : world_state(world_state_data_ptr), block_info_ptr(block_info_ptr), transaction_ptr(transaction_ptr), access_state(access_state_data_ptr, &world_state) {
-        call_state_ptr = new cuEVM::evm_call_state_t(
+        call_state_ptr = new CuEVM::evm_call_state_t(
             arith,
             &access_state,
             nullptr,
@@ -48,13 +48,13 @@ namespace cuEVM {
             gas_priority_fee
         );
         if (error_code == ERROR_SUCCESS) {
-            cuEVM::evm_message_call_t *transaction_call_message_ptr = nullptr;
+            CuEVM::evm_message_call_t *transaction_call_message_ptr = nullptr;
             error_code = transaction_ptr->get_message_call(
                 arith,
                 access_state,
                 transaction_call_message_ptr
             );
-            cuEVM::evm_call_state_t* child_call_state_ptr = new cuEVM::evm_call_state_t(
+            CuEVM::evm_call_state_t* child_call_state_ptr = new CuEVM::evm_call_state_t(
                 arith,
                 call_state_ptr,
                 transaction_call_message_ptr
@@ -71,7 +71,7 @@ namespace cuEVM {
 
     __host__ __device__  evm_t::evm_t(
         ArithEnv &arith,
-        cuEVM::evm_instance_t &evm_instance
+        CuEVM::evm_instance_t &evm_instance
     ) : evm_t(
             arith,
             evm_instance.world_state_data_ptr,
@@ -119,7 +119,7 @@ namespace cuEVM {
             ERROR_SUCCESS
         );
         // warmup the accounts
-        cuEVM::account::account_t* account_ptr;
+        CuEVM::account::account_t* account_ptr;
         error_code |= call_state_ptr->touch_state.get_account(arith, sender, account_ptr, ACCOUNT_NONE_FLAG);
         error_code |= call_state_ptr->touch_state.get_account(arith, recipient, account_ptr, ACCOUNT_BYTE_CODE_FLAG);
 
@@ -137,11 +137,11 @@ namespace cuEVM {
             uint64_t nonce;
             error_code |= arith.uint64_t_from_cgbn(nonce, sender_nonce) == 1 ?  ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED : ERROR_SUCCESS;
         } else {
-            error_code |= call_state_ptr->depth > cuEVM::max_depth ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
+            error_code |= call_state_ptr->depth > CuEVM::max_depth ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
             if (account_ptr->byte_code.size == 0) {
                 bn_t contract_address;
                 call_state_ptr->message_ptr->get_contract_address(arith, contract_address);
-                if (cgbn_compare_ui32(arith.env, contract_address, cuEVM::no_precompile_contracts) == -1) {
+                if (cgbn_compare_ui32(arith.env, contract_address, CuEVM::no_precompile_contracts) == -1) {
 
                     switch (cgbn_get_ui32(arith.env, contract_address))
                     {
@@ -171,7 +171,7 @@ namespace cuEVM {
             return; //finish call
         }
         uint8_t opcode;
-        cuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
+        CuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
         while (
             status == ERROR_SUCCESS 
         ) {
@@ -201,7 +201,7 @@ namespace cuEVM {
             // printf("touch state END END END\n");
             if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70))
             {
-                error_code = cuEVM::operations::PUSHX(
+                error_code = CuEVM::operations::PUSHX(
                     arith,
                     call_state_ptr->gas_limit,
                     call_state_ptr->gas_used,
@@ -213,7 +213,7 @@ namespace cuEVM {
             }
             else if ((opcode & 0xF0) == 0x80) // DUPX
             {
-                error_code = cuEVM::operations::DUPX(
+                error_code = CuEVM::operations::DUPX(
                     arith,
                     call_state_ptr->gas_limit,
                     call_state_ptr->gas_used,
@@ -223,7 +223,7 @@ namespace cuEVM {
             }
             else if ((opcode & 0xF0) == 0x90) // SWAPX
             {
-                error_code = cuEVM::operations::SWAPX(
+                error_code = CuEVM::operations::SWAPX(
                     arith,
                     call_state_ptr->gas_limit,
                     call_state_ptr->gas_used,
@@ -233,7 +233,7 @@ namespace cuEVM {
             }
             else if ((opcode >= 0xA0) && (opcode <= 0xA4)) // LOGX
             {
-                error_code = cuEVM::operations::LOGX(
+                error_code = CuEVM::operations::LOGX(
                     arith,
                     call_state_ptr->gas_limit,
                     call_state_ptr->gas_used,
@@ -250,12 +250,12 @@ namespace cuEVM {
                 switch (opcode)
                 {
                 case OP_STOP:
-                    error_code = cuEVM::operations::STOP(
+                    error_code = CuEVM::operations::STOP(
                         *call_state_ptr->parent->last_return_data_ptr
                     );
                     break;
                 case OP_ADD:
-                    error_code = cuEVM::operations::ADD(
+                    error_code = CuEVM::operations::ADD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -263,7 +263,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_MUL:
-                    error_code = cuEVM::operations::MUL(
+                    error_code = CuEVM::operations::MUL(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -271,7 +271,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SUB:
-                    error_code = cuEVM::operations::SUB(
+                    error_code = CuEVM::operations::SUB(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -279,7 +279,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_DIV:
-                    error_code = cuEVM::operations::DIV(
+                    error_code = CuEVM::operations::DIV(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -287,7 +287,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SDIV:
-                    error_code = cuEVM::operations::SDIV(
+                    error_code = CuEVM::operations::SDIV(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -295,7 +295,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_MOD:
-                    error_code = cuEVM::operations::MOD(
+                    error_code = CuEVM::operations::MOD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -303,7 +303,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SMOD:
-                    error_code = cuEVM::operations::SMOD(
+                    error_code = CuEVM::operations::SMOD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -311,7 +311,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_ADDMOD:
-                    error_code = cuEVM::operations::ADDMOD(
+                    error_code = CuEVM::operations::ADDMOD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -319,7 +319,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_MULMOD:
-                    error_code = cuEVM::operations::MULMOD(
+                    error_code = CuEVM::operations::MULMOD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -327,7 +327,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_EXP:
-                    error_code = cuEVM::operations::EXP(
+                    error_code = CuEVM::operations::EXP(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -335,7 +335,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SIGNEXTEND:
-                    error_code = cuEVM::operations::SIGNEXTEND(
+                    error_code = CuEVM::operations::SIGNEXTEND(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -343,7 +343,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_LT:
-                    error_code = cuEVM::operations::LT(
+                    error_code = CuEVM::operations::LT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -351,7 +351,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_GT:
-                    error_code = cuEVM::operations::GT(
+                    error_code = CuEVM::operations::GT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -359,7 +359,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SLT:
-                    error_code = cuEVM::operations::SLT(
+                    error_code = CuEVM::operations::SLT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -367,7 +367,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SGT:
-                    error_code = cuEVM::operations::SGT(
+                    error_code = CuEVM::operations::SGT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -375,7 +375,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_EQ:
-                    error_code = cuEVM::operations::EQ(
+                    error_code = CuEVM::operations::EQ(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -383,7 +383,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_ISZERO:
-                    error_code = cuEVM::operations::ISZERO(
+                    error_code = CuEVM::operations::ISZERO(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -391,7 +391,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_AND:
-                    error_code = cuEVM::operations::AND(
+                    error_code = CuEVM::operations::AND(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -399,7 +399,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_OR:
-                    error_code = cuEVM::operations::OR(
+                    error_code = CuEVM::operations::OR(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -407,7 +407,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_XOR:
-                    error_code = cuEVM::operations::XOR(
+                    error_code = CuEVM::operations::XOR(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -415,7 +415,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_NOT:
-                    error_code = cuEVM::operations::NOT(
+                    error_code = CuEVM::operations::NOT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -423,7 +423,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_BYTE:
-                    error_code = cuEVM::operations::BYTE(
+                    error_code = CuEVM::operations::BYTE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -431,7 +431,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SHL:
-                    error_code = cuEVM::operations::SHL(
+                    error_code = CuEVM::operations::SHL(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -439,7 +439,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SHR:
-                    error_code = cuEVM::operations::SHR(
+                    error_code = CuEVM::operations::SHR(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -447,7 +447,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SAR:
-                    error_code = cuEVM::operations::SAR(
+                    error_code = CuEVM::operations::SAR(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -455,7 +455,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SHA3:
-                    error_code = cuEVM::operations::SHA3(
+                    error_code = CuEVM::operations::SHA3(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -464,7 +464,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_ADDRESS:
-                    error_code = cuEVM::operations::ADDRESS(
+                    error_code = CuEVM::operations::ADDRESS(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -473,7 +473,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_BALANCE:
-                    error_code = cuEVM::operations::BALANCE(
+                    error_code = CuEVM::operations::BALANCE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -483,7 +483,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_ORIGIN:
-                    error_code = cuEVM::operations::ORIGIN(
+                    error_code = CuEVM::operations::ORIGIN(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -492,7 +492,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CALLER:
-                    error_code = cuEVM::operations::CALLER(
+                    error_code = CuEVM::operations::CALLER(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -501,7 +501,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CALLVALUE:
-                    error_code = cuEVM::operations::CALLVALUE(
+                    error_code = CuEVM::operations::CALLVALUE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -510,7 +510,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CALLDATALOAD:
-                    error_code = cuEVM::operations::CALLDATALOAD(
+                    error_code = CuEVM::operations::CALLDATALOAD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -519,7 +519,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CALLDATASIZE:
-                    error_code = cuEVM::operations::CALLDATASIZE(
+                    error_code = CuEVM::operations::CALLDATASIZE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -528,7 +528,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CALLDATACOPY:
-                    error_code = cuEVM::operations::CALLDATACOPY(
+                    error_code = CuEVM::operations::CALLDATACOPY(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -538,7 +538,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CODESIZE:
-                    error_code = cuEVM::operations::CODESIZE(
+                    error_code = CuEVM::operations::CODESIZE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -547,7 +547,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CODECOPY:
-                    error_code = cuEVM::operations::CODECOPY(
+                    error_code = CuEVM::operations::CODECOPY(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -557,7 +557,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_GASPRICE:
-                    error_code = cuEVM::operations::GASPRICE(
+                    error_code = CuEVM::operations::GASPRICE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -567,7 +567,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_EXTCODESIZE:
-                    error_code = cuEVM::operations::EXTCODESIZE(
+                    error_code = CuEVM::operations::EXTCODESIZE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -577,7 +577,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_EXTCODECOPY:
-                    error_code = cuEVM::operations::EXTCODECOPY(
+                    error_code = CuEVM::operations::EXTCODECOPY(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -588,7 +588,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_RETURNDATASIZE:
-                    error_code = cuEVM::operations::RETURNDATASIZE(
+                    error_code = CuEVM::operations::RETURNDATASIZE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -597,7 +597,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_RETURNDATACOPY:
-                    error_code = cuEVM::operations::RETURNDATACOPY(
+                    error_code = CuEVM::operations::RETURNDATACOPY(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -607,7 +607,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_EXTCODEHASH:
-                    error_code = cuEVM::operations::EXTCODEHASH(
+                    error_code = CuEVM::operations::EXTCODEHASH(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -617,7 +617,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_BLOCKHASH:
-                    error_code = cuEVM::operations::BLOCKHASH(
+                    error_code = CuEVM::operations::BLOCKHASH(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -626,7 +626,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_COINBASE:
-                    error_code = cuEVM::operations::COINBASE(
+                    error_code = CuEVM::operations::COINBASE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -635,7 +635,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_TIMESTAMP:
-                    error_code = cuEVM::operations::TIMESTAMP(
+                    error_code = CuEVM::operations::TIMESTAMP(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -644,7 +644,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_NUMBER:
-                    error_code = cuEVM::operations::NUMBER(
+                    error_code = CuEVM::operations::NUMBER(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -653,7 +653,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_DIFFICULTY:
-                    error_code = cuEVM::operations::PREVRANDAO(
+                    error_code = CuEVM::operations::PREVRANDAO(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -662,7 +662,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_GASLIMIT:
-                    error_code = cuEVM::operations::GASLIMIT(
+                    error_code = CuEVM::operations::GASLIMIT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -671,7 +671,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_CHAINID:
-                    error_code = cuEVM::operations::CHAINID(
+                    error_code = CuEVM::operations::CHAINID(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -680,7 +680,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SELFBALANCE:
-                    error_code = cuEVM::operations::SELFBALANCE(
+                    error_code = CuEVM::operations::SELFBALANCE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -690,7 +690,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_BASEFEE:
-                    error_code = cuEVM::operations::BASEFEE(
+                    error_code = CuEVM::operations::BASEFEE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -699,7 +699,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_POP:
-                    error_code = cuEVM::operations::POP(
+                    error_code = CuEVM::operations::POP(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -707,7 +707,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_MLOAD:
-                    error_code = cuEVM::operations::MLOAD(
+                    error_code = CuEVM::operations::MLOAD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -716,7 +716,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_MSTORE:
-                    error_code = cuEVM::operations::MSTORE(
+                    error_code = CuEVM::operations::MSTORE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -725,7 +725,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_MSTORE8:
-                    error_code = cuEVM::operations::MSTORE8(
+                    error_code = CuEVM::operations::MSTORE8(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -734,7 +734,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SLOAD:
-                    error_code = cuEVM::operations::SLOAD(
+                    error_code = CuEVM::operations::SLOAD(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -745,7 +745,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_SSTORE:
-                    error_code = cuEVM::operations::SSTORE(
+                    error_code = CuEVM::operations::SSTORE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -757,7 +757,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_JUMP:
-                    error_code = cuEVM::operations::JUMP(
+                    error_code = CuEVM::operations::JUMP(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -767,7 +767,7 @@ namespace cuEVM {
                     );
                     break;
                 case OP_JUMPI:
-                    error_code = cuEVM::operations::JUMPI(
+                    error_code = CuEVM::operations::JUMPI(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -778,7 +778,7 @@ namespace cuEVM {
                     break;
                 
                 case OP_PC:
-                    error_code = cuEVM::operations::PC(
+                    error_code = CuEVM::operations::PC(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -788,7 +788,7 @@ namespace cuEVM {
                     break;
                 
                 case OP_MSIZE:
-                    error_code = cuEVM::operations::MSIZE(
+                    error_code = CuEVM::operations::MSIZE(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -798,7 +798,7 @@ namespace cuEVM {
                     break;
                 
                 case OP_GAS:
-                    error_code = cuEVM::operations::GAS(
+                    error_code = CuEVM::operations::GAS(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -807,7 +807,7 @@ namespace cuEVM {
                     break;
 
                 case OP_JUMPDEST:
-                    error_code = cuEVM::operations::JUMPDEST(
+                    error_code = CuEVM::operations::JUMPDEST(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used
@@ -815,7 +815,7 @@ namespace cuEVM {
                     break;
                 
                 case OP_PUSH0:
-                    error_code = cuEVM::operations::PUSH0(
+                    error_code = CuEVM::operations::PUSH0(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -825,7 +825,7 @@ namespace cuEVM {
                 
                 case OP_CREATE:
                     child_call_state_ptr = nullptr;
-                    error_code = cuEVM::operations::CREATE(
+                    error_code = CuEVM::operations::CREATE(
                         arith,
                         access_state,
                         *call_state_ptr,
@@ -840,7 +840,7 @@ namespace cuEVM {
                 
                 case OP_CALL:
                     child_call_state_ptr = nullptr;
-                    error_code = cuEVM::operations::CALL(
+                    error_code = CuEVM::operations::CALL(
                         arith,
                         access_state,
                         *call_state_ptr,
@@ -855,7 +855,7 @@ namespace cuEVM {
                 
                 case OP_CALLCODE:
                     child_call_state_ptr = nullptr;
-                    error_code = cuEVM::operations::CALLCODE(
+                    error_code = CuEVM::operations::CALLCODE(
                         arith,
                         access_state,
                         *call_state_ptr,
@@ -869,7 +869,7 @@ namespace cuEVM {
                     break;
                 
                 case OP_RETURN:
-                    error_code = cuEVM::operations::RETURN(
+                    error_code = CuEVM::operations::RETURN(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -881,7 +881,7 @@ namespace cuEVM {
                 
                 case OP_DELEGATECALL:
                     child_call_state_ptr = nullptr;
-                    error_code = cuEVM::operations::DELEGATECALL(
+                    error_code = CuEVM::operations::DELEGATECALL(
                         arith,
                         access_state,
                         *call_state_ptr,
@@ -896,7 +896,7 @@ namespace cuEVM {
                 
                 case OP_CREATE2:
                     child_call_state_ptr = nullptr;
-                    error_code = cuEVM::operations::CREATE2(
+                    error_code = CuEVM::operations::CREATE2(
                         arith,
                         access_state,
                         *call_state_ptr,
@@ -911,7 +911,7 @@ namespace cuEVM {
                 
                 case OP_STATICCALL:
                     child_call_state_ptr = nullptr;
-                    error_code = cuEVM::operations::STATICCALL(
+                    error_code = CuEVM::operations::STATICCALL(
                         arith,
                         access_state,
                         *call_state_ptr,
@@ -925,7 +925,7 @@ namespace cuEVM {
                     break;
 
                 case OP_REVERT:
-                    error_code = cuEVM::operations::REVERT(
+                    error_code = CuEVM::operations::REVERT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -936,7 +936,7 @@ namespace cuEVM {
                     break;
                 
                 case OP_SELFDESTRUCT:
-                    error_code = cuEVM::operations::SELFDESTRUCT(
+                    error_code = CuEVM::operations::SELFDESTRUCT(
                         arith,
                         call_state_ptr->gas_limit,
                         call_state_ptr->gas_used,
@@ -949,7 +949,7 @@ namespace cuEVM {
                 
                 
                 default:
-                    error_code = cuEVM::operations::INVALID();
+                    error_code = CuEVM::operations::INVALID();
                     break;
                 }
             }
@@ -1073,7 +1073,7 @@ namespace cuEVM {
             call_state_ptr->parent->touch_state.set_balance(arith, beneficiary, beneficiary_balance);
         }
 
-        cuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
+        CuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
         delete call_state_ptr;
         call_state_ptr = parent_call_state_ptr;
         #ifdef EIP_3155
@@ -1146,7 +1146,7 @@ namespace cuEVM {
                 ret_size);
             
             // change the call state to the parent
-            cuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
+            CuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
             delete call_state_ptr;
             call_state_ptr = parent_call_state_ptr;
             // trace the call
@@ -1173,7 +1173,7 @@ namespace cuEVM {
         // to see if the contract is a contract
         bn_t sender_address;
         call_state_ptr->message_ptr->get_sender(arith, sender_address);
-        cuEVM::account::account_t *sender_account;
+        CuEVM::account::account_t *sender_account;
         call_state_ptr->parent->touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_BYTE_CODE_FLAG);
         if (sender_account->is_contract()) {
             bn_t sender_nonce;
@@ -1188,9 +1188,9 @@ namespace cuEVM {
         // compute the gas to deposit the contract
         bn_t code_size;
         cgbn_set_ui32(arith.env, code_size, call_state_ptr->last_return_data_ptr->size);
-        cuEVM::gas_cost::code_cost(arith, call_state_ptr->gas_used, code_size);
+        CuEVM::gas_cost::code_cost(arith, call_state_ptr->gas_used, code_size);
         int32_t error_code = ERROR_SUCCESS;
-        error_code |= cuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             call_state_ptr->gas_limit,
             call_state_ptr->gas_used
@@ -1201,7 +1201,7 @@ namespace cuEVM {
             call_state_ptr->message_ptr->get_recipient(arith, contract_address);
             uint8_t *code = call_state_ptr->last_return_data_ptr->data;
             uint32_t code_size = call_state_ptr->last_return_data_ptr->size;
-            if (code_size <= cuEVM::max_code_size) {
+            if (code_size <= CuEVM::max_code_size) {
                 #ifdef EIP_3541
                 if ((code_size > 0) && (code[0] == 0xef)) {
                     error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
@@ -1227,7 +1227,7 @@ namespace cuEVM {
         int32_t managed
     ) {
         // get the world state
-        cuEVM::state::state_t *world_state_data_ptr = nullptr;
+        CuEVM::state::state_t *world_state_data_ptr = nullptr;
         const cJSON *world_state_json = NULL; // the json for the world state
         // get the world state json
         if (cJSON_IsObject(test_json))
@@ -1237,16 +1237,16 @@ namespace cuEVM {
         else
             return 1;
         
-        world_state_data_ptr = new cuEVM::state::state_t(world_state_json, managed);
+        world_state_data_ptr = new CuEVM::state::state_t(world_state_json, managed);
 
         // get the block info
-        cuEVM::block_info_t* block_info_ptr = nullptr;
-        cuEVM::get_block_info(block_info_ptr, test_json, managed);
+        CuEVM::block_info_t* block_info_ptr = nullptr;
+        CuEVM::get_block_info(block_info_ptr, test_json, managed);
 
         // get the transaction
-        cuEVM::evm_transaction_t* transactions_ptr = nullptr;
+        CuEVM::evm_transaction_t* transactions_ptr = nullptr;
         uint32_t num_transactions = 0;
-        cuEVM::transaction::get_transactios(
+        CuEVM::transaction::get_transactios(
             arith,
             transactions_ptr,
             test_json,
@@ -1269,66 +1269,66 @@ namespace cuEVM {
             evm_instances[index].block_info_ptr = block_info_ptr;
             evm_instances[index].transaction_ptr = &transactions_ptr[index];
             if (managed == 0) {
-                evm_instances[index].access_state_data_ptr = new cuEVM::state::state_access_t();
-                evm_instances[index].touch_state_data_ptr = new cuEVM::state::state_access_t();
-                evm_instances[index].log_state_ptr = new cuEVM::state::log_state_data_t();
-                evm_instances[index].return_data_ptr = new cuEVM::evm_return_data_t();
+                evm_instances[index].access_state_data_ptr = new CuEVM::state::state_access_t();
+                evm_instances[index].touch_state_data_ptr = new CuEVM::state::state_access_t();
+                evm_instances[index].log_state_ptr = new CuEVM::state::log_state_data_t();
+                evm_instances[index].return_data_ptr = new CuEVM::evm_return_data_t();
                 #ifdef EIP_3155
-                evm_instances[index].tracer_ptr = new cuEVM::utils::tracer_t();
+                evm_instances[index].tracer_ptr = new CuEVM::utils::tracer_t();
                 #endif
             } else {
-                cuEVM::state::state_access_t *access_state = new cuEVM::state::state_access_t();
+                CuEVM::state::state_access_t *access_state = new CuEVM::state::state_access_t();
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].access_state_data_ptr,
-                    sizeof(cuEVM::state::state_access_t)
+                    sizeof(CuEVM::state::state_access_t)
                 ));
                 memcpy(
                     evm_instances[index].access_state_data_ptr,
                     access_state,
-                    sizeof(cuEVM::state::state_access_t)
+                    sizeof(CuEVM::state::state_access_t)
                 );
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].touch_state_data_ptr,
-                    sizeof(cuEVM::state::state_access_t)
+                    sizeof(CuEVM::state::state_access_t)
                 ));
                 memcpy(
                     evm_instances[index].touch_state_data_ptr,
                     access_state,
-                    sizeof(cuEVM::state::state_access_t)
+                    sizeof(CuEVM::state::state_access_t)
                 );
                 delete access_state;
-                cuEVM::state::log_state_data_t *log_state = new cuEVM::state::log_state_data_t();
+                CuEVM::state::log_state_data_t *log_state = new CuEVM::state::log_state_data_t();
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].log_state_ptr,
-                    sizeof(cuEVM::state::log_state_data_t)
+                    sizeof(CuEVM::state::log_state_data_t)
                 ));
                 memcpy(
                     evm_instances[index].log_state_ptr,
                     log_state,
-                    sizeof(cuEVM::state::log_state_data_t)
+                    sizeof(CuEVM::state::log_state_data_t)
                 );
                 delete log_state;
-                cuEVM::evm_return_data_t *return_data = new cuEVM::evm_return_data_t();
+                CuEVM::evm_return_data_t *return_data = new CuEVM::evm_return_data_t();
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].return_data_ptr,
-                    sizeof(cuEVM::evm_return_data_t)
+                    sizeof(CuEVM::evm_return_data_t)
                 ));
                 memcpy(
                     evm_instances[index].return_data_ptr,
                     return_data,
-                    sizeof(cuEVM::evm_return_data_t)
+                    sizeof(CuEVM::evm_return_data_t)
                 );
                 delete return_data;
                 #ifdef EIP_3155
-                cuEVM::utils::tracer_t *tracer = new cuEVM::utils::tracer_t();
+                CuEVM::utils::tracer_t *tracer = new CuEVM::utils::tracer_t();
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].tracer_ptr,
-                    sizeof(cuEVM::utils::tracer_t)
+                    sizeof(CuEVM::utils::tracer_t)
                 ));
                 memcpy(
                     evm_instances[index].tracer_ptr,
                     tracer,
-                    sizeof(cuEVM::utils::tracer_t)
+                    sizeof(CuEVM::utils::tracer_t)
                 );
                 delete tracer;
                 #endif

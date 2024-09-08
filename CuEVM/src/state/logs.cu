@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -7,7 +7,7 @@
 #include <CuEVM/state/logs.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM::state {
+namespace CuEVM::state {
     __host__ __device__ int32_t log_state_data_t::grow() {
         log_data_t *new_logs = new log_data_t[capacity + log_page_size];
         if (new_logs == nullptr) {
@@ -25,7 +25,7 @@ namespace cuEVM::state {
     __host__ __device__ int32_t log_state_data_t::push(
         ArithEnv &arith,
         const bn_t &address,
-        const cuEVM::byte_array_t &record,
+        const CuEVM::byte_array_t &record,
         const bn_t &topic_1,
         const bn_t &topic_2,
         const bn_t &topic_3,
@@ -94,7 +94,7 @@ namespace cuEVM::state {
         cJSON *logs_json = cJSON_CreateArray();
         cJSON *log_json = NULL;
         cJSON *topics_json = NULL;
-        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+        char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
         for (uint32_t idx = 0; idx < no_logs; idx++) {
             log_json = cJSON_CreateObject();
             logs[idx].address.to_hex(hex_string_ptr, 0, 5);

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Date: 2023-07-15
@@ -20,7 +20,7 @@
  * - EQ
  * - ISZERO
  */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The LT operation implementation.
      * Takes two values from the stack, compares them and pushes the result
@@ -37,7 +37,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The GT operation implementation.
@@ -55,7 +55,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The SLT operation implementation.
@@ -73,7 +73,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The SGT operation implementation.
@@ -91,7 +91,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The EQ operation implementation.
@@ -108,7 +108,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The ISZERO operation implementation.
@@ -125,7 +125,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 }
 
 #endif

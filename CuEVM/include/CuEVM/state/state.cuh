@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -12,14 +12,14 @@
 #include <CuEVM/state/account.cuh>
 #include <cjson/cJSON.h>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace state {
         /**
          * The state struct.
          * It contains the accounts and the number of accounts.
          */
         struct state_t {
-            cuEVM::account::account_t *accounts; /**< The accounts */
+            CuEVM::account::account_t *accounts; /**< The accounts */
             uint32_t no_accounts; /**< The number of accounts */
 
             /**
@@ -33,7 +33,7 @@ namespace cuEVM {
              * @param[in] accounts The accounts.
              * @param[in] no_accounts The number of accounts.
              */
-            __host__ __device__ state_t(cuEVM::account::account_t *accounts, uint32_t no_accounts)
+            __host__ __device__ state_t(CuEVM::account::account_t *accounts, uint32_t no_accounts)
                 : accounts(accounts), no_accounts(no_accounts) {}
             
             /**
@@ -94,7 +94,7 @@ namespace cuEVM {
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t &account);
+                CuEVM::account::account_t &account);
 
             /**
              * The get account function.
@@ -106,7 +106,7 @@ namespace cuEVM {
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t* &account_ptr);
+                CuEVM::account::account_t* &account_ptr);
 
             /**
              * The add account function.
@@ -114,7 +114,7 @@ namespace cuEVM {
              * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_account(
-                const cuEVM::account::account_t &account);
+                const CuEVM::account::account_t &account);
 
             /**
              * The set account function.
@@ -124,7 +124,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t set_account(
                 ArithEnv &arith,
-                const cuEVM::account::account_t &account);
+                const CuEVM::account::account_t &account);
 
             /**
              * The has account function.
@@ -144,7 +144,7 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t update_account(
                 ArithEnv &arith,
-                const cuEVM::account::account_t &account);
+                const CuEVM::account::account_t &account);
 
             /**
              * Get the account from the JSON.
@@ -174,7 +174,7 @@ namespace cuEVM {
          * It extends the state struct with the flags for each account.
          */
         struct state_access_t : state_t {
-            cuEVM::account::account_flags_t* flags; /**< The flags fro each account */
+            CuEVM::account::account_flags_t* flags; /**< The flags fro each account */
 
             /**
              * The default constructor.
@@ -188,9 +188,9 @@ namespace cuEVM {
              * @param[in] flags The flags.
              */
             __host__ __device__ state_access_t(
-                cuEVM::account::account_t *accounts,
+                CuEVM::account::account_t *accounts,
                 uint32_t no_accounts,
-                cuEVM::account::account_flags_t* flags)
+                CuEVM::account::account_flags_t* flags)
                 : state_t(accounts, no_accounts), flags(flags) {}
             
             /**
@@ -244,8 +244,8 @@ namespace cuEVM {
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t &account,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+                CuEVM::account::account_t &account,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**
              * The get account function.
@@ -258,8 +258,8 @@ namespace cuEVM {
             __host__ __device__ int32_t get_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t* &account_ptr,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+                CuEVM::account::account_t* &account_ptr,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**
              * The get account index function.
@@ -278,8 +278,8 @@ namespace cuEVM {
              * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_account(
-                const cuEVM::account::account_t &account,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+                const CuEVM::account::account_t &account,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**
              * The add duplicate account function.
@@ -289,9 +289,9 @@ namespace cuEVM {
              * @return If added 0. otherwise error.
              */
             __host__ __device__ int32_t add_duplicate_account(
-                cuEVM::account::account_t* &account_ptr,
-                cuEVM::account::account_t* &src_account_ptr,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+                CuEVM::account::account_t* &account_ptr,
+                CuEVM::account::account_t* &src_account_ptr,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**
              * The add new account function.
@@ -304,8 +304,8 @@ namespace cuEVM {
             __host__ __device__ int32_t add_new_account(
                 ArithEnv &arith,
                 const bn_t &address,
-                cuEVM::account::account_t* &account_ptr,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
+                CuEVM::account::account_t* &account_ptr,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
             /**
              * The set account function.
@@ -316,8 +316,8 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t set_account(
                 ArithEnv &arith,
-                const cuEVM::account::account_t &account,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_ALL_FLAG);
+                const CuEVM::account::account_t &account,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_ALL_FLAG);
 
             /**
              * The update account function.
@@ -328,8 +328,8 @@ namespace cuEVM {
              */
             __host__ __device__ int32_t update_account(
                 ArithEnv &arith,
-                const cuEVM::account::account_t &account,
-                const cuEVM::account::account_flags_t flag = ACCOUNT_ALL_FLAG);
+                const CuEVM::account::account_t &account,
+                const CuEVM::account::account_flags_t flag = ACCOUNT_ALL_FLAG);
 
             /**
              * The update state function.

@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-07-12
@@ -6,7 +6,7 @@
 
 #include <CuEVM/core/message.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     __host__ __device__ evm_message_call_t::evm_message_call_t(
         ArithEnv &arith,
         const bn_t &sender,
@@ -17,8 +17,8 @@ namespace cuEVM {
         const uint32_t depth,
         const uint32_t call_type,
         const bn_t &storage_address,
-        const cuEVM::byte_array_t &data,
-        const cuEVM::byte_array_t &byte_code,
+        const CuEVM::byte_array_t &data,
+        const CuEVM::byte_array_t &byte_code,
         const bn_t &return_data_offset,
         const bn_t &return_data_size,
         const uint32_t static_env
@@ -37,7 +37,7 @@ namespace cuEVM {
       cgbn_store(arith.env, &this->return_data_size, return_data_size);
       this->static_env = static_env;
       // create the jump destinations
-      this->jump_destinations = new cuEVM::jump_destinations_t(
+      this->jump_destinations = new CuEVM::jump_destinations_t(
           this->byte_code);
     }
 
@@ -137,7 +137,7 @@ namespace cuEVM {
      * Get the call/init data.
      * @return The data YP: \f$d\f$.
      */
-    __host__ __device__ cuEVM::byte_array_t evm_message_call_t::get_data() const {
+    __host__ __device__ CuEVM::byte_array_t evm_message_call_t::get_data() const {
       return this->data;
     }
 
@@ -145,7 +145,7 @@ namespace cuEVM {
      * Get the byte code.
      * @return The byte code YP: \f$b\f$.
      */
-    __host__ __device__ cuEVM::byte_array_t evm_message_call_t::get_byte_code() const {
+    __host__ __device__ CuEVM::byte_array_t evm_message_call_t::get_byte_code() const {
       return this->byte_code;
     }
 
@@ -195,7 +195,7 @@ namespace cuEVM {
      * @param[in] data The data YP: \f$d\f$.
      */
     __host__ __device__ void evm_message_call_t::set_data(
-        cuEVM::byte_array_t &data) {
+        CuEVM::byte_array_t &data) {
       this->data = data;
     }
 
@@ -204,14 +204,14 @@ namespace cuEVM {
      * @param[in] byte_code The byte code YP: \f$b\f$.
      */
     __host__ __device__ void evm_message_call_t::set_byte_code(
-        cuEVM::byte_array_t &byte_code) {
+        CuEVM::byte_array_t &byte_code) {
       this->byte_code = byte_code;
       if (jump_destinations != nullptr)
       {
         delete jump_destinations;
         jump_destinations = nullptr;
       }
-      jump_destinations = new cuEVM::jump_destinations_t(
+      jump_destinations = new CuEVM::jump_destinations_t(
           byte_code);
     }
 
@@ -241,7 +241,7 @@ namespace cuEVM {
      * Get the jump destinations.
      * @return The jump destinations.
      */
-    __host__ __device__ cuEVM::jump_destinations_t* evm_message_call_t::get_jump_destinations() const {
+    __host__ __device__ CuEVM::jump_destinations_t* evm_message_call_t::get_jump_destinations() const {
       return jump_destinations;
     }
 

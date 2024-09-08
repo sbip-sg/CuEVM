@@ -135,7 +135,7 @@
 #define EIP_8
 #endif
 
-namespace cuEVM {
+namespace CuEVM {
 
 constexpr CONSTANT uint32_t bits_per_byte = 8;
 
@@ -176,6 +176,6 @@ constexpr CONSTANT uint32_t cgbn_tpi = 32;
 // CUEVM parameters
 constexpr CONSTANT uint32_t max_transactions_count = 10000;
 
-} // namespace cuEVM
+} // namespace CuEVM
 
 #endif

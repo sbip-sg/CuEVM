@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
@@ -7,15 +7,15 @@
 #include <CuEVM/state/access_state.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
     namespace state {
         __host__ __device__ int32_t AccessState::add_account(
             ArithEnv &arith,
             const bn_t &address,
-            cuEVM::account::account_t* &account_ptr,
-            const cuEVM::account::account_flags_t flag
+            CuEVM::account::account_t* &account_ptr,
+            const CuEVM::account::account_flags_t flag
         ) {
-            cuEVM::account::account_t* tmp_account_ptr = nullptr;
+            CuEVM::account::account_t* tmp_account_ptr = nullptr;
             return (
                 _world_state->get_account(arith, address, tmp_account_ptr) ?
                 _state->add_new_account(
@@ -33,8 +33,8 @@ namespace cuEVM {
         __host__ __device__ int32_t AccessState::get_account(
             ArithEnv &arith,
             const bn_t &address,
-            cuEVM::account::account_t* &account_ptr,
-            const cuEVM::account::account_flags_t flag
+            CuEVM::account::account_t* &account_ptr,
+            const CuEVM::account::account_flags_t flag
         ) {
             return (
                 _state->get_account(arith, address, account_ptr, flag) ?
@@ -86,7 +86,7 @@ namespace cuEVM {
         __host__ __device__ int32_t AccessState::is_warm_account(
             ArithEnv &arith,
             const bn_t &address) const {
-            cuEVM::account::account_t* account_ptr = nullptr;
+            CuEVM::account::account_t* account_ptr = nullptr;
             return _state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG) == 0;
         }
 
@@ -94,7 +94,7 @@ namespace cuEVM {
             ArithEnv &arith,
             const bn_t &address,
             const bn_t &key) const {
-            cuEVM::account::account_t* account_ptr = nullptr;
+            CuEVM::account::account_t* account_ptr = nullptr;
             bn_t value;
             return !(
                 _state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG) ||
@@ -104,7 +104,7 @@ namespace cuEVM {
         __host__ __device__ int32_t AccessState::is_deleted_account(
             ArithEnv &arith,
             const bn_t &address) const {
-            cuEVM::account::account_t* account_ptr = nullptr;
+            CuEVM::account::account_t* account_ptr = nullptr;
             return _world_state->get_account(arith, address, account_ptr);
         }
     }

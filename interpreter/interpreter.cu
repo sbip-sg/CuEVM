@@ -11,13 +11,13 @@
 
 
 // define the kernel function
-__global__ void kernel_evm(cgbn_error_report_t *report, cuEVM::evm_instance_t *instances, uint32_t count) {
-  int32_t instance = (blockIdx.x*blockDim.x+threadIdx.x) / cuEVM::cgbn_tpi;
+__global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *instances, uint32_t count) {
+  int32_t instance = (blockIdx.x*blockDim.x+threadIdx.x) / CuEVM::cgbn_tpi;
   if(instance >= count)
     return;
-  cuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
-  cuEVM::evm_t *evm = nullptr;
-  evm = new cuEVM::evm_t(arith, instances[instance]);
+  CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
+  CuEVM::evm_t *evm = nullptr;
+  evm = new CuEVM::evm_t(arith, instances[instance]);
   evm->run(arith);
   #ifdef EIP_3155
   evm->tracer_ptr->print_err();
@@ -27,8 +27,8 @@ __global__ void kernel_evm(cgbn_error_report_t *report, cuEVM::evm_instance_t *i
 }
 
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose=false) {
-  cuEVM::evm_instance_t *instances_data;
-  cuEVM::ArithEnv arith(cgbn_no_checks, 0);
+  CuEVM::evm_instance_t *instances_data;
+  CuEVM::ArithEnv arith(cgbn_no_checks, 0);
   printf("Running the interpreter\n");
   #ifdef GPU
   printf("Running on GPU\n");
@@ -42,7 +42,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
   #endif
 
   //read the json file with the global state
-  cJSON *read_root = cuEVM::utils::get_json_from_file(read_json_filename);
+  cJSON *read_root = CuEVM::utils::get_json_from_file(read_json_filename);
   if(read_root == nullptr) {
     printf("Error: could not read the json file\n");
     exit(EXIT_FAILURE);
@@ -60,12 +60,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
   
   const cJSON *test_json = nullptr;
   cJSON_ArrayForEach(test_json, read_root) {
-    cuEVM::get_evm_instances(arith, instances_data, test_json, num_instances, managed);
+    CuEVM::get_evm_instances(arith, instances_data, test_json, num_instances, managed);
 
     #ifdef GPU
       printf("Running on GPU\n");
       // run the evm
-      kernel_evm<<<num_instances, cuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
+      kernel_evm<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
       CUDA_CHECK(cudaDeviceSynchronize());
       CUDA_CHECK(cudaGetLastError());
       printf("GPU kernel finished\n");
@@ -77,12 +77,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
       const cJSON *test = nullptr;
       printf("Running CPU EVM\n");
       // run the evm
-      cuEVM::evm_t *evm = nullptr;
+      CuEVM::evm_t *evm = nullptr;
       uint32_t tmp_error;
       cJSON* final_state = nullptr;
       auto cpu_start = std::chrono::high_resolution_clock::now();
       for(uint32_t instance = 0; instance < num_instances; instance++) {
-        evm = new cuEVM::evm_t(arith, instances_data[instance]);
+        evm = new CuEVM::evm_t(arith, instances_data[instance]);
         evm->run(arith);
         #ifdef EIP_3155
         evm->tracer_ptr->print_err();
@@ -95,7 +95,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         // printf("DEBUG: CPU EVM instance %d access state\n", instance);
         // cpu_instances_data[instance].access_state_data_ptr->print();
         // printf("DEBUG: CPU EVM instance %d finished - END\n", instance);
-        final_state = cuEVM::state::state_merge_json(
+        final_state = CuEVM::state::state_merge_json(
           *instances_data[instance].world_state_data_ptr,
           *instances_data[instance].touch_state_data_ptr
         );
@@ -120,7 +120,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 
 
   printf("Freeing the memory ...\n");
-  cuEVM::free_evm_instances(instances_data, num_instances, managed);
+  CuEVM::free_evm_instances(instances_data, num_instances, managed);
 
   #ifdef GPU
       CUDA_CHECK(cudaDeviceReset());

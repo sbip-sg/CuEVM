@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2023-11-30
@@ -13,7 +13,7 @@
 #include <cuda.h>
 #include <cjson/cJSON.h>
 
-namespace cuEVM {
+namespace CuEVM {
   enum PaddingDirection {
     NO_PADDING = 0,
     LEFT_PADDING = 1,

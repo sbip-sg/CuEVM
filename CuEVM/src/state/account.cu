@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
@@ -7,7 +7,7 @@
 #include <CuEVM/state/account.cuh>
 #include <CuCrypto/keccak.cuh>
 
-namespace cuEVM
+namespace CuEVM
 {
   namespace account
   {
@@ -49,7 +49,7 @@ namespace cuEVM
                 dst_instances[instance].storage.storage,
                 src_instances[instance].storage.storage,
                 src_instances[instance].storage.size *
-                    sizeof(cuEVM::storage::storage_element_t)
+                    sizeof(CuEVM::storage::storage_element_t)
             );
             dst_instances[instance].storage.size = src_instances[instance].storage.size;
             delete[] src_instances[instance].storage.storage;
@@ -340,7 +340,7 @@ namespace cuEVM
     {
         cJSON *account_json = cJSON_CreateObject();
         char *bytes_string = nullptr;
-        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+        char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
         size_t jdx = 0;
         address.to_hex(hex_string_ptr, 0, 5);
         cJSON_SetValuestring(account_json, hex_string_ptr);
@@ -377,7 +377,7 @@ namespace cuEVM
         const account_flags_t &flags) {
         
         cJSON *account_json = cJSON_CreateObject();
-        char *hex_string_ptr = new char[cuEVM::word_size * 2 + 3];
+        char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
         account1_ptr->address.to_hex(hex_string_ptr, 0, 5);
         cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
 
@@ -397,8 +397,8 @@ namespace cuEVM
 
         char *code_hash_hex_string_ptr = nullptr;
         char *code_hex_string_ptr = nullptr;
-        cuEVM::byte_array_t *hash;
-        hash = new cuEVM::byte_array_t(cuEVM::hash_size);
+        CuEVM::byte_array_t *hash;
+        hash = new CuEVM::byte_array_t(CuEVM::hash_size);
         if(flags.has_byte_code()) {
             CuCrypto::keccak::sha3(
                 account2_ptr->byte_code.data,
@@ -426,13 +426,13 @@ namespace cuEVM
         cJSON *storage_json = nullptr;
         
         if (flags.has_storage()) {
-            storage_json = cuEVM::storage::storage_merge_json(
+            storage_json = CuEVM::storage::storage_merge_json(
                 account1_ptr->storage,
                 account2_ptr->storage,
                 1
             );
         } else {
-            storage_json = cuEVM::storage::storage_merge_json(
+            storage_json = CuEVM::storage::storage_merge_json(
                 account1_ptr->storage,
                 account1_ptr->storage,
                 1
@@ -534,13 +534,13 @@ namespace cuEVM
                 CUDA_CHECK(cudaMalloc(
                     &tmp_cpu_instances[index].storage.storage,
                     tmp_cpu_instances[index].storage.size *
-                        sizeof(cuEVM::storage::storage_element_t)
+                        sizeof(CuEVM::storage::storage_element_t)
                 ));
                 CUDA_CHECK(cudaMemcpy(
                     tmp_cpu_instances[index].storage.storage,
                     cpu_instances[index].storage.storage,
                     cpu_instances[index].storage.size *
-                        sizeof(cuEVM::storage::storage_element_t),
+                        sizeof(CuEVM::storage::storage_element_t),
                     cudaMemcpyHostToDevice
                 ));
             }
@@ -623,7 +623,7 @@ namespace cuEVM
                 (tmp_cpu_instances[index].storage.storage != nullptr) &&
                 (tmp_cpu_instances[index].storage.size > 0)
             ) {
-                cpu_instances[index].storage.storage = new cuEVM::storage::storage_element_t[tmp_cpu_instances[index].storage.size];
+                cpu_instances[index].storage.storage = new CuEVM::storage::storage_element_t[tmp_cpu_instances[index].storage.size];
             } else {
                 cpu_instances[index].storage.storage = nullptr;
                 cpu_instances[index].storage.size = 0;
@@ -684,7 +684,7 @@ namespace cuEVM
                         cpu_instances[index].storage.storage,
                         tmp_cpu_instances[index].storage.storage,
                         tmp_cpu_instances[index].storage.size *
-                            sizeof(cuEVM::storage::storage_element_t),
+                            sizeof(CuEVM::storage::storage_element_t),
                         cudaMemcpyDeviceToHost
                     )
                 );

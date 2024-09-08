@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
@@ -8,7 +8,7 @@
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/core/byte_array.cuh>
 
-namespace cuEVM {
+namespace CuEVM {
   __host__ __device__ byte_array_t::byte_array_t(
     const uint32_t size) : size(size) {
       if (size > 0) {
@@ -135,7 +135,7 @@ namespace cuEVM {
     char *tmp_hex_string = (char *)hex_string + 2;
     uint8_t *tmp_data = data;
     for(uint32_t idx=0; idx<size; idx++) {
-      cuEVM::utils::hex_from_byte(tmp_hex_string, *(tmp_data++));
+      CuEVM::utils::hex_from_byte(tmp_hex_string, *(tmp_data++));
       tmp_hex_string += 2;
     }
     hex_string[size*2+2]=0;
@@ -171,7 +171,7 @@ namespace cuEVM {
       dst_ptr = data;
       for (index = 0; index < ((length+1)/2) - 1; index++)
       {
-        *(dst_ptr++) = cuEVM::utils::byte_from_two_hex_char(
+        *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(
           *(current_char),
           *(current_char+1)
         );
@@ -179,12 +179,12 @@ namespace cuEVM {
       }
       if (length % 2 == 1)
       {
-        *(dst_ptr++) = cuEVM::utils::byte_from_two_hex_char(
+        *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(
           *current_char++,
           '0'
         );
       } else {
-        *(dst_ptr++) = cuEVM::utils::byte_from_two_hex_char(
+        *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(
           *(current_char),
           *(current_char+1)
         );
@@ -216,19 +216,19 @@ namespace cuEVM {
         
       if (length % 2 == 1)
       {
-        *dst_ptr-- = cuEVM::utils::byte_from_two_hex_char(
+        *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(
           '0',
           *current_char++
         );
       } else {
-        *dst_ptr-- = cuEVM::utils::byte_from_two_hex_char(
+        *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(
           *(current_char),
           *(current_char+1)
         );
         current_char += 2;
       }
       while(*current_char != '\0') {
-        *dst_ptr-- = cuEVM::utils::byte_from_two_hex_char(
+        *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(
           *(current_char),
           *(current_char+1)
         );
@@ -246,7 +246,7 @@ namespace cuEVM {
   {
     char *tmp_hex_char;
     tmp_hex_char = (char *)hex_string;
-    int32_t length = cuEVM::utils::clean_hex_string(&tmp_hex_char);
+    int32_t length = CuEVM::utils::clean_hex_string(&tmp_hex_char);
     if (length < 0)
     {
       data = nullptr;
@@ -463,7 +463,7 @@ namespace cuEVM {
       tmp_cpu_instances = nullptr;
 
       // 2. call the kernel to copy the memory between the gpu memories
-      cuEVM::byte_array::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+      CuEVM::byte_array::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
       CUDA_CHECK(cudaDeviceSynchronize());
       cudaFree(gpu_instances);
       gpu_instances = tmp_gpu_instances;
@@ -499,11 +499,11 @@ namespace cuEVM {
       }
 
       // 4. free the temporary allocated memory
-      cuEVM::byte_array::gpu_free(gpu_instances, count);
+      CuEVM::byte_array::gpu_free(gpu_instances, count);
       delete[] cpu_instances;
       cpu_instances=tmp_cpu_instances;
       tmp_cpu_instances=nullptr;
       return cpu_instances;
     }
   } // namespace byte_array
-} // namespace cuEVM
+} // namespace CuEVM

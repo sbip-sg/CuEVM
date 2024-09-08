@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Date: 2023-07-15
@@ -22,7 +22,7 @@
  * - SHR
  * - SAR
  */
-namespace cuEVM::operations {
+namespace CuEVM::operations {
     /**
      * The AND operation implementation.
      * Takes two values from the stack, performs a bitwise AND operation
@@ -36,7 +36,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The OR operation implementation.
@@ -51,7 +51,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The XOR operation implementation.
@@ -66,7 +66,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The NOT operation implementation.
@@ -82,7 +82,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The BYTE operation implementation.
@@ -100,7 +100,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The SHL operation implementation.
@@ -117,7 +117,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The SHR operation implementation.
@@ -134,7 +134,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 
     /**
      * The SAR operation implementation.
@@ -154,7 +154,7 @@ namespace cuEVM::operations {
         ArithEnv &arith,
         const bn_t &gas_limit,
         bn_t &gas_used,
-        cuEVM::evm_stack_t &stack);
+        CuEVM::evm_stack_t &stack);
 }
 
 #endif

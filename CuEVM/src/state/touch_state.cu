@@ -1,4 +1,4 @@
-// cuEVM: CUDA Ethereum Virtual Machine implementation
+// CuEVM: CUDA Ethereum Virtual Machine implementation
 // Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
 // Author: Stefan-Dan Ciocirlan
 // Data: 2024-06-20
@@ -7,15 +7,15 @@
 #include <CuEVM/state/touch_state.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace cuEVM::state {
+namespace CuEVM::state {
     __host__ __device__ int32_t TouchState::add_account(
         ArithEnv &arith,
         const bn_t &address,
-        cuEVM::account::account_t* &account_ptr,
-        const cuEVM::account::account_flags_t acces_state_flag
+        CuEVM::account::account_t* &account_ptr,
+        const CuEVM::account::account_flags_t acces_state_flag
     ) {
-        cuEVM::account::account_t* tmp_account_ptr = nullptr;
-        cuEVM::account::account_t *tmp_access_account_ptr = nullptr;
+        CuEVM::account::account_t* tmp_account_ptr = nullptr;
+        CuEVM::account::account_t *tmp_access_account_ptr = nullptr;
         TouchState* tmp = parent;
         _access_state->get_account(
             arith,
@@ -39,10 +39,10 @@ namespace cuEVM::state {
     __host__ __device__ int32_t TouchState::get_account(
         ArithEnv &arith,
         const bn_t &address,
-        cuEVM::account::account_t* &account_ptr,
-        const cuEVM::account::account_flags_t acces_state_flag
+        CuEVM::account::account_t* &account_ptr,
+        const CuEVM::account::account_flags_t acces_state_flag
     ) {
-        cuEVM::account::account_t *tmp_ptr;
+        CuEVM::account::account_t *tmp_ptr;
         _access_state->get_account(arith, address, tmp_ptr, acces_state_flag);
         return (
             _state->get_account(arith, address, account_ptr) ?
@@ -256,7 +256,7 @@ namespace cuEVM::state {
         ArithEnv &arith,
         const bn_t &address
     ) {
-        cuEVM::account::account_t* account_ptr = nullptr;
+        CuEVM::account::account_t* account_ptr = nullptr;
         uint32_t index;
         if (_state->get_account_index(arith, address, index) == 0) {
             return _state->flags[index].has_deleted();
