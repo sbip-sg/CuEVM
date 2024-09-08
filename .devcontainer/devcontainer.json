@@ -2,7 +2,7 @@
 	"name": "CuEVM dev container",
 	"build": { "dockerfile": "Dockerfile" },
 	"runArgs": [
-		"--rm", "--gpus=all"
+		"--rm", "--gpus=all",
 	],
 	//"remoteEnv": {
 	//	"ENV_VAR": "ENV_VAL"
@@ -16,7 +16,9 @@
 				"NVIDIA.nsight-vscode-edition",
 				"ms-vscode.cpptools-extension-pack",
 				"ccimage.jsonviewer",
-				"xaver.clang-format"
+				"xaver.clang-format",
+				"ms-vscode.makefile-tools",
+				"github.vscode-github-actions"
 			]
 		}
 	}//,

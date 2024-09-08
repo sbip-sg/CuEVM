@@ -1,14 +1,18 @@
 {
     "configurations": [
         {
-            "name": "Linux",
+            "name": "CUDA",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/CuEVM/libraries/CGBN/CGBN/include",
+                "${workspaceFolder}/CuEVM/libraries/CuBigInt/CuBigInt/include",
+                "${workspaceFolder}/CuEVM/libraries/CuCrypto/CuCrypto/include",
+                "${workspaceFolder}/CuEVM/include"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/gcc",
-            "cStandard": "c11",
-            "cppStandard": "gnu++14",
+            "compilerPath": "/usr/local/cuda/bin/nvcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-gcc-x64"
         }
     ],

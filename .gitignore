@@ -17,4 +17,8 @@ _static/
 _templates/
 docs/api/
 *.o
-cuEVM
+tmp
+run-ethtest-by-fork.log
+dtmp
+cuevm.out
+geth.out
