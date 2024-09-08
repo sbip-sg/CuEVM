@@ -1,0 +1,22 @@
+# CuCrypto
+Cuda implementation of cryptographic functions
+
+## Prerequisites
+- CUDA Toolkit (Version 12.0+, because we use `--std c++20`)
+- A CUDA-capable GPU (CUDA compute capabilily 7+ other older GPUs compability are not tested fully)
+- A C++ compiler compatible with the CUDA Toolkit (gcc/g++ version 10+)
+- The gtest suite
+- For docker image, you dont need the above but the system with docker installed
+
+## Compile and Run
+Use docker image adn cmake
+
+#### CMake
+
+* `mkdir build`
+* `cmake -S . -B build ` (for debug : `-DCMAKE_BUILD_TYPE=Debug)
+* `cmake --build build --target install`
+
+#### Test
+
+* `cd build && ctest`

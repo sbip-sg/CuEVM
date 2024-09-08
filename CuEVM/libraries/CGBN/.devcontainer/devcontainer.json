@@ -1,0 +1,26 @@
+{
+	"name": "CGBN dev container",
+	"build": { "dockerfile": "Dockerfile" },
+	"runArgs": [
+		"--rm", "--gpus=all"
+	],
+	//"remoteEnv": {
+	//	"ENV_VAR": "ENV_VAL"
+	//},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"GitHub.vscode-pull-request-github",
+				"GitHub.copilot",
+				"ms-vscode.makefile-tools",
+				"NVIDIA.nsight-vscode-edition",
+				"ms-vscode.cpptools-extension-pack",
+				"ccimage.jsonviewer",
+				"xaver.clang-format",
+				"ms-vscode.makefile-tools",
+				"github.vscode-github-actions"
+			]
+		}
+	}//,
+	//"postStartCommand": ""
+}

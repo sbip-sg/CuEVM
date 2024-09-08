@@ -4,9 +4,10 @@
             "name": "CUDA",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/libraries/CGBN/CGBN/include/CGBN",
-                "${workspaceFolder}/libraries/CuBigInt/CuBigInt/include/CuBigInt",
-                "${workspaceFolder}/libraries/CuCrypto/CuCrypto/include/CuCrypto",
+                "${workspaceFolder}/CuEVM/libraries/CGBN/CGBN/include",
+                "${workspaceFolder}/CuEVM/libraries/CuBigInt/CuBigInt/include",
+                "${workspaceFolder}/CuEVM/libraries/CuCrypto/CuCrypto/include",
+                "${workspaceFolder}/CuEVM/include"
             ],
             "defines": [],
             "compilerPath": "/usr/local/cuda/bin/nvcc",

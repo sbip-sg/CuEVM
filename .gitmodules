@@ -1,9 +1,9 @@
 [submodule "libraries/CuBigInt"]
-	path = libraries/CuBigInt
+	path = CuEVM/libraries/CuBigInt
 	url = https://github.com/sdcioc/CuBigInt.git
 [submodule "libraries/CGBN"]
-	path = libraries/CGBN
+	path = CuEVM/libraries/CGBN
 	url = https://github.com/sdcioc/CGBN.git
 [submodule "libraries/CuCrypto"]
-	path = libraries/CuCrypto
+	path = CuEVM/libraries/CuCrypto
 	url = https://github.com/sdcioc/CuCrypto.git
