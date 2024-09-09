@@ -87,12 +87,12 @@ namespace CuEVM::operations {
             gas_used);
         return (
             error_code ?
+            error_code :
             touch_state.set_storage_value(
                 arith,
                 storage_address,
                 key,
-                value) :
-            error_code
+                value)
         );
     }
 }

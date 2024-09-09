@@ -352,7 +352,7 @@ namespace CuEVM {
                 }
             }
 
-            for (uint32_t jdx; jdx < storage2.size; jdx++)
+            for (uint32_t jdx = 0; jdx < storage2.size; jdx++)
             {
                 if (written[jdx] == 0)
                 {
