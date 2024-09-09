@@ -51,7 +51,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
   if (write_json_filename != nullptr) {
     write_root = cJSON_CreateObject();
   }
-  int32_t error_code = 0;
   uint32_t num_instances = 0;
   int32_t managed = 0;
   #ifdef GPU
@@ -74,11 +73,9 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
       CUDA_CHECK(cudaEventSynchronize(stop));
       CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
     #else
-      const cJSON *test = nullptr;
       printf("Running CPU EVM\n");
       // run the evm
       CuEVM::evm_t *evm = nullptr;
-      uint32_t tmp_error;
       cJSON* final_state = nullptr;
       auto cpu_start = std::chrono::high_resolution_clock::now();
       for(uint32_t instance = 0; instance < num_instances; instance++) {

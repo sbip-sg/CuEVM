@@ -11,11 +11,17 @@
 #endif
 #endif
 #ifdef MULTIPLE_THREADS_PER_INSTANCE
-#define ONE_THREAD_PER_INSTANCE(X) __syncthreads(); if (threadIdx.x == 0) { X } __syncthreads();
-#define SHARED_MEMORY __shared__
+#define __ONE_THREAD_PER_INSTANCE(X)__ __syncthreads(); if (threadIdx.x == 0) { X } __syncthreads();
+#define __ONE_GPU_THREAD_BEGIN__ __syncthreads(); if (threadIdx.x == 0) {
+#define __ONE_GPU_THREAD_END__ } __syncthreads();
+#define __SYNC_THREADS__ __syncthreads()
+#define __SHARED_MEMORY__ __shared__
 #else
-#define ONE_THREAD_PER_INSTANCE(X) X
-#define SHARED_MEMORY
+#define __ONE_THREAD_PER_INSTANCE(X)__ X
+#define __ONE_GPU_THREAD_BEGIN__
+#define __ONE_GPU_THREAD_END__
+#define __SYNC_THREADS__
+#define __SHARED_MEMORY__
 #endif
 
 #ifdef __CUDA_ARCH__

@@ -52,7 +52,7 @@ namespace CuEVM {
      * @param[in] endian The endian format.
      * @param[in] padding The padding direction.
      */
-    __host__ __device__ byte_array_t(
+    __host__ byte_array_t(
       const char *hex_string,
       int32_t endian = LITTLE_ENDIAN,
       PaddingDirection padding = NO_PADDING);
@@ -63,7 +63,7 @@ namespace CuEVM {
      * @param[in] endian The endian format.
      * @param[in] padding The padding direction.
      */
-    __host__ __device__ byte_array_t(
+    __host__ byte_array_t(
       const char *hex_string,
       uint32_t size,
       int32_t endian = LITTLE_ENDIAN,
@@ -103,12 +103,94 @@ namespace CuEVM {
      * The hex string is allocated on the heap and needs to be freed.
      * @return The hex string.
      */
-    __host__ __device__ char* to_hex() const;
+    __host__ char* to_hex() const;
     /**
      * Get the json object from the byte array.
      * @return The json object.
      */
     __host__ cJSON *to_json() const;
+    
+    /**
+     * Get the byte array from a hex string.
+     * @param[in] hex_string The hex string.
+     * @param[in] endian The endian format.
+     * @param[in] padding The padding direction.
+     * @param[in] managed The managed flag.
+     * @return The Error code. 0 for success, 1 for failure.
+     */
+    __host__ int32_t from_hex(
+      const char *hex_string,
+      int32_t endian = LITTLE_ENDIAN,
+      PaddingDirection padding = NO_PADDING,
+      int32_t managed = 0);
+    /**
+     * Copy the source byte array
+     * considering a Big Endian format, the extra size
+     * of the byte array will be padded with
+     * zeros.
+     * @param[in] src The source byte array
+     * @return the difference in size -1 <, 0 =, 1 >
+     */
+    __host__ __device__ int32_t padded_copy_BE(
+      const byte_array_t src
+    );
+
+    /**
+     * Access the byte array using the index operator.
+     * @param[in] index The index of the element to access.
+     * @return The reference to the element at the specified index.
+     */
+    __host__ __device__ uint8_t& operator[](uint32_t index);
+    
+    // STATIC FUNCTIONS
+    
+    /**
+     * Get the cpu instances for the return data
+     * @param[in] count the number of instances
+     * @return the cpu instances
+    */
+    __host__ static byte_array_t *get_cpu(
+        uint32_t count);
+
+    /**
+     * Free the cpu instances
+     * @param[in] cpu_instances the cpu instances
+     * @param[in] count the number of instances
+    */
+    __host__ static void cpu_free(
+        byte_array_t *cpu_instances,
+        uint32_t count);
+
+    /**
+     * Get the gpu instances for the return data from the cpu instances
+     * @param[in] cpu_instances the cpu instances
+     * @param[in] count the number of instances
+     * @return the gpu instances
+    */
+    __host__ static byte_array_t *gpu_from_cpu(
+        byte_array_t *cpu_instances,
+        uint32_t count);
+
+    /**
+     * Free the gpu instances
+     * @param[in] gpu_instances the gpu instances
+     * @param[in] count the number of instances
+    */
+    __host__ static void gpu_free(
+        byte_array_t *gpu_instances,
+        uint32_t count);
+
+    /**
+     * Get the cpu instances from the gpu instances
+     * @param[in] gpu_instances the gpu instances
+     * @param[in] count the number of instances
+     * @return the cpu instances
+    */
+    __host__ static byte_array_t *cpu_from_gpu(
+        byte_array_t *gpu_instances,
+        uint32_t count);
+
+    private:
     /**
      * Get the byte array from a hex string in Little Endian format.
      * @param[in] clean_hex_string The clean hex string.
@@ -129,92 +211,18 @@ namespace CuEVM {
       const char *clean_hex_string,
       int32_t length,
       PaddingDirection padding);
-    
-    /**
-     * Get the byte array from a hex string.
-     * @param[in] hex_string The hex string.
-     * @param[in] endian The endian format.
-     * @param[in] padding The padding direction.
-     * @param[in] managed The managed flag.
-     * @return The Error code. 0 for success, 1 for failure.
-     */
-    __host__ __device__ int32_t from_hex(
-      const char *hex_string,
-      int32_t endian = LITTLE_ENDIAN,
-      PaddingDirection padding = NO_PADDING,
-      int32_t managed = 0);
-    /**
-     * Copy the source byte array
-     * considering a Big Endian format, the extra size
-     * of the byte array will be padded with
-     * zeros.
-     * @param[in] src The source byte array
-     * @return the difference in size -1 <, 0 =, 1 >
-     */
-    __host__ __device__ int32_t padded_copy_BE(
-      const byte_array_t src
-    );
 
   };
-
-  namespace byte_array {
-    // GPU-CPU interaction
-    /**
-     * Copy data content between two device memories
-     * @param[out] dst_instances the destination memory
-     * @param[in] src_instances the source memory
-     * @param[in] count the number of instances to copy
-    */
-    __global__ void transfer_kernel(
-        byte_array_t *dst_instances,
-        byte_array_t *src_instances,
-        uint32_t count);
-    /**
-     * Get the cpu instances for the return data
-     * @param[in] count the number of instances
-     * @return the cpu instances
-    */
-    __host__ byte_array_t *get_cpu(
-        uint32_t count);
-
-    /**
-     * Free the cpu instances
-     * @param[in] cpu_instances the cpu instances
-     * @param[in] count the number of instances
-    */
-    __host__ void cpu_free(
-        byte_array_t *cpu_instances,
-        uint32_t count);
-
-    /**
-     * Get the gpu instances for the return data from the cpu instances
-     * @param[in] cpu_instances the cpu instances
-     * @param[in] count the number of instances
-     * @return the gpu instances
-    */
-    __host__ byte_array_t *gpu_from_cpu(
-        byte_array_t *cpu_instances,
-        uint32_t count);
-
-    /**
-     * Free the gpu instances
-     * @param[in] gpu_instances the gpu instances
-     * @param[in] count the number of instances
-    */
-    __host__ void gpu_free(
-        byte_array_t *gpu_instances,
-        uint32_t count);
-
-    /**
-     * Get the cpu instances from the gpu instances
-     * @param[in] gpu_instances the gpu instances
-     * @param[in] count the number of instances
-     * @return the cpu instances
-    */
-    __host__ byte_array_t *cpu_from_gpu(
-        byte_array_t *gpu_instances,
-        uint32_t count);
-  }
+  /**
+   * Copy data content between two device memories
+   * @param[out] dst_instances the destination memory
+   * @param[in] src_instances the source memory
+   * @param[in] count the number of instances to copy
+  */
+  __global__ void byte_array_t_transfer_kernel(
+      byte_array_t *dst_instances,
+      byte_array_t *src_instances,
+      uint32_t count);
 }
 
 #endif

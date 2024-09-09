@@ -11,35 +11,42 @@
 namespace CuEVM {
   __host__ __device__ byte_array_t::byte_array_t(
     const uint32_t size) : size(size) {
+      __SHARED_MEMORY__ uint8_t *tmp_data;
+      __ONE_GPU_THREAD_BEGIN__
       if (size > 0) {
-        data = new uint8_t[size];
-        // TODO: maybe delete to get performence boost
-        std::fill(data, data + size, 0);
+        tmp_data = new uint8_t[size];
+        memset(tmp_data, 0, size * sizeof(uint8_t));
       }
       else
-        data = nullptr;
+        tmp_data = nullptr;
+      __ONE_GPU_THREAD_END__
+      data = tmp_data;
   }
 
   __host__ __device__ byte_array_t::byte_array_t(
     uint8_t *data,
     uint32_t size) : size(size) {
+      __SHARED_MEMORY__ uint8_t *tmp_data;
+      __ONE_GPU_THREAD_BEGIN__
       if (size > 0)
       {
-        this->data = new uint8_t[size];
-        std::copy(data, data + size, this->data);
+        tmp_data = new uint8_t[size];
+        memcpy(tmp_data, data, size * sizeof(uint8_t));
       }
       else
-        this->data = nullptr;
+        tmp_data = nullptr;
+      __ONE_GPU_THREAD_END__
+      this->data = tmp_data;
   }
 
-  __host__ __device__ byte_array_t::byte_array_t(
+  __host__ byte_array_t::byte_array_t(
     const char *hex_string,
     int32_t endian,
     PaddingDirection padding) : size(0), data(nullptr) {
       from_hex(hex_string, endian, padding, 0);
   }
 
-  __host__ __device__ byte_array_t::byte_array_t(
+  __host__ byte_array_t::byte_array_t(
     const char *hex_string,
     uint32_t size,
     int32_t endian,
@@ -48,48 +55,59 @@ namespace CuEVM {
   }
 
   __host__ __device__ byte_array_t::~byte_array_t() {
+    __ONE_GPU_THREAD_BEGIN__
     if (
       (size > 0) &&
       (data != nullptr)
     ) {
       delete[] data;
-      data = nullptr;
     }
+    __ONE_GPU_THREAD_END__
+    data = nullptr;
     size = 0;
   }
 
   __host__ __device__ byte_array_t::byte_array_t(
     const byte_array_t &other) : size(other.size) {
+      __SHARED_MEMORY__ uint8_t *tmp_data;
+      __ONE_GPU_THREAD_BEGIN__
       if (size > 0)
       {
-        data = new uint8_t[size];
-        std::copy(other.data, other.data + size, data);
+        tmp_data = new uint8_t[size];
+        memcpy(tmp_data, other.data, size * sizeof(uint8_t));
       }
       else
-        data = nullptr;
+        tmp_data = nullptr;
+      __ONE_GPU_THREAD_END__
+      data = tmp_data;
   }
 
   __host__ __device__ byte_array_t& byte_array_t::operator=(
     const byte_array_t &other) {
       if (this == &other)
         return *this;
+      __SHARED_MEMORY__ uint8_t *tmp_data;
+      __ONE_GPU_THREAD_BEGIN__
       if (size != other.size)
       {
         if (size > 0)
         {
           delete[] data;
         }
-        data = nullptr;
+        tmp_data = nullptr;
         size = other.size;
         if (size > 0)
-          data = new uint8_t[size];
+          tmp_data = new uint8_t[size];
       }
       if (size > 0)
       {
-        std::copy(other.data, other.data + size, data);
+        memcpy(tmp_data, other.data, size * sizeof(uint8_t));
       }
       else
-        data = nullptr;
+        tmp_data = nullptr;
+      __ONE_GPU_THREAD_END__
+      data = tmp_data;
+      size = other.size;
       return *this;
   }
 
@@ -99,22 +117,25 @@ namespace CuEVM {
     int32_t zero_padding) {
       if (new_size == size)
         return ERROR_SUCCESS;
-      uint8_t *new_data = new uint8_t[new_size];
-      // TODO: fill zeros
+      __SHARED_MEMORY__ uint8_t *new_data;
+      __ONE_GPU_THREAD_BEGIN__
+      new_data = new uint8_t[new_size];
       if (zero_padding)
-        std::fill(new_data, new_data + new_size, 0);
+        memset(new_data, 0, new_size * sizeof(uint8_t));
       if (size > 0)
       {
         if (new_size > size)
         {
-          std::copy(data, data + size, new_data);
+          memcpy(new_data, data, size * sizeof(uint8_t));
           // if (zero_padding)
-          //   std::fill(new_data + size, new_data + new_size, 0);
+          //   memset(new_data + size, 0, new_size - size);
         }
-        else
-          std::copy(data, data + new_size, new_data);
+        else {
+          memcpy(new_data, data, new_size * sizeof(uint8_t));
+        }
         delete[] data;
       }
+      __ONE_GPU_THREAD_END__
       data = new_data;
       size = new_size;
       return ERROR_SUCCESS;
@@ -128,7 +149,7 @@ namespace CuEVM {
       printf("\n");
   }
 
-  __host__ __device__ char *byte_array_t::to_hex() const {
+  __host__ char *byte_array_t::to_hex() const {
     char *hex_string = new char[size*2+3]; // 3 - 0x and \0
     hex_string[0]='0';
     hex_string[1]='x';
@@ -156,7 +177,7 @@ namespace CuEVM {
     return data_json;
   }
 
-  __host__ __device__ int32_t byte_array_t::from_hex_set_le(
+  __host__ int32_t byte_array_t::from_hex_set_le(
     const char *clean_hex_string,
     int32_t length) {
     if ( (length < 0) || ( (size * 2) < length ) ) {
@@ -194,7 +215,7 @@ namespace CuEVM {
     return 0;
   }
 
-  __host__ __device__ int32_t byte_array_t::from_hex_set_be(
+  __host__ int32_t byte_array_t::from_hex_set_be(
     const char *clean_hex_string,
     int32_t length,
     PaddingDirection padding) {
@@ -238,7 +259,7 @@ namespace CuEVM {
     return 0;
   }
 
-  __host__ __device__ int32_t byte_array_t::from_hex(
+  __host__ int32_t byte_array_t::from_hex(
     const char *hex_string,
     int32_t endian,
     PaddingDirection padding,
@@ -258,11 +279,11 @@ namespace CuEVM {
         CUDA_CHECK(cudaMallocManaged(
           (void **)&data,
           sizeof(uint8_t) * size));
-        memset(data, 0, size);
+        memset(data, 0, size * sizeof(uint8_t));
       } else {
         // data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
         data = new uint8_t[size];
-        memset(data, 0, size);
+        memset(data, 0, size * sizeof(uint8_t));
       }
     }
     int32_t error_code = ERROR_SUCCESS;
@@ -302,15 +323,176 @@ namespace CuEVM {
       size_diff = -1;
       copy_size = size;
     }
+    __ONE_GPU_THREAD_BEGIN__
     memcpy(data, src.data, copy_size);
     memset(data + copy_size, 0, size - src.size);
+    __ONE_GPU_THREAD_END__
     return size_diff;
   }
+  
+    __host__ __device__ uint8_t& byte_array_t::operator[](uint32_t index)
+    {
+      return data[index];
+    }
 
-  namespace byte_array {
+  // STATIC FUNCTIONS
+  
+
+    __host__ byte_array_t *byte_array_t::get_cpu(
+        uint32_t count)
+    {
+      byte_array_t *cpu_instances = new byte_array_t[count];
+      return cpu_instances;
+    }
+
+    __host__ void byte_array_t::cpu_free(
+        byte_array_t *cpu_instances,
+        uint32_t count)
+    {
+      delete[] cpu_instances;
+    }
+
+    __host__ byte_array_t *byte_array_t::gpu_from_cpu(
+        byte_array_t *cpu_instances,
+        uint32_t count)
+    {
+      byte_array_t *gpu_instances, *tmp_cpu_instances;
+      tmp_cpu_instances = new byte_array_t[count];
+      for (uint32_t idx = 0; idx < count; idx++)
+      {
+        if (cpu_instances[idx].size > 0)
+        {
+          CUDA_CHECK(cudaMalloc(
+              (void **)&tmp_cpu_instances[idx].data,
+              sizeof(uint8_t) * cpu_instances[idx].size));
+          CUDA_CHECK(cudaMemcpy(
+              tmp_cpu_instances[idx].data,
+              cpu_instances[idx].data,
+              sizeof(uint8_t) * cpu_instances[idx].size,
+              cudaMemcpyHostToDevice));
+          tmp_cpu_instances[idx].size = cpu_instances[idx].size;
+        }
+      }
+      CUDA_CHECK(cudaMalloc(
+          (void **)&gpu_instances,
+          sizeof(byte_array_t) * count));
+      CUDA_CHECK(cudaMemcpy(
+          gpu_instances,
+          tmp_cpu_instances,
+          sizeof(byte_array_t) * count,
+          cudaMemcpyHostToDevice));
+      for (uint32_t idx = 0; idx < count; idx++)
+      {
+        tmp_cpu_instances[idx].size = 0;
+        tmp_cpu_instances[idx].data = nullptr;
+      }
+      delete[] tmp_cpu_instances;
+      return gpu_instances;
+    }
+
+    __host__ void byte_array_t::gpu_free(
+        byte_array_t *gpu_instances,
+        uint32_t count)
+    {
+      byte_array_t *cpu_instances = new byte_array_t[count];
+      CUDA_CHECK(cudaMemcpy(
+          cpu_instances,
+          gpu_instances,
+          sizeof(byte_array_t) * count,
+          cudaMemcpyDeviceToHost));
+      for (uint32_t idx = 0; idx < count; idx++)
+      {
+        if (cpu_instances[idx].size > 0)
+        {
+          CUDA_CHECK(cudaFree(cpu_instances[idx].data));
+          cpu_instances[idx].data = nullptr;
+          cpu_instances[idx].size = 0;
+        }
+      }
+      delete[] cpu_instances;
+      CUDA_CHECK(cudaFree(gpu_instances));
+    }
+
+    __host__ byte_array_t *byte_array_t::cpu_from_gpu(
+        byte_array_t *gpu_instances,
+        uint32_t count)
+    {
+      byte_array_t *cpu_instances;
+      cpu_instances = new byte_array_t[count];
+      CUDA_CHECK(cudaMemcpy(
+          cpu_instances,
+          gpu_instances,
+          sizeof(byte_array_t) * count,
+          cudaMemcpyDeviceToHost));
+
+      // 1. alocate the memory for gpu memory as memory which can be addressed by the cpu
+      byte_array_t *tmp_cpu_instances, *tmp_gpu_instances;
+      tmp_cpu_instances = new byte_array_t[count];
+      for (uint32_t idx = 0; idx < count; idx++)
+      {
+        if (cpu_instances[idx].size > 0)
+        {
+          CUDA_CHECK(cudaMalloc(
+              (void **)&tmp_cpu_instances[idx].data,
+              sizeof(uint8_t) * cpu_instances[idx].size));
+          tmp_cpu_instances[idx].size = cpu_instances[idx].size;
+        }
+      }
+      CUDA_CHECK(cudaMalloc(
+          (void **)&tmp_gpu_instances,
+          sizeof(byte_array_t) * count));
+      CUDA_CHECK(cudaMemcpy(
+          tmp_gpu_instances,
+          tmp_cpu_instances,
+          sizeof(byte_array_t) * count,
+          cudaMemcpyHostToDevice));
+
+      // 2. call the kernel to copy the memory between the gpu memories
+      CUDA_CHECK(cudaDeviceSynchronize());
+      CuEVM::byte_array_t_transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
+      CUDA_CHECK(cudaDeviceSynchronize());
+      cudaFree(gpu_instances);
+      gpu_instances = tmp_gpu_instances;
+      tmp_gpu_instances = nullptr;
+
+      // 3. copy the gpu memories back in the cpu memories
+      CUDA_CHECK(cudaMemcpy(
+        cpu_instances,
+        gpu_instances,
+        sizeof(byte_array_t)*count,
+        cudaMemcpyDeviceToHost
+      ));
+      for(uint32_t idx=0; idx<count; idx++) {
+        if (cpu_instances[idx].size > 0)
+        {
+          tmp_cpu_instances[idx].data = new uint8_t[cpu_instances[idx].size];
+          CUDA_CHECK(cudaMemcpy(
+              tmp_cpu_instances[idx].data,
+              cpu_instances[idx].data,
+              sizeof(uint8_t) * cpu_instances[idx].size,
+              cudaMemcpyDeviceToHost));
+          tmp_cpu_instances[idx].size = cpu_instances[idx].size;
+        }
+        else
+        {
+          tmp_cpu_instances[idx].data = nullptr;
+          tmp_cpu_instances[idx].size = 0;
+        }
+      }
+      // 4. free the temporary allocated memory
+      byte_array_t::gpu_free(gpu_instances, count);
+      for(uint32_t idx=0; idx<count; idx++) {
+        cpu_instances[idx].data = tmp_cpu_instances[idx].data;
+        tmp_cpu_instances[idx].data = nullptr;
+        tmp_cpu_instances[idx].size = 0;
+      }
+      delete[] tmp_cpu_instances;
+      tmp_cpu_instances=nullptr;
+      return cpu_instances;
+    }
 
     // CPU-GPU
-    __global__ void transfer_kernel(
+    __global__ void byte_array_t_transfer_kernel(
           byte_array_t *dst_instances,
           byte_array_t *src_instances,
           uint32_t count)
@@ -331,179 +513,4 @@ namespace CuEVM {
         src_instances[instance].data = nullptr;
       }
     }
-
-    __host__ byte_array_t *get_cpu(
-        uint32_t count)
-    {
-      byte_array_t *cpu_instances = new byte_array_t[count];
-      for (size_t idx = 0; idx < count; idx++)
-      {
-        cpu_instances[idx].size = 0;
-        cpu_instances[idx].data = nullptr;
-      }
-      return cpu_instances;
-    }
-
-    __host__ void cpu_free(
-        byte_array_t *cpu_instances,
-        uint32_t count)
-    {
-      for (size_t idx = 0; idx < count; idx++)
-      {
-        if (
-            (cpu_instances[idx].size > 0) &&
-            (cpu_instances[idx].data != nullptr))
-        {
-          delete[] cpu_instances[idx].data;
-          cpu_instances[idx].size = 0;
-          cpu_instances[idx].data = nullptr;
-        }
-      }
-      delete[] cpu_instances;
-    }
-
-    __host__ byte_array_t *gpu_from_cpu(
-        byte_array_t *cpu_instances,
-        uint32_t count)
-    {
-      byte_array_t *gpu_instances, *tmp_cpu_instances;
-      tmp_cpu_instances = new byte_array_t[count];
-      memcpy(
-          tmp_cpu_instances,
-          cpu_instances,
-          sizeof(byte_array_t) * count);
-      for (size_t idx = 0; idx < count; idx++)
-      {
-        if (tmp_cpu_instances[idx].size > 0)
-        {
-          CUDA_CHECK(cudaMalloc(
-              (void **)&tmp_cpu_instances[idx].data,
-              sizeof(uint8_t) * tmp_cpu_instances[idx].size));
-          CUDA_CHECK(cudaMemcpy(
-              tmp_cpu_instances[idx].data,
-              cpu_instances[idx].data,
-              sizeof(uint8_t) * tmp_cpu_instances[idx].size,
-              cudaMemcpyHostToDevice));
-        }
-      }
-      CUDA_CHECK(cudaMalloc(
-          (void **)&gpu_instances,
-          sizeof(byte_array_t) * count));
-      CUDA_CHECK(cudaMemcpy(
-          gpu_instances,
-          tmp_cpu_instances,
-          sizeof(byte_array_t) * count,
-          cudaMemcpyHostToDevice));
-      delete[] tmp_cpu_instances;
-      return gpu_instances;
-    }
-
-    __host__ void gpu_free(
-        byte_array_t *gpu_instances,
-        uint32_t count)
-    {
-      byte_array_t *cpu_instances = new byte_array_t[count];
-      CUDA_CHECK(cudaMemcpy(
-          cpu_instances,
-          gpu_instances,
-          sizeof(byte_array_t) * count,
-          cudaMemcpyDeviceToHost));
-      for (size_t idx = 0; idx < count; idx++)
-      {
-        if (cpu_instances[idx].size > 0)
-        {
-          CUDA_CHECK(cudaFree(cpu_instances[idx].data));
-        }
-      }
-      delete[] cpu_instances;
-      CUDA_CHECK(cudaFree(gpu_instances));
-    }
-
-    __host__ byte_array_t *cpu_from_gpu(
-        byte_array_t *gpu_instances,
-        uint32_t count)
-    {
-      byte_array_t *cpu_instances;
-      cpu_instances = new byte_array_t[count];
-      CUDA_CHECK(cudaMemcpy(
-          cpu_instances,
-          gpu_instances,
-          sizeof(byte_array_t) * count,
-          cudaMemcpyDeviceToHost));
-
-      // 1. alocate the memory for gpu memory as memory which can be addressed by the cpu
-      byte_array_t *tmp_cpu_instances, *tmp_gpu_instances;
-      tmp_cpu_instances = new byte_array_t[count];
-      memcpy(
-          tmp_cpu_instances,
-          cpu_instances,
-          sizeof(byte_array_t) * count);
-      for (uint32_t idx = 0; idx < count; idx++)
-      {
-        if (tmp_cpu_instances[idx].size > 0)
-        {
-          CUDA_CHECK(cudaMalloc(
-              (void **)&tmp_cpu_instances[idx].data,
-              sizeof(uint8_t) * tmp_cpu_instances[idx].size));
-        }
-        else
-        {
-          tmp_cpu_instances[idx].data = nullptr;
-        }
-      }
-      CUDA_CHECK(cudaMalloc(
-          (void **)&tmp_gpu_instances,
-          sizeof(byte_array_t) * count));
-      CUDA_CHECK(cudaMemcpy(
-          tmp_gpu_instances,
-          tmp_cpu_instances,
-          sizeof(byte_array_t) * count,
-          cudaMemcpyHostToDevice));
-      delete[] tmp_cpu_instances;
-      tmp_cpu_instances = nullptr;
-
-      // 2. call the kernel to copy the memory between the gpu memories
-      CuEVM::byte_array::transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
-      CUDA_CHECK(cudaDeviceSynchronize());
-      cudaFree(gpu_instances);
-      gpu_instances = tmp_gpu_instances;
-      tmp_gpu_instances = nullptr;
-
-      // 3. copy the gpu memories back in the cpu memories
-      CUDA_CHECK(cudaMemcpy(
-        cpu_instances,
-        gpu_instances,
-        sizeof(byte_array_t)*count,
-        cudaMemcpyDeviceToHost
-      ));
-      tmp_cpu_instances=new byte_array_t[count];
-      memcpy(
-        tmp_cpu_instances,
-        cpu_instances,
-        sizeof(byte_array_t)*count
-      );
-      for(size_t idx=0; idx<count; idx++) {
-        if (tmp_cpu_instances[idx].size > 0)
-        {
-          tmp_cpu_instances[idx].data = new uint8_t[tmp_cpu_instances[idx].size];
-          CUDA_CHECK(cudaMemcpy(
-              tmp_cpu_instances[idx].data,
-              cpu_instances[idx].data,
-              sizeof(uint8_t) * tmp_cpu_instances[idx].size,
-              cudaMemcpyDeviceToHost));
-        }
-        else
-        {
-          tmp_cpu_instances[idx].data = nullptr;
-        }
-      }
-
-      // 4. free the temporary allocated memory
-      CuEVM::byte_array::gpu_free(gpu_instances, count);
-      delete[] cpu_instances;
-      cpu_instances=tmp_cpu_instances;
-      tmp_cpu_instances=nullptr;
-      return cpu_instances;
-    }
-  } // namespace byte_array
 } // namespace CuEVM

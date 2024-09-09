@@ -5,6 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "CUDA C++: Tests Launch",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/cuevm_interpreter_tests"
+        },
+        {
             "name": "CUDA C++: Launch",
             "type": "cuda-gdb",
             "request": "launch",

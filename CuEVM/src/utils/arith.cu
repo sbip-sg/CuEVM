@@ -30,6 +30,7 @@ namespace CuEVM {
     }
     return *this;*/
     std::copy(src._limbs, src._limbs + CuEVM::cgbn_limbs, _limbs);
+    return *this;
   }
 
   __host__ __device__ int32_t evm_word_t::operator==(
@@ -118,6 +119,7 @@ namespace CuEVM {
     }
     _limbs[0] = value & 0xFFFFFFFF;
     _limbs[1] = (value >> 32) & 0xFFFFFFFF;
+    return ERROR_SUCCESS;
   }
 
   __host__ __device__ int32_t evm_word_t::from_uint32_t(
@@ -129,6 +131,7 @@ namespace CuEVM {
       _limbs[idx] = 0;
     }
     _limbs[0] = value;
+    return ERROR_SUCCESS;
   }
 
   __host__ __device__ void evm_word_t::print() const
