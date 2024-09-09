@@ -831,11 +831,6 @@ namespace CuEVM {
                         *call_state_ptr,
                         child_call_state_ptr
                     );
-
-                    if (error_code == ERROR_SUCCESS) {
-                        call_state_ptr = child_call_state_ptr;
-                        start_CALL(arith);
-                    }
                     break;
                 
                 case OP_CALL:
@@ -846,11 +841,6 @@ namespace CuEVM {
                         *call_state_ptr,
                         child_call_state_ptr
                     );
-
-                    if (error_code == ERROR_SUCCESS) {
-                        call_state_ptr = child_call_state_ptr;
-                        start_CALL(arith);
-                    }
                     break;
                 
                 case OP_CALLCODE:
@@ -861,11 +851,6 @@ namespace CuEVM {
                         *call_state_ptr,
                         child_call_state_ptr
                     );
-
-                    if (error_code == ERROR_SUCCESS) {
-                        call_state_ptr = child_call_state_ptr;
-                        start_CALL(arith);
-                    }
                     break;
                 
                 case OP_RETURN:
@@ -887,11 +872,6 @@ namespace CuEVM {
                         *call_state_ptr,
                         child_call_state_ptr
                     );
-
-                    if (error_code == ERROR_SUCCESS) {
-                        call_state_ptr = child_call_state_ptr;
-                        start_CALL(arith);
-                    }
                     break;
                 
                 case OP_CREATE2:
@@ -902,11 +882,6 @@ namespace CuEVM {
                         *call_state_ptr,
                         child_call_state_ptr
                     );
-
-                    if (error_code == ERROR_SUCCESS) {
-                        call_state_ptr = child_call_state_ptr;
-                        start_CALL(arith);
-                    }
                     break;
                 
                 case OP_STATICCALL:
@@ -917,11 +892,6 @@ namespace CuEVM {
                         *call_state_ptr,
                         child_call_state_ptr
                     );
-
-                    if (error_code == ERROR_SUCCESS) {
-                        call_state_ptr = child_call_state_ptr;
-                        start_CALL(arith);
-                    }
                     break;
 
                 case OP_REVERT:
@@ -954,6 +924,23 @@ namespace CuEVM {
                 }
             }
 
+            // TODO: to see after calls
+            // increase program counter
+            call_state_ptr->pc++;
+
+            if (
+                (opcode == OP_CALL) || 
+                (opcode == OP_CALLCODE) ||
+                (opcode == OP_DELEGATECALL) ||
+                (opcode == OP_CREATE) || 
+                (opcode == OP_CREATE2) || 
+                (opcode == OP_STATICCALL)) {
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        error_code = start_CALL(arith);
+                    }
+                }
+
             #ifdef EIP_3155
             if (call_state_ptr->trace_idx > 0 ||
                 (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1) ) {
@@ -969,7 +956,7 @@ namespace CuEVM {
                 );
             }
             #endif
-            // TODO: to see after calls
+
 
             if (error_code != ERROR_SUCCESS) {
                 if (
@@ -978,23 +965,21 @@ namespace CuEVM {
                     call_state_ptr->message_ptr->call_type == OP_CREATE2)
                 ) {
                     // TODO: finish create call add the contract to the state
-                    printf("Create call\n");
+                    // printf("Create call\n");
                     error_code |= finish_CREATE(arith);
                 }
 
                 if (call_state_ptr->depth == 1) {
                     // TODO: finish transaction
-                    printf("Finish transaction\n");
+                    // printf("Finish transaction\n");
                     finish_CALL(arith, error_code);
                     error_code |= finish_TRANSACTION(arith, error_code);
                 } else {
                     // TODO: finish call
-                    printf("Finish call\n");
+                    // printf("Finish call\n");
                     error_code |= finish_CALL(arith, error_code);
                 }
             }
-            // increase program counter
-            call_state_ptr->pc++;
         }
     }
 

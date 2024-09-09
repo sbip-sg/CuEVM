@@ -97,7 +97,7 @@ namespace CuEVM {
       if(get_last_offset(arith, index, length, offset) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
       }
-      if (offset >= size) {
+      if (offset > size) {
         if(allocate_pages(offset) != 0) {
           return ERR_MEMORY_INVALID_ALLOCATION;
         }

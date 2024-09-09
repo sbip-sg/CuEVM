@@ -16,8 +16,8 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t generic_CALL(
         ArithEnv &arith,
-        const bn_t args_offset,
-        const bn_t args_size,
+        const bn_t &args_offset,
+        const bn_t &args_size,
         CuEVM::state::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)

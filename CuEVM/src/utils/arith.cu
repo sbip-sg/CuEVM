@@ -306,9 +306,10 @@ namespace CuEVM {
     uint32_t &dst,
     const bn_t &src) {
     bn_t tmp;
-    cgbn_bitwise_mask_and(env, tmp, src, -(CuEVM::word_bits - 32));
+    //cgbn_bitwise_mask_and(env, tmp, src, -(CuEVM::word_bits - 32));
     dst = cgbn_get_ui32(env, src);
-    return cgbn_compare_ui32(env, tmp, 0);
+    cgbn_set_ui32(env, tmp, dst);
+    return cgbn_compare(env, tmp, src) == 0 ? 0 : 1;
   }
 
   __host__ __device__ void ArithEnv::bit_array_from_cgbn_memory(
