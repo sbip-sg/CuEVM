@@ -47,7 +47,7 @@ namespace CuEVM::operations {
                 memory_offset,
                 length,
                 data);
-            
+
 
             bn_t value;
             error_code |= arith.byte_array_to_bn_t(data, value);
@@ -91,10 +91,10 @@ namespace CuEVM::operations {
 
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
-            CuEVM::byte_array_t value_bytes;
+            CuEVM::byte_array_t value_bytes(CuEVM::word_size);
             evm_word_t value_word;
             cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &value_word, value);
-            
+
             value_word.to_byte_array_t(&value_bytes);
 
             error_code |= memory.set(
@@ -144,7 +144,7 @@ namespace CuEVM::operations {
             CuEVM::byte_array_t value_bytes;
             evm_word_t value_word;
             cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &value_word, value);
-            
+
             value_word.to_byte_array_t(&value_bytes);
 
             CuEVM::byte_array_t value_byte(
