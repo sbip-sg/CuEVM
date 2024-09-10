@@ -122,7 +122,7 @@ namespace CuEVM {
                     return ERROR_SUCCESS;
                 }
             }
-            
+
             return add_account(account);
         }
 
@@ -316,7 +316,10 @@ namespace CuEVM {
             uint32_t index = 0;
             if(state_t::get_account_index(arith, target_address, index)) {
                 accounts[index].update(arith, account, flag);
-                flags[index].update(flag);
+                if (flags != nullptr){
+                    flags[index].update(flag);
+                }
+
                 return ERROR_SUCCESS;
             }
             return ERROR_STATE_ADDRESS_NOT_FOUND;
@@ -372,7 +375,7 @@ namespace CuEVM {
             flag_string_ptr = nullptr;
             return state_json;
         }
-        
+
         __host__ int32_t state_access_t::get_account_index_evm(
             const evm_word_t &address,
             uint32_t &index) const {
@@ -391,8 +394,8 @@ namespace CuEVM {
             cJSON *state_json = nullptr;
             cJSON *account_json = nullptr;
             cJSON *accounts_json = nullptr;
-        
-            
+
+
             state_json = cJSON_CreateObject();
             accounts_json = cJSON_CreateArray();
             cJSON_AddItemToObject(state_json, "accounts", accounts_json);
