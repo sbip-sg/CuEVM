@@ -316,10 +316,7 @@ namespace CuEVM {
             uint32_t index = 0;
             if(state_t::get_account_index(arith, target_address, index) == ERROR_SUCCESS) {
                 accounts[index].update(arith, account, flag);
-                if (flags != nullptr){
-                    flags[index].update(flag);
-                }
-
+                flags[index].update(flag);
                 return ERROR_SUCCESS;
             }
             return ERROR_STATE_ADDRESS_NOT_FOUND;
