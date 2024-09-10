@@ -31,7 +31,7 @@ namespace CuEVM::operations {
             error_code = arith.uint32_t_from_cgbn(destination_u32, destination) ? ERROR_INVALID_JUMP_DESTINATION : error_code;
             if (error_code == ERROR_SUCCESS)
             {
-                pc = message.get_jump_destinations()->has(destination_u32) ? destination_u32 - 1 : ([&]() -> uint32_t {
+                pc = message.get_jump_destinations()->has(destination_u32) == ERROR_SUCCESS ? destination_u32 - 1 : ([&]() -> uint32_t {
                     error_code = ERROR_INVALID_JUMP_DESTINATION;
                     return pc;
                 })();
@@ -68,7 +68,7 @@ namespace CuEVM::operations {
                 error_code = arith.uint32_t_from_cgbn(destination_u32, destination) ? ERROR_INVALID_JUMP_DESTINATION : error_code;
                 if (error_code == ERROR_SUCCESS)
                 {
-                    pc = message.get_jump_destinations()->has(destination_u32) ? destination_u32 - 1 : ([&]() -> uint32_t {
+                    pc = message.get_jump_destinations()->has(destination_u32) == ERROR_SUCCESS ? destination_u32 - 1 : ([&]() -> uint32_t {
                         error_code = ERROR_INVALID_JUMP_DESTINATION;
                         return pc;
                     })();

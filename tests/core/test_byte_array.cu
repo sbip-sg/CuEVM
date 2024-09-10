@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
+#include <stdint.h>
+#include <stdlib.h>
+
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
-#include <stdlib.h>
-#include <stdint.h>
+#include <CuEVM/utils/error_codes.cuh>
 
 TEST(ByteArrayTests, ConstructorWithHexString) {
     CuEVM::byte_array_t byteArray("0A1B2C");
@@ -18,8 +20,8 @@ TEST(ByteArrayTests, ConstructorWithHexStringAndFixedSize) {
     ASSERT_EQ(byteArray[0], 0x0A);
     ASSERT_EQ(byteArray[1], 0x1B);
     ASSERT_EQ(byteArray[2], 0x2C);
-    ASSERT_EQ(byteArray[3], 0x00); // Assuming zero padding
-    ASSERT_EQ(byteArray[4], 0x00); // Assuming zero padding
+    ASSERT_EQ(byteArray[3], 0x00);  // Assuming zero padding
+    ASSERT_EQ(byteArray[4], 0x00);  // Assuming zero padding
 }
 
 TEST(ByteArrayTests, CopyConstructor) {
@@ -42,13 +44,13 @@ TEST(ByteArrayTests, AssignmentOperator) {
 
 TEST(ByteArrayTests, GrowFunction) {
     CuEVM::byte_array_t byteArray("0A1B2C");
-    byteArray.grow(5, 1); // Grow with zero padding
+    byteArray.grow(5, 1);  // Grow with zero padding
     ASSERT_EQ(byteArray.size, 5);
     ASSERT_EQ(byteArray[0], 0x0A);
     ASSERT_EQ(byteArray[1], 0x1B);
     ASSERT_EQ(byteArray[2], 0x2C);
-    ASSERT_EQ(byteArray[3], 0x00); // Zero padding
-    ASSERT_EQ(byteArray[4], 0x00); // Zero padding
+    ASSERT_EQ(byteArray[3], 0x00);  // Zero padding
+    ASSERT_EQ(byteArray[4], 0x00);  // Zero padding
 }
 
 TEST(ByteArrayTests, PrintFunction) {
@@ -56,7 +58,9 @@ TEST(ByteArrayTests, PrintFunction) {
     testing::internal::CaptureStdout();
     byteArray.print();
     std::string output = testing::internal::GetCapturedStdout();
-    ASSERT_EQ(output, "size: 3\ndata: 0a1b2c\n"); // Assuming print outputs the hex string followed by a newline
+    ASSERT_EQ(output,
+              "size: 3\ndata: 0a1b2c\n");  // Assuming print outputs the hex
+                                           // string followed by a newline
 }
 
 TEST(ByteArrayTests, DefaultConstructor) {
@@ -158,7 +162,8 @@ TEST(ByteArrayTests, ConstructorWithHexString2) {
 }
 
 TEST(ByteArrayTests, ConstructorWithHexStringAndSize) {
-    CuEVM::byte_array_t byteArray("123456", 4, LITTLE_ENDIAN, CuEVM::LEFT_PADDING);
+    CuEVM::byte_array_t byteArray("123456", 4, LITTLE_ENDIAN,
+                                  CuEVM::LEFT_PADDING);
     EXPECT_EQ(byteArray.size, 4);
     EXPECT_EQ(byteArray.data[0], 0x12);
     EXPECT_EQ(byteArray.data[1], 0x34);
@@ -196,13 +201,21 @@ TEST(ByteArrayTests, IndexOperator) {
     EXPECT_EQ(byteArray[2], 0x56);
 }
 
-
 TEST(ByteArrayTests, ArrayOfZeroByteArrays) {
     CuEVM::byte_array_t byteArray[5];
     for (int i = 0; i < 5; ++i) {
         EXPECT_EQ(byteArray[i].size, 0);
         EXPECT_EQ(byteArray[i].data, nullptr);
     }
+}
+
+TEST(ByteArrayTests, HasValueFunction) {
+    CuEVM::byte_array_t byteArray("0A1B2C");
+    EXPECT_EQ(byteArray.has_value(0x0A), ERROR_SUCCESS);
+    EXPECT_EQ(byteArray.has_value(0x1B), ERROR_SUCCESS);
+    EXPECT_EQ(byteArray.has_value(0x2C), ERROR_SUCCESS);
+    EXPECT_EQ(byteArray.has_value(0x00), ERROR_VALUE_NOT_FOUND);
+    EXPECT_EQ(byteArray.has_value(0xFF), ERROR_VALUE_NOT_FOUND);
 }
 
 TEST(ByteArrayTests, GetCpu) {
@@ -226,7 +239,8 @@ TEST(ByteArrayTests, CpuGpuFree) {
     cpuArray[1].data[1] = 0x9A;
 
     CUDA_CHECK(cudaDeviceReset());
-    CuEVM::byte_array_t* gpuArray = CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
+    CuEVM::byte_array_t* gpuArray =
+        CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
 
     CuEVM::byte_array_t::gpu_free(gpuArray, 2);
 
@@ -236,31 +250,43 @@ TEST(ByteArrayTests, CpuGpuFree) {
 
 // Additional GPU tests
 
-__global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count) {
-    int32_t instance = (blockIdx.x*blockDim.x+threadIdx.x) / CuEVM::cgbn_tpi;
-    if(instance >= count)
-        return;
+__global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count, uint32_t *result) {
+    int32_t instance =
+        (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
+    if (instance >= count) return;
+    result[instance] = ERROR_SUCCESS;
     if (instance == 0) {
         gpuArray[0].grow(3, 1);
         gpuArray[0].data[0] = 0x12;
         gpuArray[0].data[1] = 0x34;
         gpuArray[0].data[2] = 0x56;
+        result[instance] |= (gpuArray[0].has_value(0x12) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x34) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x56) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x00) == ERROR_VALUE_NOT_FOUND ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
     } else if (instance == 1) {
         gpuArray[1].grow(3, 1);
         gpuArray[1].data[0] = 0x78;
         gpuArray[1].data[1] = 0x9A;
         gpuArray[1].data[2] = 0xBC;
+        result[instance] |= (gpuArray[1].has_value(0x78) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0x9A) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0xBC) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0x00) == ERROR_VALUE_NOT_FOUND ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
     }
 }
-
 
 TEST(ByteArrayTests, GpuKernelTest) {
     CuEVM::byte_array_t* cpuArray = CuEVM::byte_array_t::get_cpu(2);
     CUDA_CHECK(cudaDeviceReset());
-    CuEVM::byte_array_t* gpuArray = CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
-    testKernel<<<2, CuEVM::cgbn_tpi>>>(gpuArray, 2);
+    CuEVM::byte_array_t* gpuArray =
+        CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
+    uint32_t *d_result;
+    cudaMalloc(&d_result, 2 * sizeof(uint32_t));
+    testKernel<<<2, CuEVM::cgbn_tpi>>>(gpuArray, 2, d_result);
     CUDA_CHECK(cudaDeviceSynchronize());
-    CuEVM::byte_array_t* results = CuEVM::byte_array_t::cpu_from_gpu(gpuArray, 2);
+    CuEVM::byte_array_t* results =
+        CuEVM::byte_array_t::cpu_from_gpu(gpuArray, 2);
     CuEVM::byte_array_t* expectedCpuArray = CuEVM::byte_array_t::get_cpu(2);
     expectedCpuArray[0].grow(3, 1);
     expectedCpuArray[0].data[0] = 0x12;
@@ -278,6 +304,14 @@ TEST(ByteArrayTests, GpuKernelTest) {
             EXPECT_EQ(results[i].data[j], expectedCpuArray[i].data[j]);
         }
     }
+    uint32_t *h_result;
+    h_result = (uint32_t *)malloc(2 * sizeof(uint32_t));
+    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    for (int i = 0; i < 2; i++) {
+        EXPECT_EQ(h_result[i], ERROR_SUCCESS);
+    }
+    free(h_result);
+    CUDA_CHECK(cudaFree(d_result));
     CuEVM::byte_array_t::cpu_free(cpuArray, 2);
     CuEVM::byte_array_t::cpu_free(expectedCpuArray, 2);
     CuEVM::byte_array_t::cpu_free(results, 2);

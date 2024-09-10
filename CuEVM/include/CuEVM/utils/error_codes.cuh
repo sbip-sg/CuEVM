@@ -126,6 +126,6 @@
 
 // core errors
 #define ERROR_INVALID_HEX_STRING 0x3C
-
+#define ERROR_VALUE_NOT_FOUND 0x3D
 
 #endif
