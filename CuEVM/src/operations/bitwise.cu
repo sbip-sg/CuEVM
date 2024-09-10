@@ -97,7 +97,7 @@ namespace CuEVM::operations {
         if (error_code == ERROR_SUCCESS)
         {
             bn_t a;
-            error_code |=  stack.push(arith, a);
+            error_code |=  stack.pop(arith, a);
             bn_t r;
 
             cgbn_bitwise_mask_xor(arith.env, r, a, CuEVM::word_bits);
