@@ -14,22 +14,22 @@ namespace CuEVM {
             this->from_json(storage_element_json);
         }
 
-        __host__ __device__ void storage_element_t::set_value(ArithEnv arith, const bn_t &value)
+        __host__ __device__ void storage_element_t::set_value(ArithEnv &arith, const bn_t &value)
         {
             cgbn_store(arith.env, &(this->value), value);
         }
 
-        __host__ __device__ void storage_element_t::get_value(ArithEnv arith, bn_t &value) const
+        __host__ __device__ void storage_element_t::get_value(ArithEnv &arith, bn_t &value) const
         {
             cgbn_load(arith.env, value, (cgbn_evm_word_t_ptr) &(this->value));
         }
 
-        __host__ __device__ void storage_element_t::set_key(ArithEnv arith, const bn_t &key)
+        __host__ __device__ void storage_element_t::set_key(ArithEnv &arith, const bn_t &key)
         {
             cgbn_store(arith.env, &(this->key), key);
         }
 
-        __host__ __device__ void storage_element_t::get_key(ArithEnv arith, bn_t &key) const
+        __host__ __device__ void storage_element_t::get_key(ArithEnv &arith, bn_t &key) const
         {
             cgbn_load(arith.env, key, (cgbn_evm_word_t_ptr) &(this->key));
         }
@@ -39,7 +39,7 @@ namespace CuEVM {
             return (this->key == key);
         }
 
-        __host__ __device__ int32_t storage_element_t::has_key(ArithEnv arith, const bn_t &key) const
+        __host__ __device__ int32_t storage_element_t::has_key(ArithEnv &arith, const bn_t &key) const
         {
             bn_t storage_key;
             cgbn_load(arith.env, storage_key, (cgbn_evm_word_t_ptr) &(this->key));
@@ -51,7 +51,7 @@ namespace CuEVM {
             return (this->value == 0U);
         }
 
-        __host__ __device__ int32_t storage_element_t::is_zero_value(ArithEnv arith) const
+        __host__ __device__ int32_t storage_element_t::is_zero_value(ArithEnv &arith) const
         {
             bn_t storage_value;
             cgbn_load(arith.env, storage_value, (cgbn_evm_word_t_ptr) &(this->value));

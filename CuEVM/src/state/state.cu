@@ -233,7 +233,7 @@ namespace CuEVM {
             CuEVM::account::account_t &account,
             const CuEVM::account::account_flags_t flag) {
             uint32_t index = 0;
-            if(state_t::get_account_index(arith, address, index)) {
+            if(state_t::get_account_index(arith, address, index)==ERROR_SUCCESS) {
                 flags[index].update(flag);
                 account = accounts[index];
                 return ERROR_SUCCESS;

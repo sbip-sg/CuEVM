@@ -47,7 +47,7 @@ namespace CuEVM
              * @param[in] arith The arithmetic environment
              * @param[in] value The value of the storage element (bn_t)
              */
-            __host__ __device__ void set_value(ArithEnv arith, const bn_t &value);
+            __host__ __device__ void set_value(ArithEnv &arith, const bn_t &value);
 
             /**
              * Get the value of the storage element
@@ -60,7 +60,7 @@ namespace CuEVM
              * @param[in] arith The arithmetic environment
              * @param[out] value The value of the storage element (bn_t)
              */
-            __host__ __device__ void get_value(ArithEnv arith, bn_t &value) const;
+            __host__ __device__ void get_value(ArithEnv &arith, bn_t &value) const;
 
             /**
              * Set the key of the storage element
@@ -73,7 +73,7 @@ namespace CuEVM
              * @param[in] arith The arithmetic environment
              * @param[in] key The key of the storage element (bn_t)
              */
-            __host__ __device__ void set_key(ArithEnv arith, const bn_t &key);
+            __host__ __device__ void set_key(ArithEnv &arith, const bn_t &key);
 
             /**
              * Get the key of the storage element
@@ -86,7 +86,7 @@ namespace CuEVM
              * @param[in] arith The arithmetic environment
              * @param[out] key The key of the storage element (bn_t)
              */
-            __host__ __device__ void get_key(ArithEnv arith, bn_t &key) const;
+            __host__ __device__ void get_key(ArithEnv &arith, bn_t &key) const;
 
             /**
              * The assignment operator for the storage element
@@ -113,10 +113,10 @@ namespace CuEVM
              * @param[in] key The key to compare (bn_t)
              * @return If the key is equal to the key of the storage element
              */
-            __host__ __device__ int32_t has_key(ArithEnv arith, const bn_t &key) const;
+            __host__ __device__ int32_t has_key(ArithEnv &arith, const bn_t &key) const;
 
             /**
-             * Get if the value of the storage element is equal to 0 
+             * Get if the value of the storage element is equal to 0
              * @return If the value of the storage element is equal to 0, 1 if true, 0 if false
              */
             __host__ __device__ int32_t is_zero_value() const;
@@ -126,7 +126,7 @@ namespace CuEVM
              * @param[in] arith The arithmetic environment
              * @return If the value of the storage element is equal to 0, 1 if true, 0 if false
              */
-            __host__ __device__ int32_t is_zero_value(ArithEnv arith) const;
+            __host__ __device__ int32_t is_zero_value(ArithEnv &arith) const;
 
             /**
              * Get the storage element from a JSON object
@@ -176,7 +176,7 @@ namespace CuEVM
              */
             __host__ __device__ contract_storage_t(
                 const cJSON *contract_storage_json);
-            
+
             /**
              * The destructor for the contract storage
              */
@@ -219,7 +219,7 @@ namespace CuEVM
                 ArithEnv &arith,
                 const bn_t &key,
                 const bn_t &value);
-            
+
             /**
              * Update the the current storage with the given storage
              * @param[in] arith The arithmetic environment
@@ -228,7 +228,7 @@ namespace CuEVM
             __host__ __device__ void update(
                 ArithEnv &arith,
                 const contract_storage_t &other);
-            
+
             /**
              * Get the storage element index for the given key
              * @param[in] key The key to get the index for
