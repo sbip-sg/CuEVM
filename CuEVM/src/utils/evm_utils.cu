@@ -66,21 +66,25 @@ namespace CuEVM {
             }
             rlp_list[0] = 0xc0 + rlp_list_length;
 
-            uint8_t address_bytes[CuEVM::hash_size];
+
             CuEVM::byte_array_t hash_address_bytes(CuEVM::hash_size);
             CuCrypto::keccak::sha3(
                 &(rlp_list[0]),
                 rlp_list_length + 1,
                 hash_address_bytes.data,
                 CuEVM::hash_size);
-            for (uint8_t idx = 0; idx < CuEVM::word_size - CuEVM::address_size; idx++)
-            {
-                address_bytes[idx] = 0;
-            }
-            evm_word_t contract_address_word;
 
-            contract_address_word.from_byte_array_t(hash_address_bytes);
+            CuEVM::byte_array_t address_bytes(CuEVM::word_size);
+
+            for (uint32_t idx = 0; idx < CuEVM::word_size; idx++)
+            {
+                address_bytes.data[idx] = idx < CuEVM::address_size ? hash_address_bytes.data[CuEVM::word_size - idx - 1] : 0;
+            }
+
+            evm_word_t contract_address_word;
+            contract_address_word.from_byte_array_t(address_bytes);
             cgbn_load(arith.env, contract_address, &contract_address_word);
+
             return ERROR_SUCCESS;
         }
 
@@ -137,6 +141,7 @@ namespace CuEVM {
             evm_word_t contract_address_word;
             contract_address_word.from_byte_array_t(hash_input_data);
             cgbn_load(arith.env, contract_address, &contract_address_word);
+
             return ERROR_SUCCESS;
         }
 
