@@ -141,7 +141,7 @@ namespace CuEVM::operations {
 
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
-            CuEVM::byte_array_t value_bytes;
+            CuEVM::byte_array_t value_bytes(CuEVM::word_size);
             evm_word_t value_word;
             cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &value_word, value);
 
