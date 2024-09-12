@@ -95,7 +95,7 @@ namespace CuEVM::operations {
             evm_word_t value_word;
             cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &value_word, value);
             
-            value_word.to_byte_array_t(&value_bytes);
+            value_word.to_byte_array_t(value_bytes);
 
             error_code |= memory.set(
                 arith,
@@ -145,7 +145,7 @@ namespace CuEVM::operations {
             evm_word_t value_word;
             cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &value_word, value);
             
-            value_word.to_byte_array_t(&value_bytes);
+            value_word.to_byte_array_t(value_bytes);
 
             CuEVM::byte_array_t value_byte(
                 value_bytes.data + CuEVM::word_size - 1,

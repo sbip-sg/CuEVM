@@ -9,7 +9,7 @@
 #include <CuEVM/utils/evm_defines.cuh>
 #include <CuEVM/utils/opcodes.cuh>
 
-__global__ void test_jump_destinations_kernel(CuEVM::byte_array_t *byte_code,
+__global__ void test_jump_destinations_kernel(CuEVM::byte_array_t* byte_code,
                                               uint32_t expected_size,
                                               uint32_t* expected_destinations,
                                               uint32_t* result) {
@@ -23,13 +23,14 @@ __global__ void test_jump_destinations_kernel(CuEVM::byte_array_t *byte_code,
         result[instance] |= jump_destinations.has(expected_destinations[i]);
     }
 
-    result[instance] |= (
-        jump_destinations.has(0xFFFFFFFF) == ERROR_INVALID_JUMP_DESTINATION ?
-        ERROR_SUCCESS : ERROR_INVALID_JUMP_DESTINATION);
+    result[instance] |=
+        (jump_destinations.has(0xFFFFFFFF) == ERROR_INVALID_JUMP_DESTINATION
+             ? ERROR_SUCCESS
+             : ERROR_INVALID_JUMP_DESTINATION);
 }
 
 void run_test_GPU(uint8_t* bytecode_data, uint32_t bytecode_size,
-              uint32_t* expected_destinations, uint32_t expected_size) {
+                  uint32_t* expected_destinations, uint32_t expected_size) {
     CuEVM::byte_array_t* cpuArray = CuEVM::byte_array_t::get_cpu(2);
     CUDA_CHECK(cudaDeviceReset());
     // copy the bytecode data to the device
@@ -52,17 +53,18 @@ void run_test_GPU(uint8_t* bytecode_data, uint32_t bytecode_size,
     cudaMalloc(&d_result, 2 * sizeof(uint32_t));
 
     // Launch kernel to test jump_destinations_t
-    test_jump_destinations_kernel<<<2, CuEVM::cgbn_tpi>>>(gpuArray, expected_size,
-                                            d_expected_destinations, d_result);
+    test_jump_destinations_kernel<<<2, CuEVM::cgbn_tpi>>>(
+        gpuArray, expected_size, d_expected_destinations, d_result);
     cudaDeviceSynchronize();
 
     CuEVM::byte_array_t::gpu_free(gpuArray, 2);
     CuEVM::byte_array_t::cpu_free(cpuArray, 2);
 
     // Copy result back to host
-    uint32_t *h_result;
-    h_result = (uint32_t *)malloc(2 * sizeof(uint32_t));
-    cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t), cudaMemcpyDeviceToHost);
+    uint32_t* h_result;
+    h_result = (uint32_t*)malloc(2 * sizeof(uint32_t));
+    cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t),
+               cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < 2; i++) {
         EXPECT_EQ(h_result[i], ERROR_SUCCESS);
@@ -75,24 +77,28 @@ void run_test_GPU(uint8_t* bytecode_data, uint32_t bytecode_size,
 }
 
 void run_test_CPU(uint8_t* bytecode_data, uint32_t bytecode_size,
-              uint32_t* expected_destinations, uint32_t expected_size) {
+                  uint32_t* expected_destinations, uint32_t expected_size) {
     CuEVM::byte_array_t byte_code(bytecode_data, bytecode_size);
 
     CuEVM::jump_destinations_t jump_destinations(byte_code);
 
     // Check has method
     for (uint32_t i = 0; i < expected_size; i++) {
-        EXPECT_EQ(jump_destinations.has(expected_destinations[i]), ERROR_SUCCESS);
+        EXPECT_EQ(jump_destinations.has(expected_destinations[i]),
+                  ERROR_SUCCESS);
     }
 
     // Check invalid jump destination
-    EXPECT_EQ(jump_destinations.has(0xFFFFFFFF), ERROR_INVALID_JUMP_DESTINATION);
+    EXPECT_EQ(jump_destinations.has(0xFFFFFFFF),
+              ERROR_INVALID_JUMP_DESTINATION);
 }
 
 void run_test(uint8_t* bytecode_data, uint32_t bytecode_size,
               uint32_t* expected_destinations, uint32_t expected_size) {
-    run_test_CPU(bytecode_data, bytecode_size, expected_destinations, expected_size);
-    run_test_GPU(bytecode_data, bytecode_size, expected_destinations, expected_size);
+    run_test_CPU(bytecode_data, bytecode_size, expected_destinations,
+                 expected_size);
+    run_test_GPU(bytecode_data, bytecode_size, expected_destinations,
+                 expected_size);
 }
 
 TEST(JumpDestinationsTest, BasicTest) {

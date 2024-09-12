@@ -20,8 +20,8 @@ namespace CuEVM {
             evm_word_t sender_nonce_word;
             cgbn_store(arith.env, &sender_nonce_word, sender_nonce);
             CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
-            sender_address_word.to_byte_array_t(&sender_address_bytes);
-            sender_nonce_word.to_byte_array_t(&sender_nonce_bytes);
+            sender_address_word.to_byte_array_t(sender_address_bytes);
+            sender_nonce_word.to_byte_array_t(sender_nonce_bytes);
 
             uint32_t nonce_bytes;
             for (nonce_bytes = CuEVM::word_size; nonce_bytes > 0; nonce_bytes--) {
@@ -66,7 +66,6 @@ namespace CuEVM {
             }
             rlp_list[0] = 0xc0 + rlp_list_length;
 
-            uint8_t address_bytes[CuEVM::hash_size];
             CuEVM::byte_array_t hash_address_bytes(CuEVM::hash_size);
             CuCrypto::keccak::sha3(
                 &(rlp_list[0]),
@@ -75,11 +74,11 @@ namespace CuEVM {
                 CuEVM::hash_size);
             for (uint8_t idx = 0; idx < CuEVM::word_size - CuEVM::address_size; idx++)
             {
-                address_bytes[idx] = 0;
+                hash_address_bytes.data[idx] = 0;
             }
             evm_word_t contract_address_word;
             
-            contract_address_word.from_byte_array_t(hash_address_bytes);
+            contract_address_word.from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
             cgbn_load(arith.env, contract_address, &contract_address_word);
             return ERROR_SUCCESS;
         }
@@ -95,8 +94,8 @@ namespace CuEVM {
             evm_word_t salt_word;
             cgbn_store(arith.env, &salt_word, salt);
             CuEVM::byte_array_t sender_address_bytes, salt_bytes;
-            sender_address_word.to_byte_array_t(&sender_address_bytes);
-            salt_word.to_byte_array_t(&salt_bytes);
+            sender_address_word.to_byte_array_t(sender_address_bytes);
+            salt_word.to_byte_array_t(salt_bytes);
 
             uint32_t total_bytes = 1 + CuEVM::address_size + CuEVM::word_size + CuEVM::hash_size;
 

@@ -135,10 +135,11 @@ namespace CuEVM {
       error_code = (cgbn_compare_ui32(arith.env, length, 0) < 0) ? ERR_MEMORY_INVALID_SIZE : error_code;
       error_code |= grow(arith, index, length);
       if (error_code == ERROR_SUCCESS) {
-        uint32_t index_u32;
+        uint32_t index_u32, length_u32;
         arith.uint32_t_from_cgbn(index_u32, index);
+        arith.uint32_t_from_cgbn(length_u32, length);
         if (data.size > 0) {
-          std::copy(data.data, data.data + data.size, this->data.data + index_u32);
+          memcpy(this->data.data + index_u32, data.data, min(length_u32, data.size));
         }
       }
       return error_code;

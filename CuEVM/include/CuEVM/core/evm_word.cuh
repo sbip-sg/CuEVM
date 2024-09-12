@@ -54,9 +54,11 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * Set the evm_word_t from a byte array.
      * The byte array is in Big Endian format.
      * @param[in] byte_array The source byte array
+     * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ int32_t from_byte_array_t(byte_array_t &byte_array);
+    __host__ __device__ int32_t
+    from_byte_array_t(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
     /**
      * Set the evm_word_t from a size_t.
      * @param[in] value The source size_t
@@ -99,20 +101,22 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * If the caller does not provide a byte array, it allocates one.
      * Note: The caller must free the byte array.
      * @param[out] byte_array The destination byte array
-     * @return byte_array The destination byte array
+     * @param[in] endian The endian format
+     * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ byte_array_t *to_byte_array_t(
-        byte_array_t *byte_array = nullptr) const;
+    __host__ __device__ int32_t to_byte_array_t(
+        byte_array_t &byte_array, int32_t endian = BIG_ENDIAN) const;
     /**
      * Get the bit array from the evm_word_t.
      * The bit array is in Big Endian format.
      * If the caller does not provide a byte array, it allocates one.
      * Note: The caller must free the byte array.
      * @param[out] bit_array The destination bit array
-     * @return bit_array The destination bit array
+     * @param[in] endian The endian format
+     * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ byte_array_t *to_bit_array_t(
-        byte_array_t *bit_array = nullptr) const;
+    __host__ __device__ int32_t to_bit_array_t(
+        byte_array_t &bit_array, int32_t endian = LITTLE_ENDIAN) const;
 };
 
 typedef cgbn_mem_t<CuEVM::word_bits> *cgbn_evm_word_t_ptr;

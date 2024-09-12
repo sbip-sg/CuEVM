@@ -3,8 +3,8 @@
 #include <stdlib.h>
 
 #include <CuEVM/core/byte_array.cuh>
-#include <CuEVM/utils/evm_defines.cuh>
 #include <CuEVM/utils/error_codes.cuh>
+#include <CuEVM/utils/evm_defines.cuh>
 
 TEST(ByteArrayTests, ConstructorWithHexString) {
     CuEVM::byte_array_t byteArray("0A1B2C");
@@ -250,7 +250,8 @@ TEST(ByteArrayTests, CpuGpuFree) {
 
 // Additional GPU tests
 
-__global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count, uint32_t *result) {
+__global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count,
+                           uint32_t* result) {
     int32_t instance =
         (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
     if (instance >= count) return;
@@ -260,19 +261,37 @@ __global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count, uint32
         gpuArray[0].data[0] = 0x12;
         gpuArray[0].data[1] = 0x34;
         gpuArray[0].data[2] = 0x56;
-        result[instance] |= (gpuArray[0].has_value(0x12) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[0].has_value(0x34) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[0].has_value(0x56) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[0].has_value(0x00) == ERROR_VALUE_NOT_FOUND ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x12) == ERROR_SUCCESS
+                                 ? ERROR_SUCCESS
+                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x34) == ERROR_SUCCESS
+                                 ? ERROR_SUCCESS
+                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x56) == ERROR_SUCCESS
+                                 ? ERROR_SUCCESS
+                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |=
+            (gpuArray[0].has_value(0x00) == ERROR_VALUE_NOT_FOUND
+                 ? ERROR_SUCCESS
+                 : ERROR_VALUE_NOT_FOUND);
     } else if (instance == 1) {
         gpuArray[1].grow(3, 1);
         gpuArray[1].data[0] = 0x78;
         gpuArray[1].data[1] = 0x9A;
         gpuArray[1].data[2] = 0xBC;
-        result[instance] |= (gpuArray[1].has_value(0x78) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[1].has_value(0x9A) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[1].has_value(0xBC) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[1].has_value(0x00) == ERROR_VALUE_NOT_FOUND ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0x78) == ERROR_SUCCESS
+                                 ? ERROR_SUCCESS
+                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0x9A) == ERROR_SUCCESS
+                                 ? ERROR_SUCCESS
+                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0xBC) == ERROR_SUCCESS
+                                 ? ERROR_SUCCESS
+                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |=
+            (gpuArray[1].has_value(0x00) == ERROR_VALUE_NOT_FOUND
+                 ? ERROR_SUCCESS
+                 : ERROR_VALUE_NOT_FOUND);
     }
 }
 
@@ -281,7 +300,7 @@ TEST(ByteArrayTests, GpuKernelTest) {
     CUDA_CHECK(cudaDeviceReset());
     CuEVM::byte_array_t* gpuArray =
         CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
-    uint32_t *d_result;
+    uint32_t* d_result;
     cudaMalloc(&d_result, 2 * sizeof(uint32_t));
     testKernel<<<2, CuEVM::cgbn_tpi>>>(gpuArray, 2, d_result);
     CUDA_CHECK(cudaDeviceSynchronize());
@@ -304,9 +323,10 @@ TEST(ByteArrayTests, GpuKernelTest) {
             EXPECT_EQ(results[i].data[j], expectedCpuArray[i].data[j]);
         }
     }
-    uint32_t *h_result;
-    h_result = (uint32_t *)malloc(2 * sizeof(uint32_t));
-    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    uint32_t* h_result;
+    h_result = (uint32_t*)malloc(2 * sizeof(uint32_t));
+    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t),
+                          cudaMemcpyDeviceToHost));
     for (int i = 0; i < 2; i++) {
         EXPECT_EQ(h_result[i], ERROR_SUCCESS);
     }
