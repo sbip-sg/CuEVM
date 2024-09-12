@@ -280,7 +280,9 @@ namespace CuEVM {
             account_ptr = new CuEVM::account::account_t(
                 src_account_ptr,
                 no_storage_copy);
-            return add_account(*account_ptr, flag);
+            int32_t error_code = add_account(*account_ptr, flag);
+            account_ptr = &accounts[no_accounts - 1];
+            return error_code;
         }
 
         __host__ __device__ int32_t state_access_t::add_new_account(
