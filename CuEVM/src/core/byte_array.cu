@@ -33,6 +33,21 @@ namespace CuEVM {
   }
 
   __host__ __device__ byte_array_t::byte_array_t(
+    const byte_array_t &src_byte_array,
+    uint32_t offset,
+    uint32_t size) : size(size) {
+      if (size > 0)
+      {
+        this->data = new uint8_t[size];
+        std::fill(data, data + size, 0);
+        if (offset < src_byte_array.size)
+          std::copy(src_byte_array.data + offset, src_byte_array.data + min(offset + size,src_byte_array.size), this->data);
+      }
+      else
+        this->data = nullptr;
+  }
+
+  __host__ __device__ byte_array_t::byte_array_t(
     const char *hex_string,
     int32_t endian,
     PaddingDirection padding) : size(0), data(nullptr) {
@@ -213,7 +228,7 @@ namespace CuEVM {
       } else {
         return 1;
       }
-        
+
       if (length % 2 == 1)
       {
         *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(
