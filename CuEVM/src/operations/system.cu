@@ -37,14 +37,17 @@ namespace CuEVM::operations
 
         // memory call data
         bn_t memory_expansion_cost_args;
+
+        // replace gas_used, throw away after the call
+        // because we did not increase_memory_cost between expansions
+        bn_t temp_memory_gas_used;
         error_code |= CuEVM::gas_cost::memory_grow_cost(
             arith,
             *current_state.memory_ptr,
             args_offset,
             args_size,
             memory_expansion_cost_args,
-            current_state.gas_used);
-
+            temp_memory_gas_used);
         // memory return data
         bn_t ret_offset, ret_size;
         new_state_ptr->message_ptr->get_return_data_offset(arith, ret_offset);
@@ -56,7 +59,7 @@ namespace CuEVM::operations
             ret_offset,
             ret_size,
             memory_expansion_cost_ret,
-            current_state.gas_used);
+            temp_memory_gas_used);
 
         // compute the total memory expansion cost
         bn_t memory_expansion_cost;
@@ -68,7 +71,7 @@ namespace CuEVM::operations
         {
             cgbn_set(arith.env, memory_expansion_cost, memory_expansion_cost_ret);
         }
-
+        cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, memory_expansion_cost);
         // adress warm call
         bn_t contract_address;
         new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
@@ -98,7 +101,7 @@ namespace CuEVM::operations
                 };
             }
         }
-        // max gas call
+        // max gas call, gas_sent_with_call
         bn_t gas_capped;
         CuEVM::gas_cost::max_gas_call(
             arith,
@@ -115,8 +118,9 @@ namespace CuEVM::operations
         // add the the gas sent to the gas used
         cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, new_state_ptr->gas_limit);
 
-        // add the gas stippend
-        cgbn_add(arith.env, current_state.gas_limit, current_state.gas_limit, gas_stippend);
+        // Gas stipen 2300 is added to the total gas limit but not gas used
+        // add the gas stippend to gas limit of the child call
+        cgbn_add(arith.env, new_state_ptr->gas_limit, new_state_ptr->gas_limit, gas_stippend);
 
 
         error_code |= CuEVM::gas_cost::has_gas(

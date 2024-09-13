@@ -928,19 +928,6 @@ namespace CuEVM {
             // increase program counter
             call_state_ptr->pc++;
 
-            if (
-                (opcode == OP_CALL) ||
-                (opcode == OP_CALLCODE) ||
-                (opcode == OP_DELEGATECALL) ||
-                (opcode == OP_CREATE) ||
-                (opcode == OP_CREATE2) ||
-                (opcode == OP_STATICCALL)) {
-                    if (error_code == ERROR_SUCCESS) {
-                        call_state_ptr = child_call_state_ptr;
-                        error_code = start_CALL(arith);
-                    }
-                }
-
             #ifdef EIP_3155
             if (call_state_ptr->trace_idx > 0 ||
                 (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1) ) {
@@ -957,6 +944,18 @@ namespace CuEVM {
             }
             #endif
 
+            if (
+                (opcode == OP_CALL) ||
+                (opcode == OP_CALLCODE) ||
+                (opcode == OP_DELEGATECALL) ||
+                (opcode == OP_CREATE) ||
+                (opcode == OP_CREATE2) ||
+                (opcode == OP_STATICCALL)) {
+                    if (error_code == ERROR_SUCCESS) {
+                        call_state_ptr = child_call_state_ptr;
+                        error_code = start_CALL(arith);
+                    }
+                }
 
             if (error_code != ERROR_SUCCESS) {
                 if (
@@ -1135,18 +1134,18 @@ namespace CuEVM {
             delete call_state_ptr;
             call_state_ptr = parent_call_state_ptr;
             // trace the call
-            #ifdef EIP_3155
-                tracer_ptr->finish_operation(
-                    arith,
-                    call_state_ptr->trace_idx,
-                    call_state_ptr->gas_used,
-                    call_state_ptr->gas_refund
-                    #ifdef EIP_3155_OPTIONAL
-                    , error_code,
-                    call_state_ptr->touch_state
-                    #endif
-                );
-            #endif
+            // #ifdef EIP_3155
+            //     tracer_ptr->finish_operation(
+            //         arith,
+            //         call_state_ptr->trace_idx,
+            //         call_state_ptr->gas_used,
+            //         call_state_ptr->gas_refund
+            //         #ifdef EIP_3155_OPTIONAL
+            //         , error_code,
+            //         call_state_ptr->touch_state
+            //         #endif
+            //     );
+            // #endif
         }
 
         return error_code;
