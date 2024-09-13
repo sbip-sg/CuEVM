@@ -107,7 +107,7 @@ namespace CuEVM {
         int32_t error_code = (
             (
                 (cgbn_compare_ui32(arith.env, value, 0) > 0) &&
-                (cgbn_compare(arith.env, sender, recipient) != 0) &&
+                // (cgbn_compare(arith.env, sender, recipient) != 0) &&
                 (call_state_ptr->message_ptr->call_type != OP_DELEGATECALL)
             ) ?
             call_state_ptr->touch_state.transfer(
@@ -155,7 +155,7 @@ namespace CuEVM {
                     }
                 } else {
                     // operation stop
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
             }
         }
@@ -1079,7 +1079,7 @@ namespace CuEVM {
         cgbn_set_ui32(arith.env, child_success, 0);
         // if the child call return from normal halting
         // no errors
-        if ( (error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) )
+        if ( (error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) )
         {
             // give back the gas left from the child computation
             bn_t gas_left;
