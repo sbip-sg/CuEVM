@@ -146,16 +146,16 @@ namespace CuEVM {
                     switch (cgbn_get_ui32(arith.env, contract_address))
                     {
                         case 1:
-                            /* code */
                             return 1;
                             break;
 
                         default:
+                            return ERROR_RETURN;
                             break;
                     }
                 } else {
                     // operation stop
-                    return ERROR_SUCCESS;
+                    return ERROR_RETURN;
                 }
             }
         }
