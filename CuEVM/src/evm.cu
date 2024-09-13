@@ -107,7 +107,7 @@ namespace CuEVM {
         int32_t error_code = (
             (
                 (cgbn_compare_ui32(arith.env, value, 0) > 0) &&
-                (cgbn_compare(arith.env, sender, recipient) != 0) &&
+                // (cgbn_compare(arith.env, sender, recipient) != 0) &&
                 (call_state_ptr->message_ptr->call_type != OP_DELEGATECALL)
             ) ?
             call_state_ptr->touch_state.transfer(
@@ -149,13 +149,13 @@ namespace CuEVM {
                             /* code */
                             return 1;
                             break;
-                        
+
                         default:
                             break;
                     }
                 } else {
                     // operation stop
-                    return 1;
+                    return ERROR_SUCCESS;
                 }
             }
         }
@@ -173,11 +173,11 @@ namespace CuEVM {
         uint8_t opcode;
         CuEVM::evm_call_state_t* child_call_state_ptr = nullptr;
         while (
-            status == ERROR_SUCCESS 
+            status == ERROR_SUCCESS
         ) {
             opcode = (
                 (call_state_ptr->pc <
-                ((call_state_ptr->message_ptr)->byte_code).size) ? 
+                ((call_state_ptr->message_ptr)->byte_code).size) ?
                 (call_state_ptr->message_ptr)->byte_code.data[call_state_ptr->pc] :
                 OP_STOP
             );
@@ -776,7 +776,7 @@ namespace CuEVM {
                         *call_state_ptr->message_ptr
                     );
                     break;
-                
+
                 case OP_PC:
                     error_code = CuEVM::operations::PC(
                         arith,
@@ -786,7 +786,7 @@ namespace CuEVM {
                         *call_state_ptr->stack_ptr
                     );
                     break;
-                
+
                 case OP_MSIZE:
                     error_code = CuEVM::operations::MSIZE(
                         arith,
@@ -796,7 +796,7 @@ namespace CuEVM {
                         *call_state_ptr->memory_ptr
                     );
                     break;
-                
+
                 case OP_GAS:
                     error_code = CuEVM::operations::GAS(
                         arith,
@@ -813,7 +813,7 @@ namespace CuEVM {
                         call_state_ptr->gas_used
                     );
                     break;
-                
+
                 case OP_PUSH0:
                     error_code = CuEVM::operations::PUSH0(
                         arith,
@@ -822,7 +822,7 @@ namespace CuEVM {
                         *call_state_ptr->stack_ptr
                     );
                     break;
-                
+
                 case OP_CREATE:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CREATE(
@@ -832,7 +832,7 @@ namespace CuEVM {
                         child_call_state_ptr
                     );
                     break;
-                
+
                 case OP_CALL:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CALL(
@@ -842,7 +842,7 @@ namespace CuEVM {
                         child_call_state_ptr
                     );
                     break;
-                
+
                 case OP_CALLCODE:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CALLCODE(
@@ -852,7 +852,7 @@ namespace CuEVM {
                         child_call_state_ptr
                     );
                     break;
-                
+
                 case OP_RETURN:
                     error_code = CuEVM::operations::RETURN(
                         arith,
@@ -863,7 +863,7 @@ namespace CuEVM {
                         *call_state_ptr->parent->last_return_data_ptr
                     );
                     break;
-                
+
                 case OP_DELEGATECALL:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::DELEGATECALL(
@@ -873,7 +873,7 @@ namespace CuEVM {
                         child_call_state_ptr
                     );
                     break;
-                
+
                 case OP_CREATE2:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CREATE2(
@@ -883,7 +883,7 @@ namespace CuEVM {
                         child_call_state_ptr
                     );
                     break;
-                
+
                 case OP_STATICCALL:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::STATICCALL(
@@ -904,7 +904,7 @@ namespace CuEVM {
                         *call_state_ptr->parent->last_return_data_ptr
                     );
                     break;
-                
+
                 case OP_SELFDESTRUCT:
                     error_code = CuEVM::operations::SELFDESTRUCT(
                         arith,
@@ -916,8 +916,8 @@ namespace CuEVM {
                         *call_state_ptr->parent->last_return_data_ptr
                     );
                     break;
-                
-                
+
+
                 default:
                     error_code = CuEVM::operations::INVALID();
                     break;
@@ -929,11 +929,11 @@ namespace CuEVM {
             call_state_ptr->pc++;
 
             if (
-                (opcode == OP_CALL) || 
+                (opcode == OP_CALL) ||
                 (opcode == OP_CALLCODE) ||
                 (opcode == OP_DELEGATECALL) ||
-                (opcode == OP_CREATE) || 
-                (opcode == OP_CREATE2) || 
+                (opcode == OP_CREATE) ||
+                (opcode == OP_CREATE2) ||
                 (opcode == OP_STATICCALL)) {
                     if (error_code == ERROR_SUCCESS) {
                         call_state_ptr = child_call_state_ptr;
@@ -960,7 +960,7 @@ namespace CuEVM {
 
             if (error_code != ERROR_SUCCESS) {
                 if (
-                    (error_code == ERROR_RETURN) && 
+                    (error_code == ERROR_RETURN) &&
                     (call_state_ptr->message_ptr->call_type == OP_CREATE ||
                     call_state_ptr->message_ptr->call_type == OP_CREATE2)
                 ) {
@@ -1072,15 +1072,15 @@ namespace CuEVM {
         return status;
     }
 
-    
+
     __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_code) {
-        
+
         bn_t child_success;
         // set the child call to failure
         cgbn_set_ui32(arith.env, child_success, 0);
         // if the child call return from normal halting
         // no errors
-        if ( (error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) )
+        if ( (error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) )
         {
             // give back the gas left from the child computation
             bn_t gas_left;
@@ -1116,20 +1116,20 @@ namespace CuEVM {
         call_state_ptr->message_ptr->get_return_data_size(arith, ret_size);
         // reset the error code for the parent
         error_code = ERROR_SUCCESS;
-        
+
         if (call_state_ptr->depth > 1) {
             // push the result in the parent stack
             error_code |= call_state_ptr->parent->stack_ptr->push(arith, child_success);
 
             // set the parent memory with the return data
-            
+
             // write the return data in the memory
             error_code |= call_state_ptr->parent->memory_ptr->set(
                 arith,
                 *call_state_ptr->parent->last_return_data_ptr,
                 ret_offset,
                 ret_size);
-            
+
             // change the call state to the parent
             CuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
             delete call_state_ptr;
@@ -1148,11 +1148,11 @@ namespace CuEVM {
                 );
             #endif
         }
-        
+
         return error_code;
     }
 
-    
+
     __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
         // TODO: increase sender nonce if the sender is a contract
         // to see if the contract is a contract
@@ -1221,7 +1221,7 @@ namespace CuEVM {
             world_state_json = test_json;
         else
             return 1;
-        
+
         world_state_data_ptr = new CuEVM::state::state_t(world_state_json, managed);
 
         // get the block info

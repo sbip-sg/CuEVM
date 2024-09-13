@@ -116,7 +116,7 @@ namespace CuEVM::operations
         cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, new_state_ptr->gas_limit);
 
         // add the gas stippend
-        cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, gas_stippend);
+        cgbn_add(arith.env, current_state.gas_limit, current_state.gas_limit, gas_stippend);
 
 
         error_code |= CuEVM::gas_cost::has_gas(
