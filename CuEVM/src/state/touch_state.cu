@@ -23,7 +23,7 @@ namespace CuEVM::state {
             tmp_access_account_ptr,
             acces_state_flag);
         while(
-            (tmp != nullptr) && 
+            (tmp != nullptr) &&
             (tmp->_state->get_account(arith, address, tmp_account_ptr))
         ) tmp = tmp->parent;
         return _state->add_duplicate_account(
@@ -35,7 +35,7 @@ namespace CuEVM::state {
             ),
             ACCOUNT_NONE_FLAG);
     }
-    
+
     __host__ __device__ int32_t TouchState::get_account(
         ArithEnv &arith,
         const bn_t &address,
@@ -49,7 +49,7 @@ namespace CuEVM::state {
             ([&]() -> int32_t {
                 TouchState* tmp = parent;
                 while(
-                    (tmp != nullptr) && 
+                    (tmp != nullptr) &&
                     (tmp->_state->get_account(arith, address, account_ptr))
                 ) tmp = tmp->parent;
                 account_ptr = (tmp != nullptr) ? account_ptr : tmp_ptr;
@@ -114,8 +114,8 @@ namespace CuEVM::state {
         bn_t &value) const {
         account::account_t* account_ptr = nullptr;
         if (
-            _state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG) ||
-            account_ptr->get_storage_value(arith, key, value)) {
+            _state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG) == ERROR_SUCCESS &&
+            account_ptr->get_storage_value(arith, key, value) == ERROR_SUCCESS) {
             return ERROR_SUCCESS;
         }
         TouchState* tmp = parent;
@@ -126,7 +126,7 @@ namespace CuEVM::state {
                     arith,
                     address,
                     account_ptr,
-                    ACCOUNT_NONE_FLAG) || 
+                    ACCOUNT_NONE_FLAG) ||
                 account_ptr->get_storage_value(
                         arith,
                         key,
@@ -179,7 +179,7 @@ namespace CuEVM::state {
         account_ptr->set_nonce(arith, nonce);
         return ERROR_SUCCESS;
     }
-    
+
     __host__ __device__ int32_t TouchState::set_code(
         ArithEnv &arith,
         const bn_t &address,
@@ -205,7 +205,7 @@ namespace CuEVM::state {
         const bn_t &value
     ) {
         account::account_t* account_ptr = nullptr;
-        _access_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG);
+        // _access_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG);
         if (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)) {
             add_account(
                 arith,
@@ -214,6 +214,8 @@ namespace CuEVM::state {
                 ACCOUNT_STORAGE_FLAG);
         }
         account_ptr->set_storage_value(arith, key, value);
+        bn_t tmp_value;
+        _access_state->get_value(arith, address, key, tmp_value);
         return ERROR_SUCCESS;
     }
 
@@ -264,7 +266,7 @@ namespace CuEVM::state {
 
         TouchState* tmp = parent;
         while(
-            (tmp != nullptr) && 
+            (tmp != nullptr) &&
             (tmp->_state->get_account_index(arith, address, index))
         ) tmp = tmp->parent;
         return (tmp != nullptr) ? tmp->_state->flags[index].has_deleted() : _access_state->is_deleted_account(arith, address);
@@ -288,7 +290,7 @@ namespace CuEVM::state {
         return error_code;
     }
 
-    
+
         __host__ void TouchState::print() const {
             _state->print();
         }

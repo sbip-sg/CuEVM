@@ -11,7 +11,7 @@ namespace CuEVM {
             bn_t &contract_address,
             const bn_t &sender_address,
             const bn_t &sender_nonce) {
-            
+
             evm_word_t sender_address_word;
             cgbn_store(
                 arith.env,
@@ -19,7 +19,7 @@ namespace CuEVM {
                 sender_address);
             evm_word_t sender_nonce_word;
             cgbn_store(arith.env, &sender_nonce_word, sender_nonce);
-            CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
+            CuEVM::byte_array_t sender_address_bytes(CuEVM::word_size), sender_nonce_bytes(CuEVM::word_size);
             sender_address_word.to_byte_array_t(&sender_address_bytes);
             sender_nonce_word.to_byte_array_t(&sender_nonce_bytes);
 
@@ -66,21 +66,25 @@ namespace CuEVM {
             }
             rlp_list[0] = 0xc0 + rlp_list_length;
 
-            uint8_t address_bytes[CuEVM::hash_size];
+
             CuEVM::byte_array_t hash_address_bytes(CuEVM::hash_size);
             CuCrypto::keccak::sha3(
                 &(rlp_list[0]),
                 rlp_list_length + 1,
                 hash_address_bytes.data,
                 CuEVM::hash_size);
-            for (uint8_t idx = 0; idx < CuEVM::word_size - CuEVM::address_size; idx++)
+
+            CuEVM::byte_array_t address_bytes(CuEVM::word_size);
+
+            for (uint32_t idx = 0; idx < CuEVM::word_size; idx++)
             {
-                address_bytes[idx] = 0;
+                address_bytes.data[idx] = idx < CuEVM::address_size ? hash_address_bytes.data[CuEVM::word_size - idx - 1] : 0;
             }
+
             evm_word_t contract_address_word;
-            
-            contract_address_word.from_byte_array_t(hash_address_bytes);
+            contract_address_word.from_byte_array_t(address_bytes);
             cgbn_load(arith.env, contract_address, &contract_address_word);
+
             return ERROR_SUCCESS;
         }
 
@@ -106,7 +110,7 @@ namespace CuEVM {
                 init_code.size,
                 hash_code.data,
                 CuEVM::hash_size);
-            
+
             CuEVM::byte_array_t input_data(total_bytes);
             input_data.data[0] = 0xff;
             for (uint32_t idx = 0; idx < CuEVM::address_size; idx++)
@@ -128,7 +132,7 @@ namespace CuEVM {
                 total_bytes,
                 hash_input_data.data,
                 CuEVM::hash_size);
-            
+
             for (uint32_t idx = 0; idx < CuEVM::word_size - CuEVM::address_size; idx++)
             {
                 hash_input_data.data[idx] = 0;
@@ -137,6 +141,7 @@ namespace CuEVM {
             evm_word_t contract_address_word;
             contract_address_word.from_byte_array_t(hash_input_data);
             cgbn_load(arith.env, contract_address, &contract_address_word);
+
             return ERROR_SUCCESS;
         }
 
@@ -151,7 +156,7 @@ namespace CuEVM {
         __host__ __device__ char hex_from_nibble(const uint8_t nibble) {
             return nibble < 10 ? '0' + nibble : 'a' + nibble - 10;
         }
-        
+
         __host__ __device__ uint8_t nibble_from_hex(const char hex) {
             return hex >= '0' && hex <= '9' ? hex - '0' : (
                 hex >= 'a' && hex <= 'f' ? hex - 'a' + 10 : (
@@ -163,7 +168,7 @@ namespace CuEVM {
         __host__ __device__ uint8_t byte_from_nibbles(const uint8_t high, const uint8_t low) {
             return (high << 4) | low;
         }
-        
+
         __host__ __device__ void hex_from_byte(char *dst, const uint8_t byte){
             if (dst == NULL)
                 return;

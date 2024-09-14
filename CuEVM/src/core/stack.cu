@@ -93,8 +93,10 @@ namespace CuEVM
         ArithEnv &arith,
         const bn_t &value) {
         int32_t error_code = (size() >= capacity) ? grow() : ERROR_SUCCESS;
-        cgbn_store(arith.env, top(), value);
-        stack_offset++;
+        if (error_code == ERROR_SUCCESS){
+          cgbn_store(arith.env, top(), value);
+          stack_offset++;
+        }
         return error_code;
       }
 
@@ -160,8 +162,10 @@ namespace CuEVM
         uint32_t x) {
         bn_t a, b;
         int32_t error_code = ((x > 16) || (x < 1)) ? ERROR_STACK_INVALID_SIZE : (get_index(arith, 1, a) | get_index(arith, x + 1, b));
-        cgbn_store(arith.env, stack_base + size() - x - 1, a);
-        cgbn_store(arith.env, stack_base + size() - 1, b);
+        if (error_code == ERROR_SUCCESS) {
+          cgbn_store(arith.env, stack_base + size() - x - 1, a);
+          cgbn_store(arith.env, stack_base + size() - 1, b);
+        }
         return error_code;
       }
 

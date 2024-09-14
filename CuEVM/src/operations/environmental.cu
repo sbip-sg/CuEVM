@@ -33,7 +33,7 @@ namespace CuEVM::operations {
                 arith,
                 gas_used,
                 length);
-            
+
             bn_t memory_expansion_cost;
             // Get the memory expansion gas cost
             error_code |= CuEVM::gas_cost::memory_grow_cost(
@@ -43,7 +43,7 @@ namespace CuEVM::operations {
                 length,
                 memory_expansion_cost,
                 gas_used);
-            
+
             error_code |= CuEVM::gas_cost::has_gas(
                 arith,
                 gas_limit,
@@ -122,7 +122,7 @@ namespace CuEVM::operations {
             arith,
             gas_limit,
             gas_used);
-        
+
         if (error_code == ERROR_SUCCESS) {
             bn_t balance;
             touch_state.get_balance(
@@ -152,7 +152,7 @@ namespace CuEVM::operations {
             bn_t origin;
             transaction.get_sender(arith, origin);
 
-            error_code |= stack.push(arith, origin); 
+            error_code |= stack.push(arith, origin);
         }
     }
 
@@ -288,21 +288,24 @@ namespace CuEVM::operations {
             length,
             memory_expansion_cost,
             gas_used);
-        
-        error_code = CuEVM::gas_cost::has_gas(
+
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
-        
+
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
-            CuEVM::byte_array_t data;
-            error_code |= arith.byte_array_get_sub(
-                message.get_data(),
-                data_offset,
-                length,
-                data);
-            
+            uint32_t data_offset_ui32, length_ui32;
+            // get values saturated to uint32_max, in overflow case
+            data_offset_ui32 = cgbn_get_ui32(arith.env, data_offset);
+            if (cgbn_compare_ui32(arith.env, data_offset, data_offset_ui32) != 0)
+                data_offset_ui32 = UINT32_MAX;
+            length_ui32 = cgbn_get_ui32(arith.env, length);
+            if (cgbn_compare_ui32(arith.env, length, length_ui32) != 0)
+                length_ui32 = UINT32_MAX;
+            CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
+
             error_code |= memory.set(
                 arith,
                 data,
@@ -369,22 +372,22 @@ namespace CuEVM::operations {
             length,
             memory_expansion_cost,
             gas_used);
-        
+
         error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
-        
+
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             CuEVM::byte_array_t data;
-                
+
             error_code |= arith.byte_array_get_sub(
                 message.get_data(),
                 code_offset,
                 length,
                 data);
-            
+
             error_code |= memory.set(
                 arith,
                 data,
@@ -493,7 +496,7 @@ namespace CuEVM::operations {
             arith,
             gas_limit,
             gas_used);
-        
+
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             CuEVM::byte_array_t byte_code;
@@ -502,13 +505,13 @@ namespace CuEVM::operations {
                 address,
                 byte_code);
             CuEVM::byte_array_t data;
-                
+
             error_code |= arith.byte_array_get_sub(
                 byte_code,
                 code_offset,
                 length,
                 data);
-            
+
             error_code |= memory.set(
                 arith,
                 data,
@@ -573,7 +576,7 @@ namespace CuEVM::operations {
             length,
             memory_expansion_cost,
             gas_used);
-        
+
         error_code = CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
@@ -582,13 +585,13 @@ namespace CuEVM::operations {
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             CuEVM::byte_array_t data;
-            
+
             error_code |= arith.byte_array_get_sub(
                 return_data,
                 data_offset,
                 length,
                 data);
-            
+
             error_code |= memory.set(
                 arith,
                 data,
@@ -671,7 +674,7 @@ namespace CuEVM::operations {
                 arith,
                 address,
                 balance);
-            
+
             error_code |= stack.push(arith, balance);
         }
     }

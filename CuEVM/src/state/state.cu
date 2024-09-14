@@ -122,7 +122,7 @@ namespace CuEVM {
                     return ERROR_SUCCESS;
                 }
             }
-            
+
             return add_account(account);
         }
 
@@ -233,7 +233,7 @@ namespace CuEVM {
             CuEVM::account::account_t &account,
             const CuEVM::account::account_flags_t flag) {
             uint32_t index = 0;
-            if(state_t::get_account_index(arith, address, index)) {
+            if(state_t::get_account_index(arith, address, index)==ERROR_SUCCESS) {
                 flags[index].update(flag);
                 account = accounts[index];
                 return ERROR_SUCCESS;
@@ -280,7 +280,9 @@ namespace CuEVM {
             account_ptr = new CuEVM::account::account_t(
                 src_account_ptr,
                 no_storage_copy);
-            return add_account(*account_ptr, flag);
+            int32_t error_code = add_account(*account_ptr, flag);
+            account_ptr = &accounts[no_accounts - 1];
+            return error_code;
         }
 
         __host__ __device__ int32_t state_access_t::add_new_account(
@@ -314,7 +316,7 @@ namespace CuEVM {
             bn_t target_address;
             cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) &(account.address));
             uint32_t index = 0;
-            if(state_t::get_account_index(arith, target_address, index)) {
+            if(state_t::get_account_index(arith, target_address, index) == ERROR_SUCCESS) {
                 accounts[index].update(arith, account, flag);
                 flags[index].update(flag);
                 return ERROR_SUCCESS;
@@ -327,7 +329,8 @@ namespace CuEVM {
             const state_access_t &other) {
             uint32_t index = 0;
             for (uint32_t i = 0; i < other.no_accounts; i++) {
-                if (update_account(arith, other.accounts[i], other.flags[i]) == 0) {
+                // if update failed (not exist), add the account
+                if (update_account(arith, other.accounts[i], other.flags[i]) != ERROR_SUCCESS) {
                     add_account(other.accounts[i], index);
                     flags[no_accounts - 1] = other.flags[i];
                 }
@@ -372,7 +375,7 @@ namespace CuEVM {
             flag_string_ptr = nullptr;
             return state_json;
         }
-        
+
         __host__ int32_t state_access_t::get_account_index_evm(
             const evm_word_t &address,
             uint32_t &index) const {
@@ -391,8 +394,8 @@ namespace CuEVM {
             cJSON *state_json = nullptr;
             cJSON *account_json = nullptr;
             cJSON *accounts_json = nullptr;
-        
-            
+
+
             state_json = cJSON_CreateObject();
             accounts_json = cJSON_CreateArray();
             cJSON_AddItemToObject(state_json, "accounts", accounts_json);

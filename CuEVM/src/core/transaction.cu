@@ -110,7 +110,7 @@ namespace CuEVM {
                 bn_t &nonce) const {
                     cgbn_load(arith.env, nonce, (cgbn_evm_word_t_ptr) &(this->nonce));
             }
-            
+
             __host__ __device__ void evm_transaction_t::get_gas_limit(
                 ArithEnv &arith,
                 bn_t &gas_limit) const {
@@ -204,7 +204,7 @@ namespace CuEVM {
                 bn_t &gas_priority_fee,
                 bn_t &up_front_cost,
                 bn_t &m) const {
-                
+
                 bn_t max_fee_per_gas; // YP: \f$T_{m}\f$
                 bn_t value; // YP: \f$T_{v}\f$
                 get_max_fee_per_gas(arith, max_fee_per_gas);
@@ -265,7 +265,7 @@ namespace CuEVM {
                 bn_t &gas_used,
                 bn_t &gas_price,
                 bn_t &gas_priority_fee) const {
-                
+
                 bn_t gas_intrinsic;
                 CuEVM::gas_cost::transaction_intrinsic_gas(arith, *this, gas_intrinsic);
                 bn_t gas_limit;
@@ -360,7 +360,7 @@ namespace CuEVM {
                 #endif
                 bn_t precompile_contract_address;
                 #pragma unroll
-                for (uint32_t idx = 0; idx < CuEVM::no_precompile_contracts; idx++) {
+                for (uint32_t idx = 1; idx < CuEVM::no_precompile_contracts; idx++) {
                     cgbn_set_ui32(arith.env, precompile_contract_address, idx);
                     access_state.get_account(
                         arith,

@@ -32,19 +32,22 @@ namespace CuEVM::operations
             ERROR_STATIC_CALL_CONTEXT_CALL_VALUE :
             ERROR_SUCCESS
         );
-        
+
         // charge the gas for the call
 
         // memory call data
         bn_t memory_expansion_cost_args;
+
+        // replace gas_used, throw away after the call
+        // because we did not increase_memory_cost between expansions
+        bn_t temp_memory_gas_used;
         error_code |= CuEVM::gas_cost::memory_grow_cost(
             arith,
             *current_state.memory_ptr,
             args_offset,
             args_size,
             memory_expansion_cost_args,
-            current_state.gas_used);
-
+            temp_memory_gas_used);
         // memory return data
         bn_t ret_offset, ret_size;
         new_state_ptr->message_ptr->get_return_data_offset(arith, ret_offset);
@@ -56,8 +59,8 @@ namespace CuEVM::operations
             ret_offset,
             ret_size,
             memory_expansion_cost_ret,
-            current_state.gas_used);
-        
+            temp_memory_gas_used);
+
         // compute the total memory expansion cost
         bn_t memory_expansion_cost;
         if (cgbn_compare(arith.env, memory_expansion_cost_args, memory_expansion_cost_ret) > 0)
@@ -68,7 +71,7 @@ namespace CuEVM::operations
         {
             cgbn_set(arith.env, memory_expansion_cost, memory_expansion_cost_ret);
         }
-
+        cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, memory_expansion_cost);
         // adress warm call
         bn_t contract_address;
         new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
@@ -98,14 +101,14 @@ namespace CuEVM::operations
                 };
             }
         }
-        // max gas call
+        // max gas call, gas_sent_with_call
         bn_t gas_capped;
         CuEVM::gas_cost::max_gas_call(
             arith,
             gas_capped,
             current_state.gas_limit,
             current_state.gas_used);
-        
+
         // limit the gas to the gas capped
         if (cgbn_compare(arith.env, new_state_ptr->gas_limit, gas_capped) > 0)
         {
@@ -115,8 +118,9 @@ namespace CuEVM::operations
         // add the the gas sent to the gas used
         cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, new_state_ptr->gas_limit);
 
-        // add the gas stippend
-        cgbn_add(arith.env, current_state.gas_used, current_state.gas_used, gas_stippend);
+        // Gas stipen 2300 is added to the total gas limit but not gas used
+        // add the gas stippend to gas limit of the child call
+        cgbn_add(arith.env, new_state_ptr->gas_limit, new_state_ptr->gas_limit, gas_stippend);
 
 
         error_code |= CuEVM::gas_cost::has_gas(
@@ -135,7 +139,7 @@ namespace CuEVM::operations
 
             new_state_ptr->message_ptr->set_byte_code(
                 contract->byte_code);
-            
+
             // get/set the call data
              error_code |= current_state.memory_ptr->get(
                 arith,
@@ -165,7 +169,7 @@ namespace CuEVM::operations
         int32_t error_code = current_state.stack_ptr->pop(arith, value);
         error_code |= current_state.stack_ptr->pop(arith, memory_offset);
         error_code |= current_state.stack_ptr->pop(arith, length);
-        
+
         // create cost
         cgbn_add_ui32(arith.env, current_state.gas_used, current_state.gas_used, GAS_CREATE);
 
@@ -178,7 +182,7 @@ namespace CuEVM::operations
             length,
             memory_expansion_cost,
             current_state.gas_used);
-        
+
         // compute the initcode gas cost
         CuEVM::gas_cost::initcode_cost(
             arith,
@@ -195,12 +199,12 @@ namespace CuEVM::operations
                 current_state.gas_used,
                 length);
         }
-        
+
         error_code |= CuEVM::gas_cost::has_gas(
             arith,
             current_state.gas_limit,
             current_state.gas_used);
-        
+
 
         if (error_code == ERROR_SUCCESS) {
             // increase the memory cost
@@ -475,7 +479,7 @@ namespace CuEVM::operations
      * @param[in] stack The stack.
      * @param[in] memory The memory.
      * @param[out] return_data The return data.
-     * @return 0 if the operation is successful, otherwise the error code.
+     * @return ERROR_RETURN if the operation is successful, otherwise the error code.
     */
     __host__ __device__ int32_t RETURN(
         ArithEnv &arith,
@@ -497,7 +501,7 @@ namespace CuEVM::operations
             length,
             memory_expansion_cost,
             gas_used);
-        
+
         error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
@@ -508,12 +512,12 @@ namespace CuEVM::operations
             memory.increase_memory_cost(
                 arith,
                 memory_expansion_cost);
-            
+
             error_code |= memory.get(
                 arith,
                 memory_offset,
                 length,
-                return_data) || ERROR_RETURN; 
+                return_data) | ERROR_RETURN;
         }
         return error_code;
     }
@@ -539,7 +543,7 @@ namespace CuEVM::operations
         error_code |= current_state.stack_ptr->pop(arith, args_size);
         error_code |= current_state.stack_ptr->pop(arith, ret_offset);
         error_code |= current_state.stack_ptr->pop(arith, ret_size);
-        
+
         if (error_code == ERROR_SUCCESS)
         {
             // clean the address
@@ -629,7 +633,7 @@ namespace CuEVM::operations
         error_code |= current_state.stack_ptr->pop(arith, args_size);
         error_code |= current_state.stack_ptr->pop(arith, ret_offset);
         error_code |= current_state.stack_ptr->pop(arith, ret_size);
-        
+
         if (error_code == ERROR_SUCCESS)
         {
             // clean the address
@@ -674,7 +678,7 @@ namespace CuEVM::operations
                 current_state,
                 new_state_ptr);
         }
-        
+
         return error_code;
     }
 
@@ -707,23 +711,23 @@ namespace CuEVM::operations
             length,
             memory_expansion_cost,
             gas_used);
-        
+
         error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
-        
+
         if (error_code == ERROR_SUCCESS)
         {
             memory.increase_memory_cost(
                 arith,
                 memory_expansion_cost);
-            
+
             error_code |= memory.get(
                 arith,
                 memory_offset,
                 length,
-                return_data) || ERROR_REVERT; 
+                return_data) | ERROR_REVERT;
         }
         return error_code;
     }
