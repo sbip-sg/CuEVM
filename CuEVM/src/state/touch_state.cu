@@ -258,7 +258,6 @@ namespace CuEVM::state {
         ArithEnv &arith,
         const bn_t &address
     ) {
-        CuEVM::account::account_t* account_ptr = nullptr;
         uint32_t index;
         if (_state->get_account_index(arith, address, index) == 0) {
             return _state->flags[index].has_deleted();
@@ -291,7 +290,7 @@ namespace CuEVM::state {
     }
 
 
-        __host__ void TouchState::print() const {
+        __host__ __device__ void TouchState::print() const {
             _state->print();
         }
 }

@@ -309,7 +309,7 @@ namespace CuEVM {
                 if (cgbn_add(arith.env, offset, index, length) != 0) {
                     break;
                 }
-                if (arith.uint32_t_from_cgbn(offset_ui32, offset) != 0) {
+                if (cgbn_get_uint32_t(arith.env, offset_ui32, offset) == ERROR_VALUE_OVERFLOW) {
                     break;
                 }
                 bn_t old_memory_cost;

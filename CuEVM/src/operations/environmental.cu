@@ -68,9 +68,10 @@ namespace CuEVM::operations {
                         hash->data,
                         hash->size);
                     bn_t hash_bn;
-                    error_code |= arith.byte_array_to_bn_t(
-                        *hash,
-                        hash_bn);
+                    error_code |= cgbn_set_byte_array_t(
+                        arith.env,
+                        hash_bn,
+                        *hash);
                     delete hash;
                     error_code |= stack.push(arith, hash_bn);
                 }
@@ -154,6 +155,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, origin);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t CALLER(
@@ -175,6 +177,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, caller);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t CALLVALUE(
@@ -196,6 +199,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, call_value);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t CALLDATALOAD(
@@ -218,7 +222,8 @@ namespace CuEVM::operations {
             cgbn_set_ui32(arith.env, length, CuEVM::word_size);
 
             CuEVM::byte_array_t data;
-            error_code |= arith.byte_array_get_sub(
+            error_code |= get_sub_byte_array_t(
+                arith,
                 message.get_data(),
                 index,
                 length,
@@ -381,13 +386,12 @@ namespace CuEVM::operations {
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             CuEVM::byte_array_t data;
-
-            error_code |= arith.byte_array_get_sub(
+            error_code |= get_sub_byte_array_t(
+                arith,
                 message.get_data(),
                 code_offset,
                 length,
                 data);
-
             error_code |= memory.set(
                 arith,
                 data,
@@ -505,12 +509,13 @@ namespace CuEVM::operations {
                 address,
                 byte_code);
             CuEVM::byte_array_t data;
-
-            error_code |= arith.byte_array_get_sub(
+            error_code |= get_sub_byte_array_t(
+                arith,
                 byte_code,
                 code_offset,
                 length,
                 data);
+            
 
             error_code |= memory.set(
                 arith,
@@ -540,6 +545,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, length);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t RETURNDATACOPY(
@@ -585,8 +591,8 @@ namespace CuEVM::operations {
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
             CuEVM::byte_array_t data;
-
-            error_code |= arith.byte_array_get_sub(
+            error_code |= get_sub_byte_array_t(
+                arith,
                 return_data,
                 data_offset,
                 length,
@@ -641,9 +647,10 @@ namespace CuEVM::operations {
                 byte_code.size,
                 hash.data,
                 hash.size);
-            error_code |= arith.byte_array_to_bn_t(
-                hash,
-                hash_bn);
+            error_code |= cgbn_set_byte_array_t(
+                arith.env,
+                hash_bn,
+                hash);
         }
         error_code |= stack.push(
             arith,
@@ -677,5 +684,6 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, balance);
         }
+        return error_code;
     }
 }

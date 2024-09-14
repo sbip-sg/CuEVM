@@ -180,9 +180,9 @@ namespace CuEVM {
 
 
         __host__ __device__ void state_t::print() {
-            printf("no_accounts: %lu\n", no_accounts);
+            printf("no_accounts: %u\n", no_accounts);
             for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                printf("accounts[%lu]:\n", idx);
+                printf("accounts[%u]:\n", idx);
                 accounts[idx].print();
             }
         }
@@ -192,7 +192,6 @@ namespace CuEVM {
             cJSON *state_json = nullptr;
             cJSON *account_json = nullptr;
             char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
-            char *flag_string_ptr = nullptr;
             state_json = cJSON_CreateObject();
             for(uint32_t idx = 0; idx < no_accounts; idx++) {
                 accounts[idx].address.to_hex(hex_string_ptr, 0, 5);
@@ -276,7 +275,6 @@ namespace CuEVM {
             CuEVM::account::account_t* &src_account_ptr,
             const CuEVM::account::account_flags_t flag) {
             CuEVM::account::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
-            uint32_t index = 0;
             account_ptr = new CuEVM::account::account_t(
                 src_account_ptr,
                 no_storage_copy);
@@ -290,7 +288,6 @@ namespace CuEVM {
             const bn_t &address,
             CuEVM::account::account_t* &account_ptr,
             const CuEVM::account::account_flags_t flag) {
-            uint32_t index = 0;
             account_ptr = new CuEVM::account::account_t(
                 arith,
                 address);
@@ -301,7 +298,6 @@ namespace CuEVM {
             ArithEnv &arith,
             const CuEVM::account::account_t &account,
             const CuEVM::account::account_flags_t flag) {
-            uint32_t index = 0;
             if (update_account(arith, account, flag)) {
                 return add_account(account, flag);
             } else {
@@ -341,11 +337,11 @@ namespace CuEVM {
 
 
         __host__ __device__ void state_access_t::print() {
-            printf("no_accounts: %lu\n", no_accounts);
+            printf("no_accounts: %u\n", no_accounts);
             for (uint32_t idx = 0; idx < no_accounts; idx++) {
-                printf("accounts[%lu]:\n", idx);
+                printf("accounts[%u]:\n", idx);
                 accounts[idx].print();
-                printf("flags[%lu]:\n", idx);
+                printf("flags[%u]:\n", idx);
                 flags[idx].print();
             }
         }

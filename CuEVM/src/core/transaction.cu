@@ -514,7 +514,7 @@ namespace CuEVM {
                 return json;
             }
 
-        __host__ __device__ uint32_t no_transactions(
+        __host__ uint32_t no_transactions(
             const cJSON* json) {
             cJSON* transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
             const cJSON *data_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
@@ -555,7 +555,7 @@ namespace CuEVM {
             }
 
             evm_transaction_t* template_transaction_ptr = new evm_transaction_t();
-            uint32_t data_idnex, gas_limit_index, value_index, idx, jdx;
+            uint32_t data_idnex, gas_limit_index, value_index, idx;
 
             uint32_t type = 0;
 
@@ -617,7 +617,6 @@ namespace CuEVM {
             template_transaction_ptr->type = type;
 
             uint32_t index;
-            char* bytes_string = nullptr;
             for (idx = 0; idx < transactions_count; idx++) {
                 index = (start_index + idx) % original_count;
                 data_idnex = index % data_counts;

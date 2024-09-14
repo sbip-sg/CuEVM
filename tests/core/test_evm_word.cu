@@ -318,6 +318,7 @@ __global__ void test_evm_word_t_kernel(uint32_t count, uint32_t *result) {
     }
 }
 
+#ifdef GPU
 TEST(EvmWordTest, KernelTests) {
     CUDA_CHECK(cudaDeviceReset());
     uint32_t *d_result;
@@ -335,3 +336,4 @@ TEST(EvmWordTest, KernelTests) {
     CUDA_CHECK(cudaFree(d_result));
     CUDA_CHECK(cudaDeviceReset());
 }
+#endif

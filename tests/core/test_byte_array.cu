@@ -227,6 +227,7 @@ TEST(ByteArrayTests, GetCpu) {
     CuEVM::byte_array_t::cpu_free(cpuArray, 5);
 }
 
+#ifdef GPU
 TEST(ByteArrayTests, CpuGpuFree) {
     CuEVM::byte_array_t* cpuArray = CuEVM::byte_array_t::get_cpu(2);
     cpuArray[0].grow(3, 1);
@@ -247,6 +248,7 @@ TEST(ByteArrayTests, CpuGpuFree) {
     CuEVM::byte_array_t::cpu_free(cpuArray, 2);
     CUDA_CHECK(cudaDeviceReset());
 }
+#endif
 
 // Additional GPU tests
 
@@ -295,6 +297,7 @@ __global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count,
     }
 }
 
+#ifdef GPU
 TEST(ByteArrayTests, GpuKernelTest) {
     CuEVM::byte_array_t* cpuArray = CuEVM::byte_array_t::get_cpu(2);
     CUDA_CHECK(cudaDeviceReset());
@@ -337,3 +340,74 @@ TEST(ByteArrayTests, GpuKernelTest) {
     CuEVM::byte_array_t::cpu_free(results, 2);
     CUDA_CHECK(cudaDeviceReset());
 }
+#endif
+
+// New tests for the constructor with offset and size
+TEST(ByteArrayTests, ConstructorWithOffsetAndSize) {
+    uint8_t data[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
+    CuEVM::byte_array_t srcByteArray(data, 5);
+
+    // Test with valid offset and size
+    CuEVM::byte_array_t byteArray(srcByteArray, 1, 3);
+    ASSERT_EQ(byteArray.size, 3);
+    ASSERT_EQ(byteArray[0], 0x02);
+    ASSERT_EQ(byteArray[1], 0x03);
+    ASSERT_EQ(byteArray[2], 0x04);
+
+    // Test with offset beyond the source array size
+    CuEVM::byte_array_t byteArray2(srcByteArray, 6, 3);
+    ASSERT_EQ(byteArray2.size, 3);
+    ASSERT_EQ(byteArray2[0], 0x00);
+    ASSERT_EQ(byteArray2[1], 0x00);
+    ASSERT_EQ(byteArray2[2], 0x00);
+
+    // Test with size larger than the remaining elements from offset
+    CuEVM::byte_array_t byteArray3(srcByteArray, 3, 5);
+    ASSERT_EQ(byteArray3.size, 5);
+    ASSERT_EQ(byteArray3[0], 0x04);
+    ASSERT_EQ(byteArray3[1], 0x05);
+    ASSERT_EQ(byteArray3[2], 0x00);
+    ASSERT_EQ(byteArray3[3], 0x00);
+    ASSERT_EQ(byteArray3[4], 0x00);
+
+    // Test with zero size
+    CuEVM::byte_array_t byteArray4(srcByteArray, 1, 0);
+    ASSERT_EQ(byteArray4.size, 0);
+    ASSERT_EQ(byteArray4.data, nullptr);
+}
+
+// GPU tests for the constructor with offset and size
+__global__ void testConstructorWithOffsetAndSizeKernel(CuEVM::byte_array_t* srcArray, uint32_t offset, uint32_t size, uint32_t count) {
+    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
+    if (instance >= count) return;
+    uint8_t data[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
+    CuEVM::byte_array_t *tmp = new CuEVM::byte_array_t(data, 5);
+    srcArray[instance] = CuEVM::byte_array_t(*tmp, offset, size);
+    delete tmp;
+}
+
+#ifdef GPU
+TEST(ByteArrayTests, GpuConstructorWithOffsetAndSize) {
+    CuEVM::byte_array_t* cpuArray = CuEVM::byte_array_t::get_cpu(2);
+    CUDA_CHECK(cudaDeviceReset());
+
+    CuEVM::byte_array_t* gpuSrcArray = CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
+
+    testConstructorWithOffsetAndSizeKernel<<<2, CuEVM::cgbn_tpi>>>(gpuSrcArray, 1, 3, 2);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    CuEVM::byte_array_t* resultArray = CuEVM::byte_array_t::cpu_from_gpu(gpuSrcArray, 2);
+    ASSERT_EQ(resultArray[0].size, 3);
+    ASSERT_EQ(resultArray[0][0], 0x02);
+    ASSERT_EQ(resultArray[0][1], 0x03);
+    ASSERT_EQ(resultArray[0][2], 0x04);
+    ASSERT_EQ(resultArray[1].size, 3);
+    ASSERT_EQ(resultArray[1][0], 0x02);
+    ASSERT_EQ(resultArray[1][1], 0x03);
+    ASSERT_EQ(resultArray[1][2], 0x04);
+
+    CuEVM::byte_array_t::cpu_free(cpuArray, 2);
+    CuEVM::byte_array_t::cpu_free(resultArray, 2);
+    CUDA_CHECK(cudaDeviceReset());
+}
+#endif

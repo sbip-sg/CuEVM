@@ -39,17 +39,15 @@ struct byte_array_t {
     /**
      * @brief
      *
-     * The constructor with the src_byte_array, starting from [offset], get [size] bytes
-     * IGNORE boundary and size checks, fill with data and zeros if out of bounds
+     * The constructor with the src_byte_array, starting from [offset], get
+     * [size] bytes IGNORE boundary and size checks, fill with data and zeros if
+     * out of bounds
      * @param[in] src_byte_array The source array to copy
      * @param[in] offset The offset of the array where we start to copy.
      * @param[in] size The size of the array.
-     * @return __host__
      */
-    __host__ __device__ byte_array_t::byte_array_t(
-      const byte_array_t &src_byte_array,
-      uint32_t offset,
-      uint32_t size);
+    __host__ __device__ byte_array_t(const byte_array_t &src_byte_array,
+                                     uint32_t offset, uint32_t size);
     /**
      * The constructor with the hex string.
      * @param[in] hex_string The hex string.

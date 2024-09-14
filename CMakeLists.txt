@@ -11,6 +11,7 @@ option(GPU "Generating the GPU version of CuEVM " OFF)
 option(ENABLE_EIP_3155 "Enable EIP_3155 tracer" ON)
 option(ENABLE_EIP_3155_OPTIONAL "Enable EIP_3155 optional tracer" ON)
 option(TESTS "Enable tests" ON)
+option(TESTS_GPU "Enable GPU tests" OFF)
 set(EVM_VERSION "SHANGHAI" CACHE STRING "EVM version to use")
 
 project("cuevm"
@@ -149,6 +150,9 @@ if(TESTS)
         target_compile_definitions(${TEST_EXECUTABLE} PRIVATE EIP_3155_OPTIONAL)
     endif()
     target_compile_definitions(${TEST_EXECUTABLE} PRIVATE EVM_VERSION=${EVM_VERSION})
+    if (TESTS_GPU)
+        target_compile_definitions(${TEST_EXECUTABLE} PRIVATE GPU)
+    endif()
     # Add the test executable to CTest
     enable_testing()
     add_test(NAME ${TEST_EXECUTABLE} COMMAND ${TEST_EXECUTABLE})

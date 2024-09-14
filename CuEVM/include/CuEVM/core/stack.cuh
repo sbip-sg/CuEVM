@@ -171,7 +171,7 @@ struct evm_stack_t {
      * @return The stack gpu instances
      */
     __host__ static evm_stack_t *gpu_from_cpu(evm_stack_t *cpu_instances,
-                                                  uint32_t count);
+                                              uint32_t count);
 
     /**
      * Free the stack gpu instances
@@ -187,7 +187,7 @@ struct evm_stack_t {
      * @return The stack cpu instances
      */
     __host__ static evm_stack_t *cpu_from_gpu(evm_stack_t *gpu_instances,
-                                                  uint32_t count);
+                                              uint32_t count);
 };
 
 /**

@@ -107,8 +107,10 @@ namespace CuEVM {
     }
 
     __host__ __device__ int32_t evm_call_state_t::update(ArithEnv &arith, evm_call_state_t &other) {
-        this->touch_state.update(arith, &other.touch_state);
-        this->log_state_ptr->update(arith, *other.log_state_ptr);
+        uint32_t error_code = ERROR_SUCCESS;
+        error_code |= this->touch_state.update(arith, &other.touch_state);
+        error_code |= this->log_state_ptr->update(arith, *other.log_state_ptr);
+        return error_code;
     }
 
 }

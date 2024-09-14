@@ -275,7 +275,7 @@ namespace CuEVM {
          * @param[in] json the json object.
          * @return the number of transactions.
          */
-        __host__ __device__ uint32_t no_transactions(
+        __host__ uint32_t no_transactions(
             const cJSON* json);
 
         /**

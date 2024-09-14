@@ -9,7 +9,7 @@
 
 namespace CuEVM {
     namespace storage {
-        __host__ __device__ storage_element_t::storage_element_t(const cJSON *storage_element_json)
+        __host__ storage_element_t::storage_element_t(const cJSON *storage_element_json)
         {
             this->from_json(storage_element_json);
         }
@@ -60,8 +60,11 @@ namespace CuEVM {
 
         __host__ int32_t storage_element_t::from_json(const cJSON *storage_element_json)
         {
-            key.from_hex(storage_element_json->string);
-            value.from_hex(storage_element_json->valuestring);
+            uint32_t error_code = ERROR_SUCCESS;
+            error_code |= key.from_hex(storage_element_json->string);
+            error_code |= value.from_hex(storage_element_json->valuestring);
+            return error_code;
+
         }
 
         __host__ int32_t storage_element_t::add_to_json(
@@ -110,7 +113,7 @@ namespace CuEVM {
 
         // contract_storage_t
 
-        __host__ __device__ contract_storage_t::contract_storage_t(const cJSON *contract_storage_json)
+        __host__ contract_storage_t::contract_storage_t(const cJSON *contract_storage_json)
         {
             from_json(contract_storage_json);
         }

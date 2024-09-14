@@ -27,8 +27,7 @@ namespace CuEVM::operations {
             bn_t destination;
             error_code |= stack.pop(arith, destination);
             uint32_t destination_u32;
-            int32_t overflow;
-            error_code = arith.uint32_t_from_cgbn(destination_u32, destination) ? ERROR_INVALID_JUMP_DESTINATION : error_code;
+            error_code = cgbn_get_uint32_t(arith.env, destination_u32, destination) == ERROR_VALUE_OVERFLOW ? ERROR_INVALID_JUMP_DESTINATION : error_code;
             if (error_code == ERROR_SUCCESS)
             {
                 pc = message.get_jump_destinations()->has(destination_u32) == ERROR_SUCCESS ? destination_u32 - 1 : ([&]() -> uint32_t {
@@ -37,6 +36,7 @@ namespace CuEVM::operations {
                 })();
             }
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t JUMPI(
@@ -64,8 +64,7 @@ namespace CuEVM::operations {
                 (cgbn_compare_ui32(arith.env, condition, 0) != 0)
             ) {
                 uint32_t destination_u32;
-                int32_t overflow;
-                error_code = arith.uint32_t_from_cgbn(destination_u32, destination) ? ERROR_INVALID_JUMP_DESTINATION : error_code;
+                error_code = cgbn_get_uint32_t(arith.env, destination_u32, destination) == ERROR_VALUE_OVERFLOW ? ERROR_INVALID_JUMP_DESTINATION : error_code;
                 if (error_code == ERROR_SUCCESS)
                 {
                     pc = message.get_jump_destinations()->has(destination_u32) == ERROR_SUCCESS ? destination_u32 - 1 : ([&]() -> uint32_t {
@@ -75,6 +74,7 @@ namespace CuEVM::operations {
                 }
             }
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t PC(
@@ -92,6 +92,7 @@ namespace CuEVM::operations {
         bn_t pc_bn;
         cgbn_set_ui32(arith.env, pc_bn, pc);
         error_code |= stack.push(arith, pc_bn);
+        return error_code;
     }
 
     __host__ __device__ int32_t GAS(
@@ -108,6 +109,7 @@ namespace CuEVM::operations {
         bn_t gas_left;
         cgbn_sub(arith.env, gas_left, gas_limit, gas_used);
         error_code |= stack.push(arith, gas_left);
+        return error_code;
     }
 
     __host__ __device__ int32_t JUMPDEST(
@@ -120,5 +122,6 @@ namespace CuEVM::operations {
             arith,
             gas_limit,
             gas_used);
+        return error_code;
     }
 }

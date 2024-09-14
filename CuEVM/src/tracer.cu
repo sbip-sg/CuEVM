@@ -245,7 +245,7 @@ namespace CuEVM::utils {
 
         // fprintf(stderr, "\"fork\":%s,", "\"\"\"\"");
 
-        fprintf(stderr, "\"time\":%lu}\n", 2);
+        fprintf(stderr, "\"time\":%u}\n", 2);
         delete [] hex_string_ptr;
     }
 

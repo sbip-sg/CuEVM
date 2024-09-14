@@ -19,7 +19,8 @@ namespace CuEVM {
  */
 struct jump_destinations_t {
    private:
-    byte_array_t destinations; /**< The array of valid JUMPDESTs pc \f$D(c)\f$ */
+    byte_array_t
+        destinations; /**< The array of valid JUMPDESTs pc \f$D(c)\f$ */
 
    public:
     /**

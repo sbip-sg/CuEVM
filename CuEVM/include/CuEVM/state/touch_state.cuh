@@ -249,7 +249,7 @@ namespace CuEVM::state {
         /**
          * print the touch state
          */
-        __host__ void print() const;
+        __host__ __device__ void print() const;
     };
 }
 

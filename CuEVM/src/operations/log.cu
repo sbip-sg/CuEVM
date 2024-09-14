@@ -102,5 +102,6 @@ namespace CuEVM::operations {
                     no_topics);
             }
         }
+        return error_code;
     }
 }

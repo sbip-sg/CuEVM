@@ -14,8 +14,9 @@ namespace CuEVM
 
             /**
              * The default constructor for the storage element
+             * TODO: maybe make 0 and 0 for key and value
              */
-            __host__ __device__ storage_element_t() = default;
+            storage_element_t() = default;
 
             /**
              * The constructor for the storage element
@@ -174,7 +175,7 @@ namespace CuEVM
              * The constructor for the contract storage from a JSON object
              * @param[in] contract_storage_json The JSON object for the contract storage
              */
-            __host__ __device__ contract_storage_t(
+            __host__ contract_storage_t(
                 const cJSON *contract_storage_json);
 
             /**

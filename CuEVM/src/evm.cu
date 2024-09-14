@@ -100,7 +100,7 @@ namespace CuEVM {
 
 
     __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
-        bn_t sender, recipient, value, sender_balance, recipient_balance;
+        bn_t sender, recipient, value;
         call_state_ptr->message_ptr->get_sender(arith, sender);
         call_state_ptr->message_ptr->get_recipient(arith, recipient);
         call_state_ptr->message_ptr->get_value(arith, value);
@@ -135,7 +135,7 @@ namespace CuEVM {
             error_code |= call_state_ptr->touch_state.get_nonce(arith, sender, sender_nonce);
             cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
             uint64_t nonce;
-            error_code |= arith.uint64_t_from_cgbn(nonce, sender_nonce) == 1 ?  ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED : ERROR_SUCCESS;
+            error_code |= cgbn_get_uint64_t(arith.env, nonce, sender_nonce) == ERROR_VALUE_OVERFLOW ?  ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED : ERROR_SUCCESS;
         } else {
             error_code |= call_state_ptr->depth > CuEVM::max_depth ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
             if (account_ptr->byte_code.size == 0) {
@@ -1183,7 +1183,9 @@ namespace CuEVM {
             // compute the address of the contract
             bn_t contract_address;
             call_state_ptr->message_ptr->get_recipient(arith, contract_address);
+            #ifdef EIP_3541
             uint8_t *code = call_state_ptr->last_return_data_ptr->data;
+            #endif
             uint32_t code_size = call_state_ptr->last_return_data_ptr->size;
             if (code_size <= CuEVM::max_code_size) {
                 #ifdef EIP_3541
@@ -1247,7 +1249,6 @@ namespace CuEVM {
                 num_transactions * sizeof(evm_instance_t)
             ));
         }
-        uint32_t index = 0;
         for (uint32_t index = 0; index < num_transactions; index++) {
             evm_instances[index].world_state_data_ptr = world_state_data_ptr;
             evm_instances[index].block_info_ptr = block_info_ptr;
@@ -1319,6 +1320,7 @@ namespace CuEVM {
             }
         }
         num_instances = num_transactions;
+        return ERROR_SUCCESS;
     }
 
     __host__ void free_evm_instances(

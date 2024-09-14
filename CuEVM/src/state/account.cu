@@ -6,6 +6,7 @@
 
 #include <CuEVM/state/account.cuh>
 #include <CuCrypto/keccak.cuh>
+#include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM
 {
@@ -57,7 +58,7 @@ namespace CuEVM
             src_instances[instance].storage.capacity = 0;
             src_instances[instance].storage.size = 0;
         } else {
-            dst_instances[instance].storage = nullptr;
+            dst_instances[instance].storage.storage = nullptr;
             dst_instances[instance].storage.capacity = 0;
             dst_instances[instance].storage.size = 0;
         }
@@ -143,7 +144,7 @@ namespace CuEVM
         int32_t managed)
     {
         // TODO:
-        return;
+        return ERROR_SUCCESS;
     }
 
     __host__ __device__ int32_t account_t::get_storage_value(
@@ -291,8 +292,7 @@ namespace CuEVM
         const cJSON *account_json,
         int32_t managed)
     {
-        cJSON *balance_json, *nonce_json, *code_json, *storage_json, *key_value_json;
-        char *hex_string;
+        cJSON *balance_json, *nonce_json, *code_json;
         
         address.from_hex(account_json->string);
 
@@ -341,7 +341,6 @@ namespace CuEVM
         cJSON *account_json = cJSON_CreateObject();
         char *bytes_string = nullptr;
         char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
-        size_t jdx = 0;
         address.to_hex(hex_string_ptr, 0, 5);
         cJSON_SetValuestring(account_json, hex_string_ptr);
         balance.to_hex(hex_string_ptr);
@@ -482,7 +481,7 @@ namespace CuEVM
         uint32_t count)
     {
         account_t *cpu_instances = new account_t[count];
-        for(uint32_t index; index < count; index++)
+        for(uint32_t index = 0; index < count; index++)
         {
             cpu_instances[index].empty();
         }
@@ -493,7 +492,7 @@ namespace CuEVM
         account_t *cpu_instances,
         uint32_t count)
     {
-        for(uint32_t index; index < count; index++)
+        for(uint32_t index = 0; index < count; index++)
         {
             free_internals_account(cpu_instances[index]);
         }
@@ -511,7 +510,7 @@ namespace CuEVM
             cpu_instances,
             count * sizeof(account_t)
         );
-        for(uint32_t index; index < count; index++) {
+        for(uint32_t index = 0; index < count; index++) {
             if (
                 (tmp_cpu_instances[index].byte_code.data != nullptr) &&
                 (tmp_cpu_instances[index].byte_code.size > 0)
@@ -570,7 +569,7 @@ namespace CuEVM
             count * sizeof(account_t),
             cudaMemcpyDeviceToHost
         ));
-        for(uint32_t index; index < count; index++)
+        for(uint32_t index = 0; index < count; index++)
         {
             if (
                 (tmp_cpu_instances[index].byte_code.data != nullptr) &&
@@ -608,7 +607,7 @@ namespace CuEVM
             tmp_cpu_instances,
             count * sizeof(account_t)
         );
-        for(uint32_t index; index < count; index++)
+        for(uint32_t index = 0; index < count; index++)
         {
             if (
                 (tmp_cpu_instances[index].byte_code.data != nullptr) &&
@@ -656,7 +655,7 @@ namespace CuEVM
             cudaMemcpyDeviceToHost
         ));
 
-        for(uint32_t index; index < count; index++)
+        for(uint32_t index = 0; index < count; index++)
         {
             if (
                 (tmp_cpu_instances[index].byte_code.data != nullptr) &&
@@ -740,7 +739,7 @@ namespace CuEVM
         account_t *managed_instances,
         uint32_t count)
     {
-        for(uint32_t index; index < count; index++)
+        for(uint32_t index = 0; index < count; index++)
         {
             free_internals_managed_instance(managed_instances[index]);
         }

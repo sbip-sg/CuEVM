@@ -34,27 +34,28 @@ __host__ __device__ byte_array_t::byte_array_t(uint8_t *data, uint32_t size)
     this->data = tmp_data;
 }
 
-  __host__ __device__ byte_array_t::byte_array_t(
-    const byte_array_t &src_byte_array,
-    uint32_t offset,
-    uint32_t size) : size(size) {
-      if (size > 0)
-      {
-        this->data = new uint8_t[size];
-        std::fill(data, data + size, 0);
+__host__ __device__ byte_array_t::byte_array_t(
+    const byte_array_t &src_byte_array, uint32_t offset, uint32_t size)
+    : size(size) {
+    __SHARED_MEMORY__ uint8_t *tmp_data;
+    __ONE_GPU_THREAD_BEGIN__
+    if (size > 0) {
+        tmp_data = new uint8_t[size];
+        memset(tmp_data, 0, size * sizeof(uint8_t));
         if (offset < src_byte_array.size)
-          std::copy(src_byte_array.data + offset, src_byte_array.data + min(offset + size,src_byte_array.size), this->data);
-      }
-      else
-        this->data = nullptr;
-  }
+            memcpy(tmp_data, src_byte_array.data + offset,
+                   min(size, src_byte_array.size - offset) * sizeof(uint8_t));
+    } else
+        tmp_data = nullptr;
+    __ONE_GPU_THREAD_END__
+    this->data = tmp_data;
+}
 
-  __host__ __device__ byte_array_t::byte_array_t(
-    const char *hex_string,
-    int32_t endian,
-    PaddingDirection padding) : size(0), data(nullptr) {
-      from_hex(hex_string, endian, padding, 0);
-  }
+__host__ byte_array_t::byte_array_t(const char *hex_string, int32_t endian,
+                                    PaddingDirection padding)
+    : size(0), data(nullptr) {
+    from_hex(hex_string, endian, padding, 0);
+}
 
 __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size,
                                     int32_t endian, PaddingDirection padding)

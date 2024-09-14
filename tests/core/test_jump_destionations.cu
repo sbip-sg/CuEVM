@@ -97,8 +97,11 @@ void run_test(uint8_t* bytecode_data, uint32_t bytecode_size,
               uint32_t* expected_destinations, uint32_t expected_size) {
     run_test_CPU(bytecode_data, bytecode_size, expected_destinations,
                  expected_size);
+    
+    #ifdef GPU
     run_test_GPU(bytecode_data, bytecode_size, expected_destinations,
                  expected_size);
+    #endif
 }
 
 TEST(JumpDestinationsTest, BasicTest) {

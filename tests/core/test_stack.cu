@@ -241,6 +241,7 @@ __global__ void testKernel(CuEVM::evm_stack_t* gpuStack, uint32_t count,
         gpuStack[instance].size() == 1 ? ERROR_SUCCESS : __LINE__;
 }
 
+#ifdef GPU
 // Test push Operation on GPU
 TEST_F(EvmStackTest, PushOperationGPU) {
     CuEVM::evm_stack_t* cpuStack = CuEVM::evm_stack_t::get_cpu(2);
@@ -270,3 +271,4 @@ TEST_F(EvmStackTest, PushOperationGPU) {
     CuEVM::evm_stack_t::cpu_free(results, 2);
     CUDA_CHECK(cudaDeviceReset());
 }
+#endif

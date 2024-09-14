@@ -50,9 +50,10 @@ namespace CuEVM::operations {
 
 
             bn_t value;
-            error_code |= arith.byte_array_to_bn_t(data, value);
+            error_code |= cgbn_set_byte_array_t(arith.env, value, data);
             error_code |= stack.push(arith, value);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t MSTORE(

@@ -72,8 +72,8 @@ evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {
         bytes = byte_array.data + CuEVM::word_size - 1;
 #pragma unroll
         for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
-             _limbs[idx] = (*(bytes--) | *(bytes--) << 8 |
-                       *(bytes--) << 16 | *(bytes--) << 24);
+            _limbs[idx] = (*(bytes--) | *(bytes--) << 8 | *(bytes--) << 16 |
+                           *(bytes--) << 24);
         }
     } else {
         return ERROR_NOT_IMPLEMENTED;
@@ -135,8 +135,8 @@ __host__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty,
     return hex_string;
 }
 
-__host__ __device__ int32_t evm_word_t::to_byte_array_t(
-    byte_array_t &byte_array, int32_t endian) const {
+__host__ __device__ int32_t
+evm_word_t::to_byte_array_t(byte_array_t &byte_array, int32_t endian) const {
     byte_array.grow(CuEVM::word_size, 1);
     uint8_t *bytes = nullptr;
     if (endian == BIG_ENDIAN) {
@@ -161,8 +161,8 @@ __host__ __device__ int32_t evm_word_t::to_byte_array_t(
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_word_t::to_bit_array_t(
-    byte_array_t &bit_array, int32_t endian) const {
+__host__ __device__ int32_t evm_word_t::to_bit_array_t(byte_array_t &bit_array,
+                                                       int32_t endian) const {
     bit_array.grow(CuEVM::word_bits, 1);
     uint8_t *bits = nullptr;
     if (endian == BIG_ENDIAN) {
@@ -170,7 +170,8 @@ __host__ __device__ int32_t evm_word_t::to_bit_array_t(
         for (int32_t idx = CuEVM::cgbn_limbs - 1; idx >= 0; idx--) {
             for (int bit = 31; bit >= 0; bit--) {
                 *(bits++) = (uint8_t)((_limbs[idx] >> bit) & 0x01);
-                // bit_array.data[ (CuEVM::cgbn_limbs - 1 - idx) * 32  + (31-bit)] = (uint8_t)((_limbs[idx] >> bit) & 0x01);
+                // bit_array.data[ (CuEVM::cgbn_limbs - 1 - idx) * 32  +
+                // (31-bit)] = (uint8_t)((_limbs[idx] >> bit) & 0x01);
             }
         }
     } else if (endian == LITTLE_ENDIAN) {

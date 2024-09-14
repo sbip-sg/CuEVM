@@ -217,7 +217,8 @@ namespace CuEVM {
 
                 uint32_t sign_a = cgbn_extract_bits_ui32(arith.env, a, CuEVM::word_bits - 1, 1);
                 uint32_t sign_b = cgbn_extract_bits_ui32(arith.env, b, CuEVM::word_bits - 1, 1);
-                uint32_t sign = sign_a ^ sign_b;
+                // TODO: check if this is correct
+                // uint32_t sign = sign_a ^ sign_b;
                 if (cgbn_compare_ui32(arith.env, b, 0) == 0)
                     cgbn_set_ui32(arith.env, r, 0);
                 else

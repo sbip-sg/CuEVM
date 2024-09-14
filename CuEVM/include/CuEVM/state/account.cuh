@@ -255,7 +255,7 @@ namespace CuEVM
         /**
          * The default constructor for the account data structure.
          */
-        __host__ __device__ account_t() = default;
+        account_t() = default;
 
         /**
          * The constructor for the account data structure.
