@@ -6,6 +6,7 @@
 
 #include <CuEVM/core/message.cuh>
 
+
 namespace CuEVM {
     __host__ __device__ evm_message_call_t::evm_message_call_t(
         ArithEnv &arith,

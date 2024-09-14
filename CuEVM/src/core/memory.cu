@@ -17,7 +17,7 @@ namespace CuEVM {
       printf("\n");
       data.print();
     }
-    
+
     __host__ cJSON* evm_memory_t::to_json() const {
       cJSON *json = cJSON_CreateObject();
       cJSON_AddItemToObject(json, "size", cJSON_CreateNumber(size));
@@ -85,7 +85,7 @@ namespace CuEVM {
       cgbn_div_ui32(arith.env, memory_size, memory_size, 32);
       overflow |= cgbn_mul_ui32(arith.env, offset_bn, memory_size, 32);
       overflow |= arith.uint32_t_from_cgbn(offset, offset_bn);
-  
+
       return overflow;
     }
 
@@ -130,7 +130,7 @@ namespace CuEVM {
       const CuEVM::byte_array_t &data,
       const bn_t &index,
       const bn_t &length) {
-      
+
       int32_t error_code = ERROR_SUCCESS;
       error_code = (cgbn_compare_ui32(arith.env, length, 0) < 0) ? ERR_MEMORY_INVALID_SIZE : error_code;
       error_code |= grow(arith, index, length);

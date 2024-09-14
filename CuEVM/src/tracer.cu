@@ -59,7 +59,7 @@ namespace CuEVM::utils {
         // std::cerr << "{\"pc\":" << pc << ",\"op\":" << op << ",\"gas\":\"" << gas.to_hex(hex_string_ptr, 1) << "\",\"gasCost\":\"" << gas_cost.to_hex(hex_string_ptr, 1) << "\",\"stack\":[" << stack_str << "],\"depth\":" << depth << ",\"memSize\":" << mem_size << "}\n";
         // fprintf(stderr, "{\"pc\":%d,\"op\":%d,\"gas\":\"%s\",\"gasCost\":\"%s\",\"memSize\":%u,\"stack\":[%s],\"depth\":%d, \"refund\":%s}\n",
         //     pc, op, gas.to_hex(hex_string_ptr, 1), gas_cost.to_hex(hex_string_ptr, 1), mem_size, stack_str.c_str(), depth, refund.to_hex(hex_string_ptr, 1));
-        
+
         fprintf(stderr, "{\"pc\":%d,\"op\":%d,", pc, op);
 
         fprintf(stderr, "\"gas\":\"%s\",", gas.to_hex(hex_string_ptr, 1));
@@ -78,7 +78,7 @@ namespace CuEVM::utils {
         fprintf(stderr, "\"refund\":%u", refund._limbs[0]);
         #ifdef EIP_3155_OPTIONAL
         fprintf(stderr, ",\"error\":%u", error_code);
-        fprintf(stderr, ",\"memory\":\"");
+        fprintf(stderr, ",\"memory\":\"0x");
         for (uint32_t j = 0; j < mem_size; j++) {
             fprintf(stderr, "%02x", memory[j]);
         }
@@ -223,7 +223,7 @@ namespace CuEVM::utils {
         }
         // fprintf(stderr, "{\"stateRoot\":\"0x\",\"output\":%s,\"gasUsed\":\"%s\",\"pass\":\"%s\",\"fork\":%s,\"time\":%lu}\n",
         //     return_data.to_hex(), gas_used.to_hex(hex_string_ptr, 1), status == ERROR_SUCCESS ? "true" : "false", "\"\"\"\"", 2);
-        
+
         fprintf(stderr, "{\"stateRoot\":\"0x\",");
 
         char *return_data_hex = return_data.to_hex();

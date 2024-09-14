@@ -45,7 +45,7 @@ __host__ __device__ evm_stack_t &evm_stack_t::operator=(
 __host__ __device__ void evm_stack_t::duplicate(const evm_stack_t &other) {
     __SHARED_MEMORY__ evm_word_t *tmp_stack_base;
     __ONE_GPU_THREAD_BEGIN__
-    tmp_stack_base = (evm_word_t *) malloc(other.capacity * sizeof(evm_word_t));
+    tmp_stack_base = (evm_word_t *)malloc(other.capacity * sizeof(evm_word_t));
     if (tmp_stack_base != nullptr) {
         memcpy(tmp_stack_base, other.stack_base,
                other.stack_offset * sizeof(evm_word_t));
@@ -63,7 +63,7 @@ __host__ __device__ int32_t evm_stack_t::grow() {
     }
     __SHARED_MEMORY__ evm_word_t *new_stack_base;
     __ONE_GPU_THREAD_BEGIN__
-    new_stack_base = (evm_word_t *) malloc(capacity * sizeof(evm_word_t));
+    new_stack_base = (evm_word_t *)malloc(capacity * sizeof(evm_word_t));
     if (stack_base != nullptr && new_stack_base != nullptr) {
         memcpy(new_stack_base, stack_base, stack_offset * sizeof(evm_word_t));
         delete[] stack_base;
@@ -139,8 +139,10 @@ __host__ __device__ int32_t evm_stack_t::swapx(ArithEnv &arith, uint32_t x) {
         ((x > 16) || (x < 1))
             ? ERROR_STACK_INVALID_SIZE
             : (get_index(arith, 1, a) | get_index(arith, x + 1, b));
-    cgbn_store(arith.env, stack_base + size() - x - 1, a);
-    cgbn_store(arith.env, stack_base + size() - 1, b);
+    if (error_code == ERROR_SUCCESS) {
+        cgbn_store(arith.env, stack_base + size() - x - 1, a);
+        cgbn_store(arith.env, stack_base + size() - 1, b);
+    }
     return error_code;
 }
 
@@ -173,7 +175,7 @@ __host__ void evm_stack_t::cpu_free(evm_stack_t *instances, uint32_t count) {
     delete[] instances;
 }
 __host__ evm_stack_t *evm_stack_t::gpu_from_cpu(evm_stack_t *cpu_instances,
-                                                    uint32_t count) {
+                                                uint32_t count) {
     evm_stack_t *gpu_instances, *tmp_gpu_instances;
     tmp_gpu_instances = new evm_stack_t[count];
     for (uint32_t idx = 0; idx < count; idx++) {
@@ -208,7 +210,7 @@ __host__ void evm_stack_t::gpu_free(evm_stack_t *gpu_instances,
                           count * sizeof(evm_stack_t), cudaMemcpyDeviceToHost));
     for (uint32_t idx = 0; idx < count; idx++) {
         if (tmp_gpu_instances[idx].stack_base != nullptr &&
-            tmp_gpu_instances[idx].capacity > 0&&
+            tmp_gpu_instances[idx].capacity > 0 &&
             tmp_gpu_instances[idx].stack_offset > 0) {
             CUDA_CHECK(cudaFree(tmp_gpu_instances[idx].stack_base));
         }
@@ -219,7 +221,7 @@ __host__ void evm_stack_t::gpu_free(evm_stack_t *gpu_instances,
 }
 
 __host__ evm_stack_t *evm_stack_t::cpu_from_gpu(evm_stack_t *gpu_instances,
-                                                    uint32_t count) {
+                                                uint32_t count) {
     evm_stack_t *cpu_instances = new evm_stack_t[count];
     evm_stack_t *tmp_gpu_instances = new evm_stack_t[count];
     evm_stack_t *tmp_cpu_instances = new evm_stack_t[count];
@@ -288,4 +290,4 @@ __global__ void transfer_kernel_evm_stack_t(evm_stack_t *dst, evm_stack_t *src,
     src[instance].clear();
 }
 
-} // namespace CuEVM::stack
+}  // namespace CuEVM::stack
