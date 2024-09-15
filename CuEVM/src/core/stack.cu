@@ -147,12 +147,12 @@ __host__ __device__ int32_t evm_stack_t::swapx(ArithEnv &arith, uint32_t x) {
 }
 
 __host__ __device__ void evm_stack_t::print() {
-    __ONE_GPU_THREAD_BEGIN__
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     printf("Stack size: %d, data:\n", size());
     for (uint32_t idx = 0; idx < size(); idx++) {
         stack_base[idx].print();
     }
-    __ONE_GPU_THREAD_END__
+    __ONE_GPU_THREAD_WOSYNC_END__
 }
 
 __host__ cJSON *evm_stack_t::to_json() {

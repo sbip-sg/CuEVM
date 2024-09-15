@@ -21,8 +21,8 @@ namespace CuEVM {
         bn_t gas_limit; /**< The gas limit */
         CuEVM::evm_stack_t* stack_ptr; /**< The stack */
         CuEVM::evm_memory_t* memory_ptr; /**< The memory */
-        CuEVM::state::log_state_data_t* log_state_ptr; /**< The logs state */
-        CuEVM::state::TouchState touch_state; /**< The touch state */
+        CuEVM::log_state_data_t* log_state_ptr; /**< The logs state */
+        CuEVM::TouchState touch_state; /**< The touch state */
         CuEVM::evm_return_data_t* last_return_data_ptr; /**< The return data */
         #ifdef EIP_3155
         uint32_t trace_idx; /**< The index in the trace */
@@ -41,8 +41,8 @@ namespace CuEVM {
             CuEVM::evm_message_call_t* message_ptr,
             CuEVM::evm_stack_t* stack_ptr,
             CuEVM::evm_memory_t* memory_ptr,
-            CuEVM::state::log_state_data_t* log_state_ptr,
-            CuEVM::state::TouchState touch_state,
+            CuEVM::log_state_data_t* log_state_ptr,
+            CuEVM::TouchState touch_state,
             CuEVM::evm_return_data_t* last_return_data_ptr
         );
 
@@ -60,11 +60,11 @@ namespace CuEVM {
          */
         __host__ __device__ evm_call_state_t(
             ArithEnv &arith,
-            CuEVM::state::AccessState *access_state_ptr,
+            CuEVM::AccessState *access_state_ptr,
             CuEVM::evm_stack_t* stack_ptr,
             CuEVM::evm_memory_t* memory_ptr,
-            CuEVM::state::log_state_data_t* log_state_ptr, 
-            CuEVM::state::state_access_t* state_access_ptr,
+            CuEVM::log_state_data_t* log_state_ptr, 
+            CuEVM::state_access_t* state_access_ptr,
             CuEVM::evm_return_data_t* last_return_data_ptr
             );
         /**

@@ -241,11 +241,11 @@ namespace CuEVM {
 
             __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(
                 ArithEnv &arith,
-                CuEVM::state::AccessState &access_state) const {
+                CuEVM::AccessState &access_state) const {
                 for (uint32_t i = 0; i < access_list.accounts_count; i++) {
                     bn_t address;
                     cgbn_load(arith.env, address, (cgbn_evm_word_t_ptr) &(access_list.accounts[i].address));
-                    CuEVM::account::account_t* account_ptr = nullptr;
+                    CuEVM::account_t* account_ptr = nullptr;
                     access_state.get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG);
                     for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
                         bn_t key;
@@ -259,8 +259,8 @@ namespace CuEVM {
 
             __host__ __device__ int32_t evm_transaction_t::validate(
                 ArithEnv &arith,
-                CuEVM::state::AccessState &access_state,
-                CuEVM::state::TouchState &touch_state,
+                CuEVM::AccessState &access_state,
+                CuEVM::TouchState &touch_state,
                 CuEVM::block_info_t &block_info,
                 bn_t &gas_used,
                 bn_t &gas_price,
@@ -278,7 +278,7 @@ namespace CuEVM {
 
                 bn_t sender_address;
                 get_sender(arith, sender_address);
-                CuEVM::account::account_t* sender_account = nullptr;
+                CuEVM::account_t* sender_account = nullptr;
                 access_state.get_account(arith, sender_address, sender_account, ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
                 bn_t sender_balance;
                 sender_account->get_balance(arith, sender_balance);
@@ -381,7 +381,7 @@ namespace CuEVM {
              */
             __host__ __device__ int32_t evm_transaction_t::get_message_call(
                 ArithEnv &arith,
-                CuEVM::state::AccessState &access_state,
+                CuEVM::AccessState &access_state,
                 CuEVM::evm_message_call_t* &evm_message_call_ptr) const {
                 bn_t sender_address, to_address, value, gas_limit;
                 get_sender(arith, sender_address);
@@ -397,7 +397,7 @@ namespace CuEVM {
                     byte_code = data_init;
                     // TODO: code size does not execede the maximul allowed
                     bn_t sender_nonce;
-                    CuEVM::account::account_t* sender_account = nullptr;
+                    CuEVM::account_t* sender_account = nullptr;
                     access_state.get_account(arith, sender_address, sender_account, ACCOUNT_NONCE_FLAG);
                     // nonce is -1 in YP but here is before validating the transaction
                     // and increasing the nonce
@@ -410,7 +410,7 @@ namespace CuEVM {
                         return ERROR_FAILED;
                     }
                 } else {
-                    CuEVM::account::account_t* to_account = nullptr;
+                    CuEVM::account_t* to_account = nullptr;
                     access_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
                     byte_code = to_account->byte_code;
                 }

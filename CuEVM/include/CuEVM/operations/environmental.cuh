@@ -104,8 +104,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state);
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state);
 
     /**
      * The ORIGIN operation implementation.
@@ -313,8 +313,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state);
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state);
 
     /**
      * The EXTCODECOPY operation implementation.
@@ -343,8 +343,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state,
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state,
         CuEVM::evm_memory_t &memory);
 
     /**
@@ -414,8 +414,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state);
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state);
 
     /**
      * The SELFBALANCE operation implementation.
@@ -436,7 +436,7 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        CuEVM::state::TouchState &touch_state,
+        CuEVM::TouchState &touch_state,
         const CuEVM::evm_message_call_t &message);
 }
 

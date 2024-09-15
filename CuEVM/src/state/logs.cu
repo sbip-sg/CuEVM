@@ -7,7 +7,7 @@
 #include <CuEVM/state/logs.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
-namespace CuEVM::state {
+namespace CuEVM {
     __host__ __device__ int32_t log_state_data_t::grow() {
         log_data_t *new_logs = new log_data_t[capacity + log_page_size];
         if (new_logs == nullptr) {

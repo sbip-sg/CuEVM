@@ -63,12 +63,22 @@ __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size,
     from_hex(hex_string, endian, padding, 0);
 }
 
-__host__ __device__ byte_array_t::~byte_array_t() {
+__host__ __device__ byte_array_t::~byte_array_t() { free(); }
+__host__ __device__ void byte_array_t::free() {
     __ONE_GPU_THREAD_BEGIN__
     if ((size > 0) && (data != nullptr)) {
         delete[] data;
     }
     __ONE_GPU_THREAD_END__
+    clear();
+}
+__host__ void byte_array_t::free_managed() {
+    if ((size > 0) && (data != nullptr)) {
+        CUDA_CHECK(cudaFree(data));
+    }
+    clear();
+}
+__host__ __device__ void byte_array_t::clear() {
     data = nullptr;
     size = 0;
 }
@@ -161,12 +171,12 @@ __host__ __device__ uint32_t byte_array_t::has_value(uint8_t value) const {
 }
 
 __host__ __device__ void byte_array_t::print() const {
-    __ONE_GPU_THREAD_BEGIN__
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     printf("size: %u\n", size);
     printf("data: ");
     for (uint32_t index = 0; index < size; index++) printf("%02x", data[index]);
     printf("\n");
-    __ONE_GPU_THREAD_END__
+    __ONE_GPU_THREAD_WOSYNC_END__
 }
 
 __host__ char *byte_array_t::to_hex() const {
@@ -444,6 +454,17 @@ __host__ byte_array_t *byte_array_t::cpu_from_gpu(byte_array_t *gpu_instances,
     return cpu_instances;
 }
 
+__host__ __device__ void byte_array_t::transfer_memory(byte_array_t &dst,
+                                                       byte_array_t &src) {
+    dst.size = src.size;
+    if (src.size > 0) {
+        memcpy(dst.data, src.data, src.size * sizeof(uint8_t));
+    } else {
+        dst.data = nullptr;
+    }
+    src.free();
+}
+
 // CPU-GPU
 __global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances,
                                              byte_array_t *src_instances,
@@ -452,12 +473,7 @@ __global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances,
 
     if (instance >= count) return;
 
-    dst_instances[instance].size = src_instances[instance].size;
-    if (src_instances[instance].size > 0) {
-        memcpy(dst_instances[instance].data, src_instances[instance].data,
-               src_instances[instance].size * sizeof(uint8_t));
-        delete[] src_instances[instance].data;
-        src_instances[instance].data = nullptr;
-    }
+    CuEVM::byte_array_t::transfer_memory(dst_instances[instance],
+                                         src_instances[instance]);
 }
 }  // namespace CuEVM

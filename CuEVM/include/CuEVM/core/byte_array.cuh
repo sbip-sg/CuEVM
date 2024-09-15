@@ -72,6 +72,18 @@ struct byte_array_t {
      */
     __host__ __device__ ~byte_array_t();
     /**
+     * Free the memory of the byte array.
+     */
+    __host__ __device__ void free();
+    /**
+     * Free the memory of the byte array for managed memory.
+     */
+    __host__ void free_managed();
+    /**
+     * Clear the memory of the byte array.
+     */
+    __host__ __device__ void clear();
+    /**
      * The copy constructor.
      * @param[in] other The other byte array.
      */
@@ -181,6 +193,14 @@ struct byte_array_t {
      */
     __host__ static byte_array_t *cpu_from_gpu(byte_array_t *gpu_instances,
                                                uint32_t count);
+
+    /**
+     * Copy data content between two device memories
+     * @param[out] dst the destination memory
+     * @param[in] src the source memory
+     */
+    __host__ __device__ static void transfer_memory(byte_array_t &dst,
+                                                    byte_array_t &src);
 
    private:
     /**

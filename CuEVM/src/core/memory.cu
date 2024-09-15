@@ -10,12 +10,14 @@
 namespace CuEVM {
   namespace memory {
     __host__ __device__ void evm_memory_t::print() const {
+      __ONE_GPU_THREAD_WOSYNC_BEGIN__
       printf("Memory data: \n");
       printf("Size: %d\n", size);
       printf("Memory cost: ");
       memory_cost.print();
       printf("\n");
       data.print();
+      __ONE_GPU_THREAD_WOSYNC_END__
     }
 
     __host__ cJSON* evm_memory_t::to_json() const {

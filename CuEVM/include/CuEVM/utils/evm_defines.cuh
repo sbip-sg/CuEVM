@@ -10,6 +10,9 @@
 // #define EIP_3155
 // trace optional
 // #define EIP_3155_OPTIONAL
+#ifndef EVM_VERSION
+#define EVM_VERSION SHANGHAI
+#endif
 
 #define SHANGHAI_VERSION SHANGHAI
 #define PARIS_VERSION PARIS
@@ -219,6 +222,11 @@ constexpr CONSTANT uint32_t cgbn_tpi = 32;
 constexpr CONSTANT uint32_t max_transactions_count = 10000;
 
 constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
+
+// specific implementation constants
+constexpr CONSTANT uint32_t initial_storage_capacity = 4;
+
+
 /**
  * The CGBN context type.  This is a template type that takes
  * the number of threads per instance and the

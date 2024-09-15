@@ -107,8 +107,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state)
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
@@ -428,8 +428,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state)
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
@@ -462,8 +462,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state,
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state,
         CuEVM::evm_memory_t &memory)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
@@ -612,8 +612,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state)
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
@@ -663,7 +663,7 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        CuEVM::state::TouchState &touch_state,
+        CuEVM::TouchState &touch_state,
         const CuEVM::evm_message_call_t &message)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_LOW);

@@ -160,7 +160,7 @@ namespace CuEVM::utils {
         const bn_t &gas_refund
         #ifdef EIP_3155_OPTIONAL
         , const uint32_t error_code,
-        const CuEVM::state::TouchState &touch_state
+        const CuEVM::TouchState &touch_state
         #endif
     ) {
         bn_t gas_cost;

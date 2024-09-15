@@ -231,7 +231,7 @@ namespace CuEVM {
              */
             __host__ __device__ int32_t access_list_warm_up(
                 ArithEnv &arith,
-                CuEVM::state::AccessState &access_state) const;
+                CuEVM::AccessState &access_state) const;
 
             /**
              * validate the transaction
@@ -246,8 +246,8 @@ namespace CuEVM {
              */
             __host__ __device__ int32_t validate(
                 ArithEnv &arith,
-                CuEVM::state::AccessState &access_state,
-                CuEVM::state::TouchState &touch_state,
+                CuEVM::AccessState &access_state,
+                CuEVM::TouchState &touch_state,
                 CuEVM::block_info_t &block_info,
                 bn_t &gas_used,
                 bn_t &gas_price,
@@ -262,7 +262,7 @@ namespace CuEVM {
              */
             __host__ __device__ int32_t get_message_call(
                 ArithEnv &arith,
-                CuEVM::state::AccessState &access_state,
+                CuEVM::AccessState &access_state,
                 CuEVM::evm_message_call_t* &evm_message_call_ptr) const;
 
             __host__ __device__ void print();

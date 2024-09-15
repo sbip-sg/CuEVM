@@ -252,7 +252,7 @@ namespace CuEVM {
         __host__ __device__ int32_t access_account_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            const CuEVM::state::AccessState &access_state,
+            const CuEVM::AccessState &access_state,
             const bn_t &address);
 
         /**
@@ -267,7 +267,7 @@ namespace CuEVM {
         __host__ __device__ int32_t sload_cost(
             ArithEnv &arith,
             bn_t &gas_used,
-            const CuEVM::state::AccessState &access_state,
+            const CuEVM::AccessState &access_state,
             const bn_t &address,
             const bn_t &key);
         
@@ -287,8 +287,8 @@ namespace CuEVM {
             ArithEnv &arith,
             bn_t &gas_used,
             bn_t &gas_refund,
-            const CuEVM::state::TouchState &touch_state,
-            const CuEVM::state::AccessState &access_state,
+            const CuEVM::TouchState &touch_state,
+            const CuEVM::AccessState &access_state,
             const bn_t &address,
             const bn_t &key,
             const bn_t &value);
