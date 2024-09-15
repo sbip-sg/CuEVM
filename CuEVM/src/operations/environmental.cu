@@ -380,13 +380,15 @@ namespace CuEVM::operations {
 
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
-            CuEVM::byte_array_t data;
-
-            error_code |= arith.byte_array_get_sub(
-                message.get_data(),
-                code_offset,
-                length,
-                data);
+            uint32_t data_offset_ui32, length_ui32;
+            // get values saturated to uint32_max, in overflow case
+            data_offset_ui32 = cgbn_get_ui32(arith.env, code_offset);
+            if (cgbn_compare_ui32(arith.env, code_offset, data_offset_ui32) != 0)
+                data_offset_ui32 = UINT32_MAX;
+            length_ui32 = cgbn_get_ui32(arith.env, length);
+            if (cgbn_compare_ui32(arith.env, length, length_ui32) != 0)
+                length_ui32 = UINT32_MAX;
+            CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
 
             error_code |= memory.set(
                 arith,
