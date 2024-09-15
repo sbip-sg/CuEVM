@@ -86,25 +86,16 @@ namespace CuEVM {
 
   __host__ __device__ byte_array_t& byte_array_t::operator=(
     const byte_array_t &other) {
-      if (this == &other)
-        return *this;
-      if (size != other.size)
-      {
-        if (size > 0)
-        {
-          delete[] data;
+      if (this != &other){
+        if (size!= other.size){
+          if (data!= nullptr)
+            delete[] data;
+          size = other.size;
+          data = (size > 0) ? new uint8_t[size] : nullptr;
         }
-        data = nullptr;
-        size = other.size;
         if (size > 0)
-          data = new uint8_t[size];
+          std::copy(other.data, other.data + size, data);
       }
-      if (size > 0)
-      {
-        std::copy(other.data, other.data + size, data);
-      }
-      else
-        data = nullptr;
       return *this;
   }
 

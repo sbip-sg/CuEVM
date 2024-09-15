@@ -1108,6 +1108,13 @@ namespace CuEVM {
                 }
             }
         }
+
+        if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
+            // abnormal halting where return data ptr is not handled, need to reset it
+            if (call_state_ptr->parent->last_return_data_ptr != nullptr)
+                delete call_state_ptr->parent->last_return_data_ptr;
+            call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
+        }
         // get the memory offset and size of the return data
         // in the parent memory
         bn_t ret_offset, ret_size;
