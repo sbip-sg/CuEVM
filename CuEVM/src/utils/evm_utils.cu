@@ -98,7 +98,7 @@ namespace CuEVM {
             cgbn_store(arith.env, &sender_address_word, sender_address);
             evm_word_t salt_word;
             cgbn_store(arith.env, &salt_word, salt);
-            CuEVM::byte_array_t sender_address_bytes, salt_bytes;
+            CuEVM::byte_array_t sender_address_bytes = CuEVM::byte_array_t(CuEVM::word_size), salt_bytes = CuEVM::byte_array_t(CuEVM::word_size);
             sender_address_word.to_byte_array_t(&sender_address_bytes);
             salt_word.to_byte_array_t(&salt_bytes);
 
