@@ -49,11 +49,8 @@ __host__ __device__ int32_t cgbn_get_size_t(env_t env, size_t &dst,
                   << (idx * 8);
     }
     dst = result;
-    if (cgbn_compare(env, src, tmp) >= 0) {
-        return ERROR_VALUE_OVERFLOW;
-    } else {
-        return ERROR_SUCCESS;
-    }
+    return cgbn_compare(env, src, tmp) == 0 ? ERROR_SUCCESS
+                                            : ERROR_VALUE_OVERFLOW;
 }
 
 __host__ __device__ int32_t cgbn_get_uint64_t(env_t env, uint64_t &dst,
@@ -66,11 +63,8 @@ __host__ __device__ int32_t cgbn_get_uint64_t(env_t env, uint64_t &dst,
                   << (idx * 8);
     }
     dst = result;
-    if (cgbn_compare(env, src, tmp) >= 0) {
-        return ERROR_VALUE_OVERFLOW;
-    } else {
-        return ERROR_SUCCESS;
-    }
+    return cgbn_compare(env, src, tmp) == 0 ? ERROR_SUCCESS
+                                            : ERROR_VALUE_OVERFLOW;
 }
 
 __host__ __device__ int32_t cgbn_get_uint32_t(env_t env, uint32_t &dst,

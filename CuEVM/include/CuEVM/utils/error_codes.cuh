@@ -1,5 +1,9 @@
-#ifndef _CUEVM_ERRORCODES_H_
-#define _CUEVM_ERRORCODES_H_
+// CuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
+// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
+// SPDX-License-Identifier: MIT
+
+#pragma once
 
 // error codes
 #define ERROR_SUCCESS 0x00
@@ -17,11 +21,9 @@
 #define ERROR_INVALID_ZERO_DIVIDE 0x07
 #define ERROR_INVALID_MODULUS 0x08
 
-
 // global storage error codes
 #define ERROR_STATE_ADDRESS_NOT_FOUND 0x09
 #define ERROR_STORAGE_KEY_NOT_FOUND 0x0A
-
 
 // operation not implemented
 #define ERROR_NOT_IMPLEMENTED 0x0B
@@ -44,7 +46,6 @@
 // execution codes
 #define ERROR_INVALID_JUMP_DESTINATION 0x11
 
-
 // static call error
 #define ERROR_STATIC_CALL_CONTEXT 0x14
 
@@ -63,7 +64,6 @@
 #define ERROR_TRANSACTION_BLOCK_GAS_LIMIT 0x1F
 #define ERROR_TRANSACTION_FEES 0x20
 
-
 // message calls
 #define ERROR_MESSAGE_CALL_SENDER_BALANCE 0x20
 #define ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS 0x31
@@ -77,7 +77,6 @@
 #define ERROR_STACK_INVALID_PUSHX_X 0x22
 #define ERROR_STACK_INVALID_DUPX_X 0x23
 
-
 // return data errors
 #define ERROR_RETURN_DATA_INVALID_SIZE 0x24
 #define ERROR_RETURN_DATA_OVERFLOW 0x25
@@ -90,10 +89,8 @@
 #define ERROR_STATIC_CALL_CONTEXT_SELFDESTRUCT 0x2A
 #define ERROR_STATIC_CALL_CONTEXT_CREATE2 0x2B
 
-
 // EVM error codes
-#define ERROR_MAX_DEPTH_EXCEEDED    0x0C
-
+#define ERROR_MAX_DEPTH_EXCEEDED 0x0C
 
 // CREATE errors
 #define ERROR_CREATE2_ADDRESS_ALREADY_EXISTS 0x30
@@ -123,10 +120,8 @@
 // addded errors
 #define ERROR_INSUFFICIENT_FUNDS 0x3B
 
-
 // core errors
 #define ERROR_INVALID_HEX_STRING 0x3C
 #define ERROR_VALUE_NOT_FOUND 0x3D
 #define ERROR_VALUE_OVERFLOW 0x3E
-
-#endif
+#define ERROR_VALUE_UNDERFLOW 0x3F

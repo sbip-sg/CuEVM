@@ -1,6 +1,9 @@
-#ifndef _CUEVM_DEFINES_H_
+// CuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
+// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
+// SPDX-License-Identifier: MIT
 
-#define _CUEVM_DEFINES_H_
+#pragma once
 
 #include <CuEVM/utils/cuda_utils.cuh>
 // tracer activated
@@ -50,7 +53,6 @@
 #error "EVM_VERSION is not defined"
 #endif
 
-
 #ifdef CANCUN
 #define EIP_1153
 #define EIP_4788
@@ -70,7 +72,6 @@
 #define PARIS
 #endif
 
-
 #ifdef PARIS
 #define EIP_3675
 #define EIP_4399
@@ -84,7 +85,6 @@
 #ifdef EIP_5133
 #define EIP_4345
 #endif
-
 
 #ifdef ARROW_GLACIER
 #define EIP_4345
@@ -198,16 +198,17 @@ constexpr CONSTANT uint32_t hash_size = 32;
 constexpr CONSTANT uint32_t max_code_size = 24576;
 #else
 #error "EIP_170 is not defined"
-constexpr CONSTANT uint32_t max_code_size = std::numeric_limits<uint32_t>::max();
+constexpr CONSTANT uint32_t max_code_size =
+    std::numeric_limits<uint32_t>::max();
 #endif
 
 #ifdef EIP_3860
 constexpr CONSTANT uint32_t max_initcode_size = 2 * max_code_size;
 #else
 #error "EIP_3860 is not defined"
-constexpr CONSTANT uint32_t max_initcode_size = std::numeric_limits<uint32_t>::max();
+constexpr CONSTANT uint32_t max_initcode_size =
+    std::numeric_limits<uint32_t>::max();
 #endif
-
 
 constexpr CONSTANT uint32_t no_precompile_contracts = 10;
 
@@ -222,27 +223,26 @@ constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
  * The CGBN context type.  This is a template type that takes
  * the number of threads per instance and the
  * parameters class as template parameters.
-*/
+ */
 #if defined(__CUDA_ARCH__)
-  using context_t = cgbn_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+using context_t = cgbn_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 #else
-  using context_t = cgbn_host_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+using context_t =
+    cgbn_host_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 #endif
 
 /**
  * The CGBN environment type. This is a template type that takes the
  * context type as a template parameter. It provides the CGBN functions.
-*/
+ */
 using env_t = cgbn_env_t<context_t, CuEVM::word_bits>;
 
 /**
  * The CGBN base type for the given number of bit in environment.
-*/
+ */
 using bn_t = env_t::cgbn_t;
 /**
  * The CGBN wide type with double the given number of bits in environment.
-*/
+ */
 using bn_wide_t = env_t::cgbn_wide_t;
-} // namespace CuEVM
-
-#endif
+}  // namespace CuEVM

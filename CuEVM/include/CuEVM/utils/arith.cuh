@@ -3,8 +3,7 @@
 // Programme) Author: Stefan-Dan Ciocirlan Data: 2023-11-30
 // SPDX-License-Identifier: MIT
 
-#ifndef _CUEVM_ARITH_H_
-#define _CUEVM_ARITH_H_
+#pragma once
 
 #include <CGBN/cgbn.h>
 #include <cuda.h>
@@ -132,5 +131,3 @@ __host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
  */
 __host__ __device__ void evm_address_conversion(ArithEnv &arith, bn_t &address);
 }  // namespace CuEVM
-
-#endif
