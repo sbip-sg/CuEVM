@@ -83,6 +83,13 @@ namespace CuEVM
          */
         __host__ __device__ void clear();
 
+        /**
+         * Assigment operator for the account data structure.
+         * @param[in] other The other account data structure
+         * @return The current account data structure
+         */
+        __host__ __device__ account_t &operator=(
+            const account_t &other);
 
         /**
          * Get the storage value for the given key.

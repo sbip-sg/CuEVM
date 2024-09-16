@@ -88,6 +88,20 @@ __host__ void account_t::free_managed() {
 
 __host__ __device__ void account_t::clear() { empty(); }
 
+__host__ __device__ account_t &account_t::operator=(const account_t &other) {
+    if (this != &other) {
+        free();
+        __ONE_GPU_THREAD_BEGIN__
+        memcpy(&address, &other.address, sizeof(evm_word_t));
+        memcpy(&balance, &other.balance, sizeof(evm_word_t));
+        memcpy(&nonce, &other.nonce, sizeof(evm_word_t));
+        __ONE_GPU_THREAD_END__
+        byte_code = other.byte_code;
+        storage = other.storage;
+    }
+    return *this;
+}
+
 __host__ __device__ int32_t account_t::get_storage_value(ArithEnv &arith,
                                                          const bn_t &key,
                                                          bn_t &value) {
@@ -192,8 +206,12 @@ __host__ __device__ int32_t account_t::is_contract() {
 
 __host__ __device__ void account_t::empty() {
     __ONE_GPU_THREAD_BEGIN__
-    memset(this, 0, sizeof(account_t));
+    memset(&address, 0, sizeof(evm_word_t));
+    memset(&balance, 0, sizeof(evm_word_t));
+    memset(&nonce, 0, sizeof(evm_word_t));
     __ONE_GPU_THREAD_END__
+    byte_code.clear();
+    storage.clear();
 }
 
 __host__ void account_t::from_json(const cJSON *account_json, int32_t managed) {

@@ -22,3 +22,5 @@ run-ethtest-by-fork.log
 dtmp
 cuevm.out
 geth.out
+*.out
+*.jsonl

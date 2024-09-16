@@ -93,6 +93,9 @@ __host__ __device__ int32_t state_access_t::add_duplicate_account(
     __ONE_GPU_THREAD_END__
     int32_t error_code = add_account(*tmp_account_ptr, flag);
     account_ptr = &accounts[no_accounts - 1];
+    __ONE_GPU_THREAD_BEGIN__
+    delete tmp_account_ptr;
+    __ONE_GPU_THREAD_END__
     return error_code;
 }
 
@@ -106,6 +109,9 @@ __host__ __device__ int32_t state_access_t::add_new_account(
     tmp_account_ptr->set_address(arith, address);
     int32_t error_code = add_account(*account_ptr, flag);
     account_ptr = &accounts[no_accounts - 1];
+    __ONE_GPU_THREAD_BEGIN__
+    delete tmp_account_ptr;
+    __ONE_GPU_THREAD_END__
     return error_code;
 }
 
@@ -137,12 +143,11 @@ state_access_t::update_account(ArithEnv &arith, const CuEVM::account_t &account,
 
 __host__ __device__ int32_t
 state_access_t::update(ArithEnv &arith, const state_access_t &other) {
-    uint32_t index = 0;
     for (uint32_t i = 0; i < other.no_accounts; i++) {
         // if update failed (not exist), add the account
         if (update_account(arith, other.accounts[i], other.flags[i]) !=
             ERROR_SUCCESS) {
-            add_account(other.accounts[i], index);
+            add_account(other.accounts[i], other.flags[i]);
             flags[no_accounts - 1] = other.flags[i];
         }
     }

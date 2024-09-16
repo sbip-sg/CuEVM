@@ -122,7 +122,7 @@ TEST(ByteArrayTests, ToHex) {
     CuEVM::byte_array_t byteArray(data, 3);
     char* hexString = byteArray.to_hex();
     EXPECT_STREQ(hexString, "0x123456");
-    free(hexString);
+    delete[] hexString;
 }
 
 TEST(ByteArrayTests, FromHexSetLE) {

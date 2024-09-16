@@ -96,12 +96,16 @@ state_t::add_account(const CuEVM::account_t &account) {
     tmp_accounts = new CuEVM::account_t[no_accounts + 1];
     memcpy(tmp_accounts, accounts, no_accounts * sizeof(CuEVM::account_t));
     __ONE_GPU_THREAD_END__
+    tmp_accounts[no_accounts].clear();
     tmp_accounts[no_accounts] = account;
-    __ONE_GPU_THREAD_BEGIN__
     if (accounts != nullptr) {
+        for (uint32_t idx = 0; idx < no_accounts; idx++) {
+            accounts[idx].clear();
+        }
+        __ONE_GPU_THREAD_BEGIN__
         delete[] accounts;
+        __ONE_GPU_THREAD_END__
     }
-    __ONE_GPU_THREAD_END__
     accounts = tmp_accounts;
     no_accounts++;
     return ERROR_SUCCESS;

@@ -106,6 +106,8 @@ __host__ __device__ byte_array_t &byte_array_t::operator=(
             if (data!= nullptr)
                 delete[] data;
             tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
+        } else {
+            tmp_data = data;
         }
         if (other.size > 0) {
             memcpy(tmp_data, other.data, other.size * sizeof(uint8_t));
@@ -278,7 +280,15 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian,
         data = nullptr;
         return ERROR_INVALID_HEX_STRING;
     }
-    size = (size == 0) ? (length + 1) / 2 : size;
+    uint32_t new_size = (size == 0) ? (length + 1) / 2 : size;
+    if (size > 0) {
+        if (managed) {
+            free_managed();
+        } else {
+            free();
+        }
+    }
+    size = new_size;
     if (size > 0) {
         if (managed) {
             CUDA_CHECK(
