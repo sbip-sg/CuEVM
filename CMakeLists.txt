@@ -6,7 +6,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 option(DOCS "Generating the documentation for the code" OFF)
-option(CPU "Generating the CPU version of CuEVM " OFF)
+option(CPU "Generating the CPU version of CuEVM " ON)
 option(GPU "Generating the GPU version of CuEVM " OFF)
 option(ENABLE_EIP_3155 "Enable EIP_3155 tracer" ON)
 option(ENABLE_EIP_3155_OPTIONAL "Enable EIP_3155 optional tracer" ON)
