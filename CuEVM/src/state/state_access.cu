@@ -118,7 +118,7 @@ __host__ __device__ int32_t state_access_t::add_new_account(
 __host__ __device__ int32_t
 state_access_t::set_account(ArithEnv &arith, const CuEVM::account_t &account,
                             const CuEVM::account_flags_t flag) {
-    if (update_account(arith, account, flag)) {
+    if (update_account(arith, account, flag) != ERROR_SUCCESS) {
         return add_account(account, flag);
     } else {
         return ERROR_SUCCESS;

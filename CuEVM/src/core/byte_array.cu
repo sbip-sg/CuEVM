@@ -103,16 +103,14 @@ __host__ __device__ byte_array_t &byte_array_t::operator=(
     if (this != &other) {
         __ONE_GPU_THREAD_BEGIN__
         if (size != other.size) {
-            if (data!= nullptr)
-                delete[] data;
+            free();
             tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
         } else {
             tmp_data = data;
         }
         if (other.size > 0) {
             memcpy(tmp_data, other.data, other.size * sizeof(uint8_t));
-        } else
-            tmp_data = nullptr;
+        }
         __ONE_GPU_THREAD_END__
         data = tmp_data;
         size = other.size;

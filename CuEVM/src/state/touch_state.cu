@@ -115,7 +115,7 @@ __host__ __device__ int32_t TouchState::set_balance(ArithEnv &arith,
     _access_state->get_account(arith, address, account_ptr,
                                ACCOUNT_BALANCE_FLAG);
     if (_state->get_account(arith, address, account_ptr,
-                            ACCOUNT_BALANCE_FLAG)) {
+                            ACCOUNT_BALANCE_FLAG) != ERROR_SUCCESS) {
         add_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG);
     }
     account_ptr->set_balance(arith, balance);
