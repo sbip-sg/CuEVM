@@ -18,12 +18,12 @@
 namespace CuEVM {
     __host__ __device__  evm_t::evm_t(
         ArithEnv &arith,
-        CuEVM::state::state_t *world_state_data_ptr,
+        CuEVM::state_t *world_state_data_ptr,
         CuEVM::block_info_t* block_info_ptr,
         CuEVM::evm_transaction_t* transaction_ptr,
-        CuEVM::state::state_access_t *access_state_data_ptr,
-        CuEVM::state::state_access_t *touch_state_data_ptr,
-        CuEVM::state::log_state_data_t* log_state_ptr,
+        CuEVM::state_access_t *access_state_data_ptr,
+        CuEVM::state_access_t *touch_state_data_ptr,
+        CuEVM::log_state_data_t* log_state_ptr,
         CuEVM::evm_return_data_t* return_data_ptr
         #ifdef EIP_3155
         , CuEVM::utils::tracer_t* tracer_ptr
@@ -100,7 +100,7 @@ namespace CuEVM {
 
 
     __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
-        bn_t sender, recipient, value, sender_balance, recipient_balance;
+        bn_t sender, recipient, value;
         call_state_ptr->message_ptr->get_sender(arith, sender);
         call_state_ptr->message_ptr->get_recipient(arith, recipient);
         call_state_ptr->message_ptr->get_value(arith, value);
@@ -119,7 +119,7 @@ namespace CuEVM {
             ERROR_SUCCESS
         );
         // warmup the accounts
-        CuEVM::account::account_t* account_ptr;
+        CuEVM::account_t* account_ptr;
         error_code |= call_state_ptr->touch_state.get_account(arith, sender, account_ptr, ACCOUNT_NONE_FLAG);
         error_code |= call_state_ptr->touch_state.get_account(arith, recipient, account_ptr, ACCOUNT_BYTE_CODE_FLAG);
 
@@ -135,7 +135,7 @@ namespace CuEVM {
             error_code |= call_state_ptr->touch_state.get_nonce(arith, sender, sender_nonce);
             cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
             uint64_t nonce;
-            error_code |= arith.uint64_t_from_cgbn(nonce, sender_nonce) == 1 ?  ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED : ERROR_SUCCESS;
+            error_code |= cgbn_get_uint64_t(arith.env, nonce, sender_nonce) == ERROR_VALUE_OVERFLOW ?  ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED : ERROR_SUCCESS;
         } else {
             error_code |= call_state_ptr->depth > CuEVM::max_depth ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
             if (account_ptr->byte_code.size == 0) {
@@ -1108,6 +1108,13 @@ namespace CuEVM {
                 }
             }
         }
+
+        if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
+            // abnormal halting where return data ptr is not handled, need to reset it
+            if (call_state_ptr->parent->last_return_data_ptr != nullptr)
+                delete call_state_ptr->parent->last_return_data_ptr;
+            call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
+        }
         // get the memory offset and size of the return data
         // in the parent memory
         bn_t ret_offset, ret_size;
@@ -1157,7 +1164,7 @@ namespace CuEVM {
         // to see if the contract is a contract
         bn_t sender_address;
         call_state_ptr->message_ptr->get_sender(arith, sender_address);
-        CuEVM::account::account_t *sender_account;
+        CuEVM::account_t *sender_account;
         call_state_ptr->parent->touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_BYTE_CODE_FLAG);
         if (sender_account->is_contract()) {
             bn_t sender_nonce;
@@ -1183,7 +1190,9 @@ namespace CuEVM {
             // compute the address of the contract
             bn_t contract_address;
             call_state_ptr->message_ptr->get_recipient(arith, contract_address);
+            #ifdef EIP_3541
             uint8_t *code = call_state_ptr->last_return_data_ptr->data;
+            #endif
             uint32_t code_size = call_state_ptr->last_return_data_ptr->size;
             if (code_size <= CuEVM::max_code_size) {
                 #ifdef EIP_3541
@@ -1211,7 +1220,7 @@ namespace CuEVM {
         int32_t managed
     ) {
         // get the world state
-        CuEVM::state::state_t *world_state_data_ptr = nullptr;
+        CuEVM::state_t *world_state_data_ptr = nullptr;
         const cJSON *world_state_json = NULL; // the json for the world state
         // get the world state json
         if (cJSON_IsObject(test_json))
@@ -1221,7 +1230,8 @@ namespace CuEVM {
         else
             return 1;
 
-        world_state_data_ptr = new CuEVM::state::state_t(world_state_json, managed);
+        world_state_data_ptr = new CuEVM::state_t();
+        world_state_data_ptr->from_json(world_state_json, managed);
 
         // get the block info
         CuEVM::block_info_t* block_info_ptr = nullptr;
@@ -1247,49 +1257,48 @@ namespace CuEVM {
                 num_transactions * sizeof(evm_instance_t)
             ));
         }
-        uint32_t index = 0;
         for (uint32_t index = 0; index < num_transactions; index++) {
             evm_instances[index].world_state_data_ptr = world_state_data_ptr;
             evm_instances[index].block_info_ptr = block_info_ptr;
             evm_instances[index].transaction_ptr = &transactions_ptr[index];
             if (managed == 0) {
-                evm_instances[index].access_state_data_ptr = new CuEVM::state::state_access_t();
-                evm_instances[index].touch_state_data_ptr = new CuEVM::state::state_access_t();
-                evm_instances[index].log_state_ptr = new CuEVM::state::log_state_data_t();
+                evm_instances[index].access_state_data_ptr = new CuEVM::state_access_t();
+                evm_instances[index].touch_state_data_ptr = new CuEVM::state_access_t();
+                evm_instances[index].log_state_ptr = new CuEVM::log_state_data_t();
                 evm_instances[index].return_data_ptr = new CuEVM::evm_return_data_t();
                 #ifdef EIP_3155
                 evm_instances[index].tracer_ptr = new CuEVM::utils::tracer_t();
                 #endif
             } else {
-                CuEVM::state::state_access_t *access_state = new CuEVM::state::state_access_t();
+                CuEVM::state_access_t *access_state = new CuEVM::state_access_t();
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].access_state_data_ptr,
-                    sizeof(CuEVM::state::state_access_t)
+                    sizeof(CuEVM::state_access_t)
                 ));
                 memcpy(
                     evm_instances[index].access_state_data_ptr,
                     access_state,
-                    sizeof(CuEVM::state::state_access_t)
+                    sizeof(CuEVM::state_access_t)
                 );
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].touch_state_data_ptr,
-                    sizeof(CuEVM::state::state_access_t)
+                    sizeof(CuEVM::state_access_t)
                 ));
                 memcpy(
                     evm_instances[index].touch_state_data_ptr,
                     access_state,
-                    sizeof(CuEVM::state::state_access_t)
+                    sizeof(CuEVM::state_access_t)
                 );
                 delete access_state;
-                CuEVM::state::log_state_data_t *log_state = new CuEVM::state::log_state_data_t();
+                CuEVM::log_state_data_t *log_state = new CuEVM::log_state_data_t();
                 CUDA_CHECK(cudaMallocManaged(
                     &evm_instances[index].log_state_ptr,
-                    sizeof(CuEVM::state::log_state_data_t)
+                    sizeof(CuEVM::log_state_data_t)
                 ));
                 memcpy(
                     evm_instances[index].log_state_ptr,
                     log_state,
-                    sizeof(CuEVM::state::log_state_data_t)
+                    sizeof(CuEVM::log_state_data_t)
                 );
                 delete log_state;
                 CuEVM::evm_return_data_t *return_data = new CuEVM::evm_return_data_t();
@@ -1319,6 +1328,7 @@ namespace CuEVM {
             }
         }
         num_instances = num_transactions;
+        return ERROR_SUCCESS;
     }
 
     __host__ void free_evm_instances(

@@ -10,12 +10,14 @@
 namespace CuEVM {
   namespace memory {
     __host__ __device__ void evm_memory_t::print() const {
+      __ONE_GPU_THREAD_WOSYNC_BEGIN__
       printf("Memory data: \n");
       printf("Size: %d\n", size);
       printf("Memory cost: ");
       memory_cost.print();
       printf("\n");
       data.print();
+      __ONE_GPU_THREAD_WOSYNC_END__
     }
 
     __host__ cJSON* evm_memory_t::to_json() const {
@@ -79,12 +81,12 @@ namespace CuEVM {
       int32_t overflow = 0;
       bn_t offset_bn;
       overflow = cgbn_add(arith.env, offset_bn, index, length);
-      overflow |= arith.uint32_t_from_cgbn(offset, offset_bn);
+      overflow |= cgbn_get_uint32_t(arith.env, offset, offset_bn);
       bn_t memory_size;
       overflow |= cgbn_add_ui32(arith.env, memory_size, offset_bn, 31);
       cgbn_div_ui32(arith.env, memory_size, memory_size, 32);
       overflow |= cgbn_mul_ui32(arith.env, offset_bn, memory_size, 32);
-      overflow |= arith.uint32_t_from_cgbn(offset, offset_bn);
+      overflow |= cgbn_get_uint32_t(arith.env, offset, offset_bn);
 
       return overflow;
     }
@@ -116,8 +118,8 @@ namespace CuEVM {
       error_code |= grow(arith, index, length);
       if (error_code == ERROR_SUCCESS) {
         uint32_t index_u32, length_u32;
-        arith.uint32_t_from_cgbn(index_u32, index);
-        arith.uint32_t_from_cgbn(length_u32, length);
+        error_code |= cgbn_get_uint32_t(arith.env, index_u32, index);
+        error_code |= cgbn_get_uint32_t(arith.env, length_u32, length);
         data = CuEVM::byte_array_t(this->data.data + index_u32, length_u32);
       } else {
         data = CuEVM::byte_array_t();
@@ -136,12 +138,10 @@ namespace CuEVM {
       error_code |= grow(arith, index, length);
       if (error_code == ERROR_SUCCESS) {
         uint32_t index_u32, length_u32;
-        arith.uint32_t_from_cgbn(index_u32, index);
-        arith.uint32_t_from_cgbn(length_u32, length);
-
-        if (length_u32 && data.size) {
-          // memcpy(this->data.data + index_u32, data.data, min(length_u32,data.size));
-          std::copy(data.data, data.data + min(length_u32,data.size), this->data.data + index_u32);
+        error_code |= cgbn_get_uint32_t(arith.env, index_u32, index);
+        error_code |= cgbn_get_uint32_t(arith.env, length_u32, length);
+        if (data.size > 0) {
+          memcpy(this->data.data + index_u32, data.data, min(length_u32, data.size));
         }
       }
       return error_code;

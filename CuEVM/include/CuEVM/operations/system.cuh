@@ -46,7 +46,7 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t CREATE(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr);
 
@@ -60,7 +60,7 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t CALL(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr);
 
@@ -74,7 +74,7 @@ namespace CuEVM::operations
     */
     __host__ __device__ int32_t CALLCODE(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr);
 
@@ -105,7 +105,7 @@ namespace CuEVM::operations
     */
     __host__ __device__ int32_t DELEGATECALL(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr);
 
@@ -119,7 +119,7 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t CREATE2(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr);
 
@@ -133,7 +133,7 @@ namespace CuEVM::operations
     */
     __host__ __device__ int32_t STATICCALL(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr);
 
@@ -177,7 +177,7 @@ namespace CuEVM::operations
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_message_call_t &message,
-        CuEVM::state::TouchState &touch_state,
+        CuEVM::TouchState &touch_state,
         CuEVM::evm_return_data_t &return_data);
 } // namespace CuEVM::operation
 

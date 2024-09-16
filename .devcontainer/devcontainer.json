@@ -18,7 +18,8 @@
 				"ccimage.jsonviewer",
 				"xaver.clang-format",
 				"ms-vscode.makefile-tools",
-				"github.vscode-github-actions"
+				"github.vscode-github-actions",
+				"twxs.cmake"
 			]
 		}
 	}//,

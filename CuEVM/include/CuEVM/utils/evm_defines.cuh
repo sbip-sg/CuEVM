@@ -1,14 +1,60 @@
-#ifndef _CUEVM_DEFINES_H_
+// CuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
+// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
+// SPDX-License-Identifier: MIT
 
-#define _CUEVM_DEFINES_H_
+#pragma once
 
 #include <CuEVM/utils/cuda_utils.cuh>
 // tracer activated
-#define EIP_3155
+// #define EIP_3155
 // trace optional
-#define EIP_3155_OPTIONAL
+// #define EIP_3155_OPTIONAL
+#ifndef EVM_VERSION
+#define EVM_VERSION SHANGHAI
+#endif
 
+#define SHANGHAI_VERSION SHANGHAI
+#define PARIS_VERSION PARIS
+#define BERLIN_VERSION BERLIN
+#define LONDON_VERSION LONDON
+#define ISTANBUL_VERSION ISTANBUL
+#define CONSTANTINOPLE_VERSION CONSTANTINOPLE
+#define BYZANTIUM_VERSION BYZANTIUM
+#define TANGARINE_VERSION TANGARINE
+#define DRAGON_VERSION DRAGON
+#define HOMESTEAD_VERSION HOMESTEAD
+#define CANCUN_VERSION CANCUN
+
+#ifdef EVM_VERSION
+#if (EVM_VERSION == SHANGHAI_VERSION)
 #define SHANGHAI
+#elif (EVM_VERSION == PARIS_VERSION)
+#define PARIS
+#elif (EVM_VERSION == BERLIN_VERSION)
+#define BERLIN
+#elif (EVM_VERSION == LONDON_VERSION)
+#define LONDON
+#elif (EVM_VERSION == ISTANBUL_VERSION)
+#define ISTANBUL
+#elif (EVM_VERSION == CONSTANTINOPLE_VERSION)
+#define CONSTANTINOPLE
+#elif (EVM_VERSION == BYZANTIUM_VERSION)
+#define BYZANTIUM
+#elif (EVM_VERSION == TANGARINE_VERSION)
+#define TANGARINE
+#elif (EVM_VERSION == DRAGON_VERSION)
+#define DRAGON
+#elif (EVM_VERSION == HOMESTEAD_VERSION)
+#define HOMESTEAD
+#elif (EVM_VERSION == CANCUN_VERSION)
+#define CANCUN
+#else
+#error "EVM_VERSION is badly defined"
+#endif
+#else
+#error "EVM_VERSION is not defined"
+#endif
 
 #ifdef CANCUN
 #define EIP_1153
@@ -29,7 +75,6 @@
 #define PARIS
 #endif
 
-
 #ifdef PARIS
 #define EIP_3675
 #define EIP_4399
@@ -43,7 +88,6 @@
 #ifdef EIP_5133
 #define EIP_4345
 #endif
-
 
 #ifdef ARROW_GLACIER
 #define EIP_4345
@@ -157,16 +201,17 @@ constexpr CONSTANT uint32_t hash_size = 32;
 constexpr CONSTANT uint32_t max_code_size = 24576;
 #else
 #error "EIP_170 is not defined"
-constexpr CONSTANT uint32_t max_code_size = std::numeric_limits<uint32_t>::max();
+constexpr CONSTANT uint32_t max_code_size =
+    std::numeric_limits<uint32_t>::max();
 #endif
 
 #ifdef EIP_3860
 constexpr CONSTANT uint32_t max_initcode_size = 2 * max_code_size;
 #else
 #error "EIP_3860 is not defined"
-constexpr CONSTANT uint32_t max_initcode_size = std::numeric_limits<uint32_t>::max();
+constexpr CONSTANT uint32_t max_initcode_size =
+    std::numeric_limits<uint32_t>::max();
 #endif
-
 
 constexpr CONSTANT uint32_t no_precompile_contracts = 10;
 
@@ -176,6 +221,36 @@ constexpr CONSTANT uint32_t cgbn_tpi = 32;
 // CUEVM parameters
 constexpr CONSTANT uint32_t max_transactions_count = 10000;
 
-} // namespace CuEVM
+constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
 
+// specific implementation constants
+constexpr CONSTANT uint32_t initial_storage_capacity = 4;
+
+
+/**
+ * The CGBN context type.  This is a template type that takes
+ * the number of threads per instance and the
+ * parameters class as template parameters.
+ */
+#if defined(__CUDA_ARCH__)
+using context_t = cgbn_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+#else
+using context_t =
+    cgbn_host_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 #endif
+
+/**
+ * The CGBN environment type. This is a template type that takes the
+ * context type as a template parameter. It provides the CGBN functions.
+ */
+using env_t = cgbn_env_t<context_t, CuEVM::word_bits>;
+
+/**
+ * The CGBN base type for the given number of bit in environment.
+ */
+using bn_t = env_t::cgbn_t;
+/**
+ * The CGBN wide type with double the given number of bits in environment.
+ */
+using bn_wide_t = env_t::cgbn_wide_t;
+}  // namespace CuEVM

@@ -43,7 +43,7 @@ namespace CuEVM::operations {
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_memory_t &memory,
         const CuEVM::evm_message_call_t &message,
-        CuEVM::state::log_state_data_t &log_state,
+        CuEVM::log_state_data_t &log_state,
         const uint8_t &opcode);  
 }
 

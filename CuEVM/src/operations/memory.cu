@@ -50,9 +50,10 @@ namespace CuEVM::operations {
 
 
             bn_t value;
-            error_code |= arith.byte_array_to_bn_t(data, value);
+            error_code |= cgbn_set_byte_array_t(arith.env, value, data);
             error_code |= stack.push(arith, value);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t MSTORE(
@@ -94,8 +95,8 @@ namespace CuEVM::operations {
             CuEVM::byte_array_t value_bytes(CuEVM::word_size);
             evm_word_t value_word;
             cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &value_word, value);
-
-            value_word.to_byte_array_t(&value_bytes);
+            
+            value_word.to_byte_array_t(value_bytes);
 
             error_code |= memory.set(
                 arith,
@@ -144,8 +145,8 @@ namespace CuEVM::operations {
             CuEVM::byte_array_t value_bytes(CuEVM::word_size);
             evm_word_t value_word;
             cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &value_word, value);
-
-            value_word.to_byte_array_t(&value_bytes);
+            
+            value_word.to_byte_array_t(value_bytes);
 
             CuEVM::byte_array_t value_byte(
                 value_bytes.data + CuEVM::word_size - 1,

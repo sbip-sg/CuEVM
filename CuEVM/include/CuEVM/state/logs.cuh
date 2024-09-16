@@ -12,7 +12,7 @@
 #include <cjson/cJSON.h>
 
 
-namespace CuEVM::state {
+namespace CuEVM {
     constexpr CONSTANT uint32_t log_page_size = 20U; /**< The log page size*/
     /**
      * The log data structure.

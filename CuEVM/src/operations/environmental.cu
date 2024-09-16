@@ -68,9 +68,10 @@ namespace CuEVM::operations {
                         hash->data,
                         hash->size);
                     bn_t hash_bn;
-                    error_code |= arith.byte_array_to_bn_t(
-                        *hash,
-                        hash_bn);
+                    error_code |= cgbn_set_byte_array_t(
+                        arith.env,
+                        hash_bn,
+                        *hash);
                     delete hash;
                     error_code |= stack.push(arith, hash_bn);
                 }
@@ -106,8 +107,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state)
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
@@ -154,6 +155,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, origin);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t CALLER(
@@ -175,6 +177,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, caller);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t CALLVALUE(
@@ -196,6 +199,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, call_value);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t CALLDATALOAD(
@@ -218,7 +222,8 @@ namespace CuEVM::operations {
             cgbn_set_ui32(arith.env, length, CuEVM::word_size);
 
             CuEVM::byte_array_t data;
-            error_code |= arith.byte_array_get_sub(
+            error_code |= get_sub_byte_array_t(
+                arith,
                 message.get_data(),
                 index,
                 length,
@@ -380,13 +385,15 @@ namespace CuEVM::operations {
 
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
-            CuEVM::byte_array_t data;
-
-            error_code |= arith.byte_array_get_sub(
-                message.get_data(),
-                code_offset,
-                length,
-                data);
+            uint32_t data_offset_ui32, length_ui32;
+            // get values saturated to uint32_max, in overflow case
+            data_offset_ui32 = cgbn_get_ui32(arith.env, code_offset);
+            if (cgbn_compare_ui32(arith.env, code_offset, data_offset_ui32) != 0)
+                data_offset_ui32 = UINT32_MAX;
+            length_ui32 = cgbn_get_ui32(arith.env, length);
+            if (cgbn_compare_ui32(arith.env, length, length_ui32) != 0)
+                length_ui32 = UINT32_MAX;
+            CuEVM::byte_array_t data(message.get_data(), data_offset_ui32, length_ui32);
 
             error_code |= memory.set(
                 arith,
@@ -424,8 +431,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state)
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
@@ -458,8 +465,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state,
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state,
         CuEVM::evm_memory_t &memory)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
@@ -504,13 +511,16 @@ namespace CuEVM::operations {
                 arith,
                 address,
                 byte_code);
-            CuEVM::byte_array_t data;
 
-            error_code |= arith.byte_array_get_sub(
-                byte_code,
-                code_offset,
-                length,
-                data);
+            uint32_t data_offset_ui32, length_ui32;
+            // get values saturated to uint32_max, in overflow case
+            data_offset_ui32 = cgbn_get_ui32(arith.env, code_offset);
+            if (cgbn_compare_ui32(arith.env, code_offset, data_offset_ui32) != 0)
+                data_offset_ui32 = UINT32_MAX;
+            length_ui32 = cgbn_get_ui32(arith.env, length);
+            if (cgbn_compare_ui32(arith.env, length, length_ui32) != 0)
+                length_ui32 = UINT32_MAX;
+            CuEVM::byte_array_t data(byte_code, data_offset_ui32, length_ui32);
 
             error_code |= memory.set(
                 arith,
@@ -540,6 +550,7 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, length);
         }
+        return error_code;
     }
 
     __host__ __device__ int32_t RETURNDATACOPY(
@@ -577,20 +588,24 @@ namespace CuEVM::operations {
             memory_expansion_cost,
             gas_used);
 
-        error_code = CuEVM::gas_cost::has_gas(
+        error_code |= CuEVM::gas_cost::has_gas(
             arith,
             gas_limit,
             gas_used);
 
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(arith, memory_expansion_cost);
-            CuEVM::byte_array_t data;
 
-            error_code |= arith.byte_array_get_sub(
-                return_data,
-                data_offset,
-                length,
-                data);
+            uint32_t data_offset_ui32, length_ui32;
+            // get values saturated to uint32_max, in overflow case
+            data_offset_ui32 = cgbn_get_ui32(arith.env, data_offset);
+            if (cgbn_compare_ui32(arith.env, data_offset, data_offset_ui32) != 0)
+                data_offset_ui32 = UINT32_MAX;
+            length_ui32 = cgbn_get_ui32(arith.env, length);
+            if (cgbn_compare_ui32(arith.env, length, length_ui32) != 0)
+                length_ui32 = UINT32_MAX;
+            CuEVM::byte_array_t data(return_data, data_offset_ui32, length_ui32);
+
 
             error_code |= memory.set(
                 arith,
@@ -606,8 +621,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state)
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state)
     {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t address;
@@ -641,9 +656,10 @@ namespace CuEVM::operations {
                 byte_code.size,
                 hash.data,
                 hash.size);
-            error_code |= arith.byte_array_to_bn_t(
-                hash,
-                hash_bn);
+            error_code |= cgbn_set_byte_array_t(
+                arith.env,
+                hash_bn,
+                hash);
         }
         error_code |= stack.push(
             arith,
@@ -656,7 +672,7 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        CuEVM::state::TouchState &touch_state,
+        CuEVM::TouchState &touch_state,
         const CuEVM::evm_message_call_t &message)
     {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_LOW);
@@ -677,5 +693,6 @@ namespace CuEVM::operations {
 
             error_code |= stack.push(arith, balance);
         }
+        return error_code;
     }
 }

@@ -5,10 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "CUDA C++: Tests Launch",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/cuevm_tests"
+        },
+        {
             "name": "CUDA C++: Launch",
             "type": "cuda-gdb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/cuevm_interpreter_CPU",
+            "program": "${workspaceFolder}/build/cuevm_CPU",
             "args": "--input ${workspaceFolder}/input/evm_arith.json --output ${workspaceFolder}/output/evm_test.json",
         },
         {

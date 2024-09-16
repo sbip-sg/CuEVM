@@ -14,8 +14,8 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state,
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state,
         const CuEVM::evm_message_call_t &message) {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t key;
@@ -50,8 +50,8 @@ namespace CuEVM::operations {
         bn_t &gas_used,
         bn_t &gas_refund,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::state::AccessState &access_state,
-        CuEVM::state::TouchState &touch_state,
+        const CuEVM::AccessState &access_state,
+        CuEVM::TouchState &touch_state,
         const CuEVM::evm_message_call_t &message)
     {
         // only if is not a static call

@@ -21,7 +21,7 @@ namespace CuEVM::operations {
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_memory_t &memory,
         const CuEVM::evm_message_call_t &message,
-        CuEVM::state::log_state_data_t &log_state,
+        CuEVM::log_state_data_t &log_state,
         const uint8_t &opcode)
     {
         int32_t error_code = (
@@ -102,5 +102,6 @@ namespace CuEVM::operations {
                     no_topics);
             }
         }
+        return error_code;
     }
 }

@@ -30,7 +30,11 @@ namespace CuEVM::operations {
             bn_t hash;
             // even if error of invalid number/index, the hash is set to zero
             uint32_t tmp_error_code;
-            error_code |= block.get_previous_hash(arith, hash, number);
+            tmp_error_code = block.get_previous_hash(arith, hash, number);
+            if (tmp_error_code != ERROR_SUCCESS)
+            {
+                cgbn_set_ui32(arith.env, hash, 0);
+            }
 
             error_code |= stack.push(arith, hash);
         }

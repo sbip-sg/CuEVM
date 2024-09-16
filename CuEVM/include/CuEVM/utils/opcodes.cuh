@@ -1,5 +1,9 @@
-#ifndef _EVM_OPCODES_H_
-#define _EVM_OPCODES_H_
+// CuEVM: CUDA Ethereum Virtual Machine implementation
+// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
+// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
+// SPDX-License-Identifier: MIT
+
+#pragma once
 
 // artithmetic
 #define OP_STOP 0x00
@@ -62,7 +66,6 @@
 #define OP_CHAINID 0x46
 #define OP_SELFBALANCE 0x47
 #define OP_BASEFEE 0x48
-
 
 // stack, memory, storage and flow operations
 #define OP_POP 0x50
@@ -167,5 +170,3 @@
 #define OP_REVERT 0xFD
 #define OP_INVALID 0xFE
 #define OP_SELFDESTRUCT 0xFF
-
-#endif

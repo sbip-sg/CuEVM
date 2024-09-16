@@ -18,7 +18,7 @@ namespace CuEVM::operations
         ArithEnv &arith,
         const bn_t &args_offset,
         const bn_t &args_size,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)
     {
@@ -134,7 +134,7 @@ namespace CuEVM::operations
                 arith,
                 memory_expansion_cost);
             // set the byte code
-            CuEVM::account::account_t *contract;
+            CuEVM::account_t *contract;
             error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
 
             new_state_ptr->message_ptr->set_byte_code(
@@ -159,7 +159,7 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t generic_CREATE(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr,
         const uint32_t opcode
@@ -234,7 +234,7 @@ namespace CuEVM::operations
             }
             else
             {
-                CuEVM::account::account_t *sender_account;
+                CuEVM::account_t *sender_account;
                 access_state.get_account(arith, contract_address, sender_account, ACCOUNT_NONCE_FLAG);
                 bn_t sender_nonce;
                 sender_account->get_nonce(arith, sender_nonce);
@@ -245,7 +245,7 @@ namespace CuEVM::operations
                     sender_nonce);
             }
             // warm up the contract address
-            CuEVM::account::account_t *contract;
+            CuEVM::account_t *contract;
             error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_NONE_FLAG);
 
             // gas capped limit
@@ -320,7 +320,7 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t CREATE(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)
     {
@@ -341,7 +341,7 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t CALL(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)
     {
@@ -411,7 +411,7 @@ namespace CuEVM::operations
     */
     __host__ __device__ int32_t CALLCODE(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)
     {
@@ -531,7 +531,7 @@ namespace CuEVM::operations
     */
     __host__ __device__ int32_t DELEGATECALL(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)
     {
@@ -600,7 +600,7 @@ namespace CuEVM::operations
      */
     __host__ __device__ int32_t CREATE2(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)
     {
@@ -621,7 +621,7 @@ namespace CuEVM::operations
     */
     __host__ __device__ int32_t STATICCALL(
         ArithEnv &arith,
-        CuEVM::state::AccessState &access_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_call_state_t &current_state,
         CuEVM::evm_call_state_t* &new_state_ptr)
     {
@@ -758,7 +758,7 @@ namespace CuEVM::operations
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_message_call_t &message,
-        CuEVM::state::TouchState &touch_state,
+        CuEVM::TouchState &touch_state,
         CuEVM::evm_return_data_t &return_data)
     {
         int32_t error_code = ERROR_SUCCESS;

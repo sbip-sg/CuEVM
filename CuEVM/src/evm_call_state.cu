@@ -14,8 +14,8 @@ namespace CuEVM {
         CuEVM::evm_message_call_t* message_ptr,
         CuEVM::evm_stack_t* stack_ptr,
         CuEVM::evm_memory_t* memory_ptr,
-        CuEVM::state::log_state_data_t* log_state_ptr,
-        CuEVM::state::TouchState touch_state,
+        CuEVM::log_state_data_t* log_state_ptr,
+        CuEVM::TouchState touch_state,
         CuEVM::evm_return_data_t* last_return_data_ptr
     ) {
         this->parent = parent;
@@ -43,7 +43,7 @@ namespace CuEVM {
         CuEVM::evm_call_state_t* parent,
         CuEVM::evm_message_call_t *message_ptr
     ) : touch_state(
-        new CuEVM::state::state_access_t(),
+        new CuEVM::state_access_t(),
         &parent->touch_state
     ) {
         this->parent = parent;
@@ -55,7 +55,7 @@ namespace CuEVM {
         this->message_ptr->get_gas_limit(arith, this->gas_limit);
         this->stack_ptr = new CuEVM::evm_stack_t();
         this->memory_ptr = new CuEVM::evm_memory_t();
-        this->log_state_ptr = new CuEVM::state::log_state_data_t();
+        this->log_state_ptr = new CuEVM::log_state_data_t();
         this->last_return_data_ptr = new CuEVM::evm_return_data_t();
         #ifdef EIP_3155
         this->trace_idx = 0;
@@ -67,11 +67,11 @@ namespace CuEVM {
      */
     __host__ __device__ evm_call_state_t::evm_call_state_t(
         ArithEnv &arith,
-        CuEVM::state::AccessState *access_state_ptr,
+        CuEVM::AccessState *access_state_ptr,
         CuEVM::evm_stack_t* stack_ptr,
         CuEVM::evm_memory_t* memory_ptr,
-        CuEVM::state::log_state_data_t* log_state_ptr, 
-        CuEVM::state::state_access_t* state_access_ptr,
+        CuEVM::log_state_data_t* log_state_ptr, 
+        CuEVM::state_access_t* state_access_ptr,
         CuEVM::evm_return_data_t* last_return_data_ptr
         ) : touch_state(
             state_access_ptr,
@@ -107,8 +107,10 @@ namespace CuEVM {
     }
 
     __host__ __device__ int32_t evm_call_state_t::update(ArithEnv &arith, evm_call_state_t &other) {
-        this->touch_state.update(arith, &other.touch_state);
-        this->log_state_ptr->update(arith, *other.log_state_ptr);
+        uint32_t error_code = ERROR_SUCCESS;
+        error_code |= this->touch_state.update(arith, &other.touch_state);
+        error_code |= this->log_state_ptr->update(arith, *other.log_state_ptr);
+        return error_code;
     }
 
 }

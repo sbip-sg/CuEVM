@@ -26,12 +26,12 @@ namespace CuEVM::utils {
         evm_word_t *stack; /**< The stack before op*/
         uint32_t stack_size; /**< The size of the stack before op*/
         uint32_t depth; /**< The depth of the call stack */
-        CuEVM::byte_array_t return_data; /**< The return data */
+        CuEVM::byte_array_t* return_data; /**< The return data */
         evm_word_t refund; /**< The gas refund */
         #ifdef EIP_3155_OPTIONAL
         uint32_t error_code; /**< The error code */
         uint8_t *memory; /**< The memory before op*/
-        CuEVM::state::TouchState touch_state; /**< The touch state */
+        CuEVM::TouchState touch_state; /**< The touch state */
         #endif
 
         __host__ cJSON* to_json();
@@ -72,7 +72,7 @@ namespace CuEVM::utils {
             const bn_t &gas_refund
             #ifdef EIP_3155_OPTIONAL
             , const uint32_t error_code,
-            const CuEVM::state::TouchState &touch_state
+            const CuEVM::TouchState &touch_state
             #endif
         );
 
