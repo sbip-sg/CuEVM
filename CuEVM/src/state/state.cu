@@ -100,7 +100,8 @@ state_t::add_account(const CuEVM::account_t &account) {
     tmp_accounts[no_accounts] = account;
     if (accounts != nullptr) {
         for (uint32_t idx = 0; idx < no_accounts; idx++) {
-            accounts[idx].clear();
+            accounts[idx].byte_code.clear();
+            accounts[idx].storage.clear();
         }
         __ONE_GPU_THREAD_BEGIN__
         delete[] accounts;
