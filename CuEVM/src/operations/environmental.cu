@@ -393,7 +393,7 @@ namespace CuEVM::operations {
             length_ui32 = cgbn_get_ui32(arith.env, length);
             if (cgbn_compare_ui32(arith.env, length, length_ui32) != 0)
                 length_ui32 = UINT32_MAX;
-            CuEVM::byte_array_t data(message.get_data(), data_offset_ui32, length_ui32);
+            CuEVM::byte_array_t data(message.get_byte_code(), data_offset_ui32, length_ui32);
 
             error_code |= memory.set(
                 arith,
