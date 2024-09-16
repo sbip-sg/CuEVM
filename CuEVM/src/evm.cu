@@ -119,7 +119,7 @@ namespace CuEVM {
             ERROR_SUCCESS
         );
         // warmup the accounts
-        CuEVM::account_t* account_ptr;
+        CuEVM::account_t* account_ptr=nullptr;
         error_code |= call_state_ptr->touch_state.get_account(arith, sender, account_ptr, ACCOUNT_NONE_FLAG);
         error_code |= call_state_ptr->touch_state.get_account(arith, recipient, account_ptr, ACCOUNT_BYTE_CODE_FLAG);
 
@@ -1164,7 +1164,7 @@ namespace CuEVM {
         // to see if the contract is a contract
         bn_t sender_address;
         call_state_ptr->message_ptr->get_sender(arith, sender_address);
-        CuEVM::account_t *sender_account;
+        CuEVM::account_t *sender_account= nullptr;
         call_state_ptr->parent->touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_BYTE_CODE_FLAG);
         if (sender_account->is_contract()) {
             bn_t sender_nonce;

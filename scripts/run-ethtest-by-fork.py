@@ -49,7 +49,7 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
     output_filepath = None
     for dirpath, dirnames, filenames in os.walk(input_directory):
         rel_path = os.path.relpath(dirpath, input_directory)
-        if skip_folder in rel_path:
+        if skip_folder != "" and skip_folder in rel_path:
             debug_print(f"Skipping {rel_path}")
             continue
         for filename in filenames:

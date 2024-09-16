@@ -134,7 +134,7 @@ namespace CuEVM::operations
                 arith,
                 memory_expansion_cost);
             // set the byte code
-            CuEVM::account_t *contract;
+            CuEVM::account_t *contract=nullptr;
             error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
 
             new_state_ptr->message_ptr->set_byte_code(
@@ -234,7 +234,7 @@ namespace CuEVM::operations
             }
             else
             {
-                CuEVM::account_t *sender_account;
+                CuEVM::account_t *sender_account=nullptr;
                 access_state.get_account(arith, contract_address, sender_account, ACCOUNT_NONCE_FLAG);
                 bn_t sender_nonce;
                 sender_account->get_nonce(arith, sender_nonce);
@@ -245,7 +245,7 @@ namespace CuEVM::operations
                     sender_nonce);
             }
             // warm up the contract address
-            CuEVM::account_t *contract;
+            CuEVM::account_t *contract = nullptr;
             error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_NONE_FLAG);
 
             // gas capped limit
