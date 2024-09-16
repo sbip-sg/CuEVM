@@ -64,6 +64,7 @@ __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size,
 }
 
 __host__ __device__ byte_array_t::~byte_array_t() { free(); }
+
 __host__ __device__ void byte_array_t::free() {
     __ONE_GPU_THREAD_BEGIN__
     if ((size > 0) && (data != nullptr)) {
@@ -98,24 +99,22 @@ __host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other)
 
 __host__ __device__ byte_array_t &byte_array_t::operator=(
     const byte_array_t &other) {
-    if (this == &other) return *this;
     __SHARED_MEMORY__ uint8_t *tmp_data;
-    __ONE_GPU_THREAD_BEGIN__
-    if (size != other.size) {
-        if (size > 0) {
-            delete[] data;
+    if (this != &other) {
+        __ONE_GPU_THREAD_BEGIN__
+        if (size != other.size) {
+            if (data!= nullptr)
+                delete[] data;
+            tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
         }
-        tmp_data = nullptr;
+        if (other.size > 0) {
+            memcpy(tmp_data, other.data, other.size * sizeof(uint8_t));
+        } else
+            tmp_data = nullptr;
+        __ONE_GPU_THREAD_END__
+        data = tmp_data;
         size = other.size;
-        if (size > 0) tmp_data = new uint8_t[size];
     }
-    if (size > 0) {
-        memcpy(tmp_data, other.data, size * sizeof(uint8_t));
-    } else
-        tmp_data = nullptr;
-    __ONE_GPU_THREAD_END__
-    data = tmp_data;
-    size = other.size;
     return *this;
 }
 

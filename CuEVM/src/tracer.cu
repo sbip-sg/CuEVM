@@ -25,7 +25,7 @@ namespace CuEVM::utils {
         }
         cJSON_AddItemToObject(json, "stack", stack_json);
         cJSON_AddNumberToObject(json, "depth", depth);
-        cJSON_AddItemToObject(json, "returnData", return_data.to_json());
+        cJSON_AddItemToObject(json, "returnData", return_data->to_json());
         cJSON_AddStringToObject(json, "refund", refund.to_hex(hex_string_ptr));
         #ifdef EIP_3155_OPTIONAL
         cJSON_AddNumberToObject(json, "errorCode", error_code);
@@ -144,7 +144,7 @@ namespace CuEVM::utils {
         std::copy(stack.stack_base, stack.stack_base + stack.size(), data[size].stack);
         //memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) * data[size].stack_size);
         data[size].depth = depth;
-        data[size].return_data = return_data;
+        data[size].return_data = new byte_array_t(return_data);
         #ifdef EIP_3155_OPTIONAL
         data[size].memory = new uint8_t[data[size].mem_size];
         std::copy(memory.data.data, memory.data.data + data[size].mem_size, data[size].memory);
@@ -200,7 +200,7 @@ namespace CuEVM::utils {
             printf("Depth: %d\n", data[i].depth);
             printf("Memory size: %d\n", data[i].mem_size);
             printf("Return data: ");
-            data[i].return_data.print();
+            data[i].return_data->print();
             printf("Refund: ");
             data[i].refund.print();
             #ifdef EIP_3155_OPTIONAL
