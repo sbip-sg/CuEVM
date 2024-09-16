@@ -43,11 +43,15 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_s
 
     debug_print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
 
-def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth', cuevm_bin='cuevm', ignore_errors=False, result={}, without_state_root=False, microtests=False):
+def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth',
+                  cuevm_bin='cuevm', ignore_errors=False, result={}, without_state_root=False, microtests=False, skip_folder=""):
     result = result or {'n_success': 0, 'failed_files': []}
     output_filepath = None
     for dirpath, dirnames, filenames in os.walk(input_directory):
         rel_path = os.path.relpath(dirpath, input_directory)
+        if skip_folder in rel_path:
+            debug_print(f"Skipping {rel_path}")
+            continue
         for filename in filenames:
             debug_print("Processing", dirpath, filename)
             try:
@@ -128,7 +132,7 @@ def main():
     parser.add_argument('--ignore-errors', action='store_true', help='Continue testing even when test errors occur')
     parser.add_argument('--without-state-root', action='store_true', help='verify without the state root', default=False)
     parser.add_argument('--microtests', action='store_true', help='verify without the state root', default=False)
-
+    parser.add_argument('--skip-folder', type=str, help='Skip folder', default="")
     args = parser.parse_args()
 
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
@@ -138,7 +142,9 @@ def main():
     try:
         test_root = args.input
         print(f"Running tests for {test_root}")
-        runtest_fork(test_root, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth, cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result, without_state_root=args.without_state_root, microtests=args.microtests)
+        runtest_fork(test_root, args.temporary_path, fork='Shanghai', runtest_bin=args.runtest_bin, geth_bin=args.geth,
+                     cuevm_bin=args.cuevm, ignore_errors=args.ignore_errors, result=result, without_state_root=args.without_state_root,
+                     microtests=args.microtests, skip_folder=args.skip_folder)
     except Exception:
         pass
     finally:

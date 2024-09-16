@@ -112,4 +112,9 @@ __host__ __device__ void evm_address_conversion(ArithEnv &arith,
                                                 bn_t &address) {
     cgbn_bitwise_mask_and(arith.env, address, address, CuEVM::address_bits);
 }
+__host__ __device__ void print_bnt(ArithEnv &arith, const bn_t &bn){
+    evm_word_t tmp_word;
+    cgbn_store(arith.env, &tmp_word, bn);
+    tmp_word.print();
+}
 }  // namespace CuEVM
