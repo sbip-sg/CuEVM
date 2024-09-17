@@ -62,7 +62,8 @@ __host__ __device__ int32_t get_contract_address_create(
                            hash_address_bytes.data, CuEVM::hash_size);
 
     cgbn_set_byte_array_t(arith.env, contract_address, hash_address_bytes);
-    cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
+    cgbn_bitwise_mask_and(arith.env, contract_address, contract_address,
+                          CuEVM::address_bits);
     return ERROR_SUCCESS;
 }
 
@@ -104,9 +105,9 @@ __host__ __device__ int32_t get_contract_address_create2(
     CuCrypto::keccak::sha3(input_data.data, total_bytes, hash_input_data.data,
                            CuEVM::hash_size);
 
-
     cgbn_set_byte_array_t(arith.env, contract_address, hash_input_data);
-    cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
+    cgbn_bitwise_mask_and(arith.env, contract_address, contract_address,
+                          CuEVM::address_bits);
     return ERROR_SUCCESS;
 }
 
