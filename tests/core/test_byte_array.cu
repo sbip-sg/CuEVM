@@ -162,8 +162,7 @@ TEST(ByteArrayTests, ConstructorWithHexString2) {
 }
 
 TEST(ByteArrayTests, ConstructorWithHexStringAndSize) {
-    CuEVM::byte_array_t byteArray("123456", 4, LITTLE_ENDIAN,
-                                  CuEVM::LEFT_PADDING);
+    CuEVM::byte_array_t byteArray("123456", 4, LITTLE_ENDIAN, CuEVM::LEFT_PADDING);
     EXPECT_EQ(byteArray.size, 4);
     EXPECT_EQ(byteArray.data[0], 0x12);
     EXPECT_EQ(byteArray.data[1], 0x34);
@@ -240,8 +239,7 @@ TEST(ByteArrayTests, CpuGpuFree) {
     cpuArray[1].data[1] = 0x9A;
 
     CUDA_CHECK(cudaDeviceReset());
-    CuEVM::byte_array_t* gpuArray =
-        CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
+    CuEVM::byte_array_t* gpuArray = CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
 
     CuEVM::byte_array_t::gpu_free(gpuArray, 2);
 
@@ -252,10 +250,8 @@ TEST(ByteArrayTests, CpuGpuFree) {
 
 // Additional GPU tests
 
-__global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count,
-                           uint32_t* result) {
-    int32_t instance =
-        (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
+__global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count, uint32_t* result) {
+    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
     if (instance >= count) return;
     result[instance] = ERROR_SUCCESS;
     if (instance == 0) {
@@ -263,37 +259,21 @@ __global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count,
         gpuArray[0].data[0] = 0x12;
         gpuArray[0].data[1] = 0x34;
         gpuArray[0].data[2] = 0x56;
-        result[instance] |= (gpuArray[0].has_value(0x12) == ERROR_SUCCESS
-                                 ? ERROR_SUCCESS
-                                 : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[0].has_value(0x34) == ERROR_SUCCESS
-                                 ? ERROR_SUCCESS
-                                 : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[0].has_value(0x56) == ERROR_SUCCESS
-                                 ? ERROR_SUCCESS
-                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x12) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x34) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[0].has_value(0x56) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
         result[instance] |=
-            (gpuArray[0].has_value(0x00) == ERROR_VALUE_NOT_FOUND
-                 ? ERROR_SUCCESS
-                 : ERROR_VALUE_NOT_FOUND);
+            (gpuArray[0].has_value(0x00) == ERROR_VALUE_NOT_FOUND ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
     } else if (instance == 1) {
         gpuArray[1].grow(3, 1);
         gpuArray[1].data[0] = 0x78;
         gpuArray[1].data[1] = 0x9A;
         gpuArray[1].data[2] = 0xBC;
-        result[instance] |= (gpuArray[1].has_value(0x78) == ERROR_SUCCESS
-                                 ? ERROR_SUCCESS
-                                 : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[1].has_value(0x9A) == ERROR_SUCCESS
-                                 ? ERROR_SUCCESS
-                                 : ERROR_VALUE_NOT_FOUND);
-        result[instance] |= (gpuArray[1].has_value(0xBC) == ERROR_SUCCESS
-                                 ? ERROR_SUCCESS
-                                 : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0x78) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0x9A) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
+        result[instance] |= (gpuArray[1].has_value(0xBC) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
         result[instance] |=
-            (gpuArray[1].has_value(0x00) == ERROR_VALUE_NOT_FOUND
-                 ? ERROR_SUCCESS
-                 : ERROR_VALUE_NOT_FOUND);
+            (gpuArray[1].has_value(0x00) == ERROR_VALUE_NOT_FOUND ? ERROR_SUCCESS : ERROR_VALUE_NOT_FOUND);
     }
 }
 
@@ -301,14 +281,12 @@ __global__ void testKernel(CuEVM::byte_array_t* gpuArray, uint32_t count,
 TEST(ByteArrayTests, GpuKernelTest) {
     CuEVM::byte_array_t* cpuArray = CuEVM::byte_array_t::get_cpu(2);
     CUDA_CHECK(cudaDeviceReset());
-    CuEVM::byte_array_t* gpuArray =
-        CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
+    CuEVM::byte_array_t* gpuArray = CuEVM::byte_array_t::gpu_from_cpu(cpuArray, 2);
     uint32_t* d_result;
     cudaMalloc(&d_result, 2 * sizeof(uint32_t));
     testKernel<<<2, CuEVM::cgbn_tpi>>>(gpuArray, 2, d_result);
     CUDA_CHECK(cudaDeviceSynchronize());
-    CuEVM::byte_array_t* results =
-        CuEVM::byte_array_t::cpu_from_gpu(gpuArray, 2);
+    CuEVM::byte_array_t* results = CuEVM::byte_array_t::cpu_from_gpu(gpuArray, 2);
     CuEVM::byte_array_t* expectedCpuArray = CuEVM::byte_array_t::get_cpu(2);
     expectedCpuArray[0].grow(3, 1);
     expectedCpuArray[0].data[0] = 0x12;
@@ -328,8 +306,7 @@ TEST(ByteArrayTests, GpuKernelTest) {
     }
     uint32_t* h_result;
     h_result = (uint32_t*)malloc(2 * sizeof(uint32_t));
-    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t),
-                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t), cudaMemcpyDeviceToHost));
     for (int i = 0; i < 2; i++) {
         EXPECT_EQ(h_result[i], ERROR_SUCCESS);
     }
@@ -349,41 +326,49 @@ TEST(ByteArrayTests, ConstructorWithOffsetAndSize) {
 
     // Test with valid offset and size
     CuEVM::byte_array_t byteArray(srcByteArray, 1, 3);
-    ASSERT_EQ(byteArray.size, 3);
-    ASSERT_EQ(byteArray[0], 0x02);
-    ASSERT_EQ(byteArray[1], 0x03);
-    ASSERT_EQ(byteArray[2], 0x04);
+    EXPECT_EQ(byteArray.size, 3);
+    EXPECT_EQ(byteArray[0], 0x02);
+    EXPECT_EQ(byteArray[1], 0x03);
+    EXPECT_EQ(byteArray[2], 0x04);
 
     // Test with offset beyond the source array size
     CuEVM::byte_array_t byteArray2(srcByteArray, 6, 3);
-    ASSERT_EQ(byteArray2.size, 3);
-    ASSERT_EQ(byteArray2[0], 0x00);
-    ASSERT_EQ(byteArray2[1], 0x00);
-    ASSERT_EQ(byteArray2[2], 0x00);
+    EXPECT_EQ(byteArray2.size, 3);
+    EXPECT_EQ(byteArray2[0], 0x00);
+    EXPECT_EQ(byteArray2[1], 0x00);
+    EXPECT_EQ(byteArray2[2], 0x00);
 
     // Test with size larger than the remaining elements from offset
     CuEVM::byte_array_t byteArray3(srcByteArray, 3, 5);
-    ASSERT_EQ(byteArray3.size, 5);
-    ASSERT_EQ(byteArray3[0], 0x04);
-    ASSERT_EQ(byteArray3[1], 0x05);
-    ASSERT_EQ(byteArray3[2], 0x00);
-    ASSERT_EQ(byteArray3[3], 0x00);
-    ASSERT_EQ(byteArray3[4], 0x00);
+    EXPECT_EQ(byteArray3.size, 5);
+    EXPECT_EQ(byteArray3[0], 0x04);
+    EXPECT_EQ(byteArray3[1], 0x05);
+    EXPECT_EQ(byteArray3[2], 0x00);
+    EXPECT_EQ(byteArray3[3], 0x00);
+    EXPECT_EQ(byteArray3[4], 0x00);
 
     // Test with zero size
     CuEVM::byte_array_t byteArray4(srcByteArray, 1, 0);
-    ASSERT_EQ(byteArray4.size, 0);
-    ASSERT_EQ(byteArray4.data, nullptr);
+    EXPECT_EQ(byteArray4.size, 0);
+    EXPECT_EQ(byteArray4.data, nullptr);
 }
 
 // GPU tests for the constructor with offset and size
-__global__ void testConstructorWithOffsetAndSizeKernel(CuEVM::byte_array_t* srcArray, uint32_t offset, uint32_t size, uint32_t count) {
+__global__ void testConstructorWithOffsetAndSizeKernel(CuEVM::byte_array_t* srcArray, uint32_t offset, uint32_t size,
+                                                       uint32_t count) {
     int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
     if (instance >= count) return;
-    uint8_t data[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
-    CuEVM::byte_array_t *tmp = new CuEVM::byte_array_t(data, 5);
-    srcArray[instance] = CuEVM::byte_array_t(*tmp, offset, size);
+    __SHARED_MEMORY__ uint8_t* data;
+    __ONE_GPU_THREAD_BEGIN__
+    data = new uint8_t[5]{0x01, 0x02, 0x03, 0x04, 0x05};
+    __ONE_GPU_THREAD_END__
+    CuEVM::byte_array_t* tmp = new CuEVM::byte_array_t(data, 5);
+    CuEVM::byte_array_t byteArray(*tmp, offset, size);
+    srcArray[instance] = byteArray;
     delete tmp;
+    __ONE_GPU_THREAD_BEGIN__
+    delete[] data;
+    __ONE_GPU_THREAD_END__
 }
 
 #ifdef GPU
@@ -397,14 +382,14 @@ TEST(ByteArrayTests, GpuConstructorWithOffsetAndSize) {
     CUDA_CHECK(cudaDeviceSynchronize());
 
     CuEVM::byte_array_t* resultArray = CuEVM::byte_array_t::cpu_from_gpu(gpuSrcArray, 2);
-    ASSERT_EQ(resultArray[0].size, 3);
-    ASSERT_EQ(resultArray[0][0], 0x02);
-    ASSERT_EQ(resultArray[0][1], 0x03);
-    ASSERT_EQ(resultArray[0][2], 0x04);
-    ASSERT_EQ(resultArray[1].size, 3);
-    ASSERT_EQ(resultArray[1][0], 0x02);
-    ASSERT_EQ(resultArray[1][1], 0x03);
-    ASSERT_EQ(resultArray[1][2], 0x04);
+    EXPECT_EQ(resultArray[0].size, 3);
+    EXPECT_EQ(resultArray[0][0], 0x02);
+    EXPECT_EQ(resultArray[0][1], 0x03);
+    EXPECT_EQ(resultArray[0][2], 0x04);
+    EXPECT_EQ(resultArray[1].size, 3);
+    EXPECT_EQ(resultArray[1][0], 0x02);
+    EXPECT_EQ(resultArray[1][1], 0x03);
+    EXPECT_EQ(resultArray[1][2], 0x04);
 
     CuEVM::byte_array_t::cpu_free(cpuArray, 2);
     CuEVM::byte_array_t::cpu_free(resultArray, 2);

@@ -8,8 +8,7 @@
 #include <CuEVM/utils/evm_utils.cuh>
 
 namespace CuEVM {
-__host__ __device__ byte_array_t::byte_array_t(const uint32_t size)
-    : size(size) {
+__host__ __device__ byte_array_t::byte_array_t(const uint32_t size) : size(size) {
     __SHARED_MEMORY__ uint8_t *tmp_data;
     __ONE_GPU_THREAD_BEGIN__
     if (size > 0) {
@@ -21,8 +20,7 @@ __host__ __device__ byte_array_t::byte_array_t(const uint32_t size)
     data = tmp_data;
 }
 
-__host__ __device__ byte_array_t::byte_array_t(uint8_t *data, uint32_t size)
-    : size(size) {
+__host__ __device__ byte_array_t::byte_array_t(uint8_t *data, uint32_t size) : size(size) {
     __SHARED_MEMORY__ uint8_t *tmp_data;
     __ONE_GPU_THREAD_BEGIN__
     if (size > 0) {
@@ -34,8 +32,7 @@ __host__ __device__ byte_array_t::byte_array_t(uint8_t *data, uint32_t size)
     this->data = tmp_data;
 }
 
-__host__ __device__ byte_array_t::byte_array_t(
-    const byte_array_t &src_byte_array, uint32_t offset, uint32_t size)
+__host__ __device__ byte_array_t::byte_array_t(const byte_array_t &src_byte_array, uint32_t offset, uint32_t size)
     : size(size) {
     __SHARED_MEMORY__ uint8_t *tmp_data;
     __ONE_GPU_THREAD_BEGIN__
@@ -43,22 +40,19 @@ __host__ __device__ byte_array_t::byte_array_t(
         tmp_data = new uint8_t[size];
         memset(tmp_data, 0, size * sizeof(uint8_t));
         if (offset < src_byte_array.size)
-            memcpy(tmp_data, src_byte_array.data + offset,
-                   min(size, src_byte_array.size - offset) * sizeof(uint8_t));
+            memcpy(tmp_data, src_byte_array.data + offset, min(size, src_byte_array.size - offset) * sizeof(uint8_t));
     } else
         tmp_data = nullptr;
     __ONE_GPU_THREAD_END__
     this->data = tmp_data;
 }
 
-__host__ byte_array_t::byte_array_t(const char *hex_string, int32_t endian,
-                                    PaddingDirection padding)
+__host__ byte_array_t::byte_array_t(const char *hex_string, int32_t endian, PaddingDirection padding)
     : size(0), data(nullptr) {
     from_hex(hex_string, endian, padding, 0);
 }
 
-__host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size,
-                                    int32_t endian, PaddingDirection padding)
+__host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size, int32_t endian, PaddingDirection padding)
     : size(size), data(nullptr) {
     from_hex(hex_string, endian, padding, 0);
 }
@@ -84,8 +78,7 @@ __host__ __device__ void byte_array_t::clear() {
     size = 0;
 }
 
-__host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other)
-    : size(other.size) {
+__host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other) : size(other.size) {
     __SHARED_MEMORY__ uint8_t *tmp_data;
     __ONE_GPU_THREAD_BEGIN__
     if (size > 0) {
@@ -97,29 +90,29 @@ __host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other)
     data = tmp_data;
 }
 
-__host__ __device__ byte_array_t &byte_array_t::operator=(
-    const byte_array_t &other) {
+__host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &other) {
     __SHARED_MEMORY__ uint8_t *tmp_data;
     if (this != &other) {
-        __ONE_GPU_THREAD_BEGIN__
         if (size != other.size) {
             free();
+            __ONE_GPU_THREAD_BEGIN__
             tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
+            __ONE_GPU_THREAD_END__
         } else {
             tmp_data = data;
         }
         if (other.size > 0) {
+            __ONE_GPU_THREAD_BEGIN__
             memcpy(tmp_data, other.data, other.size * sizeof(uint8_t));
+            __ONE_GPU_THREAD_END__
         }
-        __ONE_GPU_THREAD_END__
         data = tmp_data;
         size = other.size;
     }
     return *this;
 }
 
-__host__ __device__ int32_t byte_array_t::grow(uint32_t new_size,
-                                               int32_t zero_padding) {
+__host__ __device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_padding) {
     if (new_size == size) return ERROR_SUCCESS;
     __SHARED_MEMORY__ uint8_t *new_data;
     __ONE_GPU_THREAD_BEGIN__
@@ -205,8 +198,7 @@ __host__ cJSON *byte_array_t::to_json() const {
     return data_json;
 }
 
-__host__ int32_t byte_array_t::from_hex_set_le(const char *clean_hex_string,
-                                               int32_t length) {
+__host__ int32_t byte_array_t::from_hex_set_le(const char *clean_hex_string, int32_t length) {
     if ((length < 0) || ((size * 2) < length)) {
         return 1;
     }
@@ -217,25 +209,20 @@ __host__ int32_t byte_array_t::from_hex_set_le(const char *clean_hex_string,
         uint8_t *dst_ptr;
         dst_ptr = data;
         for (index = 0; index < ((length + 1) / 2) - 1; index++) {
-            *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(
-                *(current_char), *(current_char + 1));
+            *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(*(current_char), *(current_char + 1));
             current_char += 2;
         }
         if (length % 2 == 1) {
-            *(dst_ptr++) =
-                CuEVM::utils::byte_from_two_hex_char(*current_char++, '0');
+            *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(*current_char++, '0');
         } else {
-            *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(
-                *(current_char), *(current_char + 1));
+            *(dst_ptr++) = CuEVM::utils::byte_from_two_hex_char(*(current_char), *(current_char + 1));
             current_char += 2;
         }
     }
     return 0;
 }
 
-__host__ int32_t byte_array_t::from_hex_set_be(const char *clean_hex_string,
-                                               int32_t length,
-                                               PaddingDirection padding) {
+__host__ int32_t byte_array_t::from_hex_set_be(const char *clean_hex_string, int32_t length, PaddingDirection padding) {
     if ((length < 0) || ((size * 2) < length)) {
         return 1;
     }
@@ -252,24 +239,20 @@ __host__ int32_t byte_array_t::from_hex_set_be(const char *clean_hex_string,
         }
 
         if (length % 2 == 1) {
-            *dst_ptr-- =
-                CuEVM::utils::byte_from_two_hex_char('0', *current_char++);
+            *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char('0', *current_char++);
         } else {
-            *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(
-                *(current_char), *(current_char + 1));
+            *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(*(current_char), *(current_char + 1));
             current_char += 2;
         }
         while (*current_char != '\0') {
-            *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(
-                *(current_char), *(current_char + 1));
+            *dst_ptr-- = CuEVM::utils::byte_from_two_hex_char(*(current_char), *(current_char + 1));
             current_char += 2;
         }
     }
     return 0;
 }
 
-__host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian,
-                                        PaddingDirection padding,
+__host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, PaddingDirection padding,
                                         int32_t managed) {
     char *tmp_hex_char;
     tmp_hex_char = (char *)hex_string;
@@ -289,8 +272,7 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian,
     size = new_size;
     if (size > 0) {
         if (managed) {
-            CUDA_CHECK(
-                cudaMallocManaged((void **)&data, sizeof(uint8_t) * size));
+            CUDA_CHECK(cudaMallocManaged((void **)&data, sizeof(uint8_t) * size));
             memset(data, 0, size * sizeof(uint8_t));
         } else {
             // data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
@@ -316,8 +298,7 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian,
     return error_code;
 }
 
-__host__ __device__ int32_t
-byte_array_t::padded_copy_BE(const byte_array_t src) {
+__host__ __device__ int32_t byte_array_t::padded_copy_BE(const byte_array_t src) {
     uint32_t copy_size;
     int32_t size_diff;
     if (src.size == size) {
@@ -337,9 +318,7 @@ byte_array_t::padded_copy_BE(const byte_array_t src) {
     return size_diff;
 }
 
-__host__ __device__ uint8_t &byte_array_t::operator[](uint32_t index) {
-    return data[index];
-}
+__host__ __device__ uint8_t &byte_array_t::operator[](uint32_t index) { return data[index]; }
 
 // STATIC FUNCTIONS
 
@@ -348,31 +327,21 @@ __host__ byte_array_t *byte_array_t::get_cpu(uint32_t count) {
     return cpu_instances;
 }
 
-__host__ void byte_array_t::cpu_free(byte_array_t *cpu_instances,
-                                     uint32_t count) {
-    delete[] cpu_instances;
-}
+__host__ void byte_array_t::cpu_free(byte_array_t *cpu_instances, uint32_t count) { delete[] cpu_instances; }
 
-__host__ byte_array_t *byte_array_t::gpu_from_cpu(byte_array_t *cpu_instances,
-                                                  uint32_t count) {
+__host__ byte_array_t *byte_array_t::gpu_from_cpu(byte_array_t *cpu_instances, uint32_t count) {
     byte_array_t *gpu_instances, *tmp_cpu_instances;
     tmp_cpu_instances = new byte_array_t[count];
     for (uint32_t idx = 0; idx < count; idx++) {
         if (cpu_instances[idx].size > 0) {
-            CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[idx].data,
-                                  sizeof(uint8_t) * cpu_instances[idx].size));
-            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[idx].data,
-                                  cpu_instances[idx].data,
-                                  sizeof(uint8_t) * cpu_instances[idx].size,
-                                  cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[idx].data, sizeof(uint8_t) * cpu_instances[idx].size));
+            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[idx].data, cpu_instances[idx].data,
+                                  sizeof(uint8_t) * cpu_instances[idx].size, cudaMemcpyHostToDevice));
             tmp_cpu_instances[idx].size = cpu_instances[idx].size;
         }
     }
-    CUDA_CHECK(
-        cudaMalloc((void **)&gpu_instances, sizeof(byte_array_t) * count));
-    CUDA_CHECK(cudaMemcpy(gpu_instances, tmp_cpu_instances,
-                          sizeof(byte_array_t) * count,
-                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc((void **)&gpu_instances, sizeof(byte_array_t) * count));
+    CUDA_CHECK(cudaMemcpy(gpu_instances, tmp_cpu_instances, sizeof(byte_array_t) * count, cudaMemcpyHostToDevice));
     for (uint32_t idx = 0; idx < count; idx++) {
         tmp_cpu_instances[idx].size = 0;
         tmp_cpu_instances[idx].data = nullptr;
@@ -381,12 +350,9 @@ __host__ byte_array_t *byte_array_t::gpu_from_cpu(byte_array_t *cpu_instances,
     return gpu_instances;
 }
 
-__host__ void byte_array_t::gpu_free(byte_array_t *gpu_instances,
-                                     uint32_t count) {
+__host__ void byte_array_t::gpu_free(byte_array_t *gpu_instances, uint32_t count) {
     byte_array_t *cpu_instances = new byte_array_t[count];
-    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances,
-                          sizeof(byte_array_t) * count,
-                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, sizeof(byte_array_t) * count, cudaMemcpyDeviceToHost));
     for (uint32_t idx = 0; idx < count; idx++) {
         if (cpu_instances[idx].size > 0) {
             CUDA_CHECK(cudaFree(cpu_instances[idx].data));
@@ -398,13 +364,10 @@ __host__ void byte_array_t::gpu_free(byte_array_t *gpu_instances,
     CUDA_CHECK(cudaFree(gpu_instances));
 }
 
-__host__ byte_array_t *byte_array_t::cpu_from_gpu(byte_array_t *gpu_instances,
-                                                  uint32_t count) {
+__host__ byte_array_t *byte_array_t::cpu_from_gpu(byte_array_t *gpu_instances, uint32_t count) {
     byte_array_t *cpu_instances;
     cpu_instances = new byte_array_t[count];
-    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances,
-                          sizeof(byte_array_t) * count,
-                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, sizeof(byte_array_t) * count, cudaMemcpyDeviceToHost));
 
     // 1. alocate the memory for gpu memory as memory which can be addressed by
     // the cpu
@@ -412,37 +375,28 @@ __host__ byte_array_t *byte_array_t::cpu_from_gpu(byte_array_t *gpu_instances,
     tmp_cpu_instances = new byte_array_t[count];
     for (uint32_t idx = 0; idx < count; idx++) {
         if (cpu_instances[idx].size > 0) {
-            CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[idx].data,
-                                  sizeof(uint8_t) * cpu_instances[idx].size));
+            CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[idx].data, sizeof(uint8_t) * cpu_instances[idx].size));
             tmp_cpu_instances[idx].size = cpu_instances[idx].size;
         }
     }
-    CUDA_CHECK(
-        cudaMalloc((void **)&tmp_gpu_instances, sizeof(byte_array_t) * count));
-    CUDA_CHECK(cudaMemcpy(tmp_gpu_instances, tmp_cpu_instances,
-                          sizeof(byte_array_t) * count,
-                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc((void **)&tmp_gpu_instances, sizeof(byte_array_t) * count));
+    CUDA_CHECK(cudaMemcpy(tmp_gpu_instances, tmp_cpu_instances, sizeof(byte_array_t) * count, cudaMemcpyHostToDevice));
 
     // 2. call the kernel to copy the memory between the gpu memories
     CUDA_CHECK(cudaDeviceSynchronize());
-    CuEVM::byte_array_t_transfer_kernel<<<count, 1>>>(tmp_gpu_instances,
-                                                      gpu_instances, count);
+    CuEVM::byte_array_t_transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
     CUDA_CHECK(cudaDeviceSynchronize());
     cudaFree(gpu_instances);
     gpu_instances = tmp_gpu_instances;
     tmp_gpu_instances = nullptr;
 
     // 3. copy the gpu memories back in the cpu memories
-    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances,
-                          sizeof(byte_array_t) * count,
-                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, sizeof(byte_array_t) * count, cudaMemcpyDeviceToHost));
     for (uint32_t idx = 0; idx < count; idx++) {
         if (cpu_instances[idx].size > 0) {
             tmp_cpu_instances[idx].data = new uint8_t[cpu_instances[idx].size];
-            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[idx].data,
-                                  cpu_instances[idx].data,
-                                  sizeof(uint8_t) * cpu_instances[idx].size,
-                                  cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[idx].data, cpu_instances[idx].data,
+                                  sizeof(uint8_t) * cpu_instances[idx].size, cudaMemcpyDeviceToHost));
             tmp_cpu_instances[idx].size = cpu_instances[idx].size;
         } else {
             tmp_cpu_instances[idx].data = nullptr;
@@ -461,8 +415,7 @@ __host__ byte_array_t *byte_array_t::cpu_from_gpu(byte_array_t *gpu_instances,
     return cpu_instances;
 }
 
-__host__ __device__ void byte_array_t::transfer_memory(byte_array_t &dst,
-                                                       byte_array_t &src) {
+__host__ __device__ void byte_array_t::transfer_memory(byte_array_t &dst, byte_array_t &src) {
     dst.size = src.size;
     if (src.size > 0) {
         memcpy(dst.data, src.data, src.size * sizeof(uint8_t));
@@ -473,14 +426,11 @@ __host__ __device__ void byte_array_t::transfer_memory(byte_array_t &dst,
 }
 
 // CPU-GPU
-__global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances,
-                                             byte_array_t *src_instances,
-                                             uint32_t count) {
+__global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances, byte_array_t *src_instances, uint32_t count) {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (instance >= count) return;
 
-    CuEVM::byte_array_t::transfer_memory(dst_instances[instance],
-                                         src_instances[instance]);
+    CuEVM::byte_array_t::transfer_memory(dst_instances[instance], src_instances[instance]);
 }
 }  // namespace CuEVM

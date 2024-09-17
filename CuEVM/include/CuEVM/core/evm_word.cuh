@@ -24,11 +24,22 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * The copy constructor.
      */
     __host__ __device__ evm_word_t(const evm_word_t &src);
+    /**
+     * The constructor from a uint32_t.
+     * @param[in] value The source uint32_t
+     */
+    __host__ __device__ evm_word_t(uint32_t value);
 
     /**
      * The assignment operator.
+     * @param[in] src The source evm_word_t
      */
     __host__ __device__ evm_word_t &operator=(const evm_word_t &src);
+    /**
+     * The assignment operator for uint32_t.
+     * @param[in] value The source uint32_t
+     */
+    __host__ __device__ evm_word_t &operator=(uint32_t value);
 
     /**
      * The equality operator.
