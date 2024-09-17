@@ -61,21 +61,8 @@ __host__ __device__ int32_t get_contract_address_create(
     CuCrypto::keccak::sha3(&(rlp_list[0]), rlp_list_length + 1,
                            hash_address_bytes.data, CuEVM::hash_size);
 
-    CuEVM::byte_array_t address_bytes(CuEVM::word_size);
-
-    for (uint32_t idx = 0; idx < CuEVM::word_size; idx++) {
-        // TODO to look here
-        address_bytes.data[idx] =
-            idx < CuEVM::address_size
-                ? hash_address_bytes.data[CuEVM::word_size - idx - 1]
-                : 0;
-    }
-
-    evm_word_t contract_address_word;
-
-    contract_address_word.from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
-    cgbn_load(arith.env, contract_address, &contract_address_word);
-
+    cgbn_set_byte_array_t(arith.env, contract_address, hash_address_bytes);
+    cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
     return ERROR_SUCCESS;
 }
 
@@ -117,15 +104,9 @@ __host__ __device__ int32_t get_contract_address_create2(
     CuCrypto::keccak::sha3(input_data.data, total_bytes, hash_input_data.data,
                            CuEVM::hash_size);
 
-    for (uint32_t idx = 0; idx < CuEVM::word_size - CuEVM::address_size;
-         idx++) {
-        hash_input_data.data[idx] = 0;
-    }
 
-    evm_word_t contract_address_word;
-    contract_address_word.from_byte_array_t(hash_input_data);
-    cgbn_load(arith.env, contract_address, &contract_address_word);
-
+    cgbn_set_byte_array_t(arith.env, contract_address, hash_input_data);
+    cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
     return ERROR_SUCCESS;
 }
 
