@@ -41,6 +41,12 @@ __host__ __device__ int32_t TouchState::get_account(
                                                          : ERROR_SUCCESS);
 }
 
+__host__ __device__ int32_t TouchState::get_account_index(
+    ArithEnv &arith, const bn_t &address, uint32_t &index) const {
+   index=0;
+   return _state->get_account_index(arith, address, index) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_STATE_ADDRESS_NOT_FOUND;
+}
+
 __host__ __device__ int32_t TouchState::get_balance(ArithEnv &arith,
                                                     const bn_t &address,
                                                     bn_t &balance) {
@@ -199,6 +205,11 @@ TouchState::is_deleted_account(ArithEnv &arith, const bn_t &address) {
         tmp = tmp->parent;
     return (tmp != nullptr) ? tmp->_state->flags[index].has_deleted()
                             : _access_state->is_deleted_account(arith, address);
+}
+
+__host__ __device__ CuEVM::contract_storage_t TouchState::get_entire_storage(
+    ArithEnv &arith, const uint32_t account_index) const {
+    return _state->accounts[account_index].storage;
 }
 
 __host__ __device__ int32_t TouchState::transfer(ArithEnv &arith,
