@@ -88,6 +88,7 @@ namespace CuEVM {
 
     __host__ __device__ evm_t::~evm_t() {
         if (call_state_ptr != nullptr) {
+            call_state_ptr->touch_state.clear();
             delete call_state_ptr;
         }
         call_state_ptr = nullptr;
@@ -937,8 +938,7 @@ namespace CuEVM {
                     call_state_ptr->gas_used,
                     call_state_ptr->gas_refund
                     #ifdef EIP_3155_OPTIONAL
-                    , error_code,
-                    call_state_ptr->touch_state
+                    , error_code
                     #endif
                 );
             }

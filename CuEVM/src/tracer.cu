@@ -83,10 +83,17 @@ namespace CuEVM::utils {
             fprintf(stderr, "%02x", memory[j]);
         }
         fprintf(stderr, "\"");
-        // fprintf(stderr, ",\"storage\":");
-        // fprintf(stderr, "\n");
-        // fprintf(stderr, "Touch state: ");
-        // touch_state.print();
+        // fprintf(stderr, ",\"storage\":{");
+        // for (uint32_t idx = 0; idx < storage.size; idx++) {
+        //     storage.storage[idx].key.to_hex(hex_string_ptr, 1);
+        //     fprintf(stderr, "\"%s\":", hex_string_ptr);
+        //     storage.storage[idx].value.to_hex(hex_string_ptr, 1);
+        //     fprintf(stderr, "\"%s\"", hex_string_ptr);
+        //     if (idx != storage.size - 1) {
+        //         fprintf(stderr, ", ");
+        //     }
+        // }
+        // fprintf(stderr, "}");
         #endif
         fprintf(stderr, "}\n");
         if (tmp != nullptr) {
@@ -102,6 +109,7 @@ namespace CuEVM::utils {
                 delete[] data[i].stack;
                 #ifdef EIP_3155_OPTIONAL
                 delete[] data[i].memory;
+                delete data[i].return_data;
                 #endif
             }
             delete[] data;
@@ -159,8 +167,8 @@ namespace CuEVM::utils {
         const bn_t &gas_used,
         const bn_t &gas_refund
         #ifdef EIP_3155_OPTIONAL
-        , const uint32_t error_code,
-        const CuEVM::TouchState &touch_state
+        , const uint32_t error_code
+        // , const CuEVM::contract_storage_t &storage
         #endif
     ) {
         bn_t gas_cost;
@@ -170,7 +178,7 @@ namespace CuEVM::utils {
         cgbn_store(arith.env, (cgbn_evm_word_t_ptr) &(data[idx].refund), gas_refund);
         #ifdef EIP_3155_OPTIONAL
         data[idx].error_code = error_code;
-        data[idx].touch_state = touch_state;
+        // data[idx].storage = storage;
         #endif
     }
 
@@ -210,8 +218,8 @@ namespace CuEVM::utils {
                 printf("%02x", data[i].memory[j]);
             }
             printf("\n");
-            printf("Touch state: ");
-            data[i].touch_state.print();
+            // printf("Storage: ");
+            // data[i].storage.print();
             #endif
         }
     }

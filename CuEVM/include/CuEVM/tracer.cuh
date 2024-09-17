@@ -31,7 +31,7 @@ namespace CuEVM::utils {
         #ifdef EIP_3155_OPTIONAL
         uint32_t error_code; /**< The error code */
         uint8_t *memory; /**< The memory before op*/
-        CuEVM::TouchState touch_state; /**< The touch state */
+        // CuEVM::contract_storage_t storage; /**< The storage */
         #endif
 
         __host__ cJSON* to_json();
@@ -71,8 +71,8 @@ namespace CuEVM::utils {
             const bn_t &gas_used,
             const bn_t &gas_refund
             #ifdef EIP_3155_OPTIONAL
-            , const uint32_t error_code,
-            const CuEVM::TouchState &touch_state
+            , const uint32_t error_code
+            // , const CuEVM::contract_storage_t &storage
             #endif
         );
 
