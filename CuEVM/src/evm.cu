@@ -155,6 +155,9 @@ namespace CuEVM {
                     }
                 } else {
                     // operation stop
+                    // clear return data
+                    call_state_ptr->parent->last_return_data_ptr->free();
+                    call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
                     return ERROR_RETURN;
                 }
             }
@@ -1073,7 +1076,6 @@ namespace CuEVM {
 
 
     __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_code) {
-
         bn_t child_success;
         // set the child call to failure
         cgbn_set_ui32(arith.env, child_success, 0);

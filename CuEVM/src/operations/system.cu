@@ -666,7 +666,7 @@ namespace CuEVM::operations
                     code,
                     ret_offset,
                     ret_size,
-                    current_state.message_ptr->get_static_env()
+                    1
                 )
             );
 
