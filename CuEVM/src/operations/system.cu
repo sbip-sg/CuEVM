@@ -93,7 +93,7 @@ namespace CuEVM::operations
                 // If the empty account is called
                 // only for call opcode
                 if (
-                    new_state_ptr->touch_state.is_empty_account(arith, contract_address) &&
+                    (new_state_ptr->touch_state.is_empty_account(arith, contract_address) == ERROR_SUCCESS) &&
                     (new_state_ptr->message_ptr->get_call_type() == OP_CALL)
                 )
                 {
@@ -134,10 +134,11 @@ namespace CuEVM::operations
                 arith,
                 memory_expansion_cost);
             // set the byte code
-            CuEVM::account_t *contract=nullptr;
-            error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_NONE_FLAG);
-            new_state_ptr->message_ptr->set_byte_code(
-                contract->byte_code);
+            // FIX: MAke the warm up later for the contract in START_CALL
+            // CuEVM::account_t *contract=nullptr;
+            // error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_NONE_FLAG);
+            // new_state_ptr->message_ptr->set_byte_code(
+            //     contract->byte_code);
 
             // get/set the call data
              error_code |= current_state.memory_ptr->get(
@@ -784,7 +785,7 @@ namespace CuEVM::operations
 
             if (cgbn_compare_ui32(arith.env, sender_balance, 0) > 0)
             {
-                if (touch_state.is_empty_account(arith, recipient))
+                if (touch_state.is_empty_account(arith, recipient) == ERROR_SUCCESS)
                 {
                     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_NEW_ACCOUNT);
                 }

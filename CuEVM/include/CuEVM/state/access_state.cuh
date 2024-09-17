@@ -97,8 +97,9 @@ class AccessState {
      * @param[in] address The address of the account.
      * @return 0 if the value is found, error otherwise.
      */
-    __host__ __device__ int32_t poke_balance(ArithEnv &arith, const bn_t &address, bn_t &balance) const;
-
+    __host__ __device__ int32_t poke_balance(ArithEnv &arith,
+                                             const bn_t &address,
+                                             bn_t &balance) const;
 
     /**
      * If an account has beeen accessed, it will be marked as warm.
@@ -128,5 +129,14 @@ class AccessState {
      */
     __host__ __device__ int32_t is_deleted_account(ArithEnv &arith,
                                                    const bn_t &address) const;
+    /**
+     * IF an account is empty
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @return ERROR_SUCCESS if the account is empty, otherwise
+     * ERROR_ACCOUNT_NOT_EMPTY
+     */
+    __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
+                                                 const bn_t &address) const;
 };
 }  // namespace CuEVM

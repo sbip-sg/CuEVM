@@ -193,11 +193,16 @@ __host__ __device__ int32_t account_t::is_empty(ArithEnv &arith) {
     cgbn_load(arith.env, nonce, &this->nonce);
     return ((cgbn_compare_ui32(arith.env, balance, 0) == 0) &&
             (cgbn_compare_ui32(arith.env, nonce, 0) == 0) &&
-            (this->byte_code.size == 0));
+            (this->byte_code.size == 0))
+               ? ERROR_SUCCESS
+               : ERROR_ACCOUNT_NOT_EMPTY;
 }
 
 __host__ __device__ int32_t account_t::is_empty() {
-    return ((balance == 0) && (nonce == 0) && (byte_code.size == 0));
+    return ((balance == 0) && (nonce == 0) && (byte_code.size == 0))
+               ? ERROR_SUCCESS
+               : ERROR_ACCOUNT_NOT_EMPTY;
+    ;
 }
 
 __host__ __device__ int32_t account_t::is_contract() {
