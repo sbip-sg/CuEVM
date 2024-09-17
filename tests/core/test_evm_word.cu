@@ -188,15 +188,13 @@ TEST(EvmWordTest, Print) {
 }
 
 __global__ void test_evm_word_t_kernel(uint32_t count, uint32_t *result) {
-    int32_t instance =
-        (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
+    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
     if (instance >= count) return;
     result[instance] = ERROR_SUCCESS;
     // Test default constructor and from_uint32_t
     CuEVM::evm_word_t word1;
     word1.from_uint32_t(0x12345678);
-    result[instance] |=
-        (word1._limbs[0] == 0x12345678) ? ERROR_SUCCESS : __LINE__;
+    result[instance] |= (word1._limbs[0] == 0x12345678) ? ERROR_SUCCESS : __LINE__;
     for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
         result[instance] |= (word1._limbs[i] == 0) ? ERROR_SUCCESS : __LINE__;
     }
@@ -221,10 +219,8 @@ __global__ void test_evm_word_t_kernel(uint32_t count, uint32_t *result) {
     // Test from_uint64_t
     CuEVM::evm_word_t word4;
     word4.from_uint64_t(0x123456789ABCDEF0);
-    result[instance] |=
-        (word4._limbs[0] == 0x9ABCDEF0) ? ERROR_SUCCESS : __LINE__;
-    result[instance] |=
-        (word4._limbs[1] == 0x12345678) ? ERROR_SUCCESS : __LINE__;
+    result[instance] |= (word4._limbs[0] == 0x9ABCDEF0) ? ERROR_SUCCESS : __LINE__;
+    result[instance] |= (word4._limbs[1] == 0x12345678) ? ERROR_SUCCESS : __LINE__;
     for (int i = 2; i < CuEVM::cgbn_limbs; ++i) {
         result[instance] |= (word4._limbs[i] == 0) ? ERROR_SUCCESS : __LINE__;
     }
@@ -245,15 +241,10 @@ __global__ void test_evm_word_t_kernel(uint32_t count, uint32_t *result) {
     CuEVM::byte_array_t bit_array;
     word4.to_bit_array_t(bit_array);
     for (int i = 0; i < 32; ++i) {
-        result[instance] |= (bit_array.data[i] == ((0x9ABCDEF0 >> i) & 0x01))
-                                ? ERROR_SUCCESS
-                                : __LINE__;
+        result[instance] |= (bit_array.data[i] == ((0x9ABCDEF0 >> i) & 0x01)) ? ERROR_SUCCESS : __LINE__;
     }
     for (int i = 0; i < 32; ++i) {
-        result[instance] |=
-            (bit_array.data[32 + i] == ((0x12345678 >> i) & 0x01))
-                ? ERROR_SUCCESS
-                : __LINE__;
+        result[instance] |= (bit_array.data[32 + i] == ((0x12345678 >> i) & 0x01)) ? ERROR_SUCCESS : __LINE__;
     }
     for (int i = 64; i < CuEVM::word_bits; ++i) {
         result[instance] |= (bit_array.data[i] == 0) ? ERROR_SUCCESS : __LINE__;
@@ -271,14 +262,10 @@ __global__ void test_evm_word_t_kernel(uint32_t count, uint32_t *result) {
     byte_array2.data[7] = 0xF0;
 
     CuEVM::evm_word_t word5;
-    result[instance] |= (word5.from_byte_array_t(byte_array2) == ERROR_SUCCESS)
-                            ? ERROR_SUCCESS
-                            : __LINE__;
+    result[instance] |= (word5.from_byte_array_t(byte_array2) == ERROR_SUCCESS) ? ERROR_SUCCESS : __LINE__;
 
-    result[instance] |=
-        (word5._limbs[0] == 0x78563412) ? ERROR_SUCCESS : __LINE__;
-    result[instance] |=
-        (word5._limbs[1] == 0xF0DEBC9A) ? ERROR_SUCCESS : __LINE__;
+    result[instance] |= (word5._limbs[0] == 0x78563412) ? ERROR_SUCCESS : __LINE__;
+    result[instance] |= (word5._limbs[1] == 0xF0DEBC9A) ? ERROR_SUCCESS : __LINE__;
     for (int i = 2; i < CuEVM::cgbn_limbs; ++i) {
         result[instance] |= (word5._limbs[i] == 0) ? ERROR_SUCCESS : __LINE__;
     }
@@ -301,18 +288,14 @@ __global__ void test_evm_word_t_kernel(uint32_t count, uint32_t *result) {
     };
 
     for (int i = 0; i < 64; ++i) {
-        result[instance] |=
-            (bit_array2.data[CuEVM::word_bits - 1 - i] == expected_bits[i])
-                ? ERROR_SUCCESS
-                : __LINE__;
+        result[instance] |= (bit_array2.data[CuEVM::word_bits - 1 - i] == expected_bits[i]) ? ERROR_SUCCESS : __LINE__;
     }
 
     // Test from_size_t
     CuEVM::evm_word_t word7;
     size_t value = 0x12345678;
     word7.from_size_t(value);
-    result[instance] |=
-        (word7._limbs[0] == 0x12345678) ? ERROR_SUCCESS : __LINE__;
+    result[instance] |= (word7._limbs[0] == 0x12345678) ? ERROR_SUCCESS : __LINE__;
     for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
         result[instance] |= (word7._limbs[i] == 0) ? ERROR_SUCCESS : __LINE__;
     }
@@ -327,8 +310,7 @@ TEST(EvmWordTest, KernelTests) {
     CUDA_CHECK(cudaDeviceSynchronize());
     uint32_t *h_result;
     h_result = (uint32_t *)malloc(2 * sizeof(uint32_t));
-    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t),
-                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t), cudaMemcpyDeviceToHost));
     for (int i = 0; i < 2; i++) {
         EXPECT_EQ(h_result[i], ERROR_SUCCESS);
     }
@@ -337,3 +319,77 @@ TEST(EvmWordTest, KernelTests) {
     CUDA_CHECK(cudaDeviceReset());
 }
 #endif
+
+__global__ void test_evm_word_t_kernel_assign(uint32_t count, uint32_t *result) {
+    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
+    if (instance >= count) return;
+    result[instance] = ERROR_SUCCESS;
+
+    // Test from_size_t
+    CuEVM::evm_word_t word7;
+    size_t value = 0x12345678;
+    word7.from_size_t(value);
+    result[instance] |= (word7._limbs[0] == 0x12345678) ? ERROR_SUCCESS : __LINE__;
+    for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
+        result[instance] |= (word7._limbs[i] == 0) ? ERROR_SUCCESS : __LINE__;
+    }
+
+    // Test constructor with uint32_t
+    CuEVM::evm_word_t word8(0x87654321);
+    result[instance] |= (word8._limbs[0] == 0x87654321) ? ERROR_SUCCESS : __LINE__;
+    for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
+        result[instance] |= (word8._limbs[i] == 0) ? ERROR_SUCCESS : __LINE__;
+    }
+    // Test assignment operator with uint32_t
+    CuEVM::evm_word_t word9;
+    word9 = 0xAABBCCDD;
+    result[instance] |= (word9._limbs[0] == 0xAABBCCDD) ? ERROR_SUCCESS : __LINE__;
+    for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
+        result[instance] |= (word9._limbs[i] == 0) ? ERROR_SUCCESS : __LINE__;
+    }
+}
+
+#ifdef GPU
+TEST(EvmWordTest, KernelTestsAssign) {
+    CUDA_CHECK(cudaDeviceReset());
+    uint32_t *d_result;
+    cudaMalloc(&d_result, 2 * sizeof(uint32_t));
+    test_evm_word_t_kernel_assign<<<2, CuEVM::cgbn_tpi>>>(2, d_result);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    uint32_t *h_result;
+    h_result = (uint32_t *)malloc(2 * sizeof(uint32_t));
+    CUDA_CHECK(cudaMemcpy(h_result, d_result, 2 * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    for (int i = 0; i < 2; i++) {
+        EXPECT_EQ(h_result[i], ERROR_SUCCESS);
+    }
+    free(h_result);
+    CUDA_CHECK(cudaFree(d_result));
+    CUDA_CHECK(cudaDeviceReset());
+}
+#endif
+
+TEST(EvmWordTest, CPUAssign) {
+    // Test from_size_t
+    CuEVM::evm_word_t word7;
+    size_t value = 0x12345678;
+    word7.from_size_t(value);
+    EXPECT_EQ(word7._limbs[0], 0x12345678);
+    for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
+        EXPECT_EQ(word7._limbs[i], 0);
+    }
+
+    // Test constructor with uint32_t
+    CuEVM::evm_word_t word8(0x87654321);
+    EXPECT_EQ(word8._limbs[0], 0x87654321);
+    for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
+        EXPECT_EQ(word8._limbs[i], 0);
+    }
+
+    // Test assignment operator with uint32_t
+    CuEVM::evm_word_t word9;
+    word9 = 0xAABBCCDD;
+    EXPECT_EQ(word9._limbs[0], 0xAABBCCDD);
+    for (int i = 1; i < CuEVM::cgbn_limbs; ++i) {
+        EXPECT_EQ(word9._limbs[i], 0);
+    }
+}

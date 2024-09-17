@@ -13,6 +13,10 @@ __host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) {
     memcpy(_limbs, src._limbs, CuEVM::cgbn_limbs * sizeof(uint32_t));
 }
 
+__host__ __device__ evm_word_t::evm_word_t(uint32_t value) : evm_word_t() {
+    this->from_uint32_t(value);
+}
+
 __host__ __device__ evm_word_t &evm_word_t::operator=(const evm_word_t &src) {
     /*
   #pragma unroll
@@ -21,6 +25,11 @@ __host__ __device__ evm_word_t &evm_word_t::operator=(const evm_word_t &src) {
   }
   return *this;*/
     memcpy(_limbs, src._limbs, CuEVM::cgbn_limbs * sizeof(uint32_t));
+    return *this;
+}
+
+__host__ __device__ evm_word_t &evm_word_t::operator=(uint32_t value) {
+    this->from_uint32_t(value);
     return *this;
 }
 
