@@ -235,7 +235,7 @@ namespace CuEVM::operations
             else
             {
                 CuEVM::account_t *sender_account=nullptr;
-                access_state.get_account(arith, contract_address, sender_account, ACCOUNT_NONCE_FLAG);
+                access_state.get_account(arith, sender_address, sender_account, ACCOUNT_NONCE_FLAG);
                 bn_t sender_nonce;
                 sender_account->get_nonce(arith, sender_nonce);
                 error_code |= CuEVM::utils::get_contract_address_create(
