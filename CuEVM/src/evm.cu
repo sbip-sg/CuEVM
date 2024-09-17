@@ -118,6 +118,12 @@ namespace CuEVM {
             ) :
             ERROR_SUCCESS
         );
+
+        if (error_code != ERROR_SUCCESS) {
+            //avoid complication in the subsequent code
+            //call failed = account never warmed up
+            return error_code;
+        }
         // warmup the accounts
         CuEVM::account_t* account_ptr=nullptr;
         error_code |= call_state_ptr->touch_state.get_account(arith, sender, account_ptr, ACCOUNT_NONE_FLAG);
@@ -198,7 +204,7 @@ namespace CuEVM {
             );
             #endif
             // DEBUG PRINT
-            // printf("pc: %d opcode: %d\n", call_state_ptr->pc, opcode);
+            printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode);
             // printf("touch state BEGIN BEGIN BEGIN\n");
             // call_state_ptr->touch_state.print();
             // printf("touch state END END END\n");
@@ -916,6 +922,7 @@ namespace CuEVM {
                         *call_state_ptr->stack_ptr,
                         *call_state_ptr->message_ptr,
                         call_state_ptr->touch_state,
+                        access_state,
                         *call_state_ptr->parent->last_return_data_ptr
                     );
                     break;

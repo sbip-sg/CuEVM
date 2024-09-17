@@ -135,8 +135,7 @@ namespace CuEVM::operations
                 memory_expansion_cost);
             // set the byte code
             CuEVM::account_t *contract=nullptr;
-            error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
-
+            error_code |= access_state.get_account(arith, contract_address, contract, ACCOUNT_NONE_FLAG);
             new_state_ptr->message_ptr->set_byte_code(
                 contract->byte_code);
 
@@ -759,11 +758,10 @@ namespace CuEVM::operations
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_message_call_t &message,
         CuEVM::TouchState &touch_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_return_data_t &return_data)
     {
         int32_t error_code = ERROR_SUCCESS;
-        return error_code;
-        /*
         if (message.get_static_env())
         {
             error_code = ERROR_STATIC_CALL_CONTEXT_SELFDESTRUCT;
@@ -771,54 +769,44 @@ namespace CuEVM::operations
         else
         {
             bn_t recipient;
-            stack.pop(recipient, error_code);
+            error_code |=stack.pop(arith, recipient);
 
-            cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_SELFDESTRUCT);
+            cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SELFDESTRUCT);
+            bn_t contract_address;
+            message.get_contract_address(arith, contract_address);
 
-            bn_t dummy_gas;
-            cgbn_set_ui32(arith._env, dummy_gas, 0);
-            touch_state.charge_gas_access_account(
-                recipient,
-                dummy_gas);
-            if (cgbn_compare_ui32(arith._env, dummy_gas, GAS_WARM_ACCESS) != 0)
-            {
-                cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
-            }
+            // custom logic, cannot use access_account_cost (no warm cost)
+            if (!access_state.is_warm_account(arith, recipient))
+                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
 
-            bn_t sender;
-            message.get_recipient(sender); // I_{a}
             bn_t sender_balance;
-            touch_state.get_account_balance(sender, sender_balance);
+            touch_state.get_balance(arith, contract_address, sender_balance);
 
-            if (cgbn_compare_ui32(arith._env, sender_balance, 0) > 0)
+            if (cgbn_compare_ui32(arith.env, sender_balance, 0) > 0)
             {
-                if (touch_state.is_empty_account(recipient))
+                if (touch_state.is_empty_account(arith, recipient))
                 {
-                    cgbn_add_ui32(arith._env, gas_used, gas_used, GAS_NEW_ACCOUNT);
+                    cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_NEW_ACCOUNT);
                 }
             }
-
-            if (arith.has_gas(gas_limit, gas_used, error_code))
+            error_code |= CuEVM::gas_cost::has_gas(
+                arith,
+                gas_limit,
+                gas_used);
+            if (error_code == ERROR_SUCCESS)
             {
                 bn_t recipient_balance;
-                touch_state.get_account_balance(recipient, recipient_balance);
-
-                if (cgbn_compare(arith._env, recipient, sender) != 0)
-                {
-                    cgbn_add(arith._env, recipient_balance, recipient_balance, sender_balance);
-                    touch_state.set_account_balance(recipient, recipient_balance);
-                }
-                cgbn_set_ui32(arith._env, sender_balance, 0);
-                touch_state.set_account_balance(sender, sender_balance);
-                // TODO: delete or not the storage/code?
-                touch_state.delete_account(sender);
-
-                return_data.set(
-                    NULL,
-                    0);
-                error_code = ERR_RETURN;
+                touch_state.get_balance(arith, recipient, recipient_balance);
+                cgbn_add(arith.env, recipient_balance, recipient_balance, sender_balance);
+                cgbn_set_ui32(arith.env, sender_balance, 0);
+                touch_state.set_balance(arith, contract_address, sender_balance);
+                touch_state.set_balance(arith, recipient, recipient_balance);
+                return_data = CuEVM::evm_return_data_t();
+                error_code |= ERROR_RETURN;
             }
+
         }
-        */
+        return error_code;
+
     }
 } // namespace CuEVM::operation

@@ -25,7 +25,7 @@ AccessState::get_account(ArithEnv &arith, const bn_t &address,
     bool res = _state->get_account(arith, address, account_ptr, flag);
     if (account_ptr == nullptr)
         account_ptr = new CuEVM::account_t(arith, address);
-    return (res ? add_account(arith, address, account_ptr, flag)
+    return (res  && flag.flags != ACCOUNT_POKE_FLAG ? add_account(arith, address, account_ptr, flag)
                 : ERROR_SUCCESS);
 }
 
@@ -59,6 +59,24 @@ __host__ __device__ int32_t AccessState::poke_value(ArithEnv &arith,
          account_ptr->get_storage_value(arith, key, value))
             ? _world_state->get_value(arith, address, key, value)
             : ERROR_SUCCESS);
+}
+
+__host__ __device__ int32_t AccessState::poke_balance(ArithEnv &arith,
+                                                      const bn_t &address,
+                                                      bn_t &balance) const {
+    account_t *account_ptr = nullptr;
+    _state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG);
+    if (account_ptr != nullptr) {
+        account_ptr->get_balance(arith, balance);
+        return ERROR_SUCCESS;
+    }
+    _world_state->get_account(arith, address, account_ptr);
+    if (account_ptr != nullptr) {
+        account_ptr->get_balance(arith, balance);
+        return ERROR_SUCCESS;
+    }
+    return ERROR_STATE_ADDRESS_NOT_FOUND;
+
 }
 
 __host__ __device__ int32_t

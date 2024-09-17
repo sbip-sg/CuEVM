@@ -164,6 +164,22 @@ class TouchState {
                                             const bn_t &balance);
 
     /**
+     * The getter for the balance given by an address without modifing the state.
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @param[in] balance The balance of the account.
+     * @return 0 if the balance is set, error otherwise.
+     */
+    __host__ __device__ int32_t poke_balance(ArithEnv &arith,
+                                                    const bn_t &address,
+                                                    bn_t &balance) const;
+
+    /** Helper debugging function, to be removed
+    */
+    __host__ __device__ bool is_warm_account(ArithEnv &arith,
+                                                const bn_t &address) const;
+
+    /**
      * The setter for the nonce given by an address.
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
@@ -203,6 +219,15 @@ class TouchState {
      * @return 0 if the account is deleted, error otherwise.
      */
     __host__ __device__ int32_t delete_account(ArithEnv &arith,
+                                               const bn_t &address);
+
+    /**
+     * Mark an account for deletion at the end of the transaction
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @return 0 if success, error otherwise.
+     */
+    __host__ __device__ int32_t mark_for_deletion(ArithEnv &arith,
                                                const bn_t &address);
 
     /**

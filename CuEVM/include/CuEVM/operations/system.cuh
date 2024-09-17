@@ -178,6 +178,7 @@ namespace CuEVM::operations
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_message_call_t &message,
         CuEVM::TouchState &touch_state,
+        CuEVM::AccessState &access_state,
         CuEVM::evm_return_data_t &return_data);
 } // namespace CuEVM::operation
 
