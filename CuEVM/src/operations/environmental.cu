@@ -218,16 +218,15 @@ namespace CuEVM::operations {
         {
             bn_t index;
             error_code |= stack.pop(arith, index);
-            bn_t length;
-            cgbn_set_ui32(arith.env, length, CuEVM::word_size);
+            uint32_t data_offset_ui32, length_ui32;
+            // get values saturated to uint32_max, in overflow case
+            data_offset_ui32 = cgbn_get_ui32(arith.env, index);
+            if (cgbn_compare_ui32(arith.env, index, data_offset_ui32) != 0)
+                data_offset_ui32 = UINT32_MAX;
+            length_ui32 = CuEVM::word_size;
+            CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
 
-            CuEVM::byte_array_t data;
-            error_code |= get_sub_byte_array_t(
-                arith,
-                message.get_data(),
-                index,
-                length,
-                data);
+
             error_code |= stack.pushx(
                 arith,
                 CuEVM::word_size,
@@ -393,7 +392,7 @@ namespace CuEVM::operations {
             length_ui32 = cgbn_get_ui32(arith.env, length);
             if (cgbn_compare_ui32(arith.env, length, length_ui32) != 0)
                 length_ui32 = UINT32_MAX;
-            CuEVM::byte_array_t data(message.get_data(), data_offset_ui32, length_ui32);
+            CuEVM::byte_array_t data(message.get_byte_code(), data_offset_ui32, length_ui32);
 
             error_code |= memory.set(
                 arith,

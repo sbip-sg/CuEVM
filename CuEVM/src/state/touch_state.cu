@@ -27,7 +27,7 @@ __host__ __device__ int32_t TouchState::add_account(
 __host__ __device__ int32_t TouchState::get_account(
     ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
     const CuEVM::account_flags_t acces_state_flag) {
-    CuEVM::account_t *tmp_ptr;
+    CuEVM::account_t *tmp_ptr = nullptr;
     _access_state->get_account(arith, address, tmp_ptr, acces_state_flag);
     return (
         _state->get_account(arith, address, account_ptr) ? ([&]() -> int32_t {

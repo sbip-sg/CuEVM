@@ -62,7 +62,7 @@ namespace CuEVM::operations {
         // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
         bn_t gas_left;
         cgbn_sub(arith.env, gas_left, gas_limit, gas_used);
-        error_code = (
+        error_code |= (
             cgbn_compare_ui32(arith.env, gas_left, GAS_STIPEND) < 0 ?
             ERROR_OUT_OF_GAS :
             error_code);

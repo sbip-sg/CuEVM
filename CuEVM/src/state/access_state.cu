@@ -22,8 +22,10 @@ __host__ __device__ int32_t
 AccessState::get_account(ArithEnv &arith, const bn_t &address,
                          CuEVM::account_t *&account_ptr,
                          const CuEVM::account_flags_t flag) {
-    return (_state->get_account(arith, address, account_ptr, flag)
-                ? add_account(arith, address, account_ptr, flag)
+    bool res = _state->get_account(arith, address, account_ptr, flag);
+    if (account_ptr == nullptr)
+        account_ptr = new CuEVM::account_t(arith, address);
+    return (res ? add_account(arith, address, account_ptr, flag)
                 : ERROR_SUCCESS);
 }
 

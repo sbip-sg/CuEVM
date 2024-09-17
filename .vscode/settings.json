@@ -1,4 +1,8 @@
 {
+    "editor.formatOnSave": true,
+    "[cuda]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools" // Use the C++ formatter for CUDA
+    },
     "files.associations": {
         "*.ejs": "html",
         "iostream": "cpp",
