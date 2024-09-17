@@ -130,4 +130,5 @@ __host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
  * @param[inout] address The address variable
  */
 __host__ __device__ void evm_address_conversion(ArithEnv &arith, bn_t &address);
+__host__ __device__ void print_bnt(ArithEnv &arith, const bn_t &bn);
 }  // namespace CuEVM

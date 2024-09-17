@@ -120,7 +120,7 @@ namespace CuEVM {
             ERROR_SUCCESS
         );
         // warmup the accounts
-        CuEVM::account_t* account_ptr;
+        CuEVM::account_t* account_ptr=nullptr;
         error_code |= call_state_ptr->touch_state.get_account(arith, sender, account_ptr, ACCOUNT_NONE_FLAG);
         error_code |= call_state_ptr->touch_state.get_account(arith, recipient, account_ptr, ACCOUNT_BYTE_CODE_FLAG);
 
@@ -156,6 +156,9 @@ namespace CuEVM {
                     }
                 } else {
                     // operation stop
+                    // clear return data
+                    call_state_ptr->parent->last_return_data_ptr->free();
+                    call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
                     return ERROR_RETURN;
                 }
             }
@@ -1073,7 +1076,6 @@ namespace CuEVM {
 
 
     __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_code) {
-
         bn_t child_success;
         // set the child call to failure
         cgbn_set_ui32(arith.env, child_success, 0);
@@ -1164,7 +1166,7 @@ namespace CuEVM {
         // to see if the contract is a contract
         bn_t sender_address;
         call_state_ptr->message_ptr->get_sender(arith, sender_address);
-        CuEVM::account_t *sender_account;
+        CuEVM::account_t *sender_account= nullptr;
         call_state_ptr->parent->touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_BYTE_CODE_FLAG);
         if (sender_account->is_contract()) {
             bn_t sender_nonce;
@@ -1178,7 +1180,7 @@ namespace CuEVM {
         // call_state_ptr->parent->touch_state.set_nonce(arith, sender_address, sender_nonce);
         // compute the gas to deposit the contract
         bn_t code_size;
-        cgbn_set_ui32(arith.env, code_size, call_state_ptr->last_return_data_ptr->size);
+        cgbn_set_ui32(arith.env, code_size, call_state_ptr->parent->last_return_data_ptr->size);
         CuEVM::gas_cost::code_cost(arith, call_state_ptr->gas_used, code_size);
         int32_t error_code = ERROR_SUCCESS;
         error_code |= CuEVM::gas_cost::has_gas(
@@ -1191,9 +1193,9 @@ namespace CuEVM {
             bn_t contract_address;
             call_state_ptr->message_ptr->get_recipient(arith, contract_address);
             #ifdef EIP_3541
-            uint8_t *code = call_state_ptr->last_return_data_ptr->data;
+            uint8_t *code = call_state_ptr->parent->last_return_data_ptr->data;
             #endif
-            uint32_t code_size = call_state_ptr->last_return_data_ptr->size;
+            uint32_t code_size = call_state_ptr->parent->last_return_data_ptr->size;
             if (code_size <= CuEVM::max_code_size) {
                 #ifdef EIP_3541
                 if ((code_size > 0) && (code[0] == 0xef)) {
@@ -1203,11 +1205,15 @@ namespace CuEVM {
                 call_state_ptr->touch_state.set_code(
                     arith,
                     contract_address,
-                    *call_state_ptr->last_return_data_ptr
+                    *call_state_ptr->parent->last_return_data_ptr
                 );
             } else {
                 error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
             }
+            // reset last return data after CREATE
+            if (call_state_ptr->parent->last_return_data_ptr != nullptr)
+                delete call_state_ptr->parent->last_return_data_ptr;
+            call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
         }
         return error_code;
     }
