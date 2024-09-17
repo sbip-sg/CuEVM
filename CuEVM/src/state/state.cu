@@ -156,8 +156,8 @@ __host__ __device__ int32_t state_t::is_empty_account(ArithEnv &arith,
     int32_t error_code;
     uint32_t index;
     error_code = get_account_index(arith, address, index);
-    error_code =
-        (error_code == ERROR_SUCCESS) ? accounts[index].is_empty() : error_code;
+    return (error_code == ERROR_SUCCESS) ? accounts[index].is_empty()
+                                         : error_code;
 }
 
 __host__ int32_t state_t::from_json(const cJSON *state_json, int32_t managed) {

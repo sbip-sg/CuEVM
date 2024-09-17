@@ -138,5 +138,15 @@ class AccessState {
      */
     __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
                                                  const bn_t &address) const;
+    /**
+     * Get the full storage from access state and world state
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @param[out] storage The storage of the account.
+     * @return 0 if the storage is found, error otherwise.
+     */
+    __host__ __device__ int32_t
+    get_storage(ArithEnv &arith, const bn_t &address,
+                CuEVM::contract_storage_t &storage) const;
 };
 }  // namespace CuEVM

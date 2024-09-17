@@ -110,4 +110,17 @@ AccessState::is_empty_account(ArithEnv &arith, const bn_t &address) const {
                        : account_ptr->is_empty())
                 : error_code);
 }
+__host__ __device__ int32_t
+AccessState::get_storage(ArithEnv &arith, const bn_t &address,
+                         CuEVM::contract_storage_t &storage) const {
+    CuEVM::account_t *account_ptr = nullptr;
+    if (_state->get_account(arith, address, account_ptr) == ERROR_SUCCESS) {
+        storage.update(arith, account_ptr->storage);
+    }
+    if (_world_state->get_account(arith, address, account_ptr) ==
+        ERROR_SUCCESS) {
+        storage.update(arith, account_ptr->storage);
+    }
+    return ERROR_SUCCESS;
+}
 }  // namespace CuEVM

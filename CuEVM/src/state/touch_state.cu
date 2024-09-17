@@ -195,21 +195,56 @@ __host__ __device__ int32_t TouchState::set_storage_value(ArithEnv &arith,
     return ERROR_SUCCESS;
 }
 
+// __host__ __device__ int32_t TouchState::delete_account(ArithEnv &arith,
+//                                                        const bn_t &address) {
+//     account_t *account_ptr = nullptr;
+//     int32_t error_code =
+//         _state->get_account(arith, address, account_ptr,
+//         ACCOUNT_DELETED_FLAG);
+//     // printf("TouchState::delete_account - error_code: %d\n", error_code);
+//     // printf("TouchState::delete_account - account_ptr: %p\n", account_ptr);
+//     if (account_ptr == nullptr)
+//         account_ptr = new account_t(arith, address);
+//     else
+//         account_ptr->empty();
+//     // account_ptr->print();
+//     if (error_code)
+//         add_account(arith, address, account_ptr, ACCOUNT_DELETED_FLAG);
+
+//     return ERROR_SUCCESS;
+// }
 __host__ __device__ int32_t TouchState::delete_account(ArithEnv &arith,
                                                        const bn_t &address) {
     account_t *account_ptr = nullptr;
     int32_t error_code =
-        _state->get_account(arith, address, account_ptr, ACCOUNT_DELETED_FLAG);
-    // printf("TouchState::delete_account - error_code: %d\n", error_code);
-    // printf("TouchState::delete_account - account_ptr: %p\n", account_ptr);
-    if (account_ptr == nullptr)
-        account_ptr = new account_t(arith, address);
-    else
-        account_ptr->empty();
-    // account_ptr->print();
-    if (error_code)
-        add_account(arith, address, account_ptr, ACCOUNT_DELETED_FLAG);
-
+        get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG);
+    account_ptr->byte_code.free();
+    account_ptr->storage.free();
+    CuEVM::bn_t zero;
+    cgbn_set_ui32(arith.env, zero, 0U);
+    account_ptr->set_balance(arith, zero);
+    account_ptr->set_nonce(arith, zero);
+    // get the full storage from the access state and world state
+    _access_state->get_storage(arith, address, account_ptr->storage);
+    TouchState *tmp = parent;
+    CuEVM::account_t *tmp_account_ptr = nullptr;
+    while (tmp != nullptr) {
+        if (tmp->_state->get_account(arith, address, tmp_account_ptr) ==
+            ERROR_SUCCESS) {
+            account_ptr->storage.update(arith, tmp_account_ptr->storage);
+        }
+        tmp = tmp->parent;
+    }
+    // zero the value in the storage
+    for (uint32_t idx = 0; idx < account_ptr->storage.size; idx++) {
+        cgbn_store(
+            arith.env,
+            (cgbn_evm_word_t_ptr)&account_ptr->storage.storage[idx].value,
+            zero);
+    }
+    // set all flags and deleted flag
+    _state->get_account(arith, address, account_ptr,
+                        ACCOUNT_DELETED_FLAG | ACCOUNT_ALL_FLAG);
     return ERROR_SUCCESS;
 }
 __host__ __device__ int32_t TouchState::mark_for_deletion(ArithEnv &arith,
@@ -247,7 +282,7 @@ __host__ __device__ int32_t TouchState::is_empty_account(ArithEnv &arith,
 __host__ __device__ int32_t
 TouchState::is_deleted_account(ArithEnv &arith, const bn_t &address) {
     uint32_t index;
-    if (_state->get_account_index(arith, address, index) == 0) {
+    if (_state->get_account_index(arith, address, index) == ERROR_SUCCESS) {
         return _state->flags[index].has_deleted();
     }
 
