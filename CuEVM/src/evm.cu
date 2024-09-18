@@ -74,6 +74,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
 
 __host__ __device__ evm_t::~evm_t() {
     if (call_state_ptr != nullptr) {
+        call_state_ptr->touch_state.clear();
         delete call_state_ptr;
     }
     call_state_ptr = nullptr;
@@ -683,7 +684,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                                          call_state_ptr->gas_refund
 #ifdef EIP_3155_OPTIONAL
                                          ,
-                                         error_code, call_state_ptr->touch_state
+                                         error_code
 #endif
             );
         }

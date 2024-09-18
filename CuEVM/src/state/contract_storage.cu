@@ -38,7 +38,7 @@ __host__ __device__ contract_storage_t &contract_storage_t::operator=(
     if (this == &other) {
         return *this;
     }
-    if (size != other.size) {
+    if (capacity != other.capacity) {
         free();
         size = other.size;
         capacity = other.capacity;
@@ -50,7 +50,8 @@ __host__ __device__ contract_storage_t &contract_storage_t::operator=(
         storage = tmp_storage;
     }
     __ONE_GPU_THREAD_BEGIN__
-    memcpy(storage, other.storage, size * sizeof(storage_element_t));
+    if (other.size > 0)
+        memcpy(storage, other.storage, other.size * sizeof(storage_element_t));
     __ONE_GPU_THREAD_END__
     return *this;
 }

@@ -59,6 +59,24 @@ class TouchState {
         : _state(state), _access_state(parent->_access_state), parent(parent) {}
 
     /**
+     * destructor for the touch state
+     *
+     */
+    __host__ __device__ ~TouchState() {
+        delete _state;
+        clear();
+    }
+
+    /**
+     * Clear the touch state.
+     */
+    __host__ __device__ void clear() {
+        _state = nullptr;
+        _access_state = nullptr;
+        parent = nullptr;
+    }
+
+    /**
      * the assigment operator
      * @param[in] other The other touch state.
      * @return The reference to the touch state.
@@ -82,6 +100,8 @@ class TouchState {
         ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
         const CuEVM::account_flags_t acces_state_flag = ACCOUNT_NONE_FLAG);
 
+    __host__ __device__ int32_t get_account_index(
+        ArithEnv &arith, const bn_t &address, uint32_t &index) const;
     /**
      * If the account given by address is empty
      * @param[in] arith The arithmetic environment.
@@ -249,6 +269,8 @@ class TouchState {
     __host__ __device__ int32_t transfer(ArithEnv &arith, const bn_t &from,
                                          const bn_t &to, const bn_t &value);
 
+    __host__ __device__ CuEVM::contract_storage_t get_entire_storage(
+        ArithEnv &arith, const uint32_t account_index) const;
     /**
      * print the touch state
      */
