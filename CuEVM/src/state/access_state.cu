@@ -74,7 +74,9 @@ __host__ __device__ int32_t AccessState::poke_balance(ArithEnv &arith,
         account_ptr->get_balance(arith, balance);
         return ERROR_SUCCESS;
     }
-    return ERROR_STATE_ADDRESS_NOT_FOUND;
+    // not found, simply return 0 and not error
+    cgbn_set_ui32(arith.env, balance, 0);
+    return ERROR_SUCCESS;
 }
 
 __host__ __device__ int32_t
