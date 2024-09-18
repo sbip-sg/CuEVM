@@ -30,10 +30,10 @@ struct state_access_t : state_t {
      * @param[in] no_accounts The number of accounts.
      * @param[in] flags The flags.
      */
-    __host__ __device__ state_access_t(CuEVM::account_t *accounts,
-                                       uint32_t no_accounts,
-                                       CuEVM::account_flags_t *flags)
-        : state_t(accounts, no_accounts), flags(flags) {}
+    // __host__ __device__ state_access_t(CuEVM::account_t *accounts,
+    //                                    uint32_t no_accounts,
+    //                                    CuEVM::account_flags_t *flags)
+    //     : state_t(accounts, no_accounts), flags(flags) {}
 
     /**
      * THe copy constructor.
@@ -90,9 +90,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account,
-                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The get account function.
@@ -102,9 +101,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(
-        ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The get account index function.
@@ -112,8 +110,7 @@ struct state_access_t : state_t {
      * @param[out] index The index.
      * @return If found 0. otherwise error.
      */
-    __host__ int32_t get_account_index_evm(const evm_word_t &address,
-                                           uint32_t &index) const;
+    __host__ int32_t get_account_index_evm(const evm_word_t &address, uint32_t &index) const;
 
     /**
      * The add account function.
@@ -121,9 +118,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    add_account(const CuEVM::account_t &account,
-                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t add_account(const CuEVM::account_t &account,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The add duplicate account function.
@@ -132,9 +128,9 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t add_duplicate_account(
-        CuEVM::account_t *&account_ptr, CuEVM::account_t *&src_account_ptr,
-        const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t add_duplicate_account(CuEVM::account_t *&account_ptr,
+                                                      CuEVM::account_t *&src_account_ptr,
+                                                      const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The add new account function.
@@ -144,9 +140,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t add_new_account(
-        ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t add_new_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+                                                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The set account function.
@@ -155,9 +150,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    set_account(ArithEnv &arith, const CuEVM::account_t &account,
-                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
+    __host__ __device__ int32_t set_account(ArithEnv &arith, const CuEVM::account_t &account,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
 
     /**
      * The update account function.
@@ -166,9 +160,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    update_account(ArithEnv &arith, const CuEVM::account_t &account,
-                   const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
+    __host__ __device__ int32_t update_account(ArithEnv &arith, const CuEVM::account_t &account,
+                                               const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
 
     /**
      * The update state function.
@@ -176,8 +169,7 @@ struct state_access_t : state_t {
      * @param[in] other The other state access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t update(ArithEnv &arith,
-                                       const state_access_t &other);
+    __host__ __device__ int32_t update(ArithEnv &arith, const state_access_t &other);
 
     /**
      * The print function.
@@ -197,8 +189,7 @@ struct state_access_t : state_t {
      * @param[in] state2 The second state.
      * @return The merged state in JSON.
      */
-    __host__ static cJSON *merge_json(const state_t &state1,
-                                      const state_access_t &state2);
+    __host__ static cJSON *merge_json(const state_t &state1, const state_access_t &state2);
 };
 
 }  // namespace CuEVM
