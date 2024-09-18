@@ -12,7 +12,7 @@ __host__ __device__ contract_storage_t::~contract_storage_t() { free(); }
 
 __host__ __device__ void contract_storage_t::free() {
     __ONE_GPU_THREAD_BEGIN__
-    if (storage != nullptr && capacity > 0) {
+    if ((storage != nullptr) && (capacity > 0)) {
         delete[] storage;
     }
     __ONE_GPU_THREAD_END__
@@ -206,7 +206,7 @@ __host__ cJSON *contract_storage_t::merge_json(const contract_storage_t &storage
     return storage_json;
 }
 
-__host__ __device__ void contract_storage_t::transfer_memory(contract_storage_t &src, contract_storage_t &dst) {
+__host__ __device__ void contract_storage_t::transfer_memory(contract_storage_t &dst, contract_storage_t &src) {
     if ((src.size > 0) && (src.storage != nullptr) && (src.capacity > 0)) {
         memcpy(dst.storage, src.storage, src.size * sizeof(storage_element_t));
         dst.size = src.size;
@@ -311,7 +311,7 @@ __global__ void contract_storage_t_transfer_kernel(contract_storage_t *dst_insta
                                                    uint32_t instance_count) {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance < instance_count) {
-        contract_storage_t::transfer_memory(src_instances[instance], dst_instances[instance]);
+        contract_storage_t::transfer_memory(dst_instances[instance], src_instances[instance]);
     }
 }
 

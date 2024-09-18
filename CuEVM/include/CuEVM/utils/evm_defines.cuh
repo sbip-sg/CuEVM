@@ -99,6 +99,10 @@
 
 #ifdef BERLIN
 #define EIP_2070
+#define EIP_2565
+#define EIP_2718
+#define EIP_2929
+#define EIP_2930
 #endif
 
 #ifdef EIP_2070
@@ -201,16 +205,14 @@ constexpr CONSTANT uint32_t hash_size = 32;
 constexpr CONSTANT uint32_t max_code_size = 24576;
 #else
 #error "EIP_170 is not defined"
-constexpr CONSTANT uint32_t max_code_size =
-    std::numeric_limits<uint32_t>::max();
+constexpr CONSTANT uint32_t max_code_size = std::numeric_limits<uint32_t>::max();
 #endif
 
 #ifdef EIP_3860
 constexpr CONSTANT uint32_t max_initcode_size = 2 * max_code_size;
 #else
 #error "EIP_3860 is not defined"
-constexpr CONSTANT uint32_t max_initcode_size =
-    std::numeric_limits<uint32_t>::max();
+constexpr CONSTANT uint32_t max_initcode_size = std::numeric_limits<uint32_t>::max();
 #endif
 
 constexpr CONSTANT uint32_t no_precompile_contracts = 10;
@@ -226,7 +228,6 @@ constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
 // specific implementation constants
 constexpr CONSTANT uint32_t initial_storage_capacity = 4;
 
-
 /**
  * The CGBN context type.  This is a template type that takes
  * the number of threads per instance and the
@@ -235,8 +236,7 @@ constexpr CONSTANT uint32_t initial_storage_capacity = 4;
 #if defined(__CUDA_ARCH__)
 using context_t = cgbn_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 #else
-using context_t =
-    cgbn_host_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
+using context_t = cgbn_host_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
 #endif
 
 /**
