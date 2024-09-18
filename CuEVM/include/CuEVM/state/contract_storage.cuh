@@ -120,10 +120,10 @@ struct contract_storage_t {
                                       const int32_t pretty = 0);
     /**
      * Transfer memory from one contract storage to another
-     * @param[in] src The source contract storage
      * @param[in] dst The destination contract storage
+     * @param[in] src The source contract storage
      */
-    __host__ __device__ static void transfer_memory(contract_storage_t &src, contract_storage_t &dst);
+    __host__ __device__ static void transfer_memory(contract_storage_t &dst, contract_storage_t &src);
 
     /**
      * Get the cpu instance of the contract storage

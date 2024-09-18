@@ -8,25 +8,18 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
-__global__ void account_t_transfer_kernel(account_t *dst_instances,
-                                          account_t *src_instances,
-                                          uint32_t count) {
+__global__ void account_t_transfer_kernel(account_t *dst_instances, account_t *src_instances, uint32_t count) {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (instance >= count) return;
 
-    CuEVM::byte_array_t::transfer_memory(dst_instances[instance].byte_code,
-                                         src_instances[instance].byte_code);
+    CuEVM::byte_array_t::transfer_memory(dst_instances[instance].byte_code, src_instances[instance].byte_code);
 
-    CuEVM::contract_storage_t::transfer_memory(dst_instances[instance].storage,
-                                               src_instances[instance].storage);
+    CuEVM::contract_storage_t::transfer_memory(dst_instances[instance].storage, src_instances[instance].storage);
     // copy the others not necesary
-    memcpy(&dst_instances[instance].nonce, &src_instances[instance].nonce,
-           sizeof(evm_word_t));
-    memcpy(&dst_instances[instance].balance, &src_instances[instance].balance,
-           sizeof(evm_word_t));
-    memcpy(&dst_instances[instance].address, &src_instances[instance].address,
-           sizeof(evm_word_t));
+    memcpy(&dst_instances[instance].nonce, &src_instances[instance].nonce, sizeof(evm_word_t));
+    memcpy(&dst_instances[instance].balance, &src_instances[instance].balance, sizeof(evm_word_t));
+    memcpy(&dst_instances[instance].address, &src_instances[instance].address, sizeof(evm_word_t));
 }
 
 __host__ __device__ account_t::account_t(const account_t &account) {
@@ -37,8 +30,7 @@ __host__ __device__ account_t::account_t(const account_t &account) {
     storage = account.storage;
 }
 
-__host__ __device__ account_t::account_t(const account_t &account,
-                                         const account_flags_t &flags) {
+__host__ __device__ account_t::account_t(const account_t &account, const account_flags_t &flags) {
     address = account.address;
     balance = account.balance;
     nonce = account.nonce;
@@ -50,8 +42,7 @@ __host__ __device__ account_t::account_t(const account_t &account,
     }
 }
 
-__host__ __device__ account_t::account_t(const account_t *account_ptr,
-                                         const account_flags_t &flags) {
+__host__ __device__ account_t::account_t(const account_t *account_ptr, const account_flags_t &flags) {
     address = account_ptr->address;
     balance = account_ptr->balance;
     nonce = account_ptr->nonce;
@@ -63,8 +54,7 @@ __host__ __device__ account_t::account_t(const account_t *account_ptr,
     }
 }
 
-__host__ __device__ account_t::account_t(ArithEnv &arith, const bn_t &address)
-    : storage(), byte_code(0U) {
+__host__ __device__ account_t::account_t(ArithEnv &arith, const bn_t &address) : storage(), byte_code(0U) {
     cgbn_store(arith.env, &this->address, address);
     bn_t tmp;
     cgbn_set_ui32(arith.env, tmp, 0);
@@ -102,25 +92,19 @@ __host__ __device__ account_t &account_t::operator=(const account_t &other) {
     return *this;
 }
 
-__host__ __device__ int32_t account_t::get_storage_value(ArithEnv &arith,
-                                                         const bn_t &key,
-                                                         bn_t &value) {
+__host__ __device__ int32_t account_t::get_storage_value(ArithEnv &arith, const bn_t &key, bn_t &value) {
     return storage.get_value(arith, key, value);
 }
 
-__host__ __device__ int32_t account_t::set_storage_value(ArithEnv &arith,
-                                                         const bn_t &key,
-                                                         const bn_t &value) {
+__host__ __device__ int32_t account_t::set_storage_value(ArithEnv &arith, const bn_t &key, const bn_t &value) {
     return storage.set_value(arith, key, value);
 }
 
-__host__ __device__ void account_t::get_address(ArithEnv &arith,
-                                                bn_t &address) {
+__host__ __device__ void account_t::get_address(ArithEnv &arith, bn_t &address) {
     cgbn_load(arith.env, address, &this->address);
 }
 
-__host__ __device__ void account_t::get_balance(ArithEnv &arith,
-                                                bn_t &balance) {
+__host__ __device__ void account_t::get_balance(ArithEnv &arith, bn_t &balance) {
     cgbn_load(arith.env, balance, &this->balance);
 }
 
@@ -128,48 +112,36 @@ __host__ __device__ void account_t::get_nonce(ArithEnv &arith, bn_t &nonce) {
     cgbn_load(arith.env, nonce, &this->nonce);
 }
 
-__host__ __device__ byte_array_t account_t::get_byte_code() const {
-    return byte_code;
-}
+__host__ __device__ byte_array_t account_t::get_byte_code() const { return byte_code; }
 
-__host__ __device__ void account_t::set_nonce(ArithEnv &arith,
-                                              const bn_t &nonce) {
+__host__ __device__ void account_t::set_nonce(ArithEnv &arith, const bn_t &nonce) {
     cgbn_store(arith.env, &this->nonce, nonce);
 }
 
-__host__ __device__ void account_t::set_balance(ArithEnv &arith,
-                                                const bn_t &balance) {
+__host__ __device__ void account_t::set_balance(ArithEnv &arith, const bn_t &balance) {
     cgbn_store(arith.env, &this->balance, balance);
 }
 
-__host__ __device__ void account_t::set_address(ArithEnv &arith,
-                                                const bn_t &address) {
+__host__ __device__ void account_t::set_address(ArithEnv &arith, const bn_t &address) {
     cgbn_store(arith.env, &this->address, address);
 }
 
-__host__ __device__ void account_t::set_byte_code(
-    const byte_array_t &byte_code) {
-    this->byte_code = byte_code;
-}
+__host__ __device__ void account_t::set_byte_code(const byte_array_t &byte_code) { this->byte_code = byte_code; }
 
-__host__ __device__ int32_t account_t::has_address(ArithEnv &arith,
-                                                   const bn_t &address) {
+__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const bn_t &address) {
     bn_t local_address;
     cgbn_load(arith.env, local_address, &this->address);
     return (cgbn_compare(arith.env, local_address, address) == 0);
 }
 
-__host__ __device__ int32_t account_t::has_address(ArithEnv &arith,
-                                                   const evm_word_t &address) {
+__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const evm_word_t &address) {
     bn_t local_address, target_address;
     cgbn_load(arith.env, local_address, &this->address);
     cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr)&address);
     return (cgbn_compare(arith.env, local_address, target_address) == 0);
 }
 
-__host__ __device__ void account_t::update(ArithEnv &arith,
-                                           const account_t &other,
-                                           const account_flags_t &flags) {
+__host__ __device__ void account_t::update(ArithEnv &arith, const account_t &other, const account_flags_t &flags) {
     if (flags.has_address()) {
         address = other.address;
     }
@@ -199,8 +171,7 @@ __host__ __device__ void account_t::update(ArithEnv &arith,
 // }
 
 __host__ __device__ bool account_t::is_empty() {
-    return ((balance == 0) && (nonce == 0) && (byte_code.size == 0)) ? true
-                                                                     : false;
+    return ((balance == 0) && (nonce == 0) && (byte_code.size == 0)) ? true : false;
 }
 
 __host__ __device__ bool account_t::is_empty_create() {
@@ -208,9 +179,7 @@ __host__ __device__ bool account_t::is_empty_create() {
     return ((nonce == 0) && (byte_code.size == 0)) ? true : false;
 }
 
-__host__ __device__ int32_t account_t::is_contract() {
-    return (byte_code.size > 0);
-}
+__host__ __device__ int32_t account_t::is_contract() { return (byte_code.size > 0); }
 
 __host__ __device__ void account_t::empty() {
     __ONE_GPU_THREAD_BEGIN__
@@ -235,12 +204,10 @@ __host__ void account_t::from_json(const cJSON *account_json, int32_t managed) {
     nonce_json = cJSON_GetObjectItemCaseSensitive(account_json, "nonce");
     nonce.from_hex(nonce_json->valuestring);
 
-    byte_code.from_hex(
-        cJSON_GetObjectItemCaseSensitive(account_json, "code")->valuestring,
-        LITTLE_ENDIAN, NO_PADDING, managed);
+    byte_code.from_hex(cJSON_GetObjectItemCaseSensitive(account_json, "code")->valuestring, LITTLE_ENDIAN, NO_PADDING,
+                       managed);
 
-    storage.from_json(cJSON_GetObjectItemCaseSensitive(account_json, "storage"),
-                      managed);
+    storage.from_json(cJSON_GetObjectItemCaseSensitive(account_json, "storage"), managed);
 }
 
 __host__ cJSON *account_t::to_json() const {
@@ -277,8 +244,7 @@ __host__ __device__ void account_t::print() {
     __ONE_GPU_THREAD_WOSYNC_END__
 }
 
-__host__ cJSON *account_t::merge_json(const account_t *&account1_ptr,
-                                      const account_t *&account2_ptr,
+__host__ cJSON *account_t::merge_json(const account_t *&account1_ptr, const account_t *&account2_ptr,
                                       const account_flags_t &flags) {
     cJSON *account_json = cJSON_CreateObject();
     char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
@@ -304,14 +270,10 @@ __host__ cJSON *account_t::merge_json(const account_t *&account1_ptr,
     CuEVM::byte_array_t *hash;
     hash = new CuEVM::byte_array_t(CuEVM::hash_size);
     if (flags.has_byte_code()) {
-        CuCrypto::keccak::sha3(account2_ptr->byte_code.data,
-                               account2_ptr->byte_code.size, hash->data,
-                               hash->size);
+        CuCrypto::keccak::sha3(account2_ptr->byte_code.data, account2_ptr->byte_code.size, hash->data, hash->size);
         code_hex_string_ptr = account2_ptr->byte_code.to_hex();
     } else {
-        CuCrypto::keccak::sha3(account1_ptr->byte_code.data,
-                               account1_ptr->byte_code.size, hash->data,
-                               hash->size);
+        CuCrypto::keccak::sha3(account1_ptr->byte_code.data, account1_ptr->byte_code.size, hash->data, hash->size);
         code_hex_string_ptr = account1_ptr->byte_code.to_hex();
     }
     cJSON_AddStringToObject(account_json, "code", code_hex_string_ptr);
@@ -324,11 +286,9 @@ __host__ cJSON *account_t::merge_json(const account_t *&account1_ptr,
     cJSON *storage_json = nullptr;
 
     if (flags.has_storage()) {
-        storage_json = CuEVM::contract_storage_t::merge_json(
-            account1_ptr->storage, account2_ptr->storage, 1);
+        storage_json = CuEVM::contract_storage_t::merge_json(account1_ptr->storage, account2_ptr->storage, 1);
     } else {
-        storage_json = CuEVM::contract_storage_t::merge_json(
-            account1_ptr->storage, account1_ptr->storage, 1);
+        storage_json = CuEVM::contract_storage_t::merge_json(account1_ptr->storage, account1_ptr->storage, 1);
     }
 
     cJSON_AddItemToObject(account_json, "storage", storage_json);
@@ -345,43 +305,33 @@ __host__ account_t *account_t::get_cpu(uint32_t count) {
     return cpu_instances;
 }
 
-__host__ void account_t::free_cpu(account_t *cpu_instances, uint32_t count) {
-    delete[] cpu_instances;
-}
+__host__ void account_t::free_cpu(account_t *cpu_instances, uint32_t count) { delete[] cpu_instances; }
 
-__host__ account_t *account_t::get_gpu_from_cpu(account_t *cpu_instances,
-                                                uint32_t count) {
+__host__ account_t *account_t::get_gpu_from_cpu(account_t *cpu_instances, uint32_t count) {
     account_t *gpu_instances, *tmp_cpu_instances;
     tmp_cpu_instances = new account_t[count];
     memcpy(tmp_cpu_instances, cpu_instances, count * sizeof(account_t));
 
     for (uint32_t index = 0; index < count; index++) {
-        if ((cpu_instances[index].byte_code.data != nullptr) &&
-            (cpu_instances[index].byte_code.size > 0)) {
-            CUDA_CHECK(cudaMalloc(
-                &tmp_cpu_instances[index].byte_code.data,
-                cpu_instances[index].byte_code.size * sizeof(uint8_t)));
-            CUDA_CHECK(cudaMemcpy(
-                tmp_cpu_instances[index].byte_code.data,
-                cpu_instances[index].byte_code.data,
-                cpu_instances[index].byte_code.size * sizeof(uint8_t),
-                cudaMemcpyHostToDevice));
+        if ((cpu_instances[index].byte_code.data != nullptr) && (cpu_instances[index].byte_code.size > 0)) {
+            CUDA_CHECK(cudaMalloc(&tmp_cpu_instances[index].byte_code.data,
+                                  cpu_instances[index].byte_code.size * sizeof(uint8_t)));
+            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[index].byte_code.data, cpu_instances[index].byte_code.data,
+                                  cpu_instances[index].byte_code.size * sizeof(uint8_t), cudaMemcpyHostToDevice));
+            tmp_cpu_instances[index].byte_code.size = cpu_instances[index].byte_code.size;
         }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) &&
-            (tmp_cpu_instances[index].storage.size > 0)) {
+        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
             CUDA_CHECK(cudaMalloc(&tmp_cpu_instances[index].storage.storage,
-                                  tmp_cpu_instances[index].storage.size *
-                                      sizeof(CuEVM::storage_element_t)));
-            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[index].storage.storage,
-                                  cpu_instances[index].storage.storage,
-                                  cpu_instances[index].storage.size *
-                                      sizeof(CuEVM::storage_element_t),
+                                  tmp_cpu_instances[index].storage.size * sizeof(CuEVM::storage_element_t)));
+            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[index].storage.storage, cpu_instances[index].storage.storage,
+                                  cpu_instances[index].storage.size * sizeof(CuEVM::storage_element_t),
                                   cudaMemcpyHostToDevice));
+            tmp_cpu_instances[index].storage.size = cpu_instances[index].storage.size;
+            tmp_cpu_instances[index].storage.capacity = cpu_instances[index].storage.capacity;
         }
     }
     CUDA_CHECK(cudaMalloc(&gpu_instances, count * sizeof(account_t)));
-    CUDA_CHECK(cudaMemcpy(gpu_instances, tmp_cpu_instances,
-                          count * sizeof(account_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(gpu_instances, tmp_cpu_instances, count * sizeof(account_t), cudaMemcpyHostToDevice));
     for (uint32_t index = 0; index < count; index++) {
         tmp_cpu_instances[index].clear();
     }
@@ -391,15 +341,12 @@ __host__ account_t *account_t::get_gpu_from_cpu(account_t *cpu_instances,
 
 __host__ void account_t::free_gpu(account_t *gpu_instances, uint32_t count) {
     account_t *tmp_cpu_instances = new account_t[count];
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances,
-                          count * sizeof(account_t), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances, count * sizeof(account_t), cudaMemcpyDeviceToHost));
     for (uint32_t index = 0; index < count; index++) {
-        if ((tmp_cpu_instances[index].byte_code.data != nullptr) &&
-            (tmp_cpu_instances[index].byte_code.size > 0)) {
+        if ((tmp_cpu_instances[index].byte_code.data != nullptr) && (tmp_cpu_instances[index].byte_code.size > 0)) {
             CUDA_CHECK(cudaFree(tmp_cpu_instances[index].byte_code.data));
         }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) &&
-            (tmp_cpu_instances[index].storage.size > 0)) {
+        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
             CUDA_CHECK(cudaFree(tmp_cpu_instances[index].storage.storage));
         }
         tmp_cpu_instances[index].clear();
@@ -408,32 +355,29 @@ __host__ void account_t::free_gpu(account_t *gpu_instances, uint32_t count) {
     CUDA_CHECK(cudaFree(gpu_instances));
 }
 
-__host__ account_t *account_t::get_cpu_from_gpu(account_t *gpu_instances,
-                                                uint32_t count) {
+__host__ account_t *account_t::get_cpu_from_gpu(account_t *gpu_instances, uint32_t count) {
     // we consider that the byte code and storage were not allocated
     // from the cpu side
     account_t *cpu_instances = new account_t[count];
     account_t *tmp_cpu_instances = new account_t[count];
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances,
-                          count * sizeof(account_t), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances, count * sizeof(account_t), cudaMemcpyDeviceToHost));
     memcpy(cpu_instances, tmp_cpu_instances, count * sizeof(account_t));
     for (uint32_t index = 0; index < count; index++) {
-        if ((tmp_cpu_instances[index].byte_code.data != nullptr) &&
-            (tmp_cpu_instances[index].byte_code.size > 0)) {
-            cpu_instances[index].byte_code.data =
-                new uint8_t[tmp_cpu_instances[index].byte_code.size];
+        if ((tmp_cpu_instances[index].byte_code.data != nullptr) && (tmp_cpu_instances[index].byte_code.size > 0)) {
+            cpu_instances[index].byte_code.data = new uint8_t[tmp_cpu_instances[index].byte_code.size];
+            cpu_instances[index].byte_code.size = tmp_cpu_instances[index].byte_code.size;
         } else {
             cpu_instances[index].byte_code.data = nullptr;
             cpu_instances[index].byte_code.size = 0;
         }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) &&
-            (tmp_cpu_instances[index].storage.size > 0)) {
-            cpu_instances[index].storage.storage =
-                new CuEVM::storage_element_t[tmp_cpu_instances[index]
-                                                 .storage.size];
+        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
+            cpu_instances[index].storage.storage = new CuEVM::storage_element_t[tmp_cpu_instances[index].storage.size];
+            cpu_instances[index].storage.size = tmp_cpu_instances[index].storage.size;
+            cpu_instances[index].storage.capacity = tmp_cpu_instances[index].storage.capacity;
         } else {
             cpu_instances[index].storage.storage = nullptr;
             cpu_instances[index].storage.size = 0;
+            cpu_instances[index].storage.capacity = 0;
         }
         tmp_cpu_instances[index].clear();
     }
@@ -441,37 +385,26 @@ __host__ account_t *account_t::get_cpu_from_gpu(account_t *gpu_instances,
     tmp_gpu_instaces = account_t::get_gpu_from_cpu(cpu_instances, count);
 
     // call the transfer kernel
-    account_t_transfer_kernel<<<count, 1>>>(tmp_gpu_instaces, gpu_instances,
-                                            count);
+    account_t_transfer_kernel<<<count, 1>>>(tmp_gpu_instaces, gpu_instances, count);
     CUDA_CHECK(cudaDeviceSynchronize());
     CUDA_CHECK(cudaFree(gpu_instances));
 
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, tmp_gpu_instaces,
-                          count * sizeof(account_t), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, tmp_gpu_instaces, count * sizeof(account_t), cudaMemcpyDeviceToHost));
 
     for (uint32_t index = 0; index < count; index++) {
-        if ((tmp_cpu_instances[index].byte_code.data != nullptr) &&
-            (tmp_cpu_instances[index].byte_code.size > 0)) {
-            CUDA_CHECK(cudaMemcpy(
-                cpu_instances[index].byte_code.data,
-                tmp_cpu_instances[index].byte_code.data,
-                tmp_cpu_instances[index].byte_code.size * sizeof(uint8_t),
-                cudaMemcpyDeviceToHost));
-            cpu_instances[index].byte_code.size =
-                tmp_cpu_instances[index].byte_code.size;
+        if ((tmp_cpu_instances[index].byte_code.data != nullptr) && (tmp_cpu_instances[index].byte_code.size > 0)) {
+            CUDA_CHECK(cudaMemcpy(cpu_instances[index].byte_code.data, tmp_cpu_instances[index].byte_code.data,
+                                  tmp_cpu_instances[index].byte_code.size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+            cpu_instances[index].byte_code.size = tmp_cpu_instances[index].byte_code.size;
         } else {
             cpu_instances[index].byte_code.data = nullptr;
             cpu_instances[index].byte_code.size = 0;
         }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) &&
-            (tmp_cpu_instances[index].storage.size > 0)) {
-            CUDA_CHECK(cudaMemcpy(cpu_instances[index].storage.storage,
-                                  tmp_cpu_instances[index].storage.storage,
-                                  tmp_cpu_instances[index].storage.size *
-                                      sizeof(CuEVM::storage_element_t),
+        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
+            CUDA_CHECK(cudaMemcpy(cpu_instances[index].storage.storage, tmp_cpu_instances[index].storage.storage,
+                                  tmp_cpu_instances[index].storage.size * sizeof(CuEVM::storage_element_t),
                                   cudaMemcpyDeviceToHost));
-            cpu_instances[index].storage.size =
-                tmp_cpu_instances[index].storage.size;
+            cpu_instances[index].storage.size = tmp_cpu_instances[index].storage.size;
         } else {
             cpu_instances[index].storage.storage = nullptr;
             cpu_instances[index].storage.size = 0;
