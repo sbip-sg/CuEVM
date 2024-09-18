@@ -221,6 +221,53 @@ TEST_F(ContractStorageTest, UpdateWithEmptyStorage) {
     EXPECT_EQ(cgbn_compare(arith.env, value, value2), 0) << "Value should be retrieved correctly";
 }
 
+// from json
+TEST_F(ContractStorageTest, FromJson) {
+    // example JSON string
+    const char* json_str = R"(
+    {
+        "test": {
+            "pre" : {
+                "0x12345678": {
+                    "balance": "0x1000",
+                    "nonce": "0x01",
+                    "code": "0xFF0011",
+                    "storage": {
+                        "0x01": "0x02"
+                    }
+                }
+            }
+        }
+    })";
+    cJSON* json = cJSON_Parse(json_str);
+    cJSON* test = cJSON_GetArrayItem(json, 0);
+    cJSON* pre = cJSON_GetObjectItemCaseSensitive(test, "pre");
+    cJSON* account = cJSON_GetArrayItem(pre, 0);
+    cJSON* storage_json = cJSON_GetObjectItemCaseSensitive(account, "storage");
+
+    EXPECT_EQ(storage.from_json(storage_json, 0), ERROR_SUCCESS) << "Storage should be created from JSON";
+    EXPECT_EQ(storage.size, 1) << "Size should be 1";
+    EXPECT_EQ(storage.capacity, CuEVM::initial_storage_capacity) << "Capacity should be initial_storage_capacity";
+    EXPECT_NE(storage.storage, nullptr) << "Storage should not be nullptr";
+    EXPECT_EQ(storage.storage[0].get_key(), 1) << "Key should be set correctly";
+    EXPECT_EQ(storage.storage[0].get_value(), 2) << "Value should be set correctly";
+    cJSON_Delete(json);
+}
+
+// to json
+TEST_F(ContractStorageTest, ToJson) {
+    CuEVM::bn_t key, value;
+    cgbn_set_ui32(arith.env, key, 1);
+    cgbn_set_ui32(arith.env, value, 2);
+    storage.set_value(arith, key, value);
+    cJSON* storage_json = storage.to_json(1);
+    EXPECT_NE(storage_json, nullptr) << "Storage JSON should not be nullptr";
+    char* json_str = cJSON_Print(storage_json);
+    EXPECT_STREQ(json_str, "{\n\t\"0x1\":\t\"0x2\"\n}") << "Storage JSON should be correct";
+    cJSON_Delete(storage_json);
+    free(json_str);
+}
+
 __global__ void test_contract_storage_kernel(CuEVM::contract_storage_t* gpuStorage, uint32_t count, uint32_t* result) {
     int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
     if (instance >= count) return;

@@ -13,13 +13,7 @@ __global__ void account_t_transfer_kernel(account_t *dst_instances, account_t *s
 
     if (instance >= count) return;
 
-    CuEVM::byte_array_t::transfer_memory(dst_instances[instance].byte_code, src_instances[instance].byte_code);
-
-    CuEVM::contract_storage_t::transfer_memory(dst_instances[instance].storage, src_instances[instance].storage);
-    // copy the others not necesary
-    memcpy(&dst_instances[instance].nonce, &src_instances[instance].nonce, sizeof(evm_word_t));
-    memcpy(&dst_instances[instance].balance, &src_instances[instance].balance, sizeof(evm_word_t));
-    memcpy(&dst_instances[instance].address, &src_instances[instance].address, sizeof(evm_word_t));
+    CuEVM::account_t::transfer_memory(dst_instances[instance], src_instances[instance]);
 }
 
 __host__ __device__ account_t::account_t(const account_t &account) {
@@ -187,7 +181,7 @@ __host__ __device__ void account_t::empty() {
 }
 
 __host__ void account_t::from_json(const cJSON *account_json, int32_t managed) {
-    cJSON *balance_json, *nonce_json, *code_json;
+    cJSON *balance_json, *nonce_json;
 
     address.from_hex(account_json->string);
 
@@ -237,6 +231,16 @@ __host__ __device__ void account_t::print() {
     printf("Storage: \n");
     storage.print();
     __ONE_GPU_THREAD_WOSYNC_END__
+}
+
+__host__ __device__ void account_t::transfer_memory(account_t &dst, account_t &src) {
+    CuEVM::byte_array_t::transfer_memory(dst.byte_code, src.byte_code);
+
+    CuEVM::contract_storage_t::transfer_memory(dst.storage, src.storage);
+    // copy the others not necesary
+    memcpy(&dst.nonce, &src.nonce, sizeof(evm_word_t));
+    memcpy(&dst.balance, &src, sizeof(evm_word_t));
+    memcpy(&dst.address, &src, sizeof(evm_word_t));
 }
 
 __host__ cJSON *account_t::merge_json(const account_t *&account1_ptr, const account_t *&account2_ptr,

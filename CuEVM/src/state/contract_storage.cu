@@ -114,7 +114,7 @@ __host__ int32_t contract_storage_t::from_json(const cJSON *contract_storage_jso
         storage = nullptr;
         return ERROR_SUCCESS;
     }
-    capacity = CuEVM::initial_storage_capacity;
+    capacity = CuEVM::initial_storage_capacity / 2;
     do {
         capacity *= 2;
     } while (capacity < size);
