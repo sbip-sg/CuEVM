@@ -180,8 +180,10 @@ generic_CREATE(ArithEnv &arith, CuEVM::AccessState &access_state,
                 initialisation_code);
         } else {
             CuEVM::account_t *sender_account = nullptr;
-            access_state.get_account(arith, sender_address, sender_account,
-                                     ACCOUNT_NONCE_FLAG);
+            current_state.touch_state.get_account(
+                arith, sender_address, sender_account, ACCOUNT_NONCE_FLAG);
+            printf("generic_CREATE sender_account: %p\n", sender_account);
+            sender_account->print();
             bn_t sender_nonce;
             sender_account->get_nonce(arith, sender_nonce);
             error_code |= CuEVM::utils::get_contract_address_create(
