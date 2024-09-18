@@ -637,7 +637,7 @@ namespace CuEVM::operations {
             gas_limit,
             gas_used);
         bn_t hash_bn;
-        if (touch_state.is_empty_account(arith, address) ||
+        if ( (touch_state.is_empty_account(arith, address) == ERROR_SUCCESS) ||
             touch_state.is_deleted_account(arith, address))
         {
             cgbn_set_ui32(arith.env, hash_bn, 0);
