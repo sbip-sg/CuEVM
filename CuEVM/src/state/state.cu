@@ -9,6 +9,8 @@
 
 namespace CuEVM {
 
+__host__ __device__ state_t::state_t() { clear(); }
+
 __host__ __device__ state_t::state_t(const state_t &other) : state_t() { duplicate(other); }
 
 __host__ __device__ state_t &state_t::operator=(const state_t &other) {
@@ -197,6 +199,12 @@ __host__ state_t *state_t::get_cpu(uint32_t count) { return new state_t[count]; 
 
 __host__ void state_t::cpu_free(state_t *cpu_states, uint32_t count) {
     if (cpu_states != nullptr) {
+        for (uint32_t idx = 0; idx < count; idx++) {
+            if (cpu_states[idx].no_accounts > 0) {
+                delete[] cpu_states[idx].accounts;
+            }
+            cpu_states[idx].clear();
+        }
         delete[] cpu_states;
     }
 }

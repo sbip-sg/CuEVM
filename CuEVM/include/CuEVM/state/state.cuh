@@ -24,7 +24,7 @@ struct state_t {
      * The default constructor.
      * It initializes the accounts to nullptr and the no_accounts to 0.
      */
-    __host__ __device__ state_t() : accounts(nullptr), no_accounts(0) {}
+    __host__ __device__ state_t();
 
     /**
      * The destructor.
