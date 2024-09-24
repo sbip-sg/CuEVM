@@ -1,0 +1,77 @@
+name: CI Workflow
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      docker:
+        image: docker:20.10.7
+        options: --privileged
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Docker image
+        run: |
+          docker build -t cuevm ./devcontainer
+
+      - name: Build binary
+        run: |
+          docker run --rm \
+            --name cuevm-test-runner \
+            -v ${{ github.workspace }}:/workspaces/CuEVM \
+            -w /workspaces/CuEVM \
+            cuevm \
+            /bin/bash -c "
+              cmake -S . -B build -DCPU='ON' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
+              cmake --build build
+            "
+
+      - name: Clone ethereum/tests
+        run: |
+          git clone https://github.com/ethereum/tests.git ${{ github.workspace }}/ethereum/tests
+          cd ${{ github.workspace }}/ethereum/tests && git checkout shanghai
+
+      - name: Run tests
+        run: |
+          mkdir ${{ github.workspace }}/test-outputs
+          docker run --rm \
+            -v ${{ github.workspace }}/ethereum/tests:/ethereum/tests \
+            -v ${{ github.workspace }}/test-outputs:/test-outputs \
+            cuevm \
+            python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
+            --runtest-bin /goevmlab/runtest \
+            --geth /goevmlab/gethvm \
+            --cuevm /workspaces/CuEVM/build/cuevm_CPU \
+            -i /ethereum/tests/GeneralStateTests/stPreCompiledContracts \
+            --ignore-errors --without-state-root \
+            >> /test-outputs/stPreCompiledContracts.log
+
+      - name: Archive test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: ${{ github.workspace }}/test-outputs # Adjust path based on where your tests output results
