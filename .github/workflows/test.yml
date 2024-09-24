@@ -35,7 +35,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t cuevm ./devcontainer
+          docker build -t cuevm ${{ github.workspace }}/.devcontainer
 
       - name: Build binary
         run: |
