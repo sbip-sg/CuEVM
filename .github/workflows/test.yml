@@ -66,14 +66,87 @@ jobs:
           docker exec cuevm-test-runner mkdir -p /ethereum/tests /test-outputs
           docker cp ${{ github.workspace }}/ethereum/tests cuevm-test-runner:/ethereum/tests
 
-          docker exec cuevm-test-runner \
-            python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
-            --runtest-bin /goevmlab/runtest \
-            --geth /goevmlab/gethvm \
-            --cuevm /workspaces/CuEVM/build/cuevm_CPU \
-            -i /ethereum/tests/GeneralStateTests/stPreCompiledContracts \
-            --ignore-errors --without-state-root \
-            >> ${{ github.workspace }}/test-outputs/stPreCompiledContracts.log
+          FOLDERS=(
+          "VMTests"
+          "Shanghai"
+          "stPreCompiledContracts"
+          "stPreCompiledContracts2"
+          "stArgsZeroOneBalance"
+          "stAttackTest"
+          "stBadOpcode"
+          "stBugs"
+          "stCallCodes"
+          "stCallCreateCallCodeTest"
+          "stCallDelegateCodesCallCodeHomestead"
+          "stCallDelegateCodesHomestead"
+          "stChainId"
+          "stCodeCopyTest"
+          "stCodeSizeLimit"
+          "stCreate2"
+          "stCreateTest"
+          "stDelegatecallTestHomestead"
+          "stEIP150singleCodeGasPrices"
+          "stEIP150Specific"
+          "stEIP1559"
+          "stEIP158Specific"
+          "stEIP2930"
+          "stEIP3607"
+          "stExample"
+          "stExtCodeHash"
+          "stHomesteadSpecific"
+          "stInitCodeTest"
+          "stLogTests"
+          "stMemExpandingEIP150Calls"
+          "stMemoryStressTest"
+          "stMemoryTest"
+          "stNonZeroCallsTest"
+          "stQuadraticComplexityTest"
+          "stRandom"
+          "stRandom2"
+          "stRecursiveCreate"
+          "stRefundTest"
+          "stReturnDataTest"
+          "stRevertTest"
+          "stSelfBalance"
+          "stShift"
+          "stSLoadTest"
+          "stSolidityTest"
+          "stSpecialTest"
+          "stSStoreTest"
+          "stStackTests"
+          "stStaticCall"
+          "stStaticFlagEnabled"
+          "stSystemOperationsTest"
+          "stTimeConsuming"
+          "stTransactionTest"
+          "stTransitionTest"
+          "stWalletTest"
+          "stZeroCallsRevert"
+          "stZeroCallsTest"
+          "stZeroKnowledge"
+          "stZeroKnowledge2"
+          )
+
+          for folder in "${FOLDERS[@]}"; do
+            echo "Running tests for $folder with a 5-minute timeout..."
+
+            # Using the timeout command to enforce the 5-minute limit
+            timeout 300 docker exec cuevm-test-runner \
+              python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
+              --runtest-bin /goevmlab/runtest \
+              --geth /goevmlab/gethvm \
+              --cuevm /workspaces/CuEVM/build/cuevm_CPU \
+              -i /ethereum/tests/GeneralStateTests/"$folder" \
+              --ignore-errors --without-state-root \
+              | tee -a ${{ github.workspace }}/test-outputs/"$folder".log
+
+            # Check if the timeout command exited with a specific status code (124 means timeout)
+            if [ $? -eq 124 ]; then
+              echo "Test for $folder timed out after 5 minutes."
+            else
+              echo "Test for $folder completed."
+            fi
+          done
 
       - name: Archive test results
         if: always()
