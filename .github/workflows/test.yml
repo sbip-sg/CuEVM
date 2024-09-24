@@ -63,8 +63,6 @@ jobs:
       - name: Run tests
         run: |
           mkdir ${{ github.workspace }}/test-outputs
-          docker exec cuevm-test-runner mkdir -p /ethereum/tests /test-outputs
-          docker cp ${{ github.workspace }}/ethereum/tests cuevm-test-runner:/ethereum/tests
 
           FOLDERS=(
           "VMTests"
@@ -136,7 +134,7 @@ jobs:
               --runtest-bin /goevmlab/runtest \
               --geth /goevmlab/gethvm \
               --cuevm /workspaces/CuEVM/build/cuevm_CPU \
-              -i /ethereum/tests/GeneralStateTests/"$folder" \
+              -i /workspaces/CuEVM/ethereum/tests/GeneralStateTests/"$folder" \
               --ignore-errors --without-state-root \
               | tee -a ${{ github.workspace }}/test-outputs/"$folder".log
 
