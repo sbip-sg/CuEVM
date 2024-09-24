@@ -81,3 +81,9 @@ jobs:
         with:
           name: test-results
           path: ${{ github.workspace }}/test-outputs # Adjust path based on where your tests output results
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker stop cuevm-test-runner
+          docker rm cuevm-test-runner
