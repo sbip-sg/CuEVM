@@ -41,17 +41,19 @@ jobs:
         run: |
           docker build -t cuevm ${{ github.workspace }}/.devcontainer
 
-      - name: Build binary
+      - name: Start cuevm-test-runner container
         run: |
-          docker run \
-            --name cuevm-test-runner \
+          docker run -d --name cuevm-test-runner \
             -v ${{ github.workspace }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
-            cuevm \
-            /bin/bash -c "
+            cuevm /bin/bash -c "tail -f /dev/null"
+
+      - name: Build binary inside the container
+        run: |
+          docker exec cuevm-test-runner /bin/bash -c "
               cmake -S . -B build -DCPU='ON' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
               cmake --build build
-            "
+          "
 
       - name: Clone ethereum/tests
         run: |
@@ -72,7 +74,6 @@ jobs:
             -i /ethereum/tests/GeneralStateTests/stPreCompiledContracts \
             --ignore-errors --without-state-root \
             >> ${{ github.workspace }}/test-outputs/stPreCompiledContracts.log
-
 
       - name: Archive test results
         if: always()
