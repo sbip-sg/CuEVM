@@ -43,7 +43,7 @@ jobs:
 
       - name: Build binary
         run: |
-          docker run --rm \
+          docker run \
             --name cuevm-test-runner \
             -v ${{ github.workspace }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
