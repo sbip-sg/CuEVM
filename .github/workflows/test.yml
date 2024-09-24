@@ -129,7 +129,7 @@ jobs:
             echo "Running tests for $folder with a 5-minute timeout..."
 
             # Using the timeout command to enforce the 5-minute limit
-            timeout 300 docker exec cuevm-test-runner \
+            timeout 300 docker exec --memory="6g" --memory-swap="6g" cuevm-test-runner \
               python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
               --runtest-bin /goevmlab/runtest \
               --geth /goevmlab/gethvm \
@@ -151,7 +151,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: test-results
-          path: ${{ github.workspace }}/test-outputs # Adjust path based on where your tests output results
+          path: ${{ github.workspace }}/test-outputs
 
       - name: Clean up
         if: always()
