@@ -61,17 +61,18 @@ jobs:
       - name: Run tests
         run: |
           mkdir ${{ github.workspace }}/test-outputs
-          docker run --rm \
-            -v ${{ github.workspace }}/ethereum/tests:/ethereum/tests \
-            -v ${{ github.workspace }}/test-outputs:/test-outputs \
-            cuevm \
+          docker exec cuevm-test-runner mkdir -p /ethereum/tests /test-outputs
+          docker cp ${{ github.workspace }}/ethereum/tests cuevm-test-runner:/ethereum/tests
+
+          docker exec cuevm-test-runner \
             python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
             --runtest-bin /goevmlab/runtest \
             --geth /goevmlab/gethvm \
             --cuevm /workspaces/CuEVM/build/cuevm_CPU \
             -i /ethereum/tests/GeneralStateTests/stPreCompiledContracts \
             --ignore-errors --without-state-root \
-            >> /test-outputs/stPreCompiledContracts.log
+            >> ${{ github.workspace }}/test-outputs/stPreCompiledContracts.log
+
 
       - name: Archive test results
         if: always()
