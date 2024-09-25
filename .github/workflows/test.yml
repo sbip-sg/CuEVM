@@ -10,7 +10,7 @@ on:
   workflow_dispatch: # Allows manual triggering
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
 
     services:
@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Pull submodules
+        run: |
+          git submodule update --init --recursive
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -35,19 +39,21 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t cuevm ./devcontainer
+          docker build -t cuevm ${{ github.workspace }}/.devcontainer
 
-      - name: Build binary
+      - name: Start cuevm-test-runner container
         run: |
-          docker run --rm \
-            --name cuevm-test-runner \
+          docker run --memory="6g" --memory-swap="6g"  -d --name cuevm-test-runner \
             -v ${{ github.workspace }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
-            cuevm \
-            /bin/bash -c "
+            cuevm /bin/bash -c "tail -f /dev/null"
+
+      - name: Build binary inside the container
+        run: |
+          docker exec cuevm-test-runner /bin/bash -c "
               cmake -S . -B build -DCPU='ON' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
               cmake --build build
-            "
+          "
 
       - name: Clone ethereum/tests
         run: |
@@ -57,21 +63,98 @@ jobs:
       - name: Run tests
         run: |
           mkdir ${{ github.workspace }}/test-outputs
-          docker run --rm \
-            -v ${{ github.workspace }}/ethereum/tests:/ethereum/tests \
-            -v ${{ github.workspace }}/test-outputs:/test-outputs \
-            cuevm \
-            python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
-            --runtest-bin /goevmlab/runtest \
-            --geth /goevmlab/gethvm \
-            --cuevm /workspaces/CuEVM/build/cuevm_CPU \
-            -i /ethereum/tests/GeneralStateTests/stPreCompiledContracts \
-            --ignore-errors --without-state-root \
-            >> /test-outputs/stPreCompiledContracts.log
+
+          FOLDERS=(
+          "VMTests"
+          "Shanghai"
+          "stPreCompiledContracts"
+          "stPreCompiledContracts2"
+          "stArgsZeroOneBalance"
+          "stAttackTest"
+          "stBadOpcode"
+          "stBugs"
+          "stCallCodes"
+          "stCallCreateCallCodeTest"
+          "stCallDelegateCodesCallCodeHomestead"
+          "stCallDelegateCodesHomestead"
+          "stChainId"
+          "stCodeCopyTest"
+          "stCodeSizeLimit"
+          "stCreate2"
+          "stCreateTest"
+          "stDelegatecallTestHomestead"
+          "stEIP150singleCodeGasPrices"
+          "stEIP150Specific"
+          "stEIP1559"
+          "stEIP158Specific"
+          "stEIP2930"
+          "stEIP3607"
+          "stExample"
+          "stExtCodeHash"
+          "stHomesteadSpecific"
+          "stInitCodeTest"
+          "stLogTests"
+          "stMemExpandingEIP150Calls"
+          "stMemoryStressTest"
+          "stMemoryTest"
+          "stNonZeroCallsTest"
+          "stQuadraticComplexityTest"
+          "stRandom"
+          "stRandom2"
+          "stRecursiveCreate"
+          "stRefundTest"
+          "stReturnDataTest"
+          "stRevertTest"
+          "stSelfBalance"
+          "stShift"
+          "stSLoadTest"
+          "stSolidityTest"
+          "stSpecialTest"
+          "stSStoreTest"
+          "stStackTests"
+          "stStaticCall"
+          "stStaticFlagEnabled"
+          "stSystemOperationsTest"
+          "stTimeConsuming"
+          "stTransactionTest"
+          "stTransitionTest"
+          "stWalletTest"
+          "stZeroCallsRevert"
+          "stZeroCallsTest"
+          "stZeroKnowledge"
+          "stZeroKnowledge2"
+          )
+
+          for folder in "${FOLDERS[@]}"; do
+            echo "Running tests for $folder with a 5-minute timeout..."
+
+            # Using the timeout command to enforce the 5-minute limit
+            timeout 300 docker exec cuevm-test-runner \
+              python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
+              --runtest-bin /goevmlab/runtest \
+              --geth /goevmlab/gethvm \
+              --cuevm /workspaces/CuEVM/build/cuevm_CPU \
+              -i /workspaces/CuEVM/ethereum/tests/GeneralStateTests/"$folder" \
+              --ignore-errors --without-state-root \
+              | tee -a ${{ github.workspace }}/test-outputs/"$folder".log
+
+            # Check if the timeout command exited with a specific status code (124 means timeout)
+            if [ $? -eq 124 ]; then
+              echo "Test for $folder timed out after 5 minutes."
+            else
+              echo "Test for $folder completed."
+            fi
+          done
 
       - name: Archive test results
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: test-results
-          path: ${{ github.workspace }}/test-outputs # Adjust path based on where your tests output results
+          path: ${{ github.workspace }}/test-outputs
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker stop cuevm-test-runner
+          docker rm cuevm-test-runner
