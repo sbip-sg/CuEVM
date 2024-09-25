@@ -219,7 +219,7 @@ jobs:
               --runtest-bin /goevmlab/runtest \
               --geth /goevmlab/gethvm \
               --cuevm /workspaces/CuEVM/build/cuevm_CPU \
-              -i /ethereum/tests/GeneralStateTests/"$folder" \
+              -i /workspaces/CuEVM/ethereum/tests/GeneralStateTests/"$folder" \
               --ignore-errors --without-state-root \
               | tee -a ${{ github.workspace }}/test-outputs/"$folder".log
 
