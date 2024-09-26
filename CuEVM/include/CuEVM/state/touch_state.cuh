@@ -17,9 +17,9 @@ namespace CuEVM {
  */
 class TouchState {
    private:
-    state_access_t *_state;            /**< The state access */
-    CuEVM::AccessState *_access_state; /**< The access state */
-    TouchState *parent;                /**< The parent state */
+    state_access_t *_state;          /**< The state access */
+    CuEVM::WorldState *_world_state; /**< The world state */
+    TouchState *parent;              /**< The parent state */
 
     /**
      * Add an account to the state.
@@ -38,7 +38,7 @@ class TouchState {
      * The default constructor.
      */
     __host__ __device__ TouchState()
-        : _state(nullptr), _access_state(nullptr), parent(nullptr) {}
+        : _state(nullptr), parent(nullptr), _world_state(nullptr) {}
 
     /**
      * The constructor with the state and the access state.
@@ -46,8 +46,8 @@ class TouchState {
      * @param[in] access_state The access state.
      */
     __host__ __device__ TouchState(state_access_t *state,
-                                   CuEVM::AccessState *access_state)
-        : _state(state), _access_state(access_state), parent(nullptr) {}
+                                   CuEVM::WorldState *world_state)
+        : _state(state), _world_state(world_state), parent(nullptr) {}
 
     /**
      * The constructor with the state, the access state, and the parent state.
@@ -56,7 +56,7 @@ class TouchState {
      * @param[in] parent The parent state.
      */
     __host__ __device__ TouchState(state_access_t *state, TouchState *parent)
-        : _state(state), _access_state(parent->_access_state), parent(parent) {}
+        : _state(state), _world_state(parent->_world_state), parent(parent) {}
 
     /**
      * destructor for the touch state
@@ -72,7 +72,7 @@ class TouchState {
      */
     __host__ __device__ void clear() {
         _state = nullptr;
-        _access_state = nullptr;
+        _world_state = nullptr;
         parent = nullptr;
     }
 
@@ -83,7 +83,7 @@ class TouchState {
      */
     __host__ __device__ TouchState &operator=(const TouchState &other) {
         _state = other._state;
-        _access_state = other._access_state;
+        _world_state = other._world_state;
         parent = other.parent;
         return *this;
     }
@@ -98,10 +98,11 @@ class TouchState {
      */
     __host__ __device__ int32_t get_account(
         ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t acces_state_flag = ACCOUNT_NONE_FLAG);
+        const CuEVM::account_flags_t acces_state_flag);
 
-    __host__ __device__ int32_t get_account_index(
-        ArithEnv &arith, const bn_t &address, uint32_t &index) const;
+    __host__ __device__ int32_t get_account_index(ArithEnv &arith,
+                                                  const bn_t &address,
+                                                  uint32_t &index) const;
     /**
      * If the account given by address is empty
      * @param[in] arith The arithmetic environment.
@@ -184,21 +185,29 @@ class TouchState {
                                             const bn_t &balance);
 
     /**
-     * The getter for the balance given by an address without modifing the state.
+     * The getter for the balance given by an address without modifing the
+     * state.
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[in] balance The balance of the account.
      * @return 0 if the balance is set, error otherwise.
      */
     __host__ __device__ int32_t poke_balance(ArithEnv &arith,
-                                                    const bn_t &address,
-                                                    bn_t &balance) const;
-
+                                             const bn_t &address,
+                                             bn_t &balance) const;
+    __host__ __device__ int32_t poke_account(
+        ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+        bool include_world_state = false) const;
     /** Helper debugging function, to be removed
-    */
+     */
     __host__ __device__ bool is_warm_account(ArithEnv &arith,
-                                                const bn_t &address) const;
-
+                                             const bn_t &address) const;
+    __host__ __device__ bool is_warm_key(ArithEnv &arith, const bn_t &address,
+                                         const bn_t &key) const;
+    __host__ __device__ bool set_warm_account(ArithEnv &arith,
+                                              const bn_t &address);
+    __host__ __device__ bool set_warm_key(ArithEnv &arith, const bn_t &address,
+                                          const bn_t &key, const bn_t &value);
     /**
      * The setter for the nonce given by an address.
      * @param[in] arith The arithmetic environment.
@@ -220,7 +229,8 @@ class TouchState {
                                          const byte_array_t &byte_code);
 
     /**
-     * The setter for the storage value given by an address, a key, and a value.
+     * The setter for the storage value given by an address, a key, and a
+     * value.
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[in] key The key of the storage.
@@ -248,7 +258,7 @@ class TouchState {
      * @return 0 if success, error otherwise.
      */
     __host__ __device__ int32_t mark_for_deletion(ArithEnv &arith,
-                                               const bn_t &address);
+                                                  const bn_t &address);
 
     /**
      * Update the touch state.

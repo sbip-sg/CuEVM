@@ -79,22 +79,22 @@ __host__ __device__ int32_t AccessState::poke_balance(ArithEnv &arith,
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t
-AccessState::is_warm_account(ArithEnv &arith, const bn_t &address) const {
-    CuEVM::account_t *account_ptr = nullptr;
-    return _state->get_account(arith, address, account_ptr,
-                               ACCOUNT_NONE_FLAG) == 0;
-}
+// __host__ __device__ int32_t
+// AccessState::is_warm_account(ArithEnv &arith, const bn_t &address) const {
+//     CuEVM::account_t *account_ptr = nullptr;
+//     return _state->get_account(arith, address, account_ptr,
+//                                ACCOUNT_NONE_FLAG) == 0;
+// }
 
-__host__ __device__ int32_t AccessState::is_warm_key(ArithEnv &arith,
-                                                     const bn_t &address,
-                                                     const bn_t &key) const {
-    CuEVM::account_t *account_ptr = nullptr;
-    bn_t value;
-    return !(_state->get_account(arith, address, account_ptr,
-                                 ACCOUNT_STORAGE_FLAG) ||
-             account_ptr->get_storage_value(arith, key, value));
-}
+// __host__ __device__ int32_t AccessState::is_warm_key(ArithEnv &arith,
+//                                                      const bn_t &address,
+//                                                      const bn_t &key) const {
+//     CuEVM::account_t *account_ptr = nullptr;
+//     bn_t value;
+//     return !(_state->get_account(arith, address, account_ptr,
+//                                  ACCOUNT_STORAGE_FLAG) ||
+//              account_ptr->get_storage_value(arith, key, value));
+// }
 __host__ __device__ int32_t
 AccessState::is_deleted_account(ArithEnv &arith, const bn_t &address) const {
     CuEVM::account_t *account_ptr = nullptr;

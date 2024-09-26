@@ -107,8 +107,8 @@ class AccessState {
      * @param[in] address The address of the account.
      * @return 1 if the account is warm, 0 otherwise.
      */
-    __host__ __device__ int32_t is_warm_account(ArithEnv &arith,
-                                                const bn_t &address) const;
+    // __host__ __device__ int32_t is_warm_account(ArithEnv &arith,
+    //                                             const bn_t &address) const;
 
     /**
      * If a key has been accessed, it will be marked as warm.
@@ -117,9 +117,9 @@ class AccessState {
      * @param[in] key The key of the storage.
      * @return 1 if the key is warm, 0 otherwise
      */
-    __host__ __device__ int32_t is_warm_key(ArithEnv &arith,
-                                            const bn_t &address,
-                                            const bn_t &key) const;
+    // __host__ __device__ int32_t is_warm_key(ArithEnv &arith,
+    //                                         const bn_t &address,
+    //                                         const bn_t &key) const;
 
     /**
      * If an account does not exist in the world state/deleted

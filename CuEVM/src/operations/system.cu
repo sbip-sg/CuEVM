@@ -61,7 +61,8 @@ __host__ __device__ int32_t generic_CALL(
     bn_t contract_address;
     new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
     CuEVM::gas_cost::access_account_cost(arith, current_state.gas_used,
-                                         access_state, contract_address);
+                                         current_state.touch_state,
+                                         contract_address);
     // positive value call cost (except delegate call)
     // empty account call cost
     bn_t gas_stippend;
@@ -90,7 +91,6 @@ __host__ __device__ int32_t generic_CALL(
     if (cgbn_compare(arith.env, new_state_ptr->gas_limit, gas_capped) > 0) {
         cgbn_set(arith.env, new_state_ptr->gas_limit, gas_capped);
     }
-
     // add the the gas sent to the gas used
     cgbn_add(arith.env, current_state.gas_used, current_state.gas_used,
              new_state_ptr->gas_limit);
@@ -174,25 +174,24 @@ generic_CREATE(ArithEnv &arith, CuEVM::AccessState &access_state,
         current_state.message_ptr->get_recipient(arith, sender_address);
         bn_t contract_address;
 
+        // warm up the contract address
+        error_code |=
+            current_state.touch_state.set_warm_account(arith, contract_address);
+
+        CuEVM::account_t *sender_account = nullptr;
+        current_state.touch_state.get_account(
+            arith, sender_address, sender_account, ACCOUNT_NON_STORAGE_FLAG);
+        // Do not get_account after this to reuse sender_account
         if (opcode == OP_CREATE2) {
             error_code |= CuEVM::utils::get_contract_address_create2(
                 arith, contract_address, sender_address, salt,
                 initialisation_code);
         } else {
-            CuEVM::account_t *sender_account = nullptr;
-            current_state.touch_state.get_account(
-                arith, sender_address, sender_account, ACCOUNT_NONCE_FLAG);
-            printf("generic_CREATE sender_account: %p\n", sender_account);
-            sender_account->print();
             bn_t sender_nonce;
             sender_account->get_nonce(arith, sender_nonce);
             error_code |= CuEVM::utils::get_contract_address_create(
                 arith, contract_address, sender_address, sender_nonce);
         }
-        // warm up the contract address
-        CuEVM::account_t *contract = nullptr;
-        error_code |= access_state.get_account(arith, contract_address,
-                                               contract, ACCOUNT_NONE_FLAG);
 
         // gas capped limit
         bn_t gas_capped;
@@ -227,7 +226,22 @@ generic_CREATE(ArithEnv &arith, CuEVM::AccessState &access_state,
                  ERROR_SUCCESS
 #endif
             );
+        // printf("sender account \n");
+        // sender_account->print();
+        // printf("sender_account is contract %d\n",
+        //        sender_account->is_contract());
+        // increase nonce regardless of the success of CREATE
+        if (sender_account->is_contract()) {
+            bn_t sender_nonce;
+            sender_account->get_nonce(arith, sender_nonce);
+            cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
+            sender_account->set_nonce(arith, sender_nonce);
+            // propagate to child state
+            new_state_ptr->touch_state.set_nonce(arith, sender_address,
+                                                 sender_nonce);
+        }
     }
+
     return error_code;
 }
 
@@ -565,7 +579,7 @@ SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used,
         message.get_contract_address(arith, contract_address);
 
         // custom logic, cannot use access_account_cost (no warm cost)
-        if (!access_state.is_warm_account(arith, recipient))
+        if (!touch_state.is_warm_account(arith, recipient))
             cgbn_add_ui32(arith.env, gas_used, gas_used,
                           GAS_COLD_ACCOUNT_ACCESS);
 

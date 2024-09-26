@@ -34,7 +34,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
       transaction_ptr(transaction_ptr),
       access_state(access_state_data_ptr, &world_state) {
     call_state_ptr = new CuEVM::evm_call_state_t(
-        arith, &access_state, nullptr, nullptr, log_state_ptr,
+        arith, &world_state, nullptr, nullptr, log_state_ptr,
         touch_state_data_ptr, return_data_ptr);
     int32_t error_code = transaction_ptr->validate(
         arith, access_state, call_state_ptr->touch_state, *block_info_ptr,
@@ -117,8 +117,9 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
     }
     // warmup the accounts
     CuEVM::account_t *account_ptr = nullptr;
-    error_code |= call_state_ptr->touch_state.get_account(
-        arith, sender, account_ptr, ACCOUNT_NONE_FLAG);
+    call_state_ptr->touch_state.set_warm_account(arith, sender);
+    call_state_ptr->touch_state.set_warm_account(arith, recipient);
+
     error_code |= call_state_ptr->touch_state.get_account(
         arith, recipient, account_ptr, ACCOUNT_NONE_FLAG);
 
@@ -196,7 +197,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
             call_state_ptr->gas_used);
 #endif
         // DEBUG PRINT
-        printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode);
+        // printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode);
         // printf("touch state BEGIN BEGIN BEGIN\n");
         // call_state_ptr->touch_state.print();
         // printf("touch state END END END\n");
@@ -845,6 +846,13 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith,
         }
     }
 
+    // warm the sender and receiver regardless of revert
+    bn_t sender, receiver;
+    call_state_ptr->message_ptr->get_sender(arith, sender);
+    call_state_ptr->message_ptr->get_recipient(arith, receiver);
+    call_state_ptr->parent->touch_state.set_warm_account(arith, sender);
+    call_state_ptr->parent->touch_state.set_warm_account(arith, receiver);
+
     if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN &&
         error_code != ERROR_REVERT) {
         // abnormal halting where return data ptr is not handled, need to reset
@@ -904,14 +912,16 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
     CuEVM::account_t *sender_account = nullptr;
     call_state_ptr->parent->touch_state.get_account(
         arith, sender_address, sender_account, ACCOUNT_BYTE_CODE_FLAG);
-    if (sender_account->is_contract()) {
-        bn_t sender_nonce;
-        call_state_ptr->parent->touch_state.get_nonce(arith, sender_address,
-                                                      sender_nonce);
-        cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
-        call_state_ptr->parent->touch_state.set_nonce(arith, sender_address,
-                                                      sender_nonce);
-    }
+    // if (sender_account->is_contract()) {
+    //     printf("\naccount is contract\n");
+    //     bn_t sender_nonce;
+    //     call_state_ptr->parent->touch_state.get_nonce(arith, sender_address,
+    //                                                   sender_nonce);
+    //     cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
+    //     call_state_ptr->parent->touch_state.set_nonce(arith, sender_address,
+    //                                                   sender_nonce);
+    // }
+
     // bn_t sender_nonce;
     // call_state_ptr->parent->touch_state.get_nonce(arith, sender_address,
     // sender_nonce); cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);

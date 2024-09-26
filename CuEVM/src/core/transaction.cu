@@ -257,7 +257,7 @@ __host__ __device__ int32_t evm_transaction_t::validate(
     bn_t sender_address;
     get_sender(arith, sender_address);
     CuEVM::account_t *sender_account = nullptr;
-    access_state.get_account(
+    touch_state.get_account(
         arith, sender_address, sender_account,
         ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
     bn_t sender_balance;
@@ -332,15 +332,13 @@ __host__ __device__ int32_t evm_transaction_t::validate(
 #ifdef EIP_3651
     bn_t coin_base_address;
     block_info.get_coin_base(arith, coin_base_address);
-    access_state.get_account(arith, coin_base_address, sender_account,
-                             ACCOUNT_BALANCE_FLAG);
+    touch_state.set_warm_account(arith, coin_base_address);
 #endif
     bn_t precompile_contract_address;
 #pragma unroll
     for (uint32_t idx = 1; idx < CuEVM::no_precompile_contracts; idx++) {
         cgbn_set_ui32(arith.env, precompile_contract_address, idx);
-        access_state.get_account(arith, precompile_contract_address,
-                                 sender_account, ACCOUNT_BYTE_CODE_FLAG);
+        touch_state.set_warm_account(arith, precompile_contract_address);
     }
 
     return ERROR_SUCCESS;
