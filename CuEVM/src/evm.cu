@@ -11,6 +11,7 @@
 #include <CuEVM/operations/stack.cuh>
 #include <CuEVM/operations/storage.cuh>
 #include <CuEVM/operations/system.cuh>
+#include <CuEVM/precompile.cuh>
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
@@ -152,10 +153,66 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
             if (cgbn_compare_ui32(arith.env, contract_address,
                                   CuEVM::no_precompile_contracts) == -1) {
                 switch (cgbn_get_ui32(arith.env, contract_address)) {
-                    case 1:
-                        return 1;
+                    case 0x01:
+                        return CuEVM::precompile_operations::
+                            operation_ecRecover(
+                                arith, call_state_ptr->gas_limit,
+                                call_state_ptr->gas_used,
+                                call_state_ptr->parent->last_return_data_ptr,
+                                call_state_ptr->message_ptr);
                         break;
-
+                    case 0x02:
+                        return CuEVM::precompile_operations::operation_SHA256(
+                            arith, call_state_ptr->gas_limit,
+                            call_state_ptr->gas_used,
+                            call_state_ptr->parent->last_return_data_ptr,
+                            call_state_ptr->message_ptr);
+                    case 0x03:
+                        return CuEVM::precompile_operations::
+                            operation_RIPEMD160(
+                                arith, call_state_ptr->gas_limit,
+                                call_state_ptr->gas_used,
+                                call_state_ptr->parent->last_return_data_ptr,
+                                call_state_ptr->message_ptr);
+                    case 0x04:
+                        return CuEVM::precompile_operations::operation_IDENTITY(
+                            arith, call_state_ptr->gas_limit,
+                            call_state_ptr->gas_used,
+                            call_state_ptr->parent->last_return_data_ptr,
+                            call_state_ptr->message_ptr);
+                    case 0x05:
+                        return CuEVM::precompile_operations::operation_MODEXP(
+                            arith, call_state_ptr->gas_limit,
+                            call_state_ptr->gas_used,
+                            call_state_ptr->parent->last_return_data_ptr,
+                            call_state_ptr->message_ptr);
+                    case 0x06:
+                        return CuEVM::precompile_operations::operation_ecAdd(
+                            arith, call_state_ptr->gas_limit,
+                            call_state_ptr->gas_used,
+                            call_state_ptr->parent->last_return_data_ptr,
+                            call_state_ptr->message_ptr);
+                    case 0x07:
+                        return CuEVM::precompile_operations::operation_ecMul(
+                            arith, call_state_ptr->gas_limit,
+                            call_state_ptr->gas_used,
+                            call_state_ptr->parent->last_return_data_ptr,
+                            call_state_ptr->message_ptr);
+                    case 0x08:
+                        return CuEVM::precompile_operations::
+                            operation_ecPairing(
+                                arith, call_state_ptr->gas_limit,
+                                call_state_ptr->gas_used,
+                                call_state_ptr->parent->last_return_data_ptr,
+                                call_state_ptr->message_ptr);
+                    case 0x09:
+                        return CuEVM::precompile_operations::operation_BLAKE2(
+                            arith, call_state_ptr->gas_limit,
+                            call_state_ptr->gas_used,
+                            call_state_ptr->parent->last_return_data_ptr,
+                            call_state_ptr->message_ptr);
+                    case 0x0a:
+                        return ERROR_RETURN;
                     default:
                         return ERROR_RETURN;
                         break;
