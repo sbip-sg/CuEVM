@@ -251,7 +251,7 @@ __host__ __device__ int32_t sload_cost(ArithEnv &arith, bn_t &gas_used,
 __host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used,
                                         bn_t &gas_refund,
                                         const CuEVM::TouchState &touch_state,
-                                        const CuEVM::AccessState &access_state,
+                                        // const CuEVM::AccessState &access_state,
                                         const bn_t &address, const bn_t &key,
                                         const bn_t &value);
 

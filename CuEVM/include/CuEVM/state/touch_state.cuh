@@ -173,6 +173,9 @@ class TouchState {
     __host__ __device__ int32_t poke_value(ArithEnv &arith, const bn_t &address,
                                            const bn_t &key, bn_t &value) const;
 
+    __host__ __device__ int32_t poke_original_value(ArithEnv &arith, const bn_t &address,
+                                           const bn_t &key, bn_t &value) const;
+
     /**
      * The setter for the balance given by an address.
      * @param[in] arith The arithmetic environment.

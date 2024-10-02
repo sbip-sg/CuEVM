@@ -117,6 +117,13 @@ __host__ __device__ int32_t TouchState::poke_value(ArithEnv &arith,
     return _world_state->get_value(arith, address, key, value);
 }
 
+__host__ __device__ int32_t TouchState::poke_original_value(ArithEnv &arith,
+                                                   const bn_t &address,
+                                                   const bn_t &key,
+                                                   bn_t &value) const {
+    return _world_state->get_value(arith, address, key, value);
+}
+
 __host__ __device__ int32_t TouchState::poke_balance(ArithEnv &arith,
                                                      const bn_t &address,
                                                      bn_t &balance) const {

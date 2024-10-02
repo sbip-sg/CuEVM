@@ -38,12 +38,12 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
         arith, &world_state, nullptr, nullptr, log_state_ptr,
         touch_state_data_ptr, return_data_ptr);
     int32_t error_code = transaction_ptr->validate(
-        arith, access_state, call_state_ptr->touch_state, *block_info_ptr,
+        arith, call_state_ptr->touch_state, *block_info_ptr,
         call_state_ptr->gas_used, gas_price, gas_priority_fee);
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t *transaction_call_message_ptr = nullptr;
         error_code = transaction_ptr->get_message_call(
-            arith, access_state, transaction_call_message_ptr);
+            arith, call_state_ptr->touch_state, transaction_call_message_ptr);
         CuEVM::evm_call_state_t *child_call_state_ptr =
             new CuEVM::evm_call_state_t(arith, call_state_ptr,
                                         transaction_call_message_ptr);
@@ -599,14 +599,14 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                     error_code = CuEVM::operations::SLOAD(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, *call_state_ptr->stack_ptr,
-                        access_state, call_state_ptr->touch_state,
+                        call_state_ptr->touch_state,
                         *call_state_ptr->message_ptr);
                     break;
                 case OP_SSTORE:
                     error_code = CuEVM::operations::SSTORE(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, call_state_ptr->gas_refund,
-                        *call_state_ptr->stack_ptr, access_state,
+                        *call_state_ptr->stack_ptr,
                         call_state_ptr->touch_state,
                         *call_state_ptr->message_ptr);
                     break;
