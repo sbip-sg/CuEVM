@@ -10,7 +10,6 @@
 namespace CuEVM::operations {
 __host__ __device__ int32_t SLOAD(ArithEnv &arith, const bn_t &gas_limit,
                                   bn_t &gas_used, CuEVM::evm_stack_t &stack,
-                                //   const CuEVM::AccessState &access_state,
                                   CuEVM::TouchState &touch_state,
                                   const CuEVM::evm_message_call_t &message) {
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
@@ -32,7 +31,6 @@ __host__ __device__ int32_t SLOAD(ArithEnv &arith, const bn_t &gas_limit,
 __host__ __device__ int32_t SSTORE(ArithEnv &arith, const bn_t &gas_limit,
                                    bn_t &gas_used, bn_t &gas_refund,
                                    CuEVM::evm_stack_t &stack,
-                                //    const CuEVM::AccessState &access_state,
                                    CuEVM::TouchState &touch_state,
                                    const CuEVM::evm_message_call_t &message) {
     // only if is not a static call

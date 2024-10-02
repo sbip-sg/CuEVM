@@ -21,7 +21,6 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
                                  CuEVM::state_t *world_state_data_ptr,
                                  CuEVM::block_info_t *block_info_ptr,
                                  CuEVM::evm_transaction_t *transaction_ptr,
-                                 CuEVM::state_access_t *access_state_data_ptr,
                                  CuEVM::state_access_t *touch_state_data_ptr,
                                  CuEVM::log_state_data_t *log_state_ptr,
                                  CuEVM::evm_return_data_t *return_data_ptr
@@ -32,8 +31,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
                                  )
     : world_state(world_state_data_ptr),
       block_info_ptr(block_info_ptr),
-      transaction_ptr(transaction_ptr),
-      access_state(access_state_data_ptr, &world_state) {
+      transaction_ptr(transaction_ptr){
     call_state_ptr = new CuEVM::evm_call_state_t(
         arith, &world_state, nullptr, nullptr, log_state_ptr,
         touch_state_data_ptr, return_data_ptr);
@@ -63,7 +61,6 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
                                  CuEVM::evm_instance_t &evm_instance)
     : evm_t(arith, evm_instance.world_state_data_ptr,
             evm_instance.block_info_ptr, evm_instance.transaction_ptr,
-            evm_instance.access_state_data_ptr,
             evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr,
             evm_instance.return_data_ptr
 #ifdef EIP_3155
@@ -112,7 +109,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         bn_t contract_address;
         call_state_ptr->message_ptr->get_contract_address(arith,
                                                           contract_address);
-        error_code |= access_state.get_account(
+        error_code |= call_state_ptr->touch_state.get_account(
             arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
         call_state_ptr->message_ptr->set_byte_code(contract->byte_code);
     }
@@ -1059,8 +1056,6 @@ __host__ int32_t get_evm_instances(ArithEnv &arith,
         evm_instances[index].block_info_ptr = block_info_ptr;
         evm_instances[index].transaction_ptr = &transactions_ptr[index];
         if (managed == 0) {
-            evm_instances[index].access_state_data_ptr =
-                new CuEVM::state_access_t();
             evm_instances[index].touch_state_data_ptr =
                 new CuEVM::state_access_t();
             evm_instances[index].log_state_ptr = new CuEVM::log_state_data_t();
@@ -1071,11 +1066,6 @@ __host__ int32_t get_evm_instances(ArithEnv &arith,
 #endif
         } else {
             CuEVM::state_access_t *access_state = new CuEVM::state_access_t();
-            CUDA_CHECK(
-                cudaMallocManaged(&evm_instances[index].access_state_data_ptr,
-                                  sizeof(CuEVM::state_access_t)));
-            memcpy(evm_instances[index].access_state_data_ptr, access_state,
-                   sizeof(CuEVM::state_access_t));
             CUDA_CHECK(
                 cudaMallocManaged(&evm_instances[index].touch_state_data_ptr,
                                   sizeof(CuEVM::state_access_t)));
@@ -1115,7 +1105,6 @@ __host__ void free_evm_instances(evm_instance_t *&evm_instances,
         delete evm_instances[0].world_state_data_ptr;
         delete evm_instances[0].block_info_ptr;
         for (uint32_t index = 0; index < num_instances; index++) {
-            delete evm_instances[index].access_state_data_ptr;
             delete evm_instances[index].touch_state_data_ptr;
             delete evm_instances[index].log_state_ptr;
             delete evm_instances[index].return_data_ptr;
@@ -1129,7 +1118,7 @@ __host__ void free_evm_instances(evm_instance_t *&evm_instances,
         CUDA_CHECK(cudaFree(evm_instances[0].world_state_data_ptr));
         CUDA_CHECK(cudaFree(evm_instances[0].block_info_ptr));
         for (uint32_t index = 0; index < num_instances; index++) {
-            CUDA_CHECK(cudaFree(evm_instances[index].access_state_data_ptr));
+            // CUDA_CHECK(cudaFree(evm_instances[index].access_state_data_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].touch_state_data_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].log_state_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].return_data_ptr));

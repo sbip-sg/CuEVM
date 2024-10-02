@@ -13,7 +13,6 @@
 #include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
-#include <CuEVM/state/access_state.cuh>
 #include <CuEVM/state/touch_state.cuh>
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/evm_defines.cuh>

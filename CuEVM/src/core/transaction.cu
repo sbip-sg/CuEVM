@@ -346,7 +346,7 @@ __host__ __device__ int32_t evm_transaction_t::validate(
 /**
  * get the message call from the transaction
  * @param[in] arith the arithmetic environment.
- * @param[in] access_state the access state.
+ * @param[in] touch_state the touch state.
  * @param[out] evm_message_call_ptr the message call.
  * @return 1 for success, 0 for failure.
  */
