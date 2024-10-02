@@ -15,7 +15,7 @@ namespace CuEVM::operations {
  */
 __host__ __device__ int32_t generic_CALL(
     ArithEnv &arith, const bn_t &args_offset, const bn_t &args_size,
-    CuEVM::AccessState &access_state, CuEVM::evm_call_state_t &current_state,
+    CuEVM::evm_call_state_t &current_state,
     CuEVM::evm_call_state_t *&new_state_ptr) {
     // try to send value in call
     bn_t value;
@@ -130,8 +130,7 @@ __host__ __device__ int32_t generic_CALL(
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __host__ __device__ int32_t
-generic_CREATE(ArithEnv &arith, CuEVM::AccessState &access_state,
-               CuEVM::evm_call_state_t &current_state,
+generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
                CuEVM::evm_call_state_t *&new_state_ptr, const uint32_t opcode) {
     bn_t value, memory_offset, length;
     int32_t error_code = current_state.stack_ptr->pop(arith, value);
@@ -263,10 +262,9 @@ __host__ __device__ int32_t STOP(CuEVM::evm_return_data_t &return_data) {
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __host__ __device__ int32_t CREATE(ArithEnv &arith,
-                                   CuEVM::AccessState &access_state,
                                    CuEVM::evm_call_state_t &current_state,
                                    CuEVM::evm_call_state_t *&new_state_ptr) {
-    return generic_CREATE(arith, access_state, current_state, new_state_ptr,
+    return generic_CREATE(arith, current_state, new_state_ptr,
                           OP_CREATE);
 }
 
@@ -278,7 +276,6 @@ __host__ __device__ int32_t CREATE(ArithEnv &arith,
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __host__ __device__ int32_t CALL(ArithEnv &arith,
-                                 CuEVM::AccessState &access_state,
                                  CuEVM::evm_call_state_t &current_state,
                                  CuEVM::evm_call_state_t *&new_state_ptr) {
     bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
@@ -313,7 +310,7 @@ __host__ __device__ int32_t CALL(ArithEnv &arith,
                 storage_address, call_data, code, ret_offset, ret_size,
                 current_state.message_ptr->get_static_env()));
 
-        error_code |= generic_CALL(arith, args_offset, args_size, access_state,
+        error_code |= generic_CALL(arith, args_offset, args_size,
                                    current_state, new_state_ptr);
     }
     return error_code;
@@ -327,7 +324,6 @@ __host__ __device__ int32_t CALL(ArithEnv &arith,
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __host__ __device__ int32_t CALLCODE(ArithEnv &arith,
-                                     CuEVM::AccessState &access_state,
                                      CuEVM::evm_call_state_t &current_state,
                                      CuEVM::evm_call_state_t *&new_state_ptr) {
     bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
@@ -361,7 +357,7 @@ __host__ __device__ int32_t CALLCODE(ArithEnv &arith,
                 storage_address, call_data, code, ret_offset, ret_size,
                 current_state.message_ptr->get_static_env()));
 
-        error_code |= generic_CALL(arith, args_offset, args_size, access_state,
+        error_code |= generic_CALL(arith, args_offset, args_size,
                                    current_state, new_state_ptr);
     }
     return error_code;
@@ -409,7 +405,7 @@ __host__ __device__ int32_t RETURN(ArithEnv &arith, const bn_t &gas_limit,
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __host__ __device__ int32_t
-DELEGATECALL(ArithEnv &arith, CuEVM::AccessState &access_state,
+DELEGATECALL(ArithEnv &arith,
              CuEVM::evm_call_state_t &current_state,
              CuEVM::evm_call_state_t *&new_state_ptr) {
     bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
@@ -444,7 +440,7 @@ DELEGATECALL(ArithEnv &arith, CuEVM::AccessState &access_state,
                 storage_address, call_data, code, ret_offset, ret_size,
                 current_state.message_ptr->get_static_env()));
 
-        error_code |= generic_CALL(arith, args_offset, args_size, access_state,
+        error_code |= generic_CALL(arith, args_offset, args_size,
                                    current_state, new_state_ptr);
     }
     return error_code;
@@ -458,10 +454,9 @@ DELEGATECALL(ArithEnv &arith, CuEVM::AccessState &access_state,
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __host__ __device__ int32_t CREATE2(ArithEnv &arith,
-                                    CuEVM::AccessState &access_state,
                                     CuEVM::evm_call_state_t &current_state,
                                     CuEVM::evm_call_state_t *&new_state_ptr) {
-    return generic_CREATE(arith, access_state, current_state, new_state_ptr,
+    return generic_CREATE(arith, current_state, new_state_ptr,
                           OP_CREATE2);
 }
 
@@ -473,8 +468,7 @@ __host__ __device__ int32_t CREATE2(ArithEnv &arith,
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __host__ __device__ int32_t
-STATICCALL(ArithEnv &arith, CuEVM::AccessState &access_state,
-           CuEVM::evm_call_state_t &current_state,
+STATICCALL(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
            CuEVM::evm_call_state_t *&new_state_ptr) {
     bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
     int32_t error_code = current_state.stack_ptr->pop(arith, gas);
@@ -506,7 +500,7 @@ STATICCALL(ArithEnv &arith, CuEVM::AccessState &access_state,
                 current_state.message_ptr->get_depth() + 1, OP_STATICCALL,
                 storage_address, call_data, code, ret_offset, ret_size, 1));
 
-        error_code |= generic_CALL(arith, args_offset, args_size, access_state,
+        error_code |= generic_CALL(arith, args_offset, args_size,
                                    current_state, new_state_ptr);
     }
 
@@ -565,7 +559,7 @@ __host__ __device__ int32_t INVALID() { return ERROR_NOT_IMPLEMENTED; }
 __host__ __device__ int32_t
 SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used,
              CuEVM::evm_stack_t &stack, CuEVM::evm_message_call_t &message,
-             CuEVM::TouchState &touch_state, CuEVM::AccessState &access_state,
+             CuEVM::TouchState &touch_state,
              CuEVM::evm_return_data_t &return_data) {
     int32_t error_code = ERROR_SUCCESS;
     if (message.get_static_env()) {

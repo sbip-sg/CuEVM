@@ -65,7 +65,6 @@ __host__ __device__ int32_t ADDRESS(ArithEnv &arith, const bn_t &gas_limit,
 
 __host__ __device__ int32_t BALANCE(ArithEnv &arith, const bn_t &gas_limit,
                                     bn_t &gas_used, CuEVM::evm_stack_t &stack,
-                                    const CuEVM::AccessState &access_state,
                                     CuEVM::TouchState &touch_state) {
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
     bn_t address;
@@ -272,7 +271,6 @@ GASPRICE(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used,
 __host__ __device__ int32_t EXTCODESIZE(ArithEnv &arith, const bn_t &gas_limit,
                                         bn_t &gas_used,
                                         CuEVM::evm_stack_t &stack,
-                                        const CuEVM::AccessState &access_state,
                                         CuEVM::TouchState &touch_state) {
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
     bn_t address;
@@ -291,7 +289,6 @@ __host__ __device__ int32_t EXTCODESIZE(ArithEnv &arith, const bn_t &gas_limit,
 __host__ __device__ int32_t EXTCODECOPY(ArithEnv &arith, const bn_t &gas_limit,
                                         bn_t &gas_used,
                                         CuEVM::evm_stack_t &stack,
-                                        const CuEVM::AccessState &access_state,
                                         CuEVM::TouchState &touch_state,
                                         CuEVM::evm_memory_t &memory) {
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
@@ -391,7 +388,6 @@ RETURNDATACOPY(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used,
 __host__ __device__ int32_t EXTCODEHASH(ArithEnv &arith, const bn_t &gas_limit,
                                         bn_t &gas_used,
                                         CuEVM::evm_stack_t &stack,
-                                        const CuEVM::AccessState &access_state,
                                         CuEVM::TouchState &touch_state) {
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
     bn_t address;

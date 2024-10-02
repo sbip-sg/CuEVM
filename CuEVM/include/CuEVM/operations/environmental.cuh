@@ -14,7 +14,7 @@
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/state/touch_state.cuh>
-#include <CuEVM/state/access_state.cuh>
+// #include <CuEVM/state/access_state.cuh>
 #include <CuEVM/core/return_data.cuh>
 
 /**
@@ -104,7 +104,6 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::AccessState &access_state,
         CuEVM::TouchState &touch_state);
 
     /**
@@ -313,7 +312,6 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::AccessState &access_state,
         CuEVM::TouchState &touch_state);
 
     /**
@@ -343,7 +341,6 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::AccessState &access_state,
         CuEVM::TouchState &touch_state,
         CuEVM::evm_memory_t &memory);
 
@@ -414,7 +411,6 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::AccessState &access_state,
         CuEVM::TouchState &touch_state);
 
     /**
