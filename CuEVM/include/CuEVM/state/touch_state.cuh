@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <CuEVM/state/access_state.cuh>
+#include <CuEVM/state/world_state.cuh>
 #include <CuEVM/state/account.cuh>
 #include <CuEVM/state/state_access.cuh>
 #include <CuEVM/utils/arith.cuh>
@@ -43,7 +43,7 @@ class TouchState {
     /**
      * The constructor with the state and the access state.
      * @param[in] state The state access.
-     * @param[in] access_state The access state.
+     * @param[in] world_state The world state.
      */
     __host__ __device__ TouchState(state_access_t *state,
                                    CuEVM::WorldState *world_state)
@@ -52,7 +52,6 @@ class TouchState {
     /**
      * The constructor with the state, the access state, and the parent state.
      * @param[in] state The state access.
-     * @param[in] access_state The access state.
      * @param[in] parent The parent state.
      */
     __host__ __device__ TouchState(state_access_t *state, TouchState *parent)
@@ -173,6 +172,9 @@ class TouchState {
     __host__ __device__ int32_t poke_value(ArithEnv &arith, const bn_t &address,
                                            const bn_t &key, bn_t &value) const;
 
+    __host__ __device__ int32_t poke_original_value(ArithEnv &arith, const bn_t &address,
+                                           const bn_t &key, bn_t &value) const;
+
     /**
      * The setter for the balance given by an address.
      * @param[in] arith The arithmetic environment.
@@ -195,17 +197,55 @@ class TouchState {
     __host__ __device__ int32_t poke_balance(ArithEnv &arith,
                                              const bn_t &address,
                                              bn_t &balance) const;
+    /**
+     * Get the account object without settng it warm
+     *
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @param account_ptr The pointer to the account.
+     * @param include_world_state  If the world state should be included
+     * @return 0 if the account is found, error otherwise.
+     */
     __host__ __device__ int32_t poke_account(
         ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
         bool include_world_state = false) const;
-    /** Helper debugging function, to be removed
+
+    /**
+     * Check if an account is in the warm set
+     *
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @return true if the account is in the warm set, false otherwise.
      */
     __host__ __device__ bool is_warm_account(ArithEnv &arith,
                                              const bn_t &address) const;
+
+    /**
+     * Check if a key is in the warm set
+     *
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @param key The key of the storage.
+     * @return true if the key is in the warm set, false otherwise.
+     */
     __host__ __device__ bool is_warm_key(ArithEnv &arith, const bn_t &address,
                                          const bn_t &key) const;
+
+    /**
+     * Set an account to be warm
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+    */
     __host__ __device__ bool set_warm_account(ArithEnv &arith,
                                               const bn_t &address);
+
+    /**
+     * Set a key to be warm
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @param key The key of the storage.
+     * @param value The value of the storage.
+    */
     __host__ __device__ bool set_warm_key(ArithEnv &arith, const bn_t &address,
                                           const bn_t &key, const bn_t &value);
     /**

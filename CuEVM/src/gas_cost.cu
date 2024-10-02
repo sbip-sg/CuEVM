@@ -153,24 +153,15 @@ __host__ __device__ int32_t sload_cost(ArithEnv &arith, bn_t &gas_used,
 __host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used,
                                         bn_t &gas_refund,
                                         const CuEVM::TouchState &touch_state,
-                                        const CuEVM::AccessState &access_state,
                                         const bn_t &address, const bn_t &key,
                                         const bn_t &new_value) {
     // get the key warm
-    // printf("sstore cost \n");
-    // printf("address: ");
-    // print_bnt(arith, address);
-    // printf("key: ");
-    // print_bnt(arith, key);
     if (touch_state.is_warm_key(arith, address, key) == false) {
-        // printf("COLD SSTORE\n");
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_SLOAD);
     }
     bn_t original_value, current_value;
-    access_state.poke_value(arith, address, key, original_value);
+    touch_state.poke_original_value(arith, address, key, original_value);
     touch_state.poke_value(arith, address, key, current_value);
-    // printf("current value: \n");
-    // print_bnt(arith, current_value);
     // EIP-2200
     if (cgbn_compare(arith.env, new_value, current_value) == 0) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SLOAD);

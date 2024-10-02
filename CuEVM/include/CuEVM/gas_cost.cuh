@@ -3,7 +3,6 @@
 
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/transaction.cuh>
-#include <CuEVM/state/access_state.cuh>
 #include <CuEVM/state/touch_state.cuh>
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
@@ -215,7 +214,6 @@ __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used,
  * as balance, nonce, code
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
- * @param[in] access_state The access state
  * @param[in] address The address of the account
  * @return 0 for success, 1 for failure
  */
@@ -227,7 +225,6 @@ access_account_cost(ArithEnv &arith, bn_t &gas_used,
  * Add the cost for the SLOAD operation.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
- * @param[in] access_state The access state
  * @param[in] address The address of the account
  * @param[in] key The key of the storage
  * @return 0 for success, 1 for failure
@@ -242,7 +239,6 @@ __host__ __device__ int32_t sload_cost(ArithEnv &arith, bn_t &gas_used,
  * @param[inout] gas_used The gas used
  * @param[inout] gas_refund The refund
  * @param[in] touch_state The touch state
- * @param[in] access_state The access state
  * @param[in] address The address of the account
  * @param[in] key The key of the storage
  * @param[in] value The value of the storage
@@ -251,7 +247,6 @@ __host__ __device__ int32_t sload_cost(ArithEnv &arith, bn_t &gas_used,
 __host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used,
                                         bn_t &gas_refund,
                                         const CuEVM::TouchState &touch_state,
-                                        const CuEVM::AccessState &access_state,
                                         const bn_t &address, const bn_t &key,
                                         const bn_t &value);
 

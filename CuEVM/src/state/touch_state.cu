@@ -27,9 +27,6 @@ __host__ __device__ int32_t TouchState::get_account(
            (tmp->_state->get_account(arith, address, account_ptr,
                                      acces_state_flag)))
         tmp = tmp->parent;
-    // printf("\nget account\n");
-    // account_ptr->print();
-    // printf("\nend account print\n");
     if (account_ptr == nullptr)
         _state->add_new_account(arith, address, account_ptr, acces_state_flag);
     return ERROR_SUCCESS;
@@ -117,6 +114,13 @@ __host__ __device__ int32_t TouchState::poke_value(ArithEnv &arith,
     return _world_state->get_value(arith, address, key, value);
 }
 
+__host__ __device__ int32_t TouchState::poke_original_value(ArithEnv &arith,
+                                                   const bn_t &address,
+                                                   const bn_t &key,
+                                                   bn_t &value) const {
+    return _world_state->get_value(arith, address, key, value);
+}
+
 __host__ __device__ int32_t TouchState::poke_balance(ArithEnv &arith,
                                                      const bn_t &address,
                                                      bn_t &balance) const {
@@ -156,9 +160,6 @@ __host__ __device__ bool TouchState::is_warm_key(ArithEnv &arith,
     while (tmp != nullptr) {
         if (!(tmp->_state->get_account(arith, address, account_ptr,
                                        ACCOUNT_NONE_FLAG))) {
-            // printf("\nsearching warm key\n");
-            // account_ptr->print();
-            // printf("\nend account print \n");
             if (account_ptr->get_storage_value(arith, key, value) ==
                 ERROR_SUCCESS)
                 return true;
@@ -235,10 +236,6 @@ __host__ __device__ int32_t TouchState::set_storage_value(ArithEnv &arith,
         add_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG);
     }
     account_ptr->set_storage_value(arith, key, value);
-    // printf("set storage value\n");
-    // print_bnt(arith, address);
-    // print_bnt(arith, key);
-    // printf("is warm key: %d\n", is_warm_key(arith, address, key));
     return ERROR_SUCCESS;
 }
 
@@ -296,16 +293,7 @@ __host__ __device__ int32_t TouchState::set_storage_value(ArithEnv &arith,
 //                         ACCOUNT_DELETED_FLAG | ACCOUNT_ALL_FLAG);
 //     return ERROR_SUCCESS;
 // }
-// __host__ __device__ int32_t TouchState::mark_for_deletion(ArithEnv &arith,
-//                                                           const bn_t
-//                                                           &address) {
-//     account_t *account_ptr = nullptr;
-//     int32_t error_code = _access_state->get_account(arith, address,
-//     account_ptr,
-//                                                     ACCOUNT_DELETED_FLAG);
-//     _state->get_account(arith, address, account_ptr, ACCOUNT_DELETED_FLAG);
-//     return ERROR_SUCCESS;
-// }
+
 
 __host__ __device__ int32_t TouchState::update(ArithEnv &arith,
                                                TouchState *other) {

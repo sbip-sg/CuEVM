@@ -21,7 +21,6 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
                                  CuEVM::state_t *world_state_data_ptr,
                                  CuEVM::block_info_t *block_info_ptr,
                                  CuEVM::evm_transaction_t *transaction_ptr,
-                                 CuEVM::state_access_t *access_state_data_ptr,
                                  CuEVM::state_access_t *touch_state_data_ptr,
                                  CuEVM::log_state_data_t *log_state_ptr,
                                  CuEVM::evm_return_data_t *return_data_ptr
@@ -32,18 +31,17 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
                                  )
     : world_state(world_state_data_ptr),
       block_info_ptr(block_info_ptr),
-      transaction_ptr(transaction_ptr),
-      access_state(access_state_data_ptr, &world_state) {
+      transaction_ptr(transaction_ptr){
     call_state_ptr = new CuEVM::evm_call_state_t(
         arith, &world_state, nullptr, nullptr, log_state_ptr,
         touch_state_data_ptr, return_data_ptr);
     int32_t error_code = transaction_ptr->validate(
-        arith, access_state, call_state_ptr->touch_state, *block_info_ptr,
+        arith, call_state_ptr->touch_state, *block_info_ptr,
         call_state_ptr->gas_used, gas_price, gas_priority_fee);
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t *transaction_call_message_ptr = nullptr;
         error_code = transaction_ptr->get_message_call(
-            arith, access_state, transaction_call_message_ptr);
+            arith, call_state_ptr->touch_state, transaction_call_message_ptr);
         CuEVM::evm_call_state_t *child_call_state_ptr =
             new CuEVM::evm_call_state_t(arith, call_state_ptr,
                                         transaction_call_message_ptr);
@@ -63,7 +61,6 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
                                  CuEVM::evm_instance_t &evm_instance)
     : evm_t(arith, evm_instance.world_state_data_ptr,
             evm_instance.block_info_ptr, evm_instance.transaction_ptr,
-            evm_instance.access_state_data_ptr,
             evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr,
             evm_instance.return_data_ptr
 #ifdef EIP_3155
@@ -112,7 +109,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         bn_t contract_address;
         call_state_ptr->message_ptr->get_contract_address(arith,
                                                           contract_address);
-        error_code |= access_state.get_account(
+        error_code |= call_state_ptr->touch_state.get_account(
             arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
         call_state_ptr->message_ptr->set_byte_code(contract->byte_code);
     }
@@ -427,7 +424,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                     error_code = CuEVM::operations::BALANCE(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, *call_state_ptr->stack_ptr,
-                        access_state, call_state_ptr->touch_state);
+                        call_state_ptr->touch_state);
                     break;
                 case OP_ORIGIN:
                     error_code = CuEVM::operations::ORIGIN(
@@ -489,13 +486,13 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                     error_code = CuEVM::operations::EXTCODESIZE(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, *call_state_ptr->stack_ptr,
-                        access_state, call_state_ptr->touch_state);
+                        call_state_ptr->touch_state);
                     break;
                 case OP_EXTCODECOPY:
                     error_code = CuEVM::operations::EXTCODECOPY(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, *call_state_ptr->stack_ptr,
-                        access_state, call_state_ptr->touch_state,
+                        call_state_ptr->touch_state,
                         *call_state_ptr->memory_ptr);
                     break;
                 case OP_RETURNDATASIZE:
@@ -515,7 +512,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                     error_code = CuEVM::operations::EXTCODEHASH(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, *call_state_ptr->stack_ptr,
-                        access_state, call_state_ptr->touch_state);
+                        call_state_ptr->touch_state);
                     break;
                 case OP_BLOCKHASH:
                     error_code = CuEVM::operations::BLOCKHASH(
@@ -599,14 +596,14 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                     error_code = CuEVM::operations::SLOAD(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, *call_state_ptr->stack_ptr,
-                        access_state, call_state_ptr->touch_state,
+                        call_state_ptr->touch_state,
                         *call_state_ptr->message_ptr);
                     break;
                 case OP_SSTORE:
                     error_code = CuEVM::operations::SSTORE(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, call_state_ptr->gas_refund,
-                        *call_state_ptr->stack_ptr, access_state,
+                        *call_state_ptr->stack_ptr,
                         call_state_ptr->touch_state,
                         *call_state_ptr->message_ptr);
                     break;
@@ -660,21 +657,20 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                 case OP_CREATE:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CREATE(
-                        arith, access_state, *call_state_ptr,
+                        arith, *call_state_ptr,
                         child_call_state_ptr);
                     break;
 
                 case OP_CALL:
                     child_call_state_ptr = nullptr;
-                    error_code = CuEVM::operations::CALL(arith, access_state,
-                                                         *call_state_ptr,
+                    error_code = CuEVM::operations::CALL(arith, *call_state_ptr,
                                                          child_call_state_ptr);
                     break;
 
                 case OP_CALLCODE:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CALLCODE(
-                        arith, access_state, *call_state_ptr,
+                        arith, *call_state_ptr,
                         child_call_state_ptr);
                     break;
 
@@ -689,21 +685,21 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                 case OP_DELEGATECALL:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::DELEGATECALL(
-                        arith, access_state, *call_state_ptr,
+                        arith, *call_state_ptr,
                         child_call_state_ptr);
                     break;
 
                 case OP_CREATE2:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CREATE2(
-                        arith, access_state, *call_state_ptr,
+                        arith, *call_state_ptr,
                         child_call_state_ptr);
                     break;
 
                 case OP_STATICCALL:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::STATICCALL(
-                        arith, access_state, *call_state_ptr,
+                        arith, *call_state_ptr,
                         child_call_state_ptr);
                     break;
 
@@ -720,7 +716,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, *call_state_ptr->stack_ptr,
                         *call_state_ptr->message_ptr,
-                        call_state_ptr->touch_state, access_state,
+                        call_state_ptr->touch_state,
                         *call_state_ptr->parent->last_return_data_ptr);
                     break;
 
@@ -1060,8 +1056,6 @@ __host__ int32_t get_evm_instances(ArithEnv &arith,
         evm_instances[index].block_info_ptr = block_info_ptr;
         evm_instances[index].transaction_ptr = &transactions_ptr[index];
         if (managed == 0) {
-            evm_instances[index].access_state_data_ptr =
-                new CuEVM::state_access_t();
             evm_instances[index].touch_state_data_ptr =
                 new CuEVM::state_access_t();
             evm_instances[index].log_state_ptr = new CuEVM::log_state_data_t();
@@ -1072,11 +1066,6 @@ __host__ int32_t get_evm_instances(ArithEnv &arith,
 #endif
         } else {
             CuEVM::state_access_t *access_state = new CuEVM::state_access_t();
-            CUDA_CHECK(
-                cudaMallocManaged(&evm_instances[index].access_state_data_ptr,
-                                  sizeof(CuEVM::state_access_t)));
-            memcpy(evm_instances[index].access_state_data_ptr, access_state,
-                   sizeof(CuEVM::state_access_t));
             CUDA_CHECK(
                 cudaMallocManaged(&evm_instances[index].touch_state_data_ptr,
                                   sizeof(CuEVM::state_access_t)));
@@ -1116,7 +1105,6 @@ __host__ void free_evm_instances(evm_instance_t *&evm_instances,
         delete evm_instances[0].world_state_data_ptr;
         delete evm_instances[0].block_info_ptr;
         for (uint32_t index = 0; index < num_instances; index++) {
-            delete evm_instances[index].access_state_data_ptr;
             delete evm_instances[index].touch_state_data_ptr;
             delete evm_instances[index].log_state_ptr;
             delete evm_instances[index].return_data_ptr;
@@ -1130,7 +1118,7 @@ __host__ void free_evm_instances(evm_instance_t *&evm_instances,
         CUDA_CHECK(cudaFree(evm_instances[0].world_state_data_ptr));
         CUDA_CHECK(cudaFree(evm_instances[0].block_info_ptr));
         for (uint32_t index = 0; index < num_instances; index++) {
-            CUDA_CHECK(cudaFree(evm_instances[index].access_state_data_ptr));
+            // CUDA_CHECK(cudaFree(evm_instances[index].access_state_data_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].touch_state_data_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].log_state_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].return_data_ptr));
