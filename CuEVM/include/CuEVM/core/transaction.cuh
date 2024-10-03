@@ -281,16 +281,18 @@ namespace CuEVM {
          * @param[in] json the json object.
          * @param[in] transactions_count the number of transactions.
          * @param[in] managed the managed flag.
+         * @param[in] world_state the world state to calculate CREATE destination.
          * @param[in] start_index the start index.
          * @param[in] clones the number of clones.
          * @return 0 for success, error code for failure.
          */
-        __host__ int32_t get_transactios(
+        __host__ int32_t get_transactions(
             ArithEnv &arith,
             evm_transaction_t* &transactions_ptr,
             const cJSON* json,
             uint32_t &transactions_count,
             int32_t managed = 0,
+            state_t *world_state = nullptr,
             uint32_t start_index = 0,
             uint32_t clones = 1);
 

@@ -218,7 +218,7 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
                  ? ERROR_STATIC_CALL_CONTEXT_CREATE
                  :
 #ifdef EIP_3860
-                 (cgbn_compare_ui32(arith.env, length, max_initcode_size) >= 0
+                 (cgbn_compare_ui32(arith.env, length, max_initcode_size) > 0
                       ? ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED
                       : ERROR_SUCCESS)
 #else

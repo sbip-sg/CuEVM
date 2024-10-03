@@ -492,10 +492,11 @@ __host__ uint32_t no_transactions(const cJSON *json) {
     return data_counts * gas_limit_counts * value_counts;
 }
 
-__host__ int32_t get_transactios(ArithEnv &arith,
+__host__ int32_t get_transactions(ArithEnv &arith,
                                  evm_transaction_t *&transactions_ptr,
                                  const cJSON *json,
                                  uint32_t &transactions_count, int32_t managed,
+                                 CuEVM::state_t *world_state_ptr,
                                  uint32_t start_index, uint32_t clones) {
     cJSON *transaction_json =
         cJSON_GetObjectItemCaseSensitive(json, "transaction");
@@ -535,18 +536,31 @@ __host__ int32_t get_transactios(ArithEnv &arith,
         cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
     uint32_t gas_limit_counts = cJSON_GetArraySize(gas_limit_json);
 
+    const cJSON *sender_json =
+        cJSON_GetObjectItemCaseSensitive(transaction_json, "sender");
+    template_transaction_ptr->sender.from_hex(sender_json->valuestring);
+
     const cJSON *to_json =
         cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
     // verify what is happening from strlen 0
-    template_transaction_ptr->to.from_hex(to_json->valuestring);
+    if (strlen(to_json->valuestring) == 0)  {
+        CuEVM::account_t *sender_account = nullptr;
+        bn_t sender, contract_address;
+        cgbn_load(arith.env, sender, &template_transaction_ptr->sender);
+        world_state_ptr->get_account(arith, sender, sender_account);
+        bn_t sender_nonce;
+        cgbn_load(arith.env, sender_nonce, &sender_account->nonce);
+        CuEVM::utils::get_contract_address_create(arith, contract_address,
+                                         sender, sender_nonce);
+        cgbn_store(arith.env, &template_transaction_ptr->to, contract_address);
+
+    } else{
+        template_transaction_ptr->to.from_hex(to_json->valuestring);
+    }
 
     const cJSON *value_json =
         cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
     uint32_t value_counts = cJSON_GetArraySize(value_json);
-
-    const cJSON *sender_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "sender");
-    template_transaction_ptr->sender.from_hex(sender_json->valuestring);
 
     const cJSON *access_list_json =
         cJSON_GetObjectItemCaseSensitive(transaction_json, "accessList");

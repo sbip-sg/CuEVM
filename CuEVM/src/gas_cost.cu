@@ -127,13 +127,15 @@ __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used,
 
 __host__ __device__ int32_t
 access_account_cost(ArithEnv &arith, bn_t &gas_used,
-                    const CuEVM::TouchState &touch_state, const bn_t &address) {
+                    CuEVM::TouchState &touch_state, const bn_t &address) {
     if (touch_state.is_warm_account(arith, address)) {
-        // printf("WARM ACCOUNT\n");
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
     } else {
-        // printf("COLD ACCOUNT\n");
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
+        // set the account warm in case it's cold
+        // assuming this function is called only when the account is accessed
+        // TODO: remove redundant logic
+        touch_state.set_warm_account(arith, address);
     }
     return ERROR_SUCCESS;
 }

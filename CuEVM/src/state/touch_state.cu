@@ -172,7 +172,7 @@ __host__ __device__ bool TouchState::is_warm_key(ArithEnv &arith,
 __host__ __device__ bool TouchState::set_warm_account(ArithEnv &arith,
                                                       const bn_t &address) {
     account_t *account_ptr = nullptr;
-    if (get_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG)) {
+    if (poke_account(arith, address, account_ptr)) {
         add_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG);
     }
 }
@@ -303,7 +303,7 @@ __host__ __device__ int32_t TouchState::update(ArithEnv &arith,
 __host__ __device__ int32_t TouchState::is_empty_account(ArithEnv &arith,
                                                          const bn_t &address) {
     account_t *account_ptr = nullptr;
-    poke_account(arith, address, account_ptr, ACCOUNT_NON_STORAGE_FLAG);
+    poke_account(arith, address, account_ptr, true);
     uint32_t result =
         account_ptr != nullptr ? account_ptr->is_empty() : ERROR_SUCCESS;
     return result;

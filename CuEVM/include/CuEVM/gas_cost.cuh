@@ -219,7 +219,7 @@ __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used,
  */
 __host__ __device__ int32_t
 access_account_cost(ArithEnv &arith, bn_t &gas_used,
-                    const CuEVM::TouchState &touch_state, const bn_t &address);
+                    CuEVM::TouchState &touch_state, const bn_t &address);
 
 /**
  * Add the cost for the SLOAD operation.

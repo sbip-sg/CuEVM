@@ -251,7 +251,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
             call_state_ptr->gas_used);
 #endif
         // DEBUG PRINT
-        // printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode);
+        printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode);
         // printf("touch state BEGIN BEGIN BEGIN\n");
         // call_state_ptr->touch_state.print();
         // printf("touch state END END END\n");
@@ -1041,8 +1041,8 @@ __host__ int32_t get_evm_instances(ArithEnv &arith,
     // get the transaction
     CuEVM::evm_transaction_t *transactions_ptr = nullptr;
     uint32_t num_transactions = 0;
-    CuEVM::transaction::get_transactios(arith, transactions_ptr, test_json,
-                                        num_transactions, managed);
+    CuEVM::transaction::get_transactions(arith, transactions_ptr, test_json,
+                                        num_transactions, managed, world_state_data_ptr);
 
     // generate the evm instances
     if (managed == 0) {
