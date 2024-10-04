@@ -128,6 +128,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         error_code |= account_ptr->is_contract()
                           ? ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS
                           : ERROR_SUCCESS;
+        printf("call create error code  is_contract %d\n", error_code);
         bn_t contract_nonce;
         cgbn_set_ui32(arith.env, contract_nonce, 1);
         error_code |= call_state_ptr->touch_state.set_nonce(arith, recipient,
@@ -135,12 +136,14 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         bn_t sender_nonce;
         error_code |=
             call_state_ptr->touch_state.get_nonce(arith, sender, sender_nonce);
-        cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
+        printf("call create error code  get_nonce %d\n", error_code);
+
         uint64_t nonce;
         error_code |= cgbn_get_uint64_t(arith.env, nonce, sender_nonce) ==
                               ERROR_VALUE_OVERFLOW
                           ? ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED
                           : ERROR_SUCCESS;
+        cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
         printf("call create error code %d\n", error_code);
     } else {
         printf("call error code %d\n", error_code);

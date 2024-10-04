@@ -193,7 +193,8 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
             error_code |= CuEVM::utils::get_contract_address_create(
                 arith, contract_address, sender_address, sender_nonce);
         }
-
+        if (current_state.touch_state.is_empty_account(arith, contract_address))
+            error_code |= ERROR_CREATE2_ADDRESS_ALREADY_EXISTS;
         // gas capped limit
         bn_t gas_capped;
         CuEVM::gas_cost::max_gas_call(
