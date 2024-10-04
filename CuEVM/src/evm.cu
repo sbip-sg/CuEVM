@@ -84,6 +84,7 @@ __host__ __device__ evm_t::~evm_t() {
 }
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
+    printf("start call\n");
     bn_t sender, recipient, value;
     call_state_ptr->message_ptr->get_sender(arith, sender);
     call_state_ptr->message_ptr->get_recipient(arith, recipient);
@@ -95,12 +96,13 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
              ? call_state_ptr->touch_state.transfer(arith, sender, recipient,
                                                     value)
              : ERROR_SUCCESS);
-
+    printf("transfer error code %d\n", error_code);
     if (error_code != ERROR_SUCCESS) {
         // avoid complication in the subsequent code
         // call failed = account never warmed up
         return error_code;
     }
+    printf("\n\ncall type %d\n", call_state_ptr->message_ptr->call_type);
     if (call_state_ptr->message_ptr->call_type == OP_CALL ||
         call_state_ptr->message_ptr->call_type == OP_CALLCODE ||
         call_state_ptr->message_ptr->call_type == OP_DELEGATECALL ||
@@ -139,11 +141,14 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
                               ERROR_VALUE_OVERFLOW
                           ? ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED
                           : ERROR_SUCCESS;
+        printf("call create error code %d\n", error_code);
     } else {
+        printf("call error code %d\n", error_code);
         error_code |= call_state_ptr->depth > CuEVM::max_depth
                           ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED
                           : ERROR_SUCCESS;
-        if (account_ptr->byte_code.size == 0) {
+        // Dont use account ptr here, byte_code already set
+        if (call_state_ptr->message_ptr->byte_code.size == 0) {
             bn_t contract_address;
             call_state_ptr->message_ptr->get_contract_address(arith,
                                                               contract_address);
@@ -151,6 +156,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
                                   CuEVM::no_precompile_contracts) == -1) {
                 switch (cgbn_get_ui32(arith.env, contract_address)) {
                     case 0x01:
+                        printf("\necrecover\n");
                         return CuEVM::precompile_operations::
                             operation_ecRecover(
                                 arith, call_state_ptr->gas_limit,
@@ -759,8 +765,9 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                  call_state_ptr->message_ptr->call_type == OP_CREATE2)) {
                 // TODO: finish create call add the contract to the state
                 // printf("Create call\n");
-                error_code |= finish_CREATE(arith);
+                error_code = finish_CREATE(arith);
             }
+            printf("error code %d\n", error_code);
 
             if (call_state_ptr->depth == 1) {
                 // TODO: finish transaction
@@ -871,8 +878,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith,
     cgbn_set_ui32(arith.env, child_success, 0);
     // if the child call return from normal halting
     // no errors
+    printf("\n\n finish_CALL error code: %d\n", error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) ||
-        (error_code == ERROR_INSUFFICIENT_FUNDS)) {
+        (error_code == ERROR_INSUFFICIENT_FUNDS) || (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED)) {
         // give back the gas left from the child computation
         bn_t gas_left;
         cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit,
@@ -902,8 +910,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith,
     // warm the sender and receiver regardless of revert
     bn_t sender, receiver;
     call_state_ptr->message_ptr->get_sender(arith, sender);
-    call_state_ptr->message_ptr->get_recipient(arith, receiver);
     call_state_ptr->parent->touch_state.set_warm_account(arith, sender);
+
+    call_state_ptr->message_ptr->get_recipient(arith, receiver);
     call_state_ptr->parent->touch_state.set_warm_account(arith, receiver);
 
     if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN &&
@@ -980,6 +989,8 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
     // sender_nonce); cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
     // call_state_ptr->parent->touch_state.set_nonce(arith, sender_address,
     // sender_nonce); compute the gas to deposit the contract
+    printf("\nfinish create, code size %d\n", call_state_ptr->parent->last_return_data_ptr->size);
+
     bn_t code_size;
     cgbn_set_ui32(arith.env, code_size,
                   call_state_ptr->parent->last_return_data_ptr->size);
@@ -995,6 +1006,7 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
         uint8_t *code = call_state_ptr->parent->last_return_data_ptr->data;
 #endif
         uint32_t code_size = call_state_ptr->parent->last_return_data_ptr->size;
+        printf("\nfinish create, code size %d\n", code_size);
         if (code_size <= CuEVM::max_code_size) {
 #ifdef EIP_3541
             if ((code_size > 0) && (code[0] == 0xef)) {
@@ -1013,7 +1025,8 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
         call_state_ptr->parent->last_return_data_ptr =
             new CuEVM::evm_return_data_t();
     }
-    return error_code;
+    // if success, return ERROR_RETURN to continue finish call
+    return error_code ? error_code: ERROR_RETURN;
 }
 
 __host__ int32_t get_evm_instances(ArithEnv &arith,

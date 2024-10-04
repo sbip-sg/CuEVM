@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 #include <CuEVM/precompile.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-
+#include <CuEVM/utils/arith.cuh>
 namespace CuEVM {
 
 /**
@@ -282,7 +282,53 @@ __host__ __device__ int32_t operation_BLAKE2(
 __host__ __device__ int32_t operation_ecRecover(
     ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
     CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
-    return ERROR_REVERT;
+    cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
+    int32_t error_code = ERROR_SUCCESS;
+    error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
+    printf("has gas %d\n", error_code);
+    printf("gas limit \n");
+    print_bnt(arith, gas_limit);
+
+    if (error_code == ERROR_SUCCESS) {
+
+        bn_t length;
+        cgbn_set_ui32(arith.env, length, message->data.size);
+        bn_t index;
+        cgbn_set_ui32(arith.env, index, 0);
+        // complete with zeroes the remaing bytes
+        // input = arith.padded_malloc_byte_array(tmp_input, size, 128);
+        CuEVM::byte_array_t input(message->get_data(), 0, 128);
+
+        // (msg_hash, input.data);
+        // (v, input.data + 32);
+        // (r, input.data + 64);
+        // (s, input.data + 96);
+
+        //printf("\n v %d\n", signature.v);
+        //printf("r : %s\n", ecc::bnt_to_string(arith._env, r));
+        //printf("s : %s\n", ecc::bnt_to_string(arith._env, s));
+        //printf("msgh: %s\n", ecc::bnt_to_string(arith._env, msg_hash));
+        error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+        // TODO: is not 27 and 28, only?
+        // if (cgbn_compare_ui32(arith.env, v, 28) <= 0) {
+        //     SHARED_MEMORY uint8_t output[32];
+        //     size_t res = ecc::ec_recover(arith, keccak, signature, signer);
+        //     if (res==0){
+        //         arith.memory_from_cgbn(
+        //             output,
+        //             signer
+        //         );
+        //         return_data.set(output, 32);
+        //         error_code = ERR_RETURN;
+        //     } else {
+        //         // TODO: do we consume all gas?
+        //         // it happens by default because of the error code
+        //         error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
+        //     }
+
+        // }
+    }
+    return error_code;
 }
 
 __host__ __device__ int32_t operation_ecAdd(

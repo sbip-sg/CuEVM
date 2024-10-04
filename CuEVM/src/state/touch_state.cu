@@ -127,12 +127,19 @@ __host__ __device__ int32_t TouchState::poke_balance(ArithEnv &arith,
     account_t *account_ptr = nullptr;
 
     const TouchState *tmp = this;
+    // printf("TouchState::poke_balance - address: \n");
+    // print_bnt(arith, address);
     while (tmp != nullptr) {
         if (!(tmp->_state->get_account(arith, address, account_ptr,
-                                       ACCOUNT_NONE_FLAG))) {
+                                       ACCOUNT_BALANCE_FLAG))) {
+            // printf("found account in touch state\n");
+            // account_ptr->print();
             account_ptr->get_balance(arith, balance);
             return ERROR_SUCCESS;
         }
+        // printf("\n\n current touch state");
+        // tmp->print();
+        // printf("\n\n");
         tmp = tmp->parent;
     }
     _world_state->get_account(arith, address, account_ptr);
@@ -192,7 +199,7 @@ __host__ __device__ int32_t TouchState::set_balance(ArithEnv &arith,
                                                     const bn_t &balance) {
     account_t *account_ptr = nullptr;
     _world_state->get_account(arith, address, account_ptr);
-    if (_state->get_account(arith, address, account_ptr,
+    if (get_account(arith, address, account_ptr,
                             ACCOUNT_BALANCE_FLAG) != ERROR_SUCCESS) {
         add_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG);
     }
@@ -205,7 +212,7 @@ __host__ __device__ int32_t TouchState::set_nonce(ArithEnv &arith,
                                                   const bn_t &nonce) {
     account_t *account_ptr = nullptr;
     _world_state->get_account(arith, address, account_ptr);
-    if (_state->get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG) !=
+    if (get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG) !=
         ERROR_SUCCESS) {
         add_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG);
     }
@@ -217,7 +224,7 @@ __host__ __device__ int32_t TouchState::set_code(
     ArithEnv &arith, const bn_t &address, const byte_array_t &byte_code) {
     account_t *account_ptr = nullptr;
     _world_state->get_account(arith, address, account_ptr);
-    if (_state->get_account(arith, address, account_ptr,
+    if (get_account(arith, address, account_ptr,
                             ACCOUNT_BYTE_CODE_FLAG) != ERROR_SUCCESS) {
         add_account(arith, address, account_ptr, ACCOUNT_BYTE_CODE_FLAG);
     }
