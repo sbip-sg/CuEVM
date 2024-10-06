@@ -85,10 +85,15 @@ __host__ __device__ evm_t::~evm_t() {
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
     printf("start call\n");
+    printf("touch state start call\n");
+    call_state_ptr->touch_state.print();
+    printf("\n\n");
     bn_t sender, recipient, value;
     call_state_ptr->message_ptr->get_sender(arith, sender);
     call_state_ptr->message_ptr->get_recipient(arith, recipient);
     call_state_ptr->message_ptr->get_value(arith, value);
+    printf("value \n");
+    print_bnt(arith, value);
     int32_t error_code =
         (((cgbn_compare_ui32(arith.env, value, 0) > 0) &&
           // (cgbn_compare(arith.env, sender, recipient) != 0) &&
@@ -102,7 +107,6 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         // call failed = account never warmed up
         return error_code;
     }
-    printf("\n\ncall type %d\n", call_state_ptr->message_ptr->call_type);
     if (call_state_ptr->message_ptr->call_type == OP_CALL ||
         call_state_ptr->message_ptr->call_type == OP_CALLCODE ||
         call_state_ptr->message_ptr->call_type == OP_DELEGATECALL ||
@@ -114,6 +118,11 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         error_code |= call_state_ptr->touch_state.get_account(
             arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
         call_state_ptr->message_ptr->set_byte_code(contract->byte_code);
+        print_bnt(arith, contract_address);
+        printf("current touch state \n\n");
+        call_state_ptr->touch_state.print();
+        printf("\n\n");
+        printf("\n\ncall type %d\n", call_state_ptr->message_ptr->call_type);
     }
     // warmup the accounts
     CuEVM::account_t *account_ptr = nullptr;
@@ -759,22 +768,21 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
             if (error_code == ERROR_SUCCESS) {
                 call_state_ptr = child_call_state_ptr;
                 error_code = start_CALL(arith);
+            } else if (opcode == OP_CREATE || opcode == OP_CREATE2){
+                // Logic: when op_create or create2 does not succeed,
+                // there is no start_CALL but do not revert parent contract:
+                //   + A contract already exists at the destination address.
+                //   + other (inside start_CALL)
+                if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS){
+                    // bypass the below by setting error_code == ERROR_SUCCESS
+                    error_code = ERROR_SUCCESS;
+                    // setting address = 0 to the stack
+                    bn_t create_output;
+                    cgbn_set_ui32(arith.env, create_output, 0);
+                    call_state_ptr->stack_ptr->push(arith, create_output);
+                    CuEVM::byte_array_t::reset_return_data(call_state_ptr->last_return_data_ptr);
+                }
             }
-            //  else if (opcode == OP_CREATE || opcode == OP_CREATE2){
-            //     // Logic: when op_create or create2 does not succeed,
-            //     // there is no start_CALL but do not revert parent contract:
-            //     //   + A contract already exists at the destination address.
-            //     //   + other (inside start_CALL)
-            //     if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS){
-            //         // bypass the below by setting error_code == ERROR_SUCCESS
-            //         error_code = ERROR_SUCCESS;
-            //         // setting address = 0 to the stack
-            //         bn_t create_output;
-            //         cgbn_set_ui32(arith.env, create_output, 0);
-            //         call_state_ptr->stack_ptr->push(arith, create_output);
-            //         CuEVM::byte_array_t::reset_return_data(call_state_ptr->last_return_data_ptr);
-            //     }
-            // }
         }
 
         if (error_code != ERROR_SUCCESS) {

@@ -93,11 +93,14 @@ class TouchState {
      * @param[in] address The address of the account.
      * @param[out] account_ptr The pointer to the account.
      * @param[in] acces_state_flag The account access flags.
+     * @param[in] add_to_state If the account should be force added to the state
+     *  Set to true when getting the account to update it.
      * @return 0 if the account is found, error otherwise.
      */
     __host__ __device__ int32_t get_account(
         ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t acces_state_flag);
+        const CuEVM::account_flags_t acces_state_flag,
+        bool add_to_state = false);
 
     __host__ __device__ int32_t get_account_index(ArithEnv &arith,
                                                   const bn_t &address,

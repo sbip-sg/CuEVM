@@ -193,8 +193,11 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
             error_code |= CuEVM::utils::get_contract_address_create(
                 arith, contract_address, sender_address, sender_nonce);
         }
-        if (current_state.touch_state.is_empty_account(arith, contract_address))
+        if (current_state.touch_state.is_empty_account(arith, contract_address)){
+            // corner collision case: must set warm for the contract address
+            current_state.touch_state.set_warm_account(arith, contract_address);
             error_code |= ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
+        }
         // gas capped limit
         bn_t gas_capped;
         CuEVM::gas_cost::max_gas_call(
@@ -229,11 +232,14 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
 #endif
             );
         printf("create error cost %d\n", error_code);
-        printf("is warm account new_state_ptr%d\n",
+        printf("is warm account new_state_ptr %d\n",
                new_state_ptr->touch_state.is_warm_account(arith, contract_address));
-        printf("is warm account current_state%d\n",
+        printf("is warm account current_state %d\n",
                current_state.touch_state.is_warm_account(arith, contract_address));
         // increase nonce regardless of the success of CREATE
+        printf("new touch state before set nonce\n");
+        new_state_ptr->touch_state.print();
+        printf("\n\n");
         if (sender_account->is_contract()) {
             bn_t sender_nonce;
             sender_account->get_nonce(arith, sender_nonce);
@@ -594,7 +600,11 @@ SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used,
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SELFDESTRUCT);
         bn_t contract_address;
         message.get_contract_address(arith, contract_address);
-
+        printf("SELFDESTRUCT contract_address\n");
+        print_bnt(arith, contract_address);
+        printf("current touch state \n\n");
+        touch_state.print();
+        printf("\n\n");
         // custom logic, cannot use access_account_cost (no warm cost)
         if (!touch_state.is_warm_account(arith, recipient))
             cgbn_add_ui32(arith.env, gas_used, gas_used,
