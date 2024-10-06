@@ -760,6 +760,21 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                 call_state_ptr = child_call_state_ptr;
                 error_code = start_CALL(arith);
             }
+            //  else if (opcode == OP_CREATE || opcode == OP_CREATE2){
+            //     // Logic: when op_create or create2 does not succeed,
+            //     // there is no start_CALL but do not revert parent contract:
+            //     //   + A contract already exists at the destination address.
+            //     //   + other (inside start_CALL)
+            //     if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS){
+            //         // bypass the below by setting error_code == ERROR_SUCCESS
+            //         error_code = ERROR_SUCCESS;
+            //         // setting address = 0 to the stack
+            //         bn_t create_output;
+            //         cgbn_set_ui32(arith.env, create_output, 0);
+            //         call_state_ptr->stack_ptr->push(arith, create_output);
+            //         CuEVM::byte_array_t::reset_return_data(call_state_ptr->last_return_data_ptr);
+            //     }
+            // }
         }
 
         if (error_code != ERROR_SUCCESS) {
@@ -926,6 +941,7 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith,
             delete call_state_ptr->parent->last_return_data_ptr;
         call_state_ptr->parent->last_return_data_ptr =
             new CuEVM::evm_return_data_t();
+        // CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
     }
     // get the memory offset and size of the return data
     // in the parent memory
@@ -1027,6 +1043,7 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
             delete call_state_ptr->parent->last_return_data_ptr;
         call_state_ptr->parent->last_return_data_ptr =
             new CuEVM::evm_return_data_t();
+        // CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
     }
     // if success, return ERROR_RETURN to continue finish call
     return error_code ? error_code: ERROR_RETURN;

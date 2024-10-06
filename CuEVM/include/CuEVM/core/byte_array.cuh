@@ -202,6 +202,18 @@ struct byte_array_t {
     __host__ __device__ static void transfer_memory(byte_array_t &dst,
                                                     byte_array_t &src);
 
+    /**
+     * Reset the reutnr data pointer, used frequently in finish sub context
+     *
+     * @param[in] return_data_ptr the data pointer to be reset
+     */
+
+    __host__ __device__ static void reset_return_data(byte_array_t *&return_data_ptr) {
+        if(return_data_ptr != nullptr)
+            delete return_data_ptr;
+        return_data_ptr = new byte_array_t();
+    }
+
    private:
     /**
      * Get the byte array from a hex string in Little Endian format.
