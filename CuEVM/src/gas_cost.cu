@@ -113,6 +113,79 @@ __host__ __device__ void blake2_cost(ArithEnv &arith, bn_t &gas_used,
     cgbn_add(arith.env, gas_used, gas_used, temp);
 }
 
+__host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
+                                        const bn_t &exponent_size,
+                                        const bn_t &exponent_bit_length_bn,
+                                        const bn_t &multiplication_complexity) {
+    // compute the iteration count depending on the size
+    // of the exponent and its most significant non-zero
+    // bit of the least siginifcant 256 bits
+    printf("modexp_cost\n");
+    printf("exponent_size: %d\n", cgbn_get_ui32(arith.env, exponent_size));
+    printf("exponent_bit_length_bn: %d\n",
+           cgbn_get_ui32(arith.env, exponent_bit_length_bn));
+    printf("multiplication_complexity: %d\n",
+           cgbn_get_ui32(arith.env, multiplication_complexity));
+
+    bn_t iteration_count;
+    cgbn_set_ui32(arith.env, iteration_count, 0);
+    uint32_t iteration_count_overflow;
+    iteration_count_overflow = 0;
+    // if the size is less than 32 bytes (256 bits) we
+    // just take the position of the most significant non-zero bit
+    // and substract 1
+    if (cgbn_get_ui32(arith.env, exponent_bit_length_bn) != 0) {
+        // exponent.bit_length() - 1
+        cgbn_sub_ui32(arith.env, iteration_count, exponent_bit_length_bn, 1);
+    }
+    if (cgbn_compare_ui32(arith.env, exponent_size, 32) > 0) {
+        // } else {
+        // elif Esize > 32: iteration_count = (8 * (Esize - 32)) + ((exponent &
+        // (2**256 - 1)).bit_length() - 1)
+        cgbn_sub_ui32(arith.env, iteration_count, exponent_size, 32);
+        // sometimes the iteration count can overflow
+        // for high values of the exponent size
+        iteration_count_overflow =
+            cgbn_mul_ui32(arith.env, iteration_count, iteration_count, 8);
+        iteration_count_overflow =
+            iteration_count_overflow |
+            cgbn_add(arith.env, iteration_count, iteration_count,
+                     exponent_bit_length_bn);
+        // cgbn_sub_ui32(arith.env, iteration_count, iteration_count, 1);
+    }
+    // iteration_count = max(iteration_count, 1)
+    if (cgbn_compare_ui32(arith.env, iteration_count, 1) < 0) {
+        cgbn_set_ui32(arith.env, iteration_count, 1);
+    }
+    printf("iteration_count: %d\n", cgbn_get_ui32(arith.env, iteration_count));
+
+    bn_t dynamic_gas;
+    uint32_t dynamic_gas_overflow;
+    dynamic_gas_overflow = 0;
+    // dynamic_gas = max(200, multiplication_complexity * iteration_count / 3)
+    // The dynamic gas value can overflow from the overflow
+    // of iteration count when the multiplication complexity
+    // is non-zero or from the simple multiplication of
+    // the iteration count and multiplication complexity
+    // in both case the value is way over the gas limit
+    // and we just throw an error which will consume the
+    // entire gas given for the call
+    cgbn_mul_high(arith.env, dynamic_gas, iteration_count,
+                  multiplication_complexity);
+    dynamic_gas_overflow = (cgbn_compare_ui32(arith.env, dynamic_gas, 0) != 0);
+    cgbn_mul(arith.env, dynamic_gas, iteration_count,
+             multiplication_complexity);
+    dynamic_gas_overflow =
+        dynamic_gas_overflow |
+        (iteration_count_overflow &&
+         (cgbn_compare_ui32(arith.env, multiplication_complexity, 0) != 0));
+    if (dynamic_gas_overflow) return ERROR_PRECOMPILE_MODEXP_OVERFLOW;
+    cgbn_div_ui32(arith.env, dynamic_gas, dynamic_gas, 3);
+    if (cgbn_compare_ui32(arith.env, dynamic_gas, 200) < 0) {
+        cgbn_set_ui32(arith.env, dynamic_gas, 200);
+    }
+    cgbn_add(arith.env, gas_used, gas_used, dynamic_gas);
+}
 __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used,
                                         uint32_t data_size) {
     // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 *
@@ -125,9 +198,9 @@ __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used,
     cgbn_add(arith.env, gas_used, gas_used, temp);
 }
 
-__host__ __device__ int32_t
-access_account_cost(ArithEnv &arith, bn_t &gas_used,
-                    CuEVM::TouchState &touch_state, const bn_t &address) {
+__host__ __device__ int32_t access_account_cost(ArithEnv &arith, bn_t &gas_used,
+                                                CuEVM::TouchState &touch_state,
+                                                const bn_t &address) {
     if (touch_state.is_warm_account(arith, address)) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
     } else {

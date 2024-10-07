@@ -72,7 +72,7 @@ class ArithEnv {
  */
 __host__ __device__ void cgbn_set_memory(env_t env, bn_t &dst,
                                          const uint8_t *src,
-                                         const uint32_t size);
+                                         const uint32_t size = 32);
 
 /**
  * Get a CGBN type from a size_t.
@@ -123,6 +123,42 @@ __host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
                                                  const bn_t &index,
                                                  const bn_t &length,
                                                  byte_array_t &out);
+
+/**
+ * Get an array of maximum 256 bytes, each having value 1 or 0 indicating bit
+ * set or not. Use as utility for Elliptic curve point multiplication
+ * @param[out] dst_array
+ * @param[out] array_length
+ * @param[in] src_cgbn_mem
+ * @param limb_count
+ */
+__host__ __device__ void get_bit_array(uint8_t *dst_array,
+                                       uint32_t &array_length,
+                                       evm_word_t &src_cgbn_mem,
+                                       uint32_t limb_count = 8);
+
+/**
+ * Get an array of bytes from CGBN memory.
+ * Use as utility for address conversion from Public Key point
+ * @param[out] dst_array
+ * @param[out] array_length
+ * @param[in] src_cgbn_mem
+ * @param limb_count
+ */
+__host__ __device__ void byte_array_from_cgbn_memory(uint8_t *dst_array,
+                                                     size_t &array_length,
+                                                     evm_word_t &src_cgbn_mem,
+                                                     size_t limb_count = 8);
+
+/**
+ * Get a memory byte array from CGBN base type.
+ * The memory byte array is in Big Endian format.
+ * The memory byte array must be allocated by the caller.
+ * @param[out] dst The memory byte array
+ * @param[in] src The source CGBN
+ */
+__host__ __device__ void memory_from_cgbn(ArithEnv &arith, uint8_t *dst,
+                                          bn_t &src);
 
 /**
  * Convert and evm word to and address format

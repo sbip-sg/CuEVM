@@ -31,7 +31,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith,
                                  )
     : world_state(world_state_data_ptr),
       block_info_ptr(block_info_ptr),
-      transaction_ptr(transaction_ptr){
+      transaction_ptr(transaction_ptr) {
     call_state_ptr = new CuEVM::evm_call_state_t(
         arith, &world_state, nullptr, nullptr, log_state_ptr,
         touch_state_data_ptr, return_data_ptr);
@@ -621,8 +621,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                     error_code = CuEVM::operations::SSTORE(
                         arith, call_state_ptr->gas_limit,
                         call_state_ptr->gas_used, call_state_ptr->gas_refund,
-                        *call_state_ptr->stack_ptr,
-                        call_state_ptr->touch_state,
+                        *call_state_ptr->stack_ptr, call_state_ptr->touch_state,
                         *call_state_ptr->message_ptr);
                     break;
                 case OP_JUMP:
@@ -675,8 +674,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                 case OP_CREATE:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CREATE(
-                        arith, *call_state_ptr,
-                        child_call_state_ptr);
+                        arith, *call_state_ptr, child_call_state_ptr);
                     break;
 
                 case OP_CALL:
@@ -688,8 +686,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                 case OP_CALLCODE:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CALLCODE(
-                        arith, *call_state_ptr,
-                        child_call_state_ptr);
+                        arith, *call_state_ptr, child_call_state_ptr);
                     break;
 
                 case OP_RETURN:
@@ -703,22 +700,19 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                 case OP_DELEGATECALL:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::DELEGATECALL(
-                        arith, *call_state_ptr,
-                        child_call_state_ptr);
+                        arith, *call_state_ptr, child_call_state_ptr);
                     break;
 
                 case OP_CREATE2:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::CREATE2(
-                        arith, *call_state_ptr,
-                        child_call_state_ptr);
+                        arith, *call_state_ptr, child_call_state_ptr);
                     break;
 
                 case OP_STATICCALL:
                     child_call_state_ptr = nullptr;
                     error_code = CuEVM::operations::STATICCALL(
-                        arith, *call_state_ptr,
-                        child_call_state_ptr);
+                        arith, *call_state_ptr, child_call_state_ptr);
                     break;
 
                 case OP_REVERT:
@@ -768,19 +762,20 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
             if (error_code == ERROR_SUCCESS) {
                 call_state_ptr = child_call_state_ptr;
                 error_code = start_CALL(arith);
-            } else if (opcode == OP_CREATE || opcode == OP_CREATE2){
+            } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                 // Logic: when op_create or create2 does not succeed,
                 // there is no start_CALL but do not revert parent contract:
                 //   + A contract already exists at the destination address.
                 //   + other (inside start_CALL)
-                if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS){
+                if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS) {
                     // bypass the below by setting error_code == ERROR_SUCCESS
                     error_code = ERROR_SUCCESS;
                     // setting address = 0 to the stack
                     bn_t create_output;
                     cgbn_set_ui32(arith.env, create_output, 0);
                     call_state_ptr->stack_ptr->push(arith, create_output);
-                    CuEVM::byte_array_t::reset_return_data(call_state_ptr->last_return_data_ptr);
+                    CuEVM::byte_array_t::reset_return_data(
+                        call_state_ptr->last_return_data_ptr);
                 }
             }
         }
@@ -906,14 +901,22 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith,
     // no errors
     printf("\n\n finish_CALL error code: %d\n", error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) ||
-        (error_code == ERROR_INSUFFICIENT_FUNDS) || (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED)) {
+        (error_code == ERROR_INSUFFICIENT_FUNDS) ||
+        (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED)) {
         // give back the gas left from the child computation
         bn_t gas_left;
         cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit,
                  call_state_ptr->gas_used);
+        printf("gas limit: \n");
+        print_bnt(arith, call_state_ptr->gas_limit);
+        printf("gas used: \n");
+        print_bnt(arith, call_state_ptr->gas_used);
+        printf("gas left: \n");
+        print_bnt(arith, gas_left);
         cgbn_sub(arith.env, call_state_ptr->parent->gas_used,
                  call_state_ptr->parent->gas_used, gas_left);
-
+        printf("parent gas used: \n");
+        print_bnt(arith, call_state_ptr->parent->gas_used);
         // if is a succesfull call
         if (error_code == ERROR_RETURN) {
             // update the parent state with the states of the child
@@ -1016,7 +1019,8 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
     // sender_nonce); cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
     // call_state_ptr->parent->touch_state.set_nonce(arith, sender_address,
     // sender_nonce); compute the gas to deposit the contract
-    printf("\nfinish create, code size %d\n", call_state_ptr->parent->last_return_data_ptr->size);
+    printf("\nfinish create, code size %d\n",
+           call_state_ptr->parent->last_return_data_ptr->size);
 
     bn_t code_size;
     cgbn_set_ui32(arith.env, code_size,
@@ -1054,7 +1058,7 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
         // CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
     }
     // if success, return ERROR_RETURN to continue finish call
-    return error_code ? error_code: ERROR_RETURN;
+    return error_code ? error_code : ERROR_RETURN;
 }
 
 __host__ int32_t get_evm_instances(ArithEnv &arith,
@@ -1083,7 +1087,8 @@ __host__ int32_t get_evm_instances(ArithEnv &arith,
     CuEVM::evm_transaction_t *transactions_ptr = nullptr;
     uint32_t num_transactions = 0;
     CuEVM::transaction::get_transactions(arith, transactions_ptr, test_json,
-                                        num_transactions, managed, world_state_data_ptr);
+                                         num_transactions, managed,
+                                         world_state_data_ptr);
 
     // generate the evm instances
     if (managed == 0) {
