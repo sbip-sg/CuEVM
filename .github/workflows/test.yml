@@ -37,6 +37,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
+      - name: Cache Docker images.
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-${{ runner.os }}-${{ hashFiles(paths) }}
+
       - name: Pull cached Docker image
         run: |
           docker pull augustus/goevmlab-cuevm:20241008 || true
