@@ -121,7 +121,7 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
     // of the exponent and its most significant non-zero
     // bit of the least siginifcant 256 bits
 
-    bn_t iteration_count;
+    bn_t iteration_count, adjusted_exponent_bit_length;
     cgbn_set_ui32(arith.env, iteration_count, 0);
     uint32_t iteration_count_overflow;
     iteration_count_overflow = 0;
@@ -130,8 +130,10 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
     // and substract 1
     if (cgbn_get_ui32(arith.env, exponent_bit_length_bn) != 0) {
         // exponent.bit_length() - 1
-        cgbn_sub_ui32(arith.env, iteration_count, exponent_bit_length_bn, 1);
+        cgbn_sub_ui32(arith.env, adjusted_exponent_bit_length,
+                      exponent_bit_length_bn, 1);
     }
+
     if (cgbn_compare_ui32(arith.env, exponent_size, 32) > 0) {
         // } else {
         // elif Esize > 32: iteration_count = (8 * (Esize - 32)) + ((exponent &
@@ -144,7 +146,7 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
         iteration_count_overflow =
             iteration_count_overflow |
             cgbn_add(arith.env, iteration_count, iteration_count,
-                     exponent_bit_length_bn);
+                     adjusted_exponent_bit_length);
         // cgbn_sub_ui32(arith.env, iteration_count, iteration_count, 1);
     }
     // iteration_count = max(iteration_count, 1)

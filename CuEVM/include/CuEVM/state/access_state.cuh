@@ -129,15 +129,15 @@ class AccessState {
      */
     __host__ __device__ int32_t is_deleted_account(ArithEnv &arith,
                                                    const bn_t &address) const;
-    /**
-     * IF an account is empty
-     * @param[in] arith The arithmetic environment.
-     * @param[in] address The address of the account.
-     * @return ERROR_SUCCESS if the account is empty, otherwise
-     * ERROR_ACCOUNT_NOT_EMPTY
-     */
-    __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
-                                                 const bn_t &address) const;
+    // /**
+    //  * IF an account is empty
+    //  * @param[in] arith The arithmetic environment.
+    //  * @param[in] address The address of the account.
+    //  * @return ERROR_SUCCESS if the account is empty, otherwise
+    //  * ERROR_ACCOUNT_NOT_EMPTY
+    //  */
+    // __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
+    //                                              const bn_t &address) const;
     /**
      * Get the full storage from access state and world state
      * @param[in] arith The arithmetic environment.

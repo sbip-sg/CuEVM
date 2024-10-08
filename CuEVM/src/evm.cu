@@ -84,9 +84,6 @@ __host__ __device__ evm_t::~evm_t() {
 }
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
-    // printf("touch state start call\n");
-    // call_state_ptr->touch_state.print();
-    // printf("\n\n");
     bn_t sender, recipient, value;
     call_state_ptr->message_ptr->get_sender(arith, sender);
     call_state_ptr->message_ptr->get_recipient(arith, recipient);
@@ -233,6 +230,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
             }
         }
     }
+
     return error_code;
 }
 

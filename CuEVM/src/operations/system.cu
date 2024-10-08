@@ -76,7 +76,7 @@ generic_CALL(ArithEnv &arith, const bn_t &args_offset, const bn_t &args_size,
             // If the empty account is called
             // only for call opcode
             if ((new_state_ptr->touch_state.is_empty_account(
-                     arith, contract_address) == ERROR_SUCCESS) &&
+                    arith, contract_address)) &&
                 (new_state_ptr->message_ptr->get_call_type() == OP_CALL)) {
                 cgbn_add_ui32(arith.env, current_state.gas_used,
                               current_state.gas_used, GAS_NEW_ACCOUNT);
@@ -242,6 +242,7 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
         }
     }
 
+    // printf("generic_CREATE error_code: %d\n", error_code);
     return error_code;
 }
 
@@ -579,8 +580,7 @@ __host__ __device__ int32_t SELFDESTRUCT(
         touch_state.get_balance(arith, contract_address, sender_balance);
 
         if (cgbn_compare_ui32(arith.env, sender_balance, 0) > 0) {
-            if (touch_state.is_empty_account(arith, recipient) ==
-                ERROR_SUCCESS) {
+            if (touch_state.is_empty_account(arith, recipient)) {
                 cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_NEW_ACCOUNT);
             }
         }

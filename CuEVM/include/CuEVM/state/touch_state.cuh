@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <CuEVM/state/world_state.cuh>
 #include <CuEVM/state/account.cuh>
 #include <CuEVM/state/state_access.cuh>
+#include <CuEVM/state/world_state.cuh>
 #include <CuEVM/utils/arith.cuh>
 
 namespace CuEVM {
@@ -109,10 +109,20 @@ class TouchState {
      * If the account given by address is empty
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
-     * @return 1 if the account is empty, 0 otherwise.
+     * @return true if the account is empty, false otherwise.
      */
-    __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
-                                                 const bn_t &address);
+    __host__ __device__ bool is_empty_account(ArithEnv &arith,
+                                              const bn_t &address);
+
+    /**
+     * @brief Determine if an account is empty and can be created
+     *  Different treatment to normal empty account (can have balance)
+     * @param arith
+     * @param address
+     * @return __host__
+     */
+    __host__ __device__ bool is_empty_account_create(ArithEnv &arith,
+                                                     const bn_t &address);
 
     /**
      * If the account given by address is deleted
@@ -175,8 +185,10 @@ class TouchState {
     __host__ __device__ int32_t poke_value(ArithEnv &arith, const bn_t &address,
                                            const bn_t &key, bn_t &value) const;
 
-    __host__ __device__ int32_t poke_original_value(ArithEnv &arith, const bn_t &address,
-                                           const bn_t &key, bn_t &value) const;
+    __host__ __device__ int32_t poke_original_value(ArithEnv &arith,
+                                                    const bn_t &address,
+                                                    const bn_t &key,
+                                                    bn_t &value) const;
 
     /**
      * The setter for the balance given by an address.
@@ -238,7 +250,7 @@ class TouchState {
      * Set an account to be warm
      * @param arith The arithmetic environment.
      * @param address The address of the account.
-    */
+     */
     __host__ __device__ bool set_warm_account(ArithEnv &arith,
                                               const bn_t &address);
 
@@ -248,7 +260,7 @@ class TouchState {
      * @param address The address of the account.
      * @param key The key of the storage.
      * @param value The value of the storage.
-    */
+     */
     __host__ __device__ bool set_warm_key(ArithEnv &arith, const bn_t &address,
                                           const bn_t &key, const bn_t &value);
     /**

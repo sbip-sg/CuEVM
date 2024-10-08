@@ -238,10 +238,10 @@ __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_transaction_t::validate(
-    ArithEnv &arith, CuEVM::TouchState &touch_state,
-    CuEVM::block_info_t &block_info, bn_t &gas_used, bn_t &gas_price,
-    bn_t &gas_priority_fee) const {
+__host__ __device__ int32_t
+evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
+                            CuEVM::block_info_t &block_info, bn_t &gas_used,
+                            bn_t &gas_price, bn_t &gas_priority_fee) const {
     bn_t gas_intrinsic;
     CuEVM::gas_cost::transaction_intrinsic_gas(arith, *this, gas_intrinsic);
     bn_t gas_limit;
@@ -273,8 +273,7 @@ __host__ __device__ int32_t evm_transaction_t::validate(
     // Next possible errors in the transaction context:
     // sender is an empty account YP: \f$\sigma(T_{s}) \neq \varnothing\f$
     // sender is a contract YP: \f$\sigma(T_{s})_{c} \eq KEC(())\f$
-    if ((sender_account == nullptr) ||
-        (sender_account->is_empty() == ERROR_SUCCESS) ||
+    if ((sender_account == nullptr) || (sender_account->is_empty()) ||
         (sender_account->is_contract())) {
         return ERROR_TRANSACTION_SENDER_EMPTY;
     }
@@ -369,7 +368,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         bn_t sender_nonce;
         CuEVM::account_t *sender_account = nullptr;
         touch_state.get_account(arith, sender_address, sender_account,
-                                 ACCOUNT_NONCE_FLAG);
+                                ACCOUNT_NONCE_FLAG);
         // nonce is -1 in YP but here is before validating the transaction
         // and increasing the nonce
         sender_account->get_nonce(arith, sender_nonce);
@@ -381,7 +380,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     } else {
         CuEVM::account_t *to_account = nullptr;
         touch_state.get_account(arith, to_address, to_account,
-                                 ACCOUNT_BYTE_CODE_FLAG);
+                                ACCOUNT_BYTE_CODE_FLAG);
         byte_code = to_account->byte_code;
     }
     uint32_t static_env = 0;
@@ -493,11 +492,11 @@ __host__ uint32_t no_transactions(const cJSON *json) {
 }
 
 __host__ int32_t get_transactions(ArithEnv &arith,
-                                 evm_transaction_t *&transactions_ptr,
-                                 const cJSON *json,
-                                 uint32_t &transactions_count, int32_t managed,
-                                 CuEVM::state_t *world_state_ptr,
-                                 uint32_t start_index, uint32_t clones) {
+                                  evm_transaction_t *&transactions_ptr,
+                                  const cJSON *json,
+                                  uint32_t &transactions_count, int32_t managed,
+                                  CuEVM::state_t *world_state_ptr,
+                                  uint32_t start_index, uint32_t clones) {
     cJSON *transaction_json =
         cJSON_GetObjectItemCaseSensitive(json, "transaction");
     uint32_t available_transactions = no_transactions(json);
@@ -543,7 +542,7 @@ __host__ int32_t get_transactions(ArithEnv &arith,
     const cJSON *to_json =
         cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
     // verify what is happening from strlen 0
-    if (strlen(to_json->valuestring) == 0)  {
+    if (strlen(to_json->valuestring) == 0) {
         CuEVM::account_t *sender_account = nullptr;
         bn_t sender, contract_address;
         cgbn_load(arith.env, sender, &template_transaction_ptr->sender);
@@ -551,10 +550,10 @@ __host__ int32_t get_transactions(ArithEnv &arith,
         bn_t sender_nonce;
         cgbn_load(arith.env, sender_nonce, &sender_account->nonce);
         CuEVM::utils::get_contract_address_create(arith, contract_address,
-                                         sender, sender_nonce);
+                                                  sender, sender_nonce);
         cgbn_store(arith.env, &template_transaction_ptr->to, contract_address);
 
-    } else{
+    } else {
         template_transaction_ptr->to.from_hex(to_json->valuestring);
     }
 

@@ -101,17 +101,17 @@ AccessState::is_deleted_account(ArithEnv &arith, const bn_t &address) const {
     return _world_state->get_account(arith, address, account_ptr);
 }
 
-__host__ __device__ int32_t
-AccessState::is_empty_account(ArithEnv &arith, const bn_t &address) const {
-    int32_t error_code = _state->is_empty_account(arith, address);
-    CuEVM::account_t *account_ptr = nullptr;
-    return (error_code == ERROR_STATE_ADDRESS_NOT_FOUND
-                ? (_world_state->get_account(arith, address, account_ptr) ==
-                           ERROR_STATE_ADDRESS_NOT_FOUND
-                       ? ERROR_SUCCESS
-                       : account_ptr->is_empty())
-                : error_code);
-}
+// __host__ __device__ int32_t
+// AccessState::is_empty_account(ArithEnv &arith, const bn_t &address) const {
+//     int32_t error_code = _state->is_empty_account(arith, address);
+//     CuEVM::account_t *account_ptr = nullptr;
+//     return (error_code == ERROR_STATE_ADDRESS_NOT_FOUND
+//                 ? (_world_state->get_account(arith, address, account_ptr) ==
+//                            ERROR_STATE_ADDRESS_NOT_FOUND
+//                        ? ERROR_SUCCESS
+//                        : account_ptr->is_empty())
+//                 : error_code);
+// }
 __host__ __device__ int32_t
 AccessState::get_storage(ArithEnv &arith, const bn_t &address,
                          CuEVM::contract_storage_t &storage) const {

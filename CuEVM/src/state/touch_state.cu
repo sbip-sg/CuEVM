@@ -305,12 +305,20 @@ __host__ __device__ int32_t TouchState::update(ArithEnv &arith,
     return _state->update(arith, *(other->_state));
 }
 
-__host__ __device__ int32_t TouchState::is_empty_account(ArithEnv &arith,
-                                                         const bn_t &address) {
+__host__ __device__ bool TouchState::is_empty_account(ArithEnv &arith,
+                                                      const bn_t &address) {
+    account_t *account_ptr = nullptr;
+    poke_account(arith, address, account_ptr, true);
+    uint32_t result = account_ptr != nullptr ? account_ptr->is_empty() : 1;
+    return result;
+}
+
+__host__ __device__ bool TouchState::is_empty_account_create(
+    ArithEnv &arith, const bn_t &address) {
     account_t *account_ptr = nullptr;
     poke_account(arith, address, account_ptr, true);
     uint32_t result =
-        account_ptr != nullptr ? account_ptr->is_empty() : ERROR_SUCCESS;
+        account_ptr != nullptr ? account_ptr->is_empty_create() : 1;
     return result;
 }
 

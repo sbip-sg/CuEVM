@@ -141,15 +141,15 @@ struct state_t {
     __host__ __device__ int32_t update_account(ArithEnv &arith,
                                                const CuEVM::account_t &account);
 
-    /**
-     * If an account is empty.
-     * @param[in] arith The arithmetic environment.
-     * @param[in] address The address.
-     * @return If empty ERROR_SUCCESS. otherwise error
-     * (ERROR_ACCOUNT_NOT_EMPTY or ERROR_STATE_ADDRESS_NOT_FOUND).
-     */
-    __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
-                                                 const bn_t &address);
+    // /**
+    //  * If an account is empty.
+    //  * @param[in] arith The arithmetic environment.
+    //  * @param[in] address The address.
+    //  * @return If empty ERROR_SUCCESS. otherwise error
+    //  * (ERROR_ACCOUNT_NOT_EMPTY or ERROR_STATE_ADDRESS_NOT_FOUND).
+    //  */
+    // __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
+    //                                              const bn_t &address);
     /**
      * Get the account from the JSON.
      * @param[in] state_json The state JSON.

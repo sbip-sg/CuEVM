@@ -396,7 +396,7 @@ __host__ __device__ int32_t EXTCODEHASH(ArithEnv &arith, const bn_t &gas_limit,
     CuEVM::gas_cost::access_account_cost(arith, gas_used, touch_state, address);
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
     bn_t hash_bn;
-    if ((touch_state.is_empty_account(arith, address) == ERROR_SUCCESS) ||
+    if ((touch_state.is_empty_account(arith, address)) ||
         touch_state.is_deleted_account(arith, address)) {
         cgbn_set_ui32(arith.env, hash_bn, 0);
     } else {
