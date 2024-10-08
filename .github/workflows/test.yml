@@ -151,15 +151,9 @@ jobs:
               echo "Test for $folder completed."
             fi
 
-            # Check if the test process is still running and kill it if needed
+            # Force kill
             echo "Checking if the test process is still running for $folder..."
-            docker exec cuevm-test-runner bash -c "ps aux | grep run-ethtest-by-fork.py | grep -v grep"
-            if [ $? -eq 0 ]; then
-              echo "Test for $folder is still running, killing it..."
-              docker exec cuevm-test-runner bash -c "pkill -f run-ethtest-by-fork.py"
-            else
-              echo "No lingering test process for $folder."
-            fi
+            docker kill -s 9 cuevm-test-runner || true
 
           done
 
