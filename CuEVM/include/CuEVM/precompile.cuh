@@ -9,6 +9,7 @@
 #include <CuCrypto/blake2.cuh>
 #include <CuCrypto/keccak.cuh>
 #include <CuCrypto/ripemd160.cuh>
+#include <CuCrypto/sha256.cuh>
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/return_data.cuh>

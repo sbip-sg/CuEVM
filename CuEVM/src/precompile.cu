@@ -86,7 +86,7 @@ __host__ __device__ int32_t operation_SHA256(
     }
 
     uint8_t hash[32] = {0};
-    CuCrypto::keccak::sha3_256(message->data.data, length_size, &(hash[0]));
+    CuCrypto::sha256::sha(message->data.data, length_size, &(hash[0]));
     *return_data = byte_array_t(hash, 32);
     return ERROR_RETURN;
 }
