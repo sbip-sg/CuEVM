@@ -890,7 +890,7 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith,
     cgbn_set_ui32(arith.env, child_success, 0);
     // if the child call return from normal halting
     // no errors
-    printf(" finish_CALL error_code: %d\n", error_code);
+    // printf(" finish_CALL error_code: %d\n", error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) ||
         (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) ||
