@@ -33,7 +33,7 @@ def check_output(output, error, without_state_root):
 
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root):
-    command = [runtest_bin, '--parallel=1', f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
+    command = [runtest_bin, f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 
     debug_print(' '.join(command))
 

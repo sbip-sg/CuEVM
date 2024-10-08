@@ -37,6 +37,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
+      - name: Cache Docker images.
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-${{ runner.os }}-${{ hashFiles('.devcontainer/devcontainer.json') }}
+
+      - name: Pull cached Docker image
+        run: |
+          docker pull augustus/goevmlab-cuevm:20241008 || true
+
       - name: Start cuevm-test-runner container
         run: |
           docker run --memory="6g" --memory-swap="6g"  -d --name cuevm-test-runner \
@@ -53,8 +62,7 @@ jobs:
 
       - name: Clone ethereum/tests
         run: |
-          git clone https://github.com/ethereum/tests.git ${{ github.workspace }}/ethereum/tests
-          cd ${{ github.workspace }}/ethereum/tests && git checkout shanghai
+          git clone --depth=1 --branch shanghai https://github.com/ethereum/tests.git ${{ github.workspace }}/ethereum/tests
           echo "Disabling vmPerformance test"
           mv ${{ github.workspace }}/ethereum/tests/GeneralStateTests/VMTests/vmPerformance /tmp/
 
@@ -64,7 +72,7 @@ jobs:
 
           # List of folders to process and their corresponding timeouts in seconds
           declare -A FOLDERS_WITH_TIMEOUTS=(
-            ["VMTests"]=1200
+            ["VMTests"]=3600
             ["Shanghai"]=300
             ["stPreCompiledContracts"]=300
             ["stPreCompiledContracts2"]=300
@@ -129,6 +137,8 @@ jobs:
             timeout_value=${FOLDERS_WITH_TIMEOUTS[$folder]}
             echo "Running tests for $folder with a timeout of $timeout_value seconds..."
 
+            docker start cuevm-test-runner
+
             # Using the timeout command to enforce the specified time limit for each folder
             timeout $timeout_value docker exec cuevm-test-runner \
               python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
@@ -147,6 +157,10 @@ jobs:
             else
               echo "Test for $folder completed."
             fi
+
+            # Force kill
+            docker kill -s 9 cuevm-test-runner || true
+
           done
 
       - name: Generate summary of test results
@@ -183,5 +197,5 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          docker stop cuevm-test-runner
-          docker rm cuevm-test-runner
+          docker kill -s -9 cuevm-test-runner || true
+          docker rm cuevm-test-runner || true
