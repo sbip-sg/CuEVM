@@ -57,7 +57,7 @@ jobs:
 
       - name: Clone ethereum/tests
         run: |
-          git clone --depht=1 --branch shanghai https://github.com/ethereum/tests.git ${{ github.workspace }}/ethereum/tests
+          git clone --depth=1 --branch shanghai https://github.com/ethereum/tests.git ${{ github.workspace }}/ethereum/tests
           echo "Disabling vmPerformance test"
           mv ${{ github.workspace }}/ethereum/tests/GeneralStateTests/VMTests/vmPerformance /tmp/
 
