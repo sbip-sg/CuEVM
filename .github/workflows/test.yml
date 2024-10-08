@@ -37,16 +37,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      - name: Build Docker image
-        run: |
-          docker build -t cuevm ${{ github.workspace }}/.devcontainer
-
       - name: Start cuevm-test-runner container
         run: |
           docker run --memory="6g" --memory-swap="6g"  -d --name cuevm-test-runner \
             -v ${{ github.workspace }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
-            cuevm /bin/bash -c "tail -f /dev/null"
+            augustus/goevmlab-cuevm:20241008 /bin/bash -c "tail -f /dev/null"
 
       - name: Build binary inside the container
         run: |

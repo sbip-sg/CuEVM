@@ -1,4 +1,5 @@
 FROM golang:latest as golang-builder
+ENV BUILD_DATE=20240916
 RUN git clone https://github.com/cassc/goevmlab --depth 1
 RUN cd goevmlab && \
   go build ./cmd/generic-fuzzer && \
