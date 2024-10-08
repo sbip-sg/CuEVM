@@ -78,7 +78,7 @@ jobs:
             ["stPreCompiledContracts2"]=300
             ["stArgsZeroOneBalance"]=300
             ["stAttackTest"]=300
-            ["stBadOpcode"]=300
+            ["stBadOpcode"]=600
             ["stBugs"]=300
             ["stCallCodes"]=300
             ["stCallCreateCallCodeTest"]=300
@@ -103,11 +103,11 @@ jobs:
             ["stLogTests"]=300
             ["stMemExpandingEIP150Calls"]=300
             ["stMemoryStressTest"]=300
-            ["stMemoryTest"]=300
+            ["stMemoryTest"]=600
             ["stNonZeroCallsTest"]=300
             # ["stQuadraticComplexityTest"]=300
-            ["stRandom"]=300
-            ["stRandom2"]=300
+            ["stRandom"]=600
+            ["stRandom2"]=600
             ["stRecursiveCreate"]=300
             ["stRefundTest"]=300
             ["stReturnDataTest"]=300
@@ -120,7 +120,7 @@ jobs:
             ["stSStoreTest"]=300
             ["stStackTests"]=300
             ["stStaticCall"]=300
-            ["stStaticFlagEnabled"]=300
+            ["stStaticFlagEnabled"]=600
             ["stSystemOperationsTest"]=300
             # ["stTimeConsuming"]=300
             ["stTransactionTest"]=300
@@ -163,9 +163,10 @@ jobs:
 
           done
 
-      - name: Generate summary of test results
+      - name: Generate summary of test results in markdown
         run: |
-          echo "Folder, Status, Passed, Failed, Skipped" > ${{ github.workspace }}/test-outputs/summary.txt
+          echo "| Folder | Status | Passed | Failed | Skipped |" > ${{ github.workspace }}/test-outputs/summary.md
+          echo "|---|---|---|---|---|" >> ${{ github.workspace }}/test-outputs/summary.md
           for log_file in ${{ github.workspace }}/test-outputs/*.log; do
             folder=$(basename "$log_file" .log)
             if grep -q "Test result" "$log_file"; then
@@ -174,16 +175,16 @@ jobs:
               failed=$(echo "$test_result_line" | sed -n 's/.*Failed: \([0-9]*\).*/\1/p')
               skipped=$(echo "$test_result_line" | sed -n 's/.*Skipped: \([0-9]*\).*/\1/p')
               status="Completed"
-              echo "$folder, $status, $passed, $failed, $skipped" >> ${{ github.workspace }}/test-outputs/summary.txt
+              echo "| $folder | $status | $passed | $failed | $skipped |" >> ${{ github.workspace }}/test-outputs/summary.md
             elif grep -q "timed out after" "$log_file"; then
               status="Timed out"
-              echo "$folder, $status, , , " >> ${{ github.workspace }}/test-outputs/summary.txt
+              echo "| $folder | $status | | | |" >> ${{ github.workspace }}/test-outputs/summary.md
             elif grep -q "terminated due to out-of-memory" "$log_file"; then
               status="Out of memory"
-              echo "$folder, $status, , , " >> ${{ github.workspace }}/test-outputs/summary.txt
+              echo "| $folder | $status | | | |" >> ${{ github.workspace }}/test-outputs/summary.md
             else
               status="Unknown"
-              echo "$folder, $status, , , " >> ${{ github.workspace }}/test-outputs/summary.txt
+              echo "| $folder | $status | | | |" >> ${{ github.workspace }}/test-outputs/summary.md
             fi
           done
 

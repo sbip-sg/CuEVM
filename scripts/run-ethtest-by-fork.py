@@ -115,7 +115,8 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
                                 else:
                                     raise
             except Exception as e:
-                result['failed_files'].append(output_filepath)
+                if output_filepath not in result['failed_files']:
+                    result['failed_files'].append(output_filepath)
                 if ignore_errors:
                     debug_print(f"{str(e)}")
                 else:
