@@ -120,12 +120,6 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
     // compute the iteration count depending on the size
     // of the exponent and its most significant non-zero
     // bit of the least siginifcant 256 bits
-    printf("modexp_cost\n");
-    printf("exponent_size: %d\n", cgbn_get_ui32(arith.env, exponent_size));
-    printf("exponent_bit_length_bn: %d\n",
-           cgbn_get_ui32(arith.env, exponent_bit_length_bn));
-    printf("multiplication_complexity: %d\n",
-           cgbn_get_ui32(arith.env, multiplication_complexity));
 
     bn_t iteration_count;
     cgbn_set_ui32(arith.env, iteration_count, 0);
@@ -157,7 +151,6 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
     if (cgbn_compare_ui32(arith.env, iteration_count, 1) < 0) {
         cgbn_set_ui32(arith.env, iteration_count, 1);
     }
-    printf("iteration_count: %d\n", cgbn_get_ui32(arith.env, iteration_count));
 
     bn_t dynamic_gas;
     uint32_t dynamic_gas_overflow;

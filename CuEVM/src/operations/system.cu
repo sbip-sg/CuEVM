@@ -57,8 +57,7 @@ generic_CALL(ArithEnv &arith, const bn_t &args_offset, const bn_t &args_size,
     }
     cgbn_add(arith.env, current_state.gas_used, current_state.gas_used,
              memory_expansion_cost);
-    printf("generic _ call memory_expansion_cost\n");
-    print_bnt(arith, memory_expansion_cost);
+
     // adress warm call
     bn_t contract_address;
     new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
@@ -104,10 +103,7 @@ generic_CALL(ArithEnv &arith, const bn_t &args_offset, const bn_t &args_size,
 
     error_code |= CuEVM::gas_cost::has_gas(arith, current_state.gas_limit,
                                            current_state.gas_used);
-    printf("gas used generic_CALL\n");
-    print_bnt(arith, current_state.gas_used);
-    printf("gas limit generic_CALL\n");
-    print_bnt(arith, new_state_ptr->gas_limit);
+
     if (error_code == ERROR_SUCCESS) {
         // increase the memory cost
         current_state.memory_ptr->increase_memory_cost(arith,
@@ -141,9 +137,6 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
     int32_t error_code = current_state.stack_ptr->pop(arith, value);
     error_code |= current_state.stack_ptr->pop(arith, memory_offset);
     error_code |= current_state.stack_ptr->pop(arith, length);
-    printf("\ntouch state before generic_CREATE\n");
-    current_state.touch_state.print();
-    printf("\n\n");
     // create cost
     cgbn_add_ui32(arith.env, current_state.gas_used, current_state.gas_used,
                   GAS_CREATE);
@@ -166,7 +159,6 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
 
     error_code |= CuEVM::gas_cost::has_gas(arith, current_state.gas_limit,
                                            current_state.gas_used);
-    printf("create error cost, opcode %d %d\n", error_code, opcode);
     if (error_code == ERROR_SUCCESS) {
         // increase the memory cost
         current_state.memory_ptr->increase_memory_cost(arith,
@@ -238,17 +230,7 @@ generic_CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
                  ERROR_SUCCESS
 #endif
             );
-        printf("create error cost %d\n", error_code);
-        printf("is warm account new_state_ptr %d\n",
-               new_state_ptr->touch_state.is_warm_account(arith,
-                                                          contract_address));
-        printf(
-            "is warm account current_state %d\n",
-            current_state.touch_state.is_warm_account(arith, contract_address));
-        // increase nonce regardless of the success of CREATE
-        printf("new touch state before set nonce\n");
-        new_state_ptr->touch_state.print();
-        printf("\n\n");
+
         if (sender_account->is_contract()) {
             bn_t sender_nonce;
             sender_account->get_nonce(arith, sender_nonce);
@@ -399,21 +381,11 @@ __host__ __device__ int32_t RETURN(ArithEnv &arith, const bn_t &gas_limit,
     bn_t memory_offset, length;
     int32_t error_code = stack.pop(arith, memory_offset);
     error_code |= stack.pop(arith, length);
-    printf("return memory_offset\n");
-    print_bnt(arith, memory_offset);
-    printf("return length\n");
-    print_bnt(arith, length);
+
     bn_t memory_expansion_cost;
     error_code |= CuEVM::gas_cost::memory_grow_cost(
         arith, memory, memory_offset, length, memory_expansion_cost, gas_used);
 
-    printf("\nRETURN error code %d\n", error_code);
-    printf("\nRETURN memory_expansion_cost\n");
-    print_bnt(arith, memory_expansion_cost);
-    printf("\nRETURN gas_used\n");
-    print_bnt(arith, gas_used);
-    printf("\nRETURN gas_limit\n");
-    print_bnt(arith, gas_limit);
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
@@ -422,7 +394,7 @@ __host__ __device__ int32_t RETURN(ArithEnv &arith, const bn_t &gas_limit,
         error_code |= memory.get(arith, memory_offset, length, return_data) |
                       ERROR_RETURN;
     }
-    printf("\nRETURN error code %d\n", error_code);
+
     return error_code;
 }
 
@@ -459,15 +431,7 @@ DELEGATECALL(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
         cgbn_set(arith.env, storage_address, recipient);  // I_{a}
         CuEVM::byte_array_t call_data;
         CuEVM::byte_array_t code;
-        printf("\n delegate call\n");
-        printf("sender\n");
-        print_bnt(arith, sender);
-        printf("recipient\n");
-        print_bnt(arith, recipient);
-        printf("contract_address\n");
-        print_bnt(arith, contract_address);
-        printf("storage_address\n");
-        print_bnt(arith, storage_address);
+
         new_state_ptr = new CuEVM::evm_call_state_t(
             arith, &current_state,
             new CuEVM::evm_message_call_t(
@@ -605,11 +569,7 @@ __host__ __device__ int32_t SELFDESTRUCT(
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SELFDESTRUCT);
         bn_t contract_address;
         message.get_contract_address(arith, contract_address);
-        printf("SELFDESTRUCT contract_address\n");
-        print_bnt(arith, contract_address);
-        printf("current touch state \n\n");
-        touch_state.print();
-        printf("\n\n");
+
         // custom logic, cannot use access_account_cost (no warm cost)
         if (!touch_state.is_warm_account(arith, recipient))
             cgbn_add_ui32(arith.env, gas_used, gas_used,

@@ -124,8 +124,7 @@ __host__ __device__ int32_t operation_MODEXP(
     ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
     CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
     bn_t base_size, exponent_size, modulus_size;
-    printf("gas used: before \n");
-    print_bnt(arith, gas_used);
+
     CuEVM::byte_array_t input_data(message->get_data(), 0, 96);
     byte_array_t bsize_array = byte_array_t(input_data.data, 32);
     byte_array_t esize_array = byte_array_t(input_data.data + 32, 32);
@@ -134,13 +133,7 @@ __host__ __device__ int32_t operation_MODEXP(
     int32_t error = cgbn_set_byte_array_t(arith.env, base_size, bsize_array);
     error |= cgbn_set_byte_array_t(arith.env, exponent_size, esize_array);
     error |= cgbn_set_byte_array_t(arith.env, modulus_size, msize_array);
-    printf("base size\n");
-    print_bnt(arith, base_size);
-    printf("exponent size\n");
-    print_bnt(arith, exponent_size);
-    printf("modulus size\n");
-    print_bnt(arith, modulus_size);
-    printf("error %d\n", error);
+
     if (error) {
         return error;
     }
@@ -159,7 +152,7 @@ __host__ __device__ int32_t operation_MODEXP(
         return error;
     }
     if (error) {
-        printf("cgbn_get_uint32_t error %d\n", error);
+        // printf("cgbn_get_uint32_t error %d\n", error);
         return error;
     }
 
@@ -226,15 +219,12 @@ __host__ __device__ int32_t operation_MODEXP(
         bit_size = 0;  // If all bytes are zero
     }
     cgbn_set_ui32(arith.env, exponent_bit_length_bn, bit_size);
-    printf("exponent bit length\n");
-    print_bnt(arith, exponent_bit_length_bn);
-    printf("\n\n");
+
     error |= CuEVM::gas_cost::modexp_cost(arith, gas_used, exponent_size,
                                           exponent_bit_length_bn,
                                           multiplication_complexity);
     error |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
-    printf("gas used: after has gas \n");
-    print_bnt(arith, gas_used);
+
     if (error) {
         return error;
     }
@@ -277,28 +267,9 @@ __host__ __device__ int32_t operation_MODEXP(
             mod_is_one = false;
         }
     }
-    printf("base data\n");
-    for (int i = 0; i < base_len; i++) {
-        printf("%02x", base_data.data[i]);
-    }
-    printf("\n");
-    printf("exponent data\n");
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", adjusted_exp_data[i]);
-    }
-    printf("\n");
-    printf("mod data\n");
-    for (int i = 0; i < mod_len; i++) {
-        printf("%02x", mod_data.data[i]);
-    }
-    printf("\n");
-    printf("exp is zero %d\n", exp_is_zero);
-    printf("mod is one %d\n", mod_is_one);
-    printf("mod is zero %d\n", mod_is_zero);
-    printf("base is zero %d\n", base_is_zero);
+
     // early return special cases
     if (mod_is_zero) {
-        printf("mod is zero return;\n");
         *return_data = byte_array_t(mod_len);  // return 0
         return ERROR_RETURN;
     }
@@ -307,10 +278,6 @@ __host__ __device__ int32_t operation_MODEXP(
         *return_data = byte_array_t(mod_len);
 
         if (!mod_is_one) return_data->data[mod_len - 1] = 1;  // return 1
-        printf("return data\n");
-        for (int i = 0; i < mod_len; i++) {
-            printf("%02x", return_data->data[i]);
-        }
         return ERROR_RETURN;
     }
 
@@ -328,8 +295,7 @@ __host__ __device__ int32_t operation_MODEXP(
                    &modulus_bigint);
     bigint_to_bytes(result, &result_bigint, mod_len);
     *return_data = byte_array_t(result, mod_len);
-    printf("gas used: end \n");
-    print_bnt(arith, gas_used);
+
     return ERROR_RETURN;
 }
 
@@ -385,9 +351,9 @@ __host__ __device__ int32_t operation_ecRecover(
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
-    printf("has gas %d\n", error_code);
-    printf("gas limit \n");
-    print_bnt(arith, gas_limit);
+    // printf("has gas %d\n", error_code);
+    // printf("gas limit \n");
+    // print_bnt(arith, gas_limit);
 
     if (error_code == ERROR_SUCCESS) {
         bn_t length;
@@ -408,13 +374,13 @@ __host__ __device__ int32_t operation_ecRecover(
         cgbn_store(arith.env, &signature.r, r);
         cgbn_store(arith.env, &signature.s, s);
         signature.v = cgbn_get_ui32(arith.env, v);
-        printf("\n v %d\n", signature.v);
-        printf("r : \n");
-        print_bnt(arith, r);
-        printf("s : \n");
-        print_bnt(arith, s);
-        printf("msgh: \n");
-        print_bnt(arith, msg_hash);
+        // printf("\n v %d\n", signature.v);
+        // printf("r : \n");
+        // print_bnt(arith, r);
+        // printf("s : \n");
+        // print_bnt(arith, s);
+        // printf("msgh: \n");
+        // print_bnt(arith, msg_hash);
         // TODO: is not 27 and 28, only?
         if (cgbn_compare_ui32(arith.env, v, 28) <= 0) {
             __SHARED_MEMORY__ uint8_t output[32];
@@ -514,8 +480,8 @@ __host__ __device__ int32_t operation_ecPairing(
     ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
     CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
     size_t size = message->data.size;
-    printf("ecPairing\n");
-    printf("input size %d\n", size);
+    // printf("ecPairing\n");
+    // printf("input size %d\n", size);
     // input = message.get_data(index, length, size);
     CuEVM::byte_array_t input(message->get_data(), 0, size);
     CuEVM::gas_cost::ecpairing_cost(arith, gas_used, size);
@@ -527,9 +493,9 @@ __host__ __device__ int32_t operation_ecPairing(
         } else {
             // 0 inputs is valid and returns 1.
             int res =
-                size == 0 ? 0 : ecc::pairing_multiple(arith, input.data, size);
+                size == 0 ? 1 : ecc::pairing_multiple(arith, input.data, size);
             // printf("res: %d", res);
-            if (res != 0) {
+            if (res == -1) {
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
             } else {
                 __SHARED_MEMORY__ uint8_t output[32];

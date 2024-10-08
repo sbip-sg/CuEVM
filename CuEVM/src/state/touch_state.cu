@@ -11,8 +11,10 @@ __host__ __device__ int32_t TouchState::add_account(
     ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
     const CuEVM::account_flags_t acces_state_flag) {
     CuEVM::account_t *tmp_account_ptr = nullptr;
-    if (!get_account(arith, address, tmp_account_ptr, acces_state_flag)) // if account found
-        return _state->add_duplicate_account(account_ptr, tmp_account_ptr, acces_state_flag);
+    if (!get_account(arith, address, tmp_account_ptr,
+                     acces_state_flag))  // if account found
+        return _state->add_duplicate_account(account_ptr, tmp_account_ptr,
+                                             acces_state_flag);
     account_ptr = tmp_account_ptr;
     return ERROR_SUCCESS;
 }
@@ -26,7 +28,7 @@ __host__ __device__ int32_t TouchState::get_account(
            (tmp->_state->get_account(arith, address, account_ptr,
                                      acces_state_flag)))
         tmp = tmp->parent;
-    if (account_ptr == nullptr){
+    if (account_ptr == nullptr) {
         _state->add_new_account(arith, address, account_ptr, acces_state_flag);
         return ERROR_STATE_ADDRESS_NOT_FOUND;
     }
@@ -116,9 +118,9 @@ __host__ __device__ int32_t TouchState::poke_value(ArithEnv &arith,
 }
 
 __host__ __device__ int32_t TouchState::poke_original_value(ArithEnv &arith,
-                                                   const bn_t &address,
-                                                   const bn_t &key,
-                                                   bn_t &value) const {
+                                                            const bn_t &address,
+                                                            const bn_t &key,
+                                                            bn_t &value) const {
     return _world_state->get_value(arith, address, key, value);
 }
 
@@ -127,22 +129,17 @@ __host__ __device__ int32_t TouchState::poke_balance(ArithEnv &arith,
                                                      bn_t &balance) const {
     account_t *account_ptr = nullptr;
     const TouchState *tmp = this;
-    // printf("TouchState::poke_balance - address: \n");
-    // print_bnt(arith, address);
+
     while (tmp != nullptr) {
         if (!(tmp->_state->get_account(arith, address, account_ptr,
                                        ACCOUNT_BALANCE_FLAG))) {
-            printf("found account in touch state\n");
-            account_ptr->print();
             account_ptr->get_balance(arith, balance);
             return ERROR_SUCCESS;
         }
-        // printf("\n\n current touch state");
-        // tmp->print();
-        // printf("\n\n");
+
         tmp = tmp->parent;
     }
-    printf("cant find account, get world state\n");
+
     _world_state->get_account(arith, address, account_ptr);
     if (account_ptr != nullptr) {
         account_ptr->get_balance(arith, balance);
@@ -213,8 +210,8 @@ __host__ __device__ int32_t TouchState::set_nonce(ArithEnv &arith,
                                                   const bn_t &address,
                                                   const bn_t &nonce) {
     account_t *account_ptr = nullptr;
-    if (_state->get_account(arith, address, account_ptr,
-                            ACCOUNT_NONCE_FLAG) != ERROR_SUCCESS) {
+    if (_state->get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG) !=
+        ERROR_SUCCESS) {
         add_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG);
     }
     // get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG, true);
@@ -303,7 +300,6 @@ __host__ __device__ int32_t TouchState::set_storage_value(ArithEnv &arith,
 //     return ERROR_SUCCESS;
 // }
 
-
 __host__ __device__ int32_t TouchState::update(ArithEnv &arith,
                                                TouchState *other) {
     return _state->update(arith, *(other->_state));
@@ -332,7 +328,6 @@ __host__ __device__ int32_t TouchState::transfer(ArithEnv &arith,
                                                  const bn_t &from,
                                                  const bn_t &to,
                                                  const bn_t &value) {
-    printf("TouchState::transfer\n");
     bn_t from_balance, to_balance;
     int32_t error_code = poke_balance(arith, from, from_balance);
     if (error_code != ERROR_SUCCESS ||

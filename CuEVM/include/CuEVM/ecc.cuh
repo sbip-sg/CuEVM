@@ -93,6 +93,21 @@ __host__ __device__ __forceinline__ constexpr const int32_t *
 get_modulus_coeffs<12>() {
     return FQ12_mod_coeffs;
 }
+/***
+ * @brief helper function to print FQP in hex
+ */
+template <size_t Degree>
+void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
+    evm_word_t scratch_pad;
+    char *temp_str = new char[CuEVM::word_bits / 8 * 2 + 3];
+    printf("%s: \n", name);
+    for (size_t i = 0; i < Degree; i++) {
+        cgbn_store(env, &scratch_pad, P.coeffs[i]);
+        // pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
+        scratch_pad.to_hex(temp_str);
+        printf("%s[%d] : %s\n", name, i, temp_str);
+    }
+}
 
 /**
  * @brief Get the curve object
@@ -1312,16 +1327,18 @@ __host__ __device__ __forceinline__ int pairing_multiple(ArithEnv &arith,
         cgbn_set_memory(arith.env, Qy.coeffs[0], points_data + 160);
         points_data += 192;
         // print point for debugging
-        //  print_fqp(arith, Px, "Px");
-        //  print_fqp(arith, Py, "Py");
-        //  print_fqp(arith, Qx, "Qx");
-        //  print_fqp(arith, Qy, "Qy");
+        // print_fqp(arith.env, Px, "Px");
+        // print_fqp(arith.env, Py, "Py");
+        // print_fqp(arith.env, Qx, "Qx");
+        // print_fqp(arith.env, Qy, "Qy");
         bool on_curve = FQP_is_on_curve(arith, Px, Py, mod_fp, B1) &&
                         FQP_is_on_curve(arith, Qx, Qy, mod_fp, B2);
+
         bool valid = FQP_is_valid(arith, Px, mod_fp) &&
                      FQP_is_valid(arith, Py, mod_fp) &&
                      FQP_is_valid(arith, Qx, mod_fp) &&
                      FQP_is_valid(arith, Qy, mod_fp);
+
         if (!on_curve || !valid) {
             return -1;
         } else {
