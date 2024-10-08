@@ -200,6 +200,11 @@ __host__ __device__ void ripemd160_cost(ArithEnv &arith, bn_t &gas_used,
 __host__ __device__ void blake2_cost(ArithEnv &arith, bn_t &gas_used,
                                      const uint32_t rounds);
 
+__host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
+                                        const bn_t &exponent_size,
+                                        const bn_t &exponent_bit_length_bn,
+                                        const bn_t &multiplication_complexity);
+
 /**
  * Add the pairing cost to the gas used.
  * @param[in] arith The arithmetic environment
@@ -217,9 +222,9 @@ __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used,
  * @param[in] address The address of the account
  * @return 0 for success, 1 for failure
  */
-__host__ __device__ int32_t
-access_account_cost(ArithEnv &arith, bn_t &gas_used,
-                    const CuEVM::TouchState &touch_state, const bn_t &address);
+__host__ __device__ int32_t access_account_cost(ArithEnv &arith, bn_t &gas_used,
+                                                CuEVM::TouchState &touch_state,
+                                                const bn_t &address);
 
 /**
  * Add the cost for the SLOAD operation.

@@ -108,11 +108,57 @@ __host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
     return ERROR_SUCCESS;
 }
 
+__host__ __device__ void get_bit_array(uint8_t *dst_array,
+                                       uint32_t &array_length,
+                                       evm_word_t &src_cgbn_mem,
+                                       uint32_t limb_count) {
+    uint32_t current_limb;
+    uint32_t bitIndex = 0;  // Index for each bit in dst_array
+    array_length = 0;
+    for (uint32_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem._limbs[limb_count - 1 - idx];
+        for (int bit = 31; bit >= 0; --bit) {  // hardcoded 32 bits per limb
+            // Extract each bit from the current limb and store '0' or '1' in
+            // dst_array
+            dst_array[bitIndex++] = (current_limb & (1U << bit)) ? 1 : 0;
+            if (dst_array[bitIndex - 1] == 1 && array_length == 0) {
+                array_length = 256 - (bitIndex - 1);
+            }
+        }
+    }
+}
+
+__host__ __device__ void byte_array_from_cgbn_memory(uint8_t *dst_array,
+                                                     size_t &array_length,
+                                                     evm_word_t &src_cgbn_mem,
+                                                     size_t limb_count) {
+    size_t current_limb;
+    array_length = limb_count * 4;  // Each limb has 4 bytes
+
+    for (size_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem._limbs[limb_count - 1 - idx];
+        dst_array[idx * 4] =
+            (current_limb >> 24) & 0xFF;  // Extract the most significant byte
+        dst_array[idx * 4 + 1] = (current_limb >> 16) & 0xFF;
+        dst_array[idx * 4 + 2] = (current_limb >> 8) & 0xFF;
+        dst_array[idx * 4 + 3] =
+            current_limb & 0xFF;  // Extract the least significant byte
+    }
+}
+
+__host__ __device__ void memory_from_cgbn(ArithEnv &arith, uint8_t *dst,
+                                          bn_t &src) {
+    for (uint32_t idx = 0; idx < CuEVM::word_size; idx++) {
+        dst[idx] = cgbn_extract_bits_ui32(arith.env, src,
+                                          CuEVM::word_bits - (idx + 1) * 8, 8);
+    }
+}
+
 __host__ __device__ void evm_address_conversion(ArithEnv &arith,
                                                 bn_t &address) {
     cgbn_bitwise_mask_and(arith.env, address, address, CuEVM::address_bits);
 }
-__host__ __device__ void print_bnt(ArithEnv &arith, const bn_t &bn){
+__host__ __device__ void print_bnt(ArithEnv &arith, const bn_t &bn) {
     evm_word_t tmp_word;
     cgbn_store(arith.env, &tmp_word, bn);
     tmp_word.print();

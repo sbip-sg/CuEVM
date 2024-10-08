@@ -5,19 +5,20 @@
 
 #pragma once
 
+#include <CuBigInt/bigint.cuh>
 #include <CuCrypto/blake2.cuh>
 #include <CuCrypto/keccak.cuh>
 #include <CuCrypto/ripemd160.cuh>
+#include <CuCrypto/sha256.cuh>
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/transaction.cuh>
+#include <CuEVM/ecc.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/touch_state.cuh>
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
-#include <CuBigInt/bigint.cuh>
-
 namespace CuEVM {
 /**
  * The precompile contracts

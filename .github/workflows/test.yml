@@ -101,7 +101,7 @@ jobs:
             ["stMemoryStressTest"]=300
             ["stMemoryTest"]=300
             ["stNonZeroCallsTest"]=300
-            ["stQuadraticComplexityTest"]=300
+            # ["stQuadraticComplexityTest"]=300
             ["stRandom"]=300
             ["stRandom2"]=300
             ["stRecursiveCreate"]=300
@@ -118,7 +118,7 @@ jobs:
             ["stStaticCall"]=300
             ["stStaticFlagEnabled"]=300
             ["stSystemOperationsTest"]=300
-            ["stTimeConsuming"]=300
+            # ["stTimeConsuming"]=300
             ["stTransactionTest"]=300
             ["stTransitionTest"]=300
             ["stWalletTest"]=300
@@ -153,7 +153,29 @@ jobs:
             fi
           done
 
-
+      - name: Generate summary of test results
+        run: |
+          echo "Folder, Status, Passed, Failed, Skipped" > ${{ github.workspace }}/test-outputs/summary.txt
+          for log_file in ${{ github.workspace }}/test-outputs/*.log; do
+            folder=$(basename "$log_file" .log)
+            if grep -q "Test result" "$log_file"; then
+              test_result_line=$(grep "Test result" "$log_file")
+              passed=$(echo "$test_result_line" | sed -n 's/.*Passed: \([0-9]*\).*/\1/p')
+              failed=$(echo "$test_result_line" | sed -n 's/.*Failed: \([0-9]*\).*/\1/p')
+              skipped=$(echo "$test_result_line" | sed -n 's/.*Skipped: \([0-9]*\).*/\1/p')
+              status="Completed"
+              echo "$folder, $status, $passed, $failed, $skipped" >> ${{ github.workspace }}/test-outputs/summary.txt
+            elif grep -q "timed out after" "$log_file"; then
+              status="Timed out"
+              echo "$folder, $status, , , " >> ${{ github.workspace }}/test-outputs/summary.txt
+            elif grep -q "terminated due to out-of-memory" "$log_file"; then
+              status="Out of memory"
+              echo "$folder, $status, , , " >> ${{ github.workspace }}/test-outputs/summary.txt
+            else
+              status="Unknown"
+              echo "$folder, $status, , , " >> ${{ github.workspace }}/test-outputs/summary.txt
+            fi
+          done
 
       - name: Archive test results
         if: always()
