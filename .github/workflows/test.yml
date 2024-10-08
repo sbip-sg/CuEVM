@@ -132,6 +132,8 @@ jobs:
             timeout_value=${FOLDERS_WITH_TIMEOUTS[$folder]}
             echo "Running tests for $folder with a timeout of $timeout_value seconds..."
 
+            docker start cuevm-test-runner
+
             # Using the timeout command to enforce the specified time limit for each folder
             timeout $timeout_value docker exec cuevm-test-runner \
               python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
