@@ -144,7 +144,10 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
 
     } else {
-        error_code |= call_state_ptr->depth > CuEVM::max_depth
+        // Go-ethereum: check depth > 1024 before increase
+        // -> depth > 1025 after increase
+        // test: stSelfBalance/diffPlaces.json
+        error_code |= call_state_ptr->depth > CuEVM::max_depth+1
                           ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED
                           : ERROR_SUCCESS;
         // Dont use account ptr here, byte_code already set
@@ -887,10 +890,11 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith,
     cgbn_set_ui32(arith.env, child_success, 0);
     // if the child call return from normal halting
     // no errors
-
+    printf(" finish_CALL error_code: %d\n", error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) ||
         (error_code == ERROR_INSUFFICIENT_FUNDS) ||
-        (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED)) {
+        (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) ||
+         error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
         bn_t gas_left;
         cgbn_sub(arith.env, gas_left, call_state_ptr->gas_limit,
