@@ -159,7 +159,6 @@ jobs:
             fi
 
             # Force kill
-            echo "Checking if the test process is still running for $folder..."
             docker kill -s 9 cuevm-test-runner || true
 
           done
