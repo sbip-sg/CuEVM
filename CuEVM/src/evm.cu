@@ -124,10 +124,10 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
 
     if ((call_state_ptr->message_ptr->call_type == OP_CREATE) ||
         (call_state_ptr->message_ptr->call_type == OP_CREATE2)) {
-        error_code |= account_ptr->is_contract()
-                          ? ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS
-                          : ERROR_SUCCESS;
-
+        error_code |= account_ptr->is_empty_create()
+                          ? ERROR_SUCCESS
+                          : ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
+        // printf("start_CALL contract ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS\n");
         bn_t contract_nonce;
         cgbn_set_ui32(arith.env, contract_nonce, 1);
         error_code |= call_state_ptr->touch_state.set_nonce(arith, recipient,
