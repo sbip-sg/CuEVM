@@ -120,9 +120,8 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
     // compute the iteration count depending on the size
     // of the exponent and its most significant non-zero
     // bit of the least siginifcant 256 bits
-
     bn_t iteration_count, adjusted_exponent_bit_length;
-    cgbn_set_ui32(arith.env, iteration_count, 0);
+    // cgbn_set_ui32(arith.env, iteration_count, 0);
     uint32_t iteration_count_overflow;
     iteration_count_overflow = 0;
     // if the size is less than 32 bytes (256 bits) we
@@ -133,7 +132,7 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
         cgbn_sub_ui32(arith.env, adjusted_exponent_bit_length,
                       exponent_bit_length_bn, 1);
     }
-
+    cgbn_set(arith.env, iteration_count, adjusted_exponent_bit_length);
     if (cgbn_compare_ui32(arith.env, exponent_size, 32) > 0) {
         // } else {
         // elif Esize > 32: iteration_count = (8 * (Esize - 32)) + ((exponent &
@@ -153,6 +152,7 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used,
     if (cgbn_compare_ui32(arith.env, iteration_count, 1) < 0) {
         cgbn_set_ui32(arith.env, iteration_count, 1);
     }
+    // printf("iteration_count: %d\n",cgbn_get_ui32(arith.env, iteration_count));
 
     bn_t dynamic_gas;
     uint32_t dynamic_gas_overflow;

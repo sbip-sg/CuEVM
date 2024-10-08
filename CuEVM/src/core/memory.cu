@@ -114,6 +114,10 @@ namespace CuEVM {
       const bn_t &length,
       CuEVM::byte_array_t &data) {
       int32_t error_code = ERROR_SUCCESS;
+      if (cgbn_compare_ui32(arith.env, length, 0) == 0) {
+        data = CuEVM::byte_array_t();
+        return error_code;
+      }
       error_code = (cgbn_compare_ui32(arith.env, length, 0) < 0) ? ERR_MEMORY_INVALID_SIZE : error_code;
       error_code |= grow(arith, index, length);
       if (error_code == ERROR_SUCCESS) {

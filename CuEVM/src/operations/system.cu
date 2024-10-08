@@ -525,6 +525,9 @@ __host__ __device__ int32_t REVERT(ArithEnv &arith, const bn_t &gas_limit,
     error_code |= stack.pop(arith, length);
 
     bn_t memory_expansion_cost;
+    // initialize to 0 as inner function may not set it
+    cgbn_set_ui32(arith.env, memory_expansion_cost, 0);
+
     error_code |= CuEVM::gas_cost::memory_grow_cost(
         arith, memory, memory_offset, length, memory_expansion_cost, gas_used);
 
