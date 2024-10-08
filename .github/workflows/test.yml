@@ -37,6 +37,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
+      - name: Pull cached Docker image
+        run: |
+          docker pull augustus/goevmlab-cuevm:20241008 || true
+
       - name: Start cuevm-test-runner container
         run: |
           docker run --memory="6g" --memory-swap="6g"  -d --name cuevm-test-runner \
