@@ -198,5 +198,5 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          docker stop cuevm-test-runner
-          docker rm cuevm-test-runner
+          docker kill -s -9 cuevm-test-runner || true
+          docker rm cuevm-test-runner || true
