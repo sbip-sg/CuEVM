@@ -40,7 +40,7 @@ jobs:
       - name: Cache Docker images.
         uses: ScribeMD/docker-cache@0.5.0
         with:
-          key: docker-${{ runner.os }}-${{ hashFiles(paths) }}
+          key: docker-${{ runner.os }}-${{ hashFiles('.devcontainer/devcontainer.json') }}
 
       - name: Pull cached Docker image
         run: |
