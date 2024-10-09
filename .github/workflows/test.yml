@@ -54,7 +54,7 @@ jobs:
       - name: Start cuevm-test-runner container
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
-          docker run --memory="64g" --memory-swap="64g"  -d --name cuevm-test-runner-${{ github.run_id }} \
+          docker run --memory="8g" --memory-swap="8g"  -d --name cuevm-test-runner-${{ github.run_id }} \
             -v ${{ github.workspace }}/${{ github.run_id }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
             augustus/goevmlab-cuevm:20241008 /bin/bash -c "tail -f /dev/null"
@@ -64,7 +64,7 @@ jobs:
           cd ${{ github.workspace }}/${{ github.run_id }}
           docker exec cuevm-test-runner-${{ github.run_id }} /bin/bash -c "
               cmake -S . -B build -DCPU='ON' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
-              cmake --build build
+              cmake --build build -j 24
           "
 
       - name: Clone ethereum/tests
@@ -74,136 +74,22 @@ jobs:
           # echo "Disabling vmPerformance test"
           # rm -rf ${{ github.workspace }}/${{ github.run_id }}/ethereum/tests/GeneralStateTests/VMTests/vmPerformance
 
-      - name: Run tests
+      - name: Run tests concurrently using Python
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
-          mkdir ${{ github.workspace }}/${{ github.run_id }}/test-outputs
-
-          # List of folders to process and their corresponding timeouts in seconds
-          declare -A FOLDERS_WITH_TIMEOUTS=(
-            ["vmPerformance"]=600
-            ["VMTests"]=3600
-            ["Shanghai"]=600
-            ["stPreCompiledContracts"]=600
-            ["stPreCompiledContracts2"]=600
-            ["stArgsZeroOneBalance"]=600
-            ["stAttackTest"]=600
-            ["stBadOpcode"]=600
-            ["stBugs"]=600
-            ["stCallCodes"]=600
-            ["stCallCreateCallCodeTest"]=600
-            ["stCallDelegateCodesCallCodeHomestead"]=600
-            ["stCallDelegateCodesHomestead"]=600
-            ["stChainId"]=600
-            ["stCodeCopyTest"]=600
-            ["stCodeSizeLimit"]=600
-            ["stCreate2"]=600
-            ["stCreateTest"]=600
-            ["stDelegatecallTestHomestead"]=600
-            ["stEIP150singleCodeGasPrices"]=600
-            ["stEIP150Specific"]=600
-            ["stEIP1559"]=600
-            ["stEIP158Specific"]=600
-            ["stEIP2930"]=600
-            ["stEIP3607"]=600
-            ["stExample"]=600
-            ["stExtCodeHash"]=600
-            ["stHomesteadSpecific"]=600
-            ["stInitCodeTest"]=600
-            ["stLogTests"]=600
-            ["stMemExpandingEIP150Calls"]=600
-            ["stMemoryStressTest"]=600
-            ["stMemoryTest"]=600
-            ["stNonZeroCallsTest"]=600
-            ["stQuadraticComplexityTest"]=600
-            ["stRandom"]=600
-            ["stRandom2"]=600
-            ["stRecursiveCreate"]=600
-            ["stRefundTest"]=600
-            ["stReturnDataTest"]=600
-            ["stRevertTest"]=600
-            ["stSelfBalance"]=600
-            ["stShift"]=600
-            ["stSLoadTest"]=600
-            ["stSolidityTest"]=600
-            ["stSpecialTest"]=600
-            ["stSStoreTest"]=600
-            ["stStackTests"]=600
-            ["stStaticCall"]=600
-            ["stStaticFlagEnabled"]=600
-            ["stSystemOperationsTest"]=600
-            ["stTimeConsuming"]=600
-            ["stTransactionTest"]=600
-            ["stTransitionTest"]=600
-            ["stWalletTest"]=600
-            ["stZeroCallsRevert"]=600
-            ["stZeroCallsTest"]=600
-            ["stZeroKnowledge"]=600
-            ["stZeroKnowledge2"]=600
-          )
-
-          # Loop through each folder and run the test with the specified timeout
-          for folder in "${!FOLDERS_WITH_TIMEOUTS[@]}"; do
-            timeout_value=${FOLDERS_WITH_TIMEOUTS[$folder]}
-            echo "Running tests for $folder with a timeout of $timeout_value seconds..."
-
-            docker start cuevm-test-runner-${{ github.run_id }}
-
-            # Using the timeout command to enforce the specified time limit for each folder
-            timeout $timeout_value docker exec cuevm-test-runner-${{ github.run_id }} \
-              python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
-              --runtest-bin /goevmlab/runtest \
-              --geth /goevmlab/gethvm \
-              --cuevm /workspaces/CuEVM/build/cuevm_CPU \
-              -i /workspaces/CuEVM/ethereum/tests/GeneralStateTests/"$folder" \
-              --ignore-errors --without-state-root \
-              | tee -a ${{ github.workspace }}/${{ github.run_id }}/test-outputs/"$folder".log
-
-            # Check if the timeout command exited with a specific status code (124 means timeout)
-            if [ $? -eq 124 ]; then
-              echo "Test for $folder timed out after $timeout_value seconds."
-            elif [ $? -eq 137 ]; then
-              echo "Test for $folder terminated due to out-of-memory."
-            else
-              echo "Test for $folder completed."
-            fi
-
-            # Force kill
-            docker kill -s 9 cuevm-test-runner-${{ github.run_id }} || true
-
-          done
+          python3 -u scripts/run-ci-tests.py
 
       - name: Generate summary of test results in markdown
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
-          echo "| Folder | Status | Passed | Failed | Skipped |" > ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md
-          echo "|---|---|---|---|---|" >> ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md
-          for log_file in ${{ github.workspace }}/${{ github.run_id }}/test-outputs/*.log; do
-            folder=$(basename "$log_file" .log)
-            if grep -q "Test result" "$log_file"; then
-              test_result_line=$(grep "Test result" "$log_file")
-              passed=$(echo "$test_result_line" | sed -n 's/.*Passed: \([0-9]*\).*/\1/p')
-              failed=$(echo "$test_result_line" | sed -n 's/.*Failed: \([0-9]*\).*/\1/p')
-              skipped=$(echo "$test_result_line" | sed -n 's/.*Skipped: \([0-9]*\).*/\1/p')
-              status="Completed"
-              echo "| $folder | $status | $passed | $failed | $skipped |" >> ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md
-            elif grep -q "timed out after" "$log_file"; then
-              status="Timed out"
-              echo "| $folder | $status | | | |" >> ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md
-            elif grep -q "terminated due to out-of-memory" "$log_file"; then
-              status="Out of memory"
-              echo "| $folder | $status | | | |" >> ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md
-            else
-              status="Unknown"
-              echo "| $folder | $status | | | |" >> ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md
-            fi
-          done
+          python3 scripts/generate-ci-test-summary.py
+
       - name: Send summary to Slack
         run: |
           summary_content=$(cat ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md)
           job_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -X POST -H 'Content-type: application/json' \
-          --data "{\"text\": \"*Test Summary*\n\`\`\`$summary_content\`\`\`\n\n*Job Summary*\n- Workflow: ${{ github.workflow }}\n- Job: ${{ github.job }}\n- Repository: ${{ github.repository }}\n- Commit SHA: ${{ github.sha }}\n- Branch: ${{ github.ref_name }}\n- Run ID: ${{ github.run_id }}\n- Run URL: $job_url\"}" \
+          --data "{\"text\": \"*Test Summary*\n\n\`\`\`$summary_content\`\`\`\n\n*Job Summary*\n- Workflow: ${{ github.workflow }}\n- Job: ${{ github.job }}\n- Repository: ${{ github.repository }}\n- Commit SHA: ${{ github.sha }}\n- Branch: ${{ github.head_ref }}\n- Run ID: ${{ github.run_id }}\n- Run URL: $job_url\"}" \
           ${{ secrets.SLACK_WEBHOOK_URL }}
 
 
