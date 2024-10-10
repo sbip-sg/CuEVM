@@ -24,8 +24,7 @@ __host__ __device__ int32_t access_list_account_t::free(int32_t managed) {
     return ERROR_SUCCESS;
 }
 
-__host__ int32_t access_list_account_t::from_json(const cJSON *json,
-                                                  int32_t managed) {
+__host__ int32_t access_list_account_t::from_json(const cJSON *json, int32_t managed) {
     cJSON *address_json = cJSON_GetObjectItemCaseSensitive(json, "address");
     if (address_json == NULL) {
         return ERROR_FAILED;
@@ -33,8 +32,7 @@ __host__ int32_t access_list_account_t::from_json(const cJSON *json,
     if (!address.from_hex(address_json->valuestring)) {
         return ERROR_FAILED;
     }
-    cJSON *storage_keys_json =
-        cJSON_GetObjectItemCaseSensitive(json, "storageKeys");
+    cJSON *storage_keys_json = cJSON_GetObjectItemCaseSensitive(json, "storageKeys");
     if (storage_keys_json == NULL) {
         storage_keys_count = 0;
         return ERROR_SUCCESS;
@@ -44,14 +42,12 @@ __host__ int32_t access_list_account_t::from_json(const cJSON *json,
         return ERROR_SUCCESS;
     }
     if (managed) {
-        CUDA_CHECK(cudaMallocManaged((void **)&(storage_keys),
-                                     storage_keys_count * sizeof(evm_word_t)));
+        CUDA_CHECK(cudaMallocManaged((void **)&(storage_keys), storage_keys_count * sizeof(evm_word_t)));
     } else {
         storage_keys = new evm_word_t[storage_keys_count];
     }
     for (uint32_t idx = 0; idx < storage_keys_count; idx++) {
-        if (storage_keys[idx].from_hex(
-                cJSON_GetArrayItem(storage_keys_json, idx)->valuestring)) {
+        if (storage_keys[idx].from_hex(cJSON_GetArrayItem(storage_keys_json, idx)->valuestring)) {
             return ERROR_FAILED;
         }
     }
@@ -80,9 +76,7 @@ __host__ int32_t access_list_t::from_json(const cJSON *json, int32_t managed) {
         return ERROR_SUCCESS;
     }
     if (managed) {
-        CUDA_CHECK(
-            cudaMallocManaged((void **)&(accounts),
-                              accounts_count * sizeof(access_list_account_t)));
+        CUDA_CHECK(cudaMallocManaged((void **)&(accounts), accounts_count * sizeof(access_list_account_t)));
     } else {
         accounts = new access_list_account_t[accounts_count];
     }
@@ -99,50 +93,40 @@ __host__ int32_t access_list_t::from_json(const cJSON *json, int32_t managed) {
  */
 __host__ __device__ evm_transaction_t::~evm_transaction_t() {}
 
-__host__ __device__ void evm_transaction_t::get_nonce(ArithEnv &arith,
-                                                      bn_t &nonce) const {
+__host__ __device__ void evm_transaction_t::get_nonce(ArithEnv &arith, bn_t &nonce) const {
     cgbn_load(arith.env, nonce, (cgbn_evm_word_t_ptr) & (this->nonce));
 }
 
-__host__ __device__ void evm_transaction_t::get_gas_limit(
-    ArithEnv &arith, bn_t &gas_limit) const {
+__host__ __device__ void evm_transaction_t::get_gas_limit(ArithEnv &arith, bn_t &gas_limit) const {
     cgbn_load(arith.env, gas_limit, (cgbn_evm_word_t_ptr) & (this->gas_limit));
 }
 
-__host__ __device__ void evm_transaction_t::get_to(ArithEnv &arith,
-                                                   bn_t &to) const {
+__host__ __device__ void evm_transaction_t::get_to(ArithEnv &arith, bn_t &to) const {
     cgbn_load(arith.env, to, (cgbn_evm_word_t_ptr) & (this->to));
 }
 
-__host__ __device__ void evm_transaction_t::get_value(ArithEnv &arith,
-                                                      bn_t &value) const {
+__host__ __device__ void evm_transaction_t::get_value(ArithEnv &arith, bn_t &value) const {
     cgbn_load(arith.env, value, (cgbn_evm_word_t_ptr) & (this->value));
 }
 
-__host__ __device__ void evm_transaction_t::get_sender(ArithEnv &arith,
-                                                       bn_t &sender) const {
+__host__ __device__ void evm_transaction_t::get_sender(ArithEnv &arith, bn_t &sender) const {
     cgbn_load(arith.env, sender, (cgbn_evm_word_t_ptr) & (this->sender));
 }
 
-__host__ __device__ void evm_transaction_t::get_max_fee_per_gas(
-    ArithEnv &arith, bn_t &max_fee_per_gas) const {
-    cgbn_load(arith.env, max_fee_per_gas,
-              (cgbn_evm_word_t_ptr) & (this->max_fee_per_gas));
+__host__ __device__ void evm_transaction_t::get_max_fee_per_gas(ArithEnv &arith, bn_t &max_fee_per_gas) const {
+    cgbn_load(arith.env, max_fee_per_gas, (cgbn_evm_word_t_ptr) & (this->max_fee_per_gas));
 }
 
-__host__ __device__ void evm_transaction_t::get_max_priority_fee_per_gas(
-    ArithEnv &arith, bn_t &max_priority_fee_per_gas) const {
-    cgbn_load(arith.env, max_priority_fee_per_gas,
-              (cgbn_evm_word_t_ptr) & (this->max_priority_fee_per_gas));
+__host__ __device__ void evm_transaction_t::get_max_priority_fee_per_gas(ArithEnv &arith,
+                                                                         bn_t &max_priority_fee_per_gas) const {
+    cgbn_load(arith.env, max_priority_fee_per_gas, (cgbn_evm_word_t_ptr) & (this->max_priority_fee_per_gas));
 }
 
-__host__ __device__ int32_t evm_transaction_t::get_gas_price(
-    ArithEnv &arith, const CuEVM::block_info_t &block_info,
-    bn_t &gas_price) const {
+__host__ __device__ int32_t evm_transaction_t::get_gas_price(ArithEnv &arith, const CuEVM::block_info_t &block_info,
+                                                             bn_t &gas_price) const {
     if ((type == 0) || (type == 1)) {
         // \f$p = T_{p}\f$
-        cgbn_load(arith.env, gas_price,
-                  (cgbn_evm_word_t_ptr) & (this->gas_price));
+        cgbn_load(arith.env, gas_price, (cgbn_evm_word_t_ptr) & (this->gas_price));
     } else if (type == 2) {
         cgbn_set_ui32(arith.env, gas_price, 0);
         bn_t max_priority_fee_per_gas;  // YP: \f$T_{f}\f$
@@ -155,8 +139,7 @@ __host__ __device__ int32_t evm_transaction_t::get_gas_price(
         // \f$T_{m} - H_{f}\f$
         cgbn_sub(arith.env, gas_priority_fee, max_fee_per_gas, block_base_fee);
         // \f$f=min(T_{f}, T_{m} - H_{f})\f$
-        if (cgbn_compare(arith.env, gas_priority_fee,
-                         max_priority_fee_per_gas) > 0) {
+        if (cgbn_compare(arith.env, gas_priority_fee, max_priority_fee_per_gas) > 0) {
             cgbn_set(arith.env, gas_priority_fee, max_priority_fee_per_gas);
         }
         // \f$p = f + H_{f}\f$
@@ -167,22 +150,20 @@ __host__ __device__ int32_t evm_transaction_t::get_gas_price(
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ void evm_transaction_t::get_data(
-    ArithEnv &arith, byte_array_t &data_init) const {
+__host__ __device__ void evm_transaction_t::get_data(ArithEnv &arith, byte_array_t &data_init) const {
     data_init = this->data_init;
 }
 
-__host__ __device__ int32_t
-evm_transaction_t::is_contract_creation(ArithEnv &arith) const {
+__host__ __device__ int32_t evm_transaction_t::is_contract_creation(ArithEnv &arith) const {
     bn_t to;
     get_to(arith, to);
     return cgbn_compare_ui32(arith.env, to, 0) == 0;
 }
 
-__host__ __device__ int32_t evm_transaction_t::get_transaction_fees(
-    ArithEnv &arith, CuEVM::block_info_t &block_info, bn_t &gas_value,
-    bn_t &gas_limit, bn_t &gas_price, bn_t &gas_priority_fee,
-    bn_t &up_front_cost, bn_t &m) const {
+__host__ __device__ int32_t evm_transaction_t::get_transaction_fees(ArithEnv &arith, CuEVM::block_info_t &block_info,
+                                                                    bn_t &gas_value, bn_t &gas_limit, bn_t &gas_price,
+                                                                    bn_t &gas_priority_fee, bn_t &up_front_cost,
+                                                                    bn_t &m) const {
     bn_t max_fee_per_gas;  // YP: \f$T_{m}\f$
     bn_t value;            // YP: \f$T_{v}\f$
     get_max_fee_per_gas(arith, max_fee_per_gas);
@@ -217,20 +198,16 @@ __host__ __device__ int32_t evm_transaction_t::get_transaction_fees(
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_transaction_t::access_list_warm_up(
-    ArithEnv &arith, CuEVM::TouchState &touch_state) const {
+__host__ __device__ int32_t evm_transaction_t::access_list_warm_up(ArithEnv &arith,
+                                                                   CuEVM::TouchState &touch_state) const {
     for (uint32_t i = 0; i < access_list.accounts_count; i++) {
         bn_t address;
-        cgbn_load(arith.env, address,
-                  (cgbn_evm_word_t_ptr) & (access_list.accounts[i].address));
+        cgbn_load(arith.env, address, (cgbn_evm_word_t_ptr) & (access_list.accounts[i].address));
         CuEVM::account_t *account_ptr = nullptr;
         touch_state.set_warm_account(arith, address);
-        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count;
-             j++) {
+        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
             bn_t key;
-            cgbn_load(arith.env, key,
-                      (cgbn_evm_word_t_ptr) &
-                          (access_list.accounts[i].storage_keys[j]));
+            cgbn_load(arith.env, key, (cgbn_evm_word_t_ptr) & (access_list.accounts[i].storage_keys[j]));
             bn_t value;
             touch_state.set_warm_key(arith, address, key, value);
         }
@@ -238,29 +215,30 @@ __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t
-evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
-                            CuEVM::block_info_t &block_info, bn_t &gas_used,
-                            bn_t &gas_price, bn_t &gas_priority_fee) const {
+__host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
+                                                        CuEVM::block_info_t &block_info, bn_t &gas_used,
+                                                        bn_t &gas_price, bn_t &gas_priority_fee) const {
+    // printf("begin validating transaction\n");
     bn_t gas_intrinsic;
     CuEVM::gas_cost::transaction_intrinsic_gas(arith, *this, gas_intrinsic);
     bn_t gas_limit;
     bn_t gas_value;
     bn_t up_front_cost;
     bn_t m;
-    if (get_transaction_fees(arith, block_info, gas_value, gas_limit, gas_price,
-                             gas_priority_fee, up_front_cost, m)) {
+    if (get_transaction_fees(arith, block_info, gas_value, gas_limit, gas_price, gas_priority_fee, up_front_cost, m)) {
         return ERROR_TRANSACTION_FEES;
     }
-
+    // printf("after get_transaction_fees\n");
     bn_t sender_address;
     get_sender(arith, sender_address);
+    // printf("after get_sender\n");
     CuEVM::account_t *sender_account = nullptr;
-    touch_state.get_account(
-        arith, sender_address, sender_account,
-        ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
+    touch_state.get_account(arith, sender_address, sender_account,
+                            ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
+
     bn_t sender_balance;
     sender_account->get_balance(arith, sender_balance);
+
     bn_t sender_nonce;
     sender_account->get_nonce(arith, sender_nonce);
     bn_t transaction_nonce;
@@ -273,8 +251,7 @@ evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
     // Next possible errors in the transaction context:
     // sender is an empty account YP: \f$\sigma(T_{s}) \neq \varnothing\f$
     // sender is a contract YP: \f$\sigma(T_{s})_{c} \eq KEC(())\f$
-    if ((sender_account == nullptr) || (sender_account->is_empty()) ||
-        (sender_account->is_contract())) {
+    if ((sender_account == nullptr) || (sender_account->is_empty()) || (sender_account->is_contract())) {
         return ERROR_TRANSACTION_SENDER_EMPTY;
     }
     // nonce are different YP: \f$T_{n} \eq \sigma(T_{s})_{n}\f$
@@ -297,8 +274,7 @@ evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
     }
     // Max priority fee per gas is higher than max fee per gas YP: \f$T_{m} \geq
     // T_{f}\f$
-    if (cgbn_compare(arith.env, max_fee_per_gas, max_priority_fee_per_gas) <
-        0) {
+    if (cgbn_compare(arith.env, max_fee_per_gas, max_priority_fee_per_gas) < 0) {
         return ERROR_TRANSACTION_GAS_PRIORITY;
     }
     // the other verification is about the block gas limit
@@ -309,11 +285,12 @@ evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
     if (cgbn_compare(arith.env, gas_limit, block_gas_limit) > 0) {
         return ERROR_TRANSACTION_BLOCK_GAS_LIMIT;
     }
-
+    // printf("after all checks account\n");
     // if transaction is valid update the touch state
     // \f$\simga(T_{s})_{b} = \simga(T_{s})_{b} - (p \dot T_{g})\f$
     cgbn_sub(arith.env, sender_balance, sender_balance, gas_value);
     touch_state.set_balance(arith, sender_address, sender_balance);
+    // printf("after set balance  account\n");
     // \f$\simga(T_{s})_{n} = T_{n} + 1\f$
     cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
     touch_state.set_nonce(arith, sender_address, sender_nonce);
@@ -322,23 +299,27 @@ evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
     // TODO: maybe sent the priority fee to the miner
     // or this is a final thing to verify within a transaction
     // by asking the balacne of the coinbase accountq
-
+    // printf("after set nonce  account\n");
     // warm up the access list
     access_list_warm_up(arith, touch_state);
-
+    // printf("after warm up account\n");
 // warmup coinbase and precompile contracts
+
 #ifdef EIP_3651
     bn_t coin_base_address;
     block_info.get_coin_base(arith, coin_base_address);
+    
     touch_state.set_warm_account(arith, coin_base_address);
+
 #endif
+    // printf("after warm up coinbase\n");
     bn_t precompile_contract_address;
 #pragma unroll
     for (uint32_t idx = 1; idx < CuEVM::no_precompile_contracts; idx++) {
         cgbn_set_ui32(arith.env, precompile_contract_address, idx);
         touch_state.set_warm_account(arith, precompile_contract_address);
     }
-
+    // printf("end validating transaction\n");
     return ERROR_SUCCESS;
 }
 
@@ -350,8 +331,7 @@ evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
  * @return 1 for success, 0 for failure.
  */
 __host__ __device__ int32_t evm_transaction_t::get_message_call(
-    ArithEnv &arith, CuEVM::TouchState &touch_state,
-    CuEVM::evm_message_call_t *&evm_message_call_ptr) const {
+    ArithEnv &arith, CuEVM::TouchState &touch_state, CuEVM::evm_message_call_t *&evm_message_call_ptr) const {
     bn_t sender_address, to_address, value, gas_limit;
     get_sender(arith, sender_address);
     get_to(arith, to_address);
@@ -367,20 +347,17 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         // TODO: code size does not execede the maximul allowed
         bn_t sender_nonce;
         CuEVM::account_t *sender_account = nullptr;
-        touch_state.get_account(arith, sender_address, sender_account,
-                                ACCOUNT_NONCE_FLAG);
+        touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_NONCE_FLAG);
         // nonce is -1 in YP but here is before validating the transaction
         // and increasing the nonce
         sender_account->get_nonce(arith, sender_nonce);
-        if (CuEVM::utils::get_contract_address_create(
-                arith, to_address, sender_address, sender_nonce) !=
+        if (CuEVM::utils::get_contract_address_create(arith, to_address, sender_address, sender_nonce) !=
             ERROR_SUCCESS) {
             return ERROR_FAILED;
         }
     } else {
         CuEVM::account_t *to_account = nullptr;
-        touch_state.get_account(arith, to_address, to_account,
-                                ACCOUNT_BYTE_CODE_FLAG);
+        touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
         byte_code = to_account->byte_code;
     }
     uint32_t static_env = 0;
@@ -388,14 +365,14 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     cgbn_set_ui32(arith.env, return_data_offset, 0);
     bn_t return_data_size;
     cgbn_set_ui32(arith.env, return_data_size, 0);
-    evm_message_call_ptr = new CuEVM::evm_message_call_t(
-        arith, sender_address, to_address, to_address, gas_limit, value, depth,
-        call_type, to_address, data_init, byte_code, return_data_offset,
-        return_data_size, static_env);
+    evm_message_call_ptr = new CuEVM::evm_message_call_t(arith, sender_address, to_address, to_address, gas_limit,
+                                                         value, depth, call_type, to_address, data_init, byte_code,
+                                                         return_data_offset, return_data_size, static_env);
     return ERROR_SUCCESS;
 }
 
 __host__ __device__ void evm_transaction_t::print() {
+    
     printf("Transaction:\n");
     printf("Type: %d\n", type);
     printf("Nonce: ");
@@ -417,18 +394,19 @@ __host__ __device__ void evm_transaction_t::print() {
     printf("Data: ");
     data_init.print();
     printf("Access List:\n");
+    printf("Accounts Count: %d\n", access_list.accounts_count);
     for (uint32_t i = 0; i < access_list.accounts_count; i++) {
         printf("Account %d:\n", i);
         printf("Address: ");
         access_list.accounts[i].address.print();
-        printf("Storage Keys Count: %d\n",
-               access_list.accounts[i].storage_keys_count);
-        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count;
-             j++) {
+        printf("Storage Keys Count: %d\n", access_list.accounts[i].storage_keys_count);
+        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
             printf("Storage Key %d: ", j);
             access_list.accounts[i].storage_keys[j].print();
         }
     }
+    printf("end printing transaction\n");
+    
 }
 
 __host__ cJSON *evm_transaction_t::to_json() {
@@ -465,11 +443,9 @@ __host__ cJSON *evm_transaction_t::to_json() {
         cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
         cJSON *storage_keys_json = cJSON_CreateArray();
         cJSON_AddItemToObject(account_json, "storage_keys", storage_keys_json);
-        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count;
-             j++) {
+        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
             access_list.accounts[i].storage_keys[j].to_hex(hex_string_ptr);
-            cJSON_AddItemToArray(storage_keys_json,
-                                 cJSON_CreateString(hex_string_ptr));
+            cJSON_AddItemToArray(storage_keys_json, cJSON_CreateString(hex_string_ptr));
         }
     }
     delete[] hex_string_ptr;
@@ -477,28 +453,20 @@ __host__ cJSON *evm_transaction_t::to_json() {
 }
 
 __host__ uint32_t no_transactions(const cJSON *json) {
-    cJSON *transaction_json =
-        cJSON_GetObjectItemCaseSensitive(json, "transaction");
-    const cJSON *data_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
+    cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
+    const cJSON *data_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
     size_t data_counts = cJSON_GetArraySize(data_json);
-    const cJSON *gas_limit_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
+    const cJSON *gas_limit_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
     size_t gas_limit_counts = cJSON_GetArraySize(gas_limit_json);
-    const cJSON *value_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
+    const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
     size_t value_counts = cJSON_GetArraySize(value_json);
     return data_counts * gas_limit_counts * value_counts;
 }
 
-__host__ int32_t get_transactions(ArithEnv &arith,
-                                  evm_transaction_t *&transactions_ptr,
-                                  const cJSON *json,
-                                  uint32_t &transactions_count, int32_t managed,
-                                  CuEVM::state_t *world_state_ptr,
+__host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transactions_ptr, const cJSON *json,
+                                  uint32_t &transactions_count, int32_t managed, CuEVM::state_t *world_state_ptr,
                                   uint32_t start_index, uint32_t clones) {
-    cJSON *transaction_json =
-        cJSON_GetObjectItemCaseSensitive(json, "transaction");
+    cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
     uint32_t available_transactions = no_transactions(json);
     if (start_index >= available_transactions) {
         transactions_count = 0;
@@ -507,17 +475,12 @@ __host__ int32_t get_transactions(ArithEnv &arith,
     }
     uint32_t original_count;
     original_count = available_transactions - start_index;
-    transactions_count = (original_count > clones)
-                             ? original_count
-                             : original_count * (clones / original_count);
-    transactions_count = (transactions_count > CuEVM::max_transactions_count)
-                             ? CuEVM::max_transactions_count
-                             : transactions_count;
+    transactions_count = (original_count > clones) ? original_count : original_count * (clones / original_count);
+    transactions_count =
+        (transactions_count > CuEVM::max_transactions_count) ? CuEVM::max_transactions_count : transactions_count;
 
     if (managed) {
-        CUDA_CHECK(
-            cudaMallocManaged((void **)&(transactions_ptr),
-                              transactions_count * sizeof(evm_transaction_t)));
+        CUDA_CHECK(cudaMallocManaged((void **)&(transactions_ptr), transactions_count * sizeof(evm_transaction_t)));
     } else {
         transactions_ptr = new evm_transaction_t[transactions_count];
     }
@@ -527,20 +490,16 @@ __host__ int32_t get_transactions(ArithEnv &arith,
 
     uint32_t type = 0;
 
-    const cJSON *nonce_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "nonce");
+    const cJSON *nonce_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "nonce");
     template_transaction_ptr->nonce.from_hex(nonce_json->valuestring);
 
-    const cJSON *gas_limit_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
+    const cJSON *gas_limit_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
     uint32_t gas_limit_counts = cJSON_GetArraySize(gas_limit_json);
 
-    const cJSON *sender_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "sender");
+    const cJSON *sender_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "sender");
     template_transaction_ptr->sender.from_hex(sender_json->valuestring);
 
-    const cJSON *to_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
+    const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
     // verify what is happening from strlen 0
     if (strlen(to_json->valuestring) == 0) {
         CuEVM::account_t *sender_account = nullptr;
@@ -549,46 +508,35 @@ __host__ int32_t get_transactions(ArithEnv &arith,
         world_state_ptr->get_account(arith, sender, sender_account);
         bn_t sender_nonce;
         cgbn_load(arith.env, sender_nonce, &sender_account->nonce);
-        CuEVM::utils::get_contract_address_create(arith, contract_address,
-                                                  sender, sender_nonce);
+        CuEVM::utils::get_contract_address_create(arith, contract_address, sender, sender_nonce);
         cgbn_store(arith.env, &template_transaction_ptr->to, contract_address);
 
     } else {
         template_transaction_ptr->to.from_hex(to_json->valuestring);
     }
 
-    const cJSON *value_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
+    const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
     uint32_t value_counts = cJSON_GetArraySize(value_json);
 
-    const cJSON *access_list_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "accessList");
+    const cJSON *access_list_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "accessList");
     if (access_list_json != nullptr) {
-        template_transaction_ptr->access_list.from_json(access_list_json,
-                                                        managed);
+        template_transaction_ptr->access_list.from_json(access_list_json, managed);
     }
 
-    const cJSON *max_fee_per_gas_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "maxFeePerGas");
+    const cJSON *max_fee_per_gas_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "maxFeePerGas");
 
     const cJSON *max_priority_fee_per_gas_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json,
-                                         "maxPriorityFeePerGas");
+        cJSON_GetObjectItemCaseSensitive(transaction_json, "maxPriorityFeePerGas");
 
-    const cJSON *gas_price_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "gasPrice");
+    const cJSON *gas_price_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasPrice");
 
-    if ((max_fee_per_gas_json != nullptr) &&
-        (max_priority_fee_per_gas_json != nullptr) &&
+    if ((max_fee_per_gas_json != nullptr) && (max_priority_fee_per_gas_json != nullptr) &&
         (gas_price_json == nullptr)) {
         type = 2;
-        template_transaction_ptr->max_fee_per_gas.from_hex(
-            max_fee_per_gas_json->valuestring);
-        template_transaction_ptr->max_priority_fee_per_gas.from_hex(
-            max_priority_fee_per_gas_json->valuestring);
+        template_transaction_ptr->max_fee_per_gas.from_hex(max_fee_per_gas_json->valuestring);
+        template_transaction_ptr->max_priority_fee_per_gas.from_hex(max_priority_fee_per_gas_json->valuestring);
         template_transaction_ptr->gas_price.from_uint32_t(0);
-    } else if ((max_fee_per_gas_json == nullptr) &&
-               (max_priority_fee_per_gas_json == nullptr) &&
+    } else if ((max_fee_per_gas_json == nullptr) && (max_priority_fee_per_gas_json == nullptr) &&
                (gas_price_json != nullptr)) {
         if (access_list_json == nullptr) {
             type = 0;
@@ -597,14 +545,12 @@ __host__ int32_t get_transactions(ArithEnv &arith,
         }
         template_transaction_ptr->max_fee_per_gas.from_uint32_t(0);
         template_transaction_ptr->max_priority_fee_per_gas.from_uint32_t(0);
-        template_transaction_ptr->gas_price.from_hex(
-            gas_price_json->valuestring);
+        template_transaction_ptr->gas_price.from_hex(gas_price_json->valuestring);
     } else {
         return ERROR_TRANSACTION_TYPE;
     }
 
-    const cJSON *data_json =
-        cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
+    const cJSON *data_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "data");
     uint32_t data_counts = cJSON_GetArraySize(data_json);
 
     template_transaction_ptr->type = type;
@@ -615,23 +561,18 @@ __host__ int32_t get_transactions(ArithEnv &arith,
         data_idnex = index % data_counts;
         gas_limit_index = (index / data_counts) % gas_limit_counts;
         value_index = (index / (data_counts * gas_limit_counts)) % value_counts;
-        std::copy(template_transaction_ptr, template_transaction_ptr + 1,
-                  transactions_ptr + idx);
-        transactions_ptr[idx].data_init.from_hex(
-            cJSON_GetArrayItem(data_json, data_idnex)->valuestring,
-            LITTLE_ENDIAN, CuEVM::PaddingDirection::NO_PADDING, managed);
-        transactions_ptr[idx].gas_limit.from_hex(
-            cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
-        transactions_ptr[idx].value.from_hex(
-            cJSON_GetArrayItem(value_json, value_index)->valuestring);
+        std::copy(template_transaction_ptr, template_transaction_ptr + 1, transactions_ptr + idx);
+        transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_idnex)->valuestring, LITTLE_ENDIAN,
+                                                 CuEVM::PaddingDirection::NO_PADDING, managed);
+        transactions_ptr[idx].gas_limit.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
+        transactions_ptr[idx].value.from_hex(cJSON_GetArrayItem(value_json, value_index)->valuestring);
     }
 
     delete template_transaction_ptr;
     return ERROR_SUCCESS;
 }
 
-__host__ int32_t free_instaces(evm_transaction_t *transactions_ptr,
-                               uint32_t transactions_count, int32_t managed) {
+__host__ int32_t free_instaces(evm_transaction_t *transactions_ptr, uint32_t transactions_count, int32_t managed) {
     if (transactions_ptr != nullptr) {
         transactions_ptr[0].access_list.free(managed);
         for (uint32_t i = 0; i < transactions_count; i++) {

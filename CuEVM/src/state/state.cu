@@ -161,9 +161,9 @@ __host__ int32_t state_t::from_json(const cJSON *state_json, int32_t managed) {
     } else {
         accounts = (CuEVM::account_t *)malloc(no_accounts * sizeof(CuEVM::account_t));
     }
-    for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        accounts[idx].clear();
-    }
+    // for (uint32_t idx = 0; idx < no_accounts; idx++) {
+    //     accounts[idx].clear();
+    // }
     uint32_t idx = 0;
     cJSON *account_json;
     cJSON_ArrayForEach(account_json, state_json) { accounts[idx++].from_json(account_json, managed); }

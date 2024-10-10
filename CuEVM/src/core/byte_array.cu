@@ -60,11 +60,11 @@ __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size, int32
 __host__ __device__ byte_array_t::~byte_array_t() { free(); }
 
 __host__ __device__ void byte_array_t::free() {
-    __ONE_GPU_THREAD_BEGIN__
+    // __ONE_GPU_THREAD_BEGIN__
     if ((size > 0) && (data != nullptr)) {
         delete[] data;
     }
-    __ONE_GPU_THREAD_END__
+    // __ONE_GPU_THREAD_END__
     clear();
 }
 __host__ void byte_array_t::free_managed() {
@@ -92,23 +92,28 @@ __host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other) : size
 
 __host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &other) {
     __SHARED_MEMORY__ uint8_t *tmp_data;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (this != &other) {
+        printf(" operator= This size: %d\n", size);
+        printf("other %p\n", &other);
+        printf(" operator= Other size: %d\n", other.size);
         if (size != other.size) {
             free();
-            __ONE_GPU_THREAD_BEGIN__
+            
             tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
-            __ONE_GPU_THREAD_END__
+            
         } else {
             tmp_data = data;
         }
         if (other.size > 0) {
-            __ONE_GPU_THREAD_BEGIN__
+            // __ONE_GPU_THREAD_BEGIN__
             memcpy(tmp_data, other.data, other.size * sizeof(uint8_t));
-            __ONE_GPU_THREAD_END__
+            // __ONE_GPU_THREAD_END__
         }
         data = tmp_data;
         size = other.size;
     }
+    __ONE_GPU_THREAD_WOSYNC_END__
     return *this;
 }
 
@@ -279,7 +284,8 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
             data = new uint8_t[size];
             memset(data, 0, size * sizeof(uint8_t));
         }
-    }
+    } else
+        data = nullptr;
     int32_t error_code = ERROR_SUCCESS;
     if (endian == LITTLE_ENDIAN) {
         error_code = this->from_hex_set_le(tmp_hex_char, length);

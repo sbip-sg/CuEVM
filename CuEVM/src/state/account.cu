@@ -60,8 +60,11 @@ __host__ __device__ account_t::~account_t() { free(); }
 
 __host__ __device__ void account_t::free() {
     byte_code.free();
+    printf("after byte_code.free()\n");
     storage.free();
+    printf("after storage.free()\n");
     clear();
+    printf("after clear()\n");
 }
 
 __host__ void account_t::free_managed() {
@@ -79,6 +82,11 @@ __host__ __device__ account_t &account_t::operator=(const account_t &other) {
         memcpy(&address, &other.address, sizeof(evm_word_t));
         memcpy(&balance, &other.balance, sizeof(evm_word_t));
         memcpy(&nonce, &other.nonce, sizeof(evm_word_t));
+        printf("other.bytecode %p\n", other.byte_code.data);
+        printf("other.bytecode.size %d\n", other.byte_code.size);
+        printf("other.storage.size %d\n", other.storage.size);
+        printf("other.storage.capacity %d\n", other.storage.capacity);
+        printf("other.storage.storage %p\n", other.storage.storage);
         __ONE_GPU_THREAD_END__
         byte_code = other.byte_code;
         storage = other.storage;
@@ -176,11 +184,11 @@ __host__ __device__ bool account_t::is_empty_create() {
 __host__ __device__ int32_t account_t::is_contract() { return (byte_code.size > 0); }
 
 __host__ __device__ void account_t::empty() {
-    __ONE_GPU_THREAD_BEGIN__
+    // __ONE_GPU_THREAD_BEGIN__
     memset(&address, 0, sizeof(evm_word_t));
     memset(&balance, 0, sizeof(evm_word_t));
     memset(&nonce, 0, sizeof(evm_word_t));
-    __ONE_GPU_THREAD_END__
+    // __ONE_GPU_THREAD_END__
     byte_code.clear();
     storage.clear();
 }
@@ -200,8 +208,12 @@ __host__ void account_t::from_json(const cJSON *account_json, int32_t managed) {
 
     byte_code.from_hex(cJSON_GetObjectItemCaseSensitive(account_json, "code")->valuestring, LITTLE_ENDIAN, NO_PADDING,
                        managed);
-
+    printf("byte_code.size %d\n", byte_code.size);
+    printf("byte_code.data %p\n", byte_code.data);
     storage.from_json(cJSON_GetObjectItemCaseSensitive(account_json, "storage"), managed);
+    printf("storage.size %d\n", storage.size);
+    printf("storage.capacity %d\n", storage.capacity);
+    printf("storage.storage %p\n", storage.storage);
 }
 
 __host__ cJSON *account_t::to_json() const {

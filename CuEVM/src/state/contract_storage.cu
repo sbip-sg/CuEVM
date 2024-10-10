@@ -11,11 +11,11 @@ namespace CuEVM {
 __host__ __device__ contract_storage_t::~contract_storage_t() { free(); }
 
 __host__ __device__ void contract_storage_t::free() {
-    __ONE_GPU_THREAD_BEGIN__
+    // __ONE_GPU_THREAD_BEGIN__
     if ((storage != nullptr) && (capacity > 0)) {
         delete[] storage;
     }
-    __ONE_GPU_THREAD_END__
+    // __ONE_GPU_THREAD_END__
     clear();
 }
 
@@ -34,6 +34,7 @@ __host__ __device__ void contract_storage_t::clear() {
 
 __host__ __device__ contract_storage_t &contract_storage_t::operator=(const contract_storage_t &other) {
     __SHARED_MEMORY__ storage_element_t *tmp_storage;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (this == &other) {
         return *this;
     }
@@ -41,16 +42,17 @@ __host__ __device__ contract_storage_t &contract_storage_t::operator=(const cont
         free();
         size = other.size;
         capacity = other.capacity;
-        __ONE_GPU_THREAD_BEGIN__
+        // __ONE_GPU_THREAD_BEGIN__
         if (capacity > 0) {
             tmp_storage = new storage_element_t[capacity];
         }
-        __ONE_GPU_THREAD_END__
+        // __ONE_GPU_THREAD_END__
         storage = tmp_storage;
     }
-    __ONE_GPU_THREAD_BEGIN__
+    // __ONE_GPU_THREAD_BEGIN__
     if (other.size > 0) memcpy(storage, other.storage, other.size * sizeof(storage_element_t));
-    __ONE_GPU_THREAD_END__
+    // __ONE_GPU_THREAD_END__
+    __ONE_GPU_THREAD_WOSYNC_END__
     return *this;
 }
 

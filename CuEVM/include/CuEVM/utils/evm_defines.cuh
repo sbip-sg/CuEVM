@@ -224,7 +224,7 @@ constexpr CONSTANT uint32_t max_initcode_size = std::numeric_limits<uint32_t>::m
 constexpr CONSTANT uint32_t no_precompile_contracts = 10;
 
 // CGBN parameters
-constexpr CONSTANT uint32_t cgbn_tpi = 32;
+constexpr CONSTANT uint32_t cgbn_tpi = 8;
 
 // CUEVM parameters
 constexpr CONSTANT uint32_t max_transactions_count = 10000;

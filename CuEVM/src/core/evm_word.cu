@@ -121,8 +121,9 @@ __host__ __device__ int32_t evm_word_t::from_uint32_t(uint32_t value) {
 
 __host__ __device__ void evm_word_t::print() const {
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++)
+    for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++){
         printf("%08x ", _limbs[CuEVM::cgbn_limbs - 1 - idx]);
+    }
     printf("\n");
     __ONE_GPU_THREAD_WOSYNC_END__
 }
