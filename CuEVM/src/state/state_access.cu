@@ -107,7 +107,14 @@ __host__ __device__ int32_t state_access_t::add_new_account(
     tmp_account_ptr = new CuEVM::account_t();
     __ONE_GPU_THREAD_END__
     tmp_account_ptr->set_address(arith, address);
-    int32_t error_code = add_account(*account_ptr, flag);
+
+    // default constructor did not set balance + nonce
+    bn_t zero;
+    cgbn_set_ui32(arith.env, zero, 0);
+    tmp_account_ptr->set_balance(arith, zero);
+    tmp_account_ptr->set_nonce(arith, zero);
+
+    int32_t error_code = add_account(*tmp_account_ptr, flag);
     account_ptr = &accounts[no_accounts - 1];
     __ONE_GPU_THREAD_BEGIN__
     delete tmp_account_ptr;

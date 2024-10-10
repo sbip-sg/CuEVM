@@ -9,7 +9,6 @@
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/core/block_info.cuh>
-#include <CuEVM/state/access_state.cuh>
 #include <CuEVM/state/touch_state.cuh>
 #include <CuEVM/core/message.cuh>
 #include <cjson/cJSON.h>
@@ -119,7 +118,7 @@ namespace CuEVM {
             __host__ __device__ void get_nonce(
                 ArithEnv &arith,
                 bn_t &nonce) const;
-            
+
             /**
              * get the gas limit of the transaction
              * @param[in] arith the arithmetic environment.
@@ -226,17 +225,16 @@ namespace CuEVM {
             /**
              * warm up the access list
              * @param[in] arith the arithmetic environment.
-             * @param[in] access_state the access state.
+             * @param[in] touch_state the touch state.
              * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t access_list_warm_up(
                 ArithEnv &arith,
-                CuEVM::AccessState &access_state) const;
+                CuEVM::TouchState &touch_state) const;
 
             /**
              * validate the transaction
              * @param[in] arith the arithmetic environment.
-             * @param[in] access_state the access state.
              * @param[in] touch_state the touch state.
              * @param[in] block_info the block information.
              * @param[out] gas_used the gas used YP: \f$g_{0}\f$.
@@ -246,7 +244,6 @@ namespace CuEVM {
              */
             __host__ __device__ int32_t validate(
                 ArithEnv &arith,
-                CuEVM::AccessState &access_state,
                 CuEVM::TouchState &touch_state,
                 CuEVM::block_info_t &block_info,
                 bn_t &gas_used,
@@ -256,13 +253,12 @@ namespace CuEVM {
             /**
              * get the message call from the transaction
              * @param[in] arith the arithmetic environment.
-             * @param[in] access_state the access state.
+             * @param[in] touch_state the touch state.
              * @param[out] evm_message_call_ptr the message call.
              * @return 0 for success, error code for failure.
              */
             __host__ __device__ int32_t get_message_call(
-                ArithEnv &arith,
-                CuEVM::AccessState &access_state,
+                ArithEnv &arith, CuEVM::TouchState &touch_state,
                 CuEVM::evm_message_call_t* &evm_message_call_ptr) const;
 
             __host__ __device__ void print();
@@ -285,16 +281,18 @@ namespace CuEVM {
          * @param[in] json the json object.
          * @param[in] transactions_count the number of transactions.
          * @param[in] managed the managed flag.
+         * @param[in] world_state the world state to calculate CREATE destination.
          * @param[in] start_index the start index.
          * @param[in] clones the number of clones.
          * @return 0 for success, error code for failure.
          */
-        __host__ int32_t get_transactios(
+        __host__ int32_t get_transactions(
             ArithEnv &arith,
             evm_transaction_t* &transactions_ptr,
             const cJSON* json,
             uint32_t &transactions_count,
             int32_t managed = 0,
+            state_t *world_state = nullptr,
             uint32_t start_index = 0,
             uint32_t clones = 1);
 

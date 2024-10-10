@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     services:
       docker:
@@ -21,218 +21,76 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          path: ${{ github.workspace }}/${{ github.run_id }}
+
 
       - name: Pull submodules
         run: |
+          cd ${{ github.workspace }}/${{ github.run_id }}
           git submodule update --init --recursive
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      # - name: Set up Docker Buildx
+      #   uses: docker/setup-buildx-action@v2
 
-      - name: Cache Docker layers
-        uses: actions/cache@v3
+      # - name: Cache Docker layers
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: /tmp/.buildx-cache
+      #     key: ${{ runner.os }}-buildx-${{ github.sha }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-buildx-
+
+      - name: Cache Docker images.
+        uses: ScribeMD/docker-cache@0.5.0
         with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+          key: docker-${{ runner.os }}-${{ hashFiles('.devcontainer/devcontainer.json') }}
 
-      - name: Build Docker image
+      - name: Pull cached Docker image
         run: |
-          docker build -t cuevm ${{ github.workspace }}/.devcontainer
+          cd ${{ github.workspace }}/${{ github.run_id }}
+          docker pull augustus/goevmlab-cuevm:20241008 || true
 
       - name: Start cuevm-test-runner container
         run: |
-          docker run --memory="6g" --memory-swap="6g"  -d --name cuevm-test-runner \
-            -v ${{ github.workspace }}:/workspaces/CuEVM \
+          cd ${{ github.workspace }}/${{ github.run_id }}
+          docker run --memory="8g" --memory-swap="8g"  -d --name cuevm-test-runner-${{ github.run_id }} \
+            -v ${{ github.workspace }}/${{ github.run_id }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
-            cuevm /bin/bash -c "tail -f /dev/null"
+            augustus/goevmlab-cuevm:20241008 /bin/bash -c "tail -f /dev/null"
 
       - name: Build binary inside the container
         run: |
-          docker exec cuevm-test-runner /bin/bash -c "
+          cd ${{ github.workspace }}/${{ github.run_id }}
+          docker exec cuevm-test-runner-${{ github.run_id }} /bin/bash -c "
               cmake -S . -B build -DCPU='ON' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
-              cmake --build build
+              cmake --build build -j 24
           "
 
       - name: Clone ethereum/tests
         run: |
-          git clone https://github.com/ethereum/tests.git ${{ github.workspace }}/ethereum/tests
-          cd ${{ github.workspace }}/ethereum/tests && git checkout shanghai
+          cd ${{ github.workspace }}/${{ github.run_id }}
+          git clone --depth=1 --branch shanghai https://github.com/ethereum/tests.git ${{ github.workspace }}/${{ github.run_id }}/ethereum/tests
+          # echo "Disabling vmPerformance test"
+          # rm -rf ${{ github.workspace }}/${{ github.run_id }}/ethereum/tests/GeneralStateTests/VMTests/vmPerformance
 
-      - name: Run tests
+      - name: Run tests concurrently using Python
         run: |
-          mkdir ${{ github.workspace }}/test-outputs
+          cd ${{ github.workspace }}/${{ github.run_id }}
+          python3 -u scripts/run-ci-tests.py
 
-          # FOLDERS=(
-          # "VMTests"
-          # "Shanghai"
-          # "stPreCompiledContracts"
-          # "stPreCompiledContracts2"
-          # "stArgsZeroOneBalance"
-          # "stAttackTest"
-          # "stBadOpcode"
-          # "stBugs"
-          # "stCallCodes"
-          # "stCallCreateCallCodeTest"
-          # "stCallDelegateCodesCallCodeHomestead"
-          # "stCallDelegateCodesHomestead"
-          # "stChainId"
-          # "stCodeCopyTest"
-          # "stCodeSizeLimit"
-          # "stCreate2"
-          # "stCreateTest"
-          # "stDelegatecallTestHomestead"
-          # "stEIP150singleCodeGasPrices"
-          # "stEIP150Specific"
-          # "stEIP1559"
-          # "stEIP158Specific"
-          # "stEIP2930"
-          # "stEIP3607"
-          # "stExample"
-          # "stExtCodeHash"
-          # "stHomesteadSpecific"
-          # "stInitCodeTest"
-          # "stLogTests"
-          # "stMemExpandingEIP150Calls"
-          # "stMemoryStressTest"
-          # "stMemoryTest"
-          # "stNonZeroCallsTest"
-          # "stQuadraticComplexityTest"
-          # "stRandom"
-          # "stRandom2"
-          # "stRecursiveCreate"
-          # "stRefundTest"
-          # "stReturnDataTest"
-          # "stRevertTest"
-          # "stSelfBalance"
-          # "stShift"
-          # "stSLoadTest"
-          # "stSolidityTest"
-          # "stSpecialTest"
-          # "stSStoreTest"
-          # "stStackTests"
-          # "stStaticCall"
-          # "stStaticFlagEnabled"
-          # "stSystemOperationsTest"
-          # "stTimeConsuming"
-          # "stTransactionTest"
-          # "stTransitionTest"
-          # "stWalletTest"
-          # "stZeroCallsRevert"
-          # "stZeroCallsTest"
-          # "stZeroKnowledge"
-          # "stZeroKnowledge2"
-          # )
+      - name: Generate summary of test results in markdown
+        run: |
+          cd ${{ github.workspace }}/${{ github.run_id }}
+          python3 scripts/generate-ci-test-summary.py
 
-          # for folder in "${FOLDERS[@]}"; do
-          #   echo "Running tests for $folder with a 5-minute timeout..."
-
-          #   # Using the timeout command to enforce the 5-minute limit
-          #   timeout 600 docker exec cuevm-test-runner \
-          #     python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
-          #     --runtest-bin /goevmlab/runtest \
-          #     --geth /goevmlab/gethvm \
-          #     --cuevm /workspaces/CuEVM/build/cuevm_CPU \
-          #     -i /workspaces/CuEVM/ethereum/tests/GeneralStateTests/"$folder" \
-          #     --ignore-errors --without-state-root \
-          #     | tee -a ${{ github.workspace }}/test-outputs/"$folder".log
-
-          #   # Check if the timeout command exited with a specific status code (124 means timeout)
-          #   if [ $? -eq 124 ]; then
-          #     echo "Test for $folder timed out after 5 minutes."
-          #   else
-          #     echo "Test for $folder completed."
-          #   fi
-          # done
-
-          # List of folders to process and their corresponding timeouts in seconds
-          declare -A FOLDERS_WITH_TIMEOUTS=(
-            ["VMTests"]=1200
-            ["Shanghai"]=300
-            ["stPreCompiledContracts"]=300
-            ["stPreCompiledContracts2"]=300
-            ["stArgsZeroOneBalance"]=300
-            ["stAttackTest"]=300
-            ["stBadOpcode"]=300
-            ["stBugs"]=300
-            ["stCallCodes"]=300
-            ["stCallCreateCallCodeTest"]=300
-            ["stCallDelegateCodesCallCodeHomestead"]=300
-            ["stCallDelegateCodesHomestead"]=300
-            ["stChainId"]=300
-            ["stCodeCopyTest"]=300
-            ["stCodeSizeLimit"]=300
-            ["stCreate2"]=300
-            ["stCreateTest"]=300
-            ["stDelegatecallTestHomestead"]=300
-            ["stEIP150singleCodeGasPrices"]=300
-            ["stEIP150Specific"]=300
-            ["stEIP1559"]=300
-            ["stEIP158Specific"]=300
-            ["stEIP2930"]=300
-            ["stEIP3607"]=300
-            ["stExample"]=300
-            ["stExtCodeHash"]=300
-            ["stHomesteadSpecific"]=300
-            ["stInitCodeTest"]=300
-            ["stLogTests"]=300
-            ["stMemExpandingEIP150Calls"]=300
-            ["stMemoryStressTest"]=300
-            ["stMemoryTest"]=300
-            ["stNonZeroCallsTest"]=300
-            ["stQuadraticComplexityTest"]=300
-            ["stRandom"]=300
-            ["stRandom2"]=300
-            ["stRecursiveCreate"]=300
-            ["stRefundTest"]=300
-            ["stReturnDataTest"]=300
-            ["stRevertTest"]=300
-            ["stSelfBalance"]=300
-            ["stShift"]=300
-            ["stSLoadTest"]=300
-            ["stSolidityTest"]=300
-            ["stSpecialTest"]=300
-            ["stSStoreTest"]=300
-            ["stStackTests"]=300
-            ["stStaticCall"]=300
-            ["stStaticFlagEnabled"]=300
-            ["stSystemOperationsTest"]=300
-            ["stTimeConsuming"]=300
-            ["stTransactionTest"]=300
-            ["stTransitionTest"]=300
-            ["stWalletTest"]=300
-            ["stZeroCallsRevert"]=300
-            ["stZeroCallsTest"]=300
-            ["stZeroKnowledge"]=300
-            ["stZeroKnowledge2"]=300
-          )
-
-          # Loop through each folder and run the test with the specified timeout
-          for folder in "${!FOLDERS_WITH_TIMEOUTS[@]}"; do
-            timeout_value=${FOLDERS_WITH_TIMEOUTS[$folder]}
-            echo "Running tests for $folder with a timeout of $timeout_value seconds..."
-
-            # Using the timeout command to enforce the specified time limit for each folder
-            timeout $timeout_value docker exec cuevm-test-runner \
-              python3 scripts/run-ethtest-by-fork.py -t /tmp/ \
-              --runtest-bin /goevmlab/runtest \
-              --geth /goevmlab/gethvm \
-              --cuevm /workspaces/CuEVM/build/cuevm_CPU \
-              -i /workspaces/CuEVM/ethereum/tests/GeneralStateTests/"$folder" \
-              --ignore-errors --without-state-root \
-              | tee -a ${{ github.workspace }}/test-outputs/"$folder".log
-
-            # Check if the timeout command exited with a specific status code (124 means timeout)
-            if [ $? -eq 124 ]; then
-              echo "Test for $folder timed out after $timeout_value seconds."
-            elif [ $? -eq 137 ]; then
-              echo "Test for $folder terminated due to out-of-memory."
-            else
-              echo "Test for $folder completed."
-            fi
-          done
-
+      - name: Send summary to Slack
+        run: |
+          summary_content=$(cat ${{ github.workspace }}/${{ github.run_id }}/test-outputs/summary.md)
+          job_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{\"text\": \"*Test Summary*\n\n\`\`\`$summary_content\`\`\`\n\n*Job Summary*\n- Workflow: ${{ github.workflow }}\n- Job: ${{ github.job }}\n- Repository: ${{ github.repository }}\n- Commit SHA: ${{ github.sha }}\n- Branch: ${{ github.head_ref }}\n- Run ID: ${{ github.run_id }}\n- Run URL: $job_url\"}" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
 
 
       - name: Archive test results
@@ -240,10 +98,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: test-results
-          path: ${{ github.workspace }}/test-outputs
+          path: ${{ github.workspace }}/${{ github.run_id }}/test-outputs
 
       - name: Clean up
         if: always()
         run: |
-          docker stop cuevm-test-runner
-          docker rm cuevm-test-runner
+          docker exec cuevm-test-runner-${{ github.run_id }} rm -rf /workspaces/CuEVM || true
+          rm -rf ${{ github.workspace }}/${{ github.run_id }} || true
+          docker kill -s -9 cuevm-test-runner-${{ github.run_id }} || true
+          docker rm cuevm-test-runner-${{ github.run_id }} || true

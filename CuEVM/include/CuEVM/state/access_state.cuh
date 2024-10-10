@@ -92,13 +92,23 @@ class AccessState {
                                            const bn_t &key, bn_t &value) const;
 
     /**
+     * Get the balance without modifing the state
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @return 0 if the value is found, error otherwise.
+     */
+    __host__ __device__ int32_t poke_balance(ArithEnv &arith,
+                                             const bn_t &address,
+                                             bn_t &balance) const;
+
+    /**
      * If an account has beeen accessed, it will be marked as warm.
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @return 1 if the account is warm, 0 otherwise.
      */
-    __host__ __device__ int32_t is_warm_account(ArithEnv &arith,
-                                                const bn_t &address) const;
+    // __host__ __device__ int32_t is_warm_account(ArithEnv &arith,
+    //                                             const bn_t &address) const;
 
     /**
      * If a key has been accessed, it will be marked as warm.
@@ -107,9 +117,9 @@ class AccessState {
      * @param[in] key The key of the storage.
      * @return 1 if the key is warm, 0 otherwise
      */
-    __host__ __device__ int32_t is_warm_key(ArithEnv &arith,
-                                            const bn_t &address,
-                                            const bn_t &key) const;
+    // __host__ __device__ int32_t is_warm_key(ArithEnv &arith,
+    //                                         const bn_t &address,
+    //                                         const bn_t &key) const;
 
     /**
      * If an account does not exist in the world state/deleted
@@ -119,5 +129,24 @@ class AccessState {
      */
     __host__ __device__ int32_t is_deleted_account(ArithEnv &arith,
                                                    const bn_t &address) const;
+    // /**
+    //  * IF an account is empty
+    //  * @param[in] arith The arithmetic environment.
+    //  * @param[in] address The address of the account.
+    //  * @return ERROR_SUCCESS if the account is empty, otherwise
+    //  * ERROR_ACCOUNT_NOT_EMPTY
+    //  */
+    // __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
+    //                                              const bn_t &address) const;
+    /**
+     * Get the full storage from access state and world state
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @param[out] storage The storage of the account.
+     * @return 0 if the storage is found, error otherwise.
+     */
+    __host__ __device__ int32_t
+    get_storage(ArithEnv &arith, const bn_t &address,
+                CuEVM::contract_storage_t &storage) const;
 };
 }  // namespace CuEVM

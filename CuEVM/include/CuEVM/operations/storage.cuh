@@ -11,7 +11,6 @@
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/state/touch_state.cuh>
-#include <CuEVM/state/access_state.cuh>
 
 /**
  * 50s: Storage Operations:
@@ -30,7 +29,6 @@ namespace CuEVM::operations {
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
      * @param[inout] stack The stack.
-     * @param[in] access_state The access state object.
      * @param[in] touch_state The touch state.
      * @param[in] message The message that started the execution.
      * @return 0 if the operation was successful, an error code otherwise.
@@ -40,7 +38,6 @@ namespace CuEVM::operations {
         const bn_t &gas_limit,
         bn_t &gas_used,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::AccessState &access_state,
         CuEVM::TouchState &touch_state,
         const CuEVM::evm_message_call_t &message);
 
@@ -57,7 +54,6 @@ namespace CuEVM::operations {
      * @param[inout] gas_used The gas used.
      * @param[inout] gas_refund The gas refund.
      * @param[in] stack The stack.
-     * @param[in] access_state The access state object.
      * @param[out] touch_state The touch state.
      * @param[in] message The message that started the execution.
      * @return 0 if the operation was successful, an error code otherwise.
@@ -68,10 +64,9 @@ namespace CuEVM::operations {
         bn_t &gas_used,
         bn_t &gas_refund,
         CuEVM::evm_stack_t &stack,
-        const CuEVM::AccessState &access_state,
         CuEVM::TouchState &touch_state,
         const CuEVM::evm_message_call_t &message);
-    
+
 }
 
 #endif

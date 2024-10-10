@@ -85,8 +85,10 @@ __host__ __device__ evm_word_t *evm_stack_t::top() {
 __host__ __device__ int32_t evm_stack_t::push(ArithEnv &arith,
                                               const bn_t &value) {
     int32_t error_code = (size() >= capacity) ? grow() : ERROR_SUCCESS;
-    cgbn_store(arith.env, top(), value);
-    stack_offset++;
+    if (error_code == ERROR_SUCCESS){
+        cgbn_store(arith.env, top(), value);
+        stack_offset++;
+    }
     return error_code;
 }
 

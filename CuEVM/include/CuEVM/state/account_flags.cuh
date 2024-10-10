@@ -19,12 +19,16 @@ constexpr CONSTANT uint32_t ACCOUNT_NONCE_FLAG = (1 << 2);
 constexpr CONSTANT uint32_t ACCOUNT_BYTE_CODE_FLAG = (1 << 3);
 constexpr CONSTANT uint32_t ACCOUNT_STORAGE_FLAG = (1 << 4);
 constexpr CONSTANT uint32_t ACCOUNT_DELETED_FLAG = (1 << 5);
+constexpr CONSTANT uint32_t ACCOUNT_POKE_FLAG =
+    UINT32_MAX;  // temp, will remove
 constexpr CONSTANT uint32_t ACCOUNT_NON_STORAGE_FLAG =
     (ACCOUNT_ADDRESS_FLAG | ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG |
      ACCOUNT_BYTE_CODE_FLAG);
 constexpr CONSTANT uint32_t ACCOUNT_ALL_FLAG =
     (ACCOUNT_ADDRESS_FLAG | ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG |
      ACCOUNT_BYTE_CODE_FLAG | ACCOUNT_STORAGE_FLAG);
+constexpr CONSTANT uint32_t ACCOUNT_MARKED_FOR_DELETION_FLAG =
+    (ACCOUNT_DELETED_FLAG | ACCOUNT_BALANCE_FLAG);
 /**
  * The account flags.
  * The flags are used to indicate which fields are used.
@@ -204,10 +208,14 @@ struct account_flags_t {
     /**
      * Update the flags with the given flags.
      * @param[in] other_flags The other flags
+     * TODO: The delete flag must be overwriten by the other flags
      */
     __host__ __device__ __forceinline__ void update(
         const account_flags_t &other_flags) {
-        flags = (has_deleted() ? other_flags.flags : flags | other_flags.flags);
+        flags |=
+            (has_deleted() > 0)
+                ? ((other_flags.has_deleted() > 0) ? flags : ACCOUNT_ALL_FLAG)
+                : other_flags.flags;
     }
     /**
      * Reset all flags

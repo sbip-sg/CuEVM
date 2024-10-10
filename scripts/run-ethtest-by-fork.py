@@ -4,6 +4,7 @@ import json
 import subprocess
 import shutil
 import os
+from uuid import uuid4
 
 log_file = open('run-ethtest-by-fork.log', 'a')
 
@@ -26,14 +27,14 @@ def check_output(output, error, without_state_root):
     has_str = lambda s: s in (output + error)
     if without_state_root:
         if has_str('error') and not has_str('stateRoot'):
-            raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
+            raise ValueError(f"💥 Mismatch found {output}")
     else:
         if has_str('error'):
-            raise ValueError(f"\033[91m💥\033[0m Mismatch found {output}")
+            raise ValueError(f"💥 Mismatch found {output}")
 
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root):
-    command = [runtest_bin, f'--outdir=./', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
+    command = [runtest_bin, f'--outdir=./{uuid4()}', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 
     debug_print(' '.join(command))
 
@@ -41,7 +42,7 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_s
     result = subprocess.run(command, capture_output=True, text=True, timeout=120)
     check_output(result.stdout, result.stderr, without_state_root)
 
-    debug_print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
+    debug_print(f"🎉 Test passed for {output_filepath}")
 
 def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin='runtest', geth_bin='geth',
                   cuevm_bin='cuevm', ignore_errors=False, result={}, without_state_root=False, microtests=False, skip_folder=""):
@@ -115,7 +116,8 @@ def runtest_fork(input_directory, output_directory, fork='Shanghai', runtest_bin
                                 else:
                                     raise
             except Exception as e:
-                result['failed_files'].append(output_filepath)
+                if output_filepath not in result['failed_files']:
+                    result['failed_files'].append(output_filepath)
                 if ignore_errors:
                     debug_print(f"{str(e)}")
                 else:

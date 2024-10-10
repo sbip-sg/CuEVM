@@ -79,6 +79,12 @@
 #define EIP_3675
 #define EIP_4399
 #define EIP_5133
+#define LONDON
+#endif
+
+#ifdef LONDON
+#define EIP_3541
+#define BERLIN
 #endif
 
 #ifdef GRAY_GLACIER

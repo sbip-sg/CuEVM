@@ -187,17 +187,25 @@ __host__ __device__ void account_t::update(ArithEnv &arith,
     }
 }
 
-__host__ __device__ int32_t account_t::is_empty(ArithEnv &arith) {
-    bn_t balance, nonce;
-    cgbn_load(arith.env, balance, &this->balance);
-    cgbn_load(arith.env, nonce, &this->nonce);
-    return ((cgbn_compare_ui32(arith.env, balance, 0) == 0) &&
-            (cgbn_compare_ui32(arith.env, nonce, 0) == 0) &&
-            (this->byte_code.size == 0));
+// __host__ __device__ bool account_t::is_empty(ArithEnv &arith) {
+//     bn_t balance, nonce;
+//     cgbn_load(arith.env, balance, &this->balance);
+//     cgbn_load(arith.env, nonce, &this->nonce);
+//     return ((cgbn_compare_ui32(arith.env, balance, 0) == 0) &&
+//             (cgbn_compare_ui32(arith.env, nonce, 0) == 0) &&
+//             (this->byte_code.size == 0))
+//                ? true
+//                : false;
+// }
+
+__host__ __device__ bool account_t::is_empty() {
+    return ((balance == 0) && (nonce == 0) && (byte_code.size == 0)) ? true
+                                                                     : false;
 }
 
-__host__ __device__ int32_t account_t::is_empty() {
-    return ((balance == 0) && (nonce == 0) && (byte_code.size == 0));
+__host__ __device__ bool account_t::is_empty_create() {
+    // Goethereum: nonce ==0 && code == 0, can have balance
+    return ((nonce == 0) && (byte_code.size == 0)) ? true : false;
 }
 
 __host__ __device__ int32_t account_t::is_contract() {

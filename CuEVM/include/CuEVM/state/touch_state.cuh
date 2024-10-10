@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <CuEVM/state/access_state.cuh>
 #include <CuEVM/state/account.cuh>
 #include <CuEVM/state/state_access.cuh>
+#include <CuEVM/state/world_state.cuh>
 #include <CuEVM/utils/arith.cuh>
 
 namespace CuEVM {
@@ -17,9 +17,9 @@ namespace CuEVM {
  */
 class TouchState {
    private:
-    state_access_t *_state;            /**< The state access */
-    CuEVM::AccessState *_access_state; /**< The access state */
-    TouchState *parent;                /**< The parent state */
+    state_access_t *_state;          /**< The state access */
+    CuEVM::WorldState *_world_state; /**< The world state */
+    TouchState *parent;              /**< The parent state */
 
     /**
      * Add an account to the state.
@@ -38,25 +38,24 @@ class TouchState {
      * The default constructor.
      */
     __host__ __device__ TouchState()
-        : _state(nullptr), _access_state(nullptr), parent(nullptr) {}
+        : _state(nullptr), parent(nullptr), _world_state(nullptr) {}
 
     /**
      * The constructor with the state and the access state.
      * @param[in] state The state access.
-     * @param[in] access_state The access state.
+     * @param[in] world_state The world state.
      */
     __host__ __device__ TouchState(state_access_t *state,
-                                   CuEVM::AccessState *access_state)
-        : _state(state), _access_state(access_state), parent(nullptr) {}
+                                   CuEVM::WorldState *world_state)
+        : _state(state), _world_state(world_state), parent(nullptr) {}
 
     /**
      * The constructor with the state, the access state, and the parent state.
      * @param[in] state The state access.
-     * @param[in] access_state The access state.
      * @param[in] parent The parent state.
      */
     __host__ __device__ TouchState(state_access_t *state, TouchState *parent)
-        : _state(state), _access_state(parent->_access_state), parent(parent) {}
+        : _state(state), _world_state(parent->_world_state), parent(parent) {}
 
     /**
      * destructor for the touch state
@@ -72,7 +71,7 @@ class TouchState {
      */
     __host__ __device__ void clear() {
         _state = nullptr;
-        _access_state = nullptr;
+        _world_state = nullptr;
         parent = nullptr;
     }
 
@@ -83,7 +82,7 @@ class TouchState {
      */
     __host__ __device__ TouchState &operator=(const TouchState &other) {
         _state = other._state;
-        _access_state = other._access_state;
+        _world_state = other._world_state;
         parent = other.parent;
         return *this;
     }
@@ -94,22 +93,36 @@ class TouchState {
      * @param[in] address The address of the account.
      * @param[out] account_ptr The pointer to the account.
      * @param[in] acces_state_flag The account access flags.
+     * @param[in] add_to_state If the account should be force added to the state
+     *  Set to true when getting the account to update it.
      * @return 0 if the account is found, error otherwise.
      */
     __host__ __device__ int32_t get_account(
         ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t acces_state_flag = ACCOUNT_NONE_FLAG);
+        const CuEVM::account_flags_t acces_state_flag,
+        bool add_to_state = false);
 
-    __host__ __device__ int32_t get_account_index(
-        ArithEnv &arith, const bn_t &address, uint32_t &index) const;
+    __host__ __device__ int32_t get_account_index(ArithEnv &arith,
+                                                  const bn_t &address,
+                                                  uint32_t &index) const;
     /**
      * If the account given by address is empty
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
-     * @return 1 if the account is empty, 0 otherwise.
+     * @return true if the account is empty, false otherwise.
      */
-    __host__ __device__ int32_t is_empty_account(ArithEnv &arith,
-                                                 const bn_t &address);
+    __host__ __device__ bool is_empty_account(ArithEnv &arith,
+                                              const bn_t &address);
+
+    /**
+     * @brief Determine if an account is empty and can be created
+     *  Different treatment to normal empty account (can have balance)
+     * @param arith
+     * @param address
+     * @return __host__
+     */
+    __host__ __device__ bool is_empty_account_create(ArithEnv &arith,
+                                                     const bn_t &address);
 
     /**
      * If the account given by address is deleted
@@ -172,6 +185,11 @@ class TouchState {
     __host__ __device__ int32_t poke_value(ArithEnv &arith, const bn_t &address,
                                            const bn_t &key, bn_t &value) const;
 
+    __host__ __device__ int32_t poke_original_value(ArithEnv &arith,
+                                                    const bn_t &address,
+                                                    const bn_t &key,
+                                                    bn_t &value) const;
+
     /**
      * The setter for the balance given by an address.
      * @param[in] arith The arithmetic environment.
@@ -183,6 +201,68 @@ class TouchState {
                                             const bn_t &address,
                                             const bn_t &balance);
 
+    /**
+     * The getter for the balance given by an address without modifing the
+     * state.
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @param[in] balance The balance of the account.
+     * @return 0 if the balance is set, error otherwise.
+     */
+    __host__ __device__ int32_t poke_balance(ArithEnv &arith,
+                                             const bn_t &address,
+                                             bn_t &balance) const;
+    /**
+     * Get the account object without settng it warm
+     *
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @param account_ptr The pointer to the account.
+     * @param include_world_state  If the world state should be included
+     * @return 0 if the account is found, error otherwise.
+     */
+    __host__ __device__ int32_t poke_account(
+        ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+        bool include_world_state = false) const;
+
+    /**
+     * Check if an account is in the warm set
+     *
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @return true if the account is in the warm set, false otherwise.
+     */
+    __host__ __device__ bool is_warm_account(ArithEnv &arith,
+                                             const bn_t &address) const;
+
+    /**
+     * Check if a key is in the warm set
+     *
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @param key The key of the storage.
+     * @return true if the key is in the warm set, false otherwise.
+     */
+    __host__ __device__ bool is_warm_key(ArithEnv &arith, const bn_t &address,
+                                         const bn_t &key) const;
+
+    /**
+     * Set an account to be warm
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     */
+    __host__ __device__ bool set_warm_account(ArithEnv &arith,
+                                              const bn_t &address);
+
+    /**
+     * Set a key to be warm
+     * @param arith The arithmetic environment.
+     * @param address The address of the account.
+     * @param key The key of the storage.
+     * @param value The value of the storage.
+     */
+    __host__ __device__ bool set_warm_key(ArithEnv &arith, const bn_t &address,
+                                          const bn_t &key, const bn_t &value);
     /**
      * The setter for the nonce given by an address.
      * @param[in] arith The arithmetic environment.
@@ -204,7 +284,8 @@ class TouchState {
                                          const byte_array_t &byte_code);
 
     /**
-     * The setter for the storage value given by an address, a key, and a value.
+     * The setter for the storage value given by an address, a key, and a
+     * value.
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[in] key The key of the storage.
@@ -224,6 +305,15 @@ class TouchState {
      */
     __host__ __device__ int32_t delete_account(ArithEnv &arith,
                                                const bn_t &address);
+
+    /**
+     * Mark an account for deletion at the end of the transaction
+     * @param[in] arith The arithmetic environment.
+     * @param[in] address The address of the account.
+     * @return 0 if success, error otherwise.
+     */
+    __host__ __device__ int32_t mark_for_deletion(ArithEnv &arith,
+                                                  const bn_t &address);
 
     /**
      * Update the touch state.
