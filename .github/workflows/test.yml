@@ -63,7 +63,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
           docker exec cuevm-test-runner-${{ github.run_id }} /bin/bash -c "
-              cmake -S . -B build -DCPU='ON' -DTESTS='OFF' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
+              cmake -S . -B build -DCPU='ON'  -DGPU='OFF' -DTESTS='OFF' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
               cmake --build build -j 24
           "
 
