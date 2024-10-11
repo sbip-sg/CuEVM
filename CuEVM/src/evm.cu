@@ -29,7 +29,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     : world_state(world_state_data_ptr), block_info_ptr(block_info_ptr), transaction_ptr(transaction_ptr) {
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
                                                  touch_state_data_ptr, return_data_ptr);
-    
+
     printf("call_state_ptr allocated\n");
 
     transaction_ptr->print();
@@ -39,7 +39,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     printf("transaction validated\n");
 #ifdef __CUDA_ARCH__
     printf("error  code %d idx %d \n", error_code, threadIdx.x);
-#endif   
+#endif
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t *transaction_call_message_ptr = nullptr;
         error_code =
@@ -91,10 +91,10 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
                            (call_state_ptr->message_ptr->call_type != OP_DELEGATECALL))
                               ? call_state_ptr->touch_state.transfer(arith, sender, recipient, value)
                               : ERROR_SUCCESS);
- #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
     printf("start_CALL error code %d  idx %d \n", error_code, threadIdx.x);
     // call_state_ptr->message_ptr->sender.print();
-#endif      
+#endif
     if (error_code != ERROR_SUCCESS) {
         // avoid complication in the subsequent code
         // call failed = account never warmed up
@@ -139,8 +139,8 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         // test: stSelfBalance/diffPlaces.json
         error_code |= call_state_ptr->depth > CuEVM::max_depth + 1 ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
 #ifdef __CUDA_ARCH__
-    printf("else code size 0 code %d idx %d \n", error_code, threadIdx.x);
-#endif   
+        printf("else code size 0 code %d idx %d \n", error_code, threadIdx.x);
+#endif
         // Dont use account ptr here, byte_code already set
         if (call_state_ptr->message_ptr->byte_code.size == 0) {
             bn_t contract_address;
@@ -214,13 +214,13 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
     int32_t error_code = start_CALL(arith);
 #ifdef __CUDA_ARCH__
     printf("run after start_CALL  before error code idx %d \n", threadIdx.x);
-#endif   
+#endif
     if (error_code != ERROR_SUCCESS) {
         return;  // finish call
     }
- #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
     printf("run after start_CALL idx %d \n", threadIdx.x);
-#endif   
+#endif
     uint8_t opcode;
     CuEVM::evm_call_state_t *child_call_state_ptr = nullptr;
     while (status == ERROR_SUCCESS) {
@@ -228,18 +228,24 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                       ? (call_state_ptr->message_ptr)->byte_code.data[call_state_ptr->pc]
                       : OP_STOP);
 #ifdef EIP_3155
-        call_state_ptr->trace_idx = tracer_ptr->start_operation(
-            arith, call_state_ptr->pc, opcode, *call_state_ptr->memory_ptr, *call_state_ptr->stack_ptr,
-            call_state_ptr->depth, *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_limit,
-            call_state_ptr->gas_used);
+        uint32_t trace_idx = tracer_ptr->start_operation(arith, call_state_ptr->pc, opcode, *call_state_ptr->memory_ptr,
+                                                         *call_state_ptr->stack_ptr, call_state_ptr->depth,
+                                                         *call_state_ptr->last_return_data_ptr,
+                                                         call_state_ptr->gas_limit, call_state_ptr->gas_used);
+#ifdef __CUDA_ARCH__
+        printf("trace_idx %d idx %d \n", trace_idx, threadIdx.x);
+#endif
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        call_state_ptr->trace_idx = trace_idx;
+        __ONE_GPU_THREAD_WOSYNC_END__
 #endif
         // DEBUG PRINT
 
         // __ONE_THREAD_PER_INSTANCE(
         // printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
- #ifdef __CUDA_ARCH__
-   printf("\npc: %d opcode: %d, thread %d\n", call_state_ptr->pc, opcode, threadIdx.x);
-#endif       
+#ifdef __CUDA_ARCH__
+        printf("\npc: %d opcode: %d, thread %d\n", call_state_ptr->pc, opcode, threadIdx.x);
+#endif
         // printf("touch state BEGIN BEGIN BEGIN\n");
         // call_state_ptr->touch_state.print();
         // printf("touch state END END END\n");
@@ -807,19 +813,6 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
         CuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
         delete call_state_ptr;
         call_state_ptr = parent_call_state_ptr;
-        // trace the call
-        // #ifdef EIP_3155
-        //     tracer_ptr->finish_operation(
-        //         arith,
-        //         call_state_ptr->trace_idx,
-        //         call_state_ptr->gas_used,
-        //         call_state_ptr->gas_refund
-        //         #ifdef EIP_3155_OPTIONAL
-        //         , error_code,
-        //         call_state_ptr->touch_state
-        //         #endif
-        //     );
-        // #endif
     }
 
     return error_code;

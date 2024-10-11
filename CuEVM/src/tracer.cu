@@ -20,8 +20,7 @@ __host__ cJSON *trace_data_t::to_json() {
     cJSON_AddNumberToObject(json, "memSize", mem_size);
     cJSON *stack_json = cJSON_CreateArray();
     for (uint32_t i = 0; i < stack_size; i++) {
-        cJSON_AddItemToArray(
-            stack_json, cJSON_CreateString(stack[i].to_hex(hex_string_ptr)));
+        cJSON_AddItemToArray(stack_json, cJSON_CreateString(stack[i].to_hex(hex_string_ptr)));
     }
     cJSON_AddItemToObject(json, "stack", stack_json);
     cJSON_AddNumberToObject(json, "depth", depth);
@@ -35,6 +34,41 @@ __host__ cJSON *trace_data_t::to_json() {
 #endif
     delete[] hex_string_ptr;
     return json;
+}
+
+// __device__ void tracer_t::print_tracer_data(trace_data_t *data, uint32_t size) {
+//     for (uint32_t i = 0; i < size; i++) {
+//         printf("pc %u op %u\n", data[i].pc, data[i].op);
+//     }
+// }
+// New host function to copy and print tracer data
+__host__ void print_err_device_data(tracer_t *device_tracer) {
+    // tracer_t host_tracer;
+    // CUDA_CHECK(cudaMemcpy(&host_tracer, device_tracer, sizeof(tracer_t), cudaMemcpyDeviceToHost));
+    // printf("host tracer\n");
+    // printf("size %u\n", host_tracer.size);
+    // // copy data from host_tracer
+
+    // host_tracer.data = new trace_data_t[host_tracer.size];
+    // printf("copying data\n");
+    // printf("device data size %u\n", device_tracer->size);
+    // printf("device data pointer %p\n", device_tracer->data);
+    // printf("host data pointer %p\n", host_tracer.data);
+    // print_tracer_data<<<1, host_tracer.size>>>(device_tracer->data, host_tracer.size);
+    // CUDA_CHECK(
+    //     cudaMemcpy(host_tracer.data, device_tracer->data, host_tracer.size * sizeof(trace_data_t),
+    //     cudaMemcpyDefault));
+
+    // for (uint32_t i = 0; i < device_tracer->size; i++) {
+    //     // printf("pc %u op %u\n", device_tracer->data[i], device_tracer->data[i].op);
+    //     CUDA_CHECK(
+    //         cudaMemcpy(&host_tracer.data[i], &device_tracer->data[i], sizeof(trace_data_t), cudaMemcpyDeviceToHost));
+    //     break;
+    //     // printf("gas ");
+    //     // host_tracer.data[i].gas.print();
+    //     // printf("gas cost ");
+    //     // host_tracer.data[i].gas_cost.print();
+    // }
 }
 
 __host__ void trace_data_t::print_err(char *hex_string_ptr) {
@@ -109,8 +143,7 @@ __host__ void trace_data_t::print_err(char *hex_string_ptr) {
     }
 }
 
-__host__ __device__ tracer_t::tracer_t()
-    : data(nullptr), size(0), capacity(0) {}
+__host__ __device__ tracer_t::tracer_t() : data(nullptr), size(0), capacity(0) {}
 
 __host__ __device__ tracer_t::~tracer_t() {
     if (data != nullptr) {
@@ -126,51 +159,59 @@ __host__ __device__ tracer_t::~tracer_t() {
 }
 
 __host__ __device__ void tracer_t::grow() {
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     trace_data_t *new_data = new trace_data_t[capacity + 128];
     if (data != nullptr) {
         memcpy(new_data, data, sizeof(trace_data_t) * size);
         delete[] data;
     }
+
     data = new_data;
     capacity += 128;
+    __ONE_GPU_THREAD_WOSYNC_END__
 }
 
-__host__ __device__ uint32_t tracer_t::start_operation(
-    ArithEnv &arith, const uint32_t pc, const uint8_t op,
-    const CuEVM::evm_memory_t &memory, const CuEVM::evm_stack_t &stack,
-    const uint32_t depth, const CuEVM::evm_return_data_t &return_data,
-    const bn_t &gas_limit, const bn_t &gas_used) {
+__host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const uint32_t pc, const uint8_t op,
+                                                       const CuEVM::evm_memory_t &memory,
+                                                       const CuEVM::evm_stack_t &stack, const uint32_t depth,
+                                                       const CuEVM::evm_return_data_t &return_data,
+                                                       const bn_t &gas_limit, const bn_t &gas_used) {
     if (size == capacity) {
         grow();
     }
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].pc = pc;
     data[size].op = op;
     data[size].mem_size = memory.get_size();
+    __ONE_GPU_THREAD_WOSYNC_END__
     bn_t gas;
     cgbn_sub(arith.env, gas, gas_limit, gas_used);
     cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas), gas);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas_cost),
-               gas_used);
+    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas_cost), gas_used);
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].stack_size = stack.size();
-    data[size].stack = new evm_word_t[data[size].stack_size];
-    std::copy(stack.stack_base, stack.stack_base + stack.size(),
-              data[size].stack);
-    // memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) *
-    // data[size].stack_size);
+    if (data[size].stack_size > 0) {
+        data[size].stack = new evm_word_t[data[size].stack_size];
+        // std::copy(stack.stack_base, stack.stack_base + stack.size(), data[size].stack);
+        memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) * data[size].stack_size);
+    }
     data[size].depth = depth;
-    data[size].return_data = new byte_array_t(return_data);
+    __ONE_GPU_THREAD_END__  // sync here
+
+#ifndef GPU  // reduce complication in gpu code
+        data[size]
+            .return_data = new byte_array_t(return_data);
+#endif
 #ifdef EIP_3155_OPTIONAL
     data[size].memory = new uint8_t[data[size].mem_size];
-    std::copy(memory.data.data, memory.data.data + data[size].mem_size,
-              data[size].memory);
-// memcpy(data[size].memory, memory.data.data, data[size].mem_size);
+    // std::copy(memory.data.data, memory.data.data + data[size].mem_size, data[size].memory);
+    memcpy(data[size].memory, memory.data.data, data[size].mem_size);
 #endif
+
     return size++;
 }
 
-__host__ __device__ void tracer_t::finish_operation(ArithEnv &arith,
-                                                    const uint32_t idx,
-                                                    const bn_t &gas_used,
+__host__ __device__ void tracer_t::finish_operation(ArithEnv &arith, const uint32_t idx, const bn_t &gas_used,
                                                     const bn_t &gas_refund
 #ifdef EIP_3155_OPTIONAL
                                                     ,
@@ -179,22 +220,20 @@ __host__ __device__ void tracer_t::finish_operation(ArithEnv &arith,
 #endif
 ) {
     bn_t gas_cost;
-    cgbn_load(arith.env, gas_cost,
-              (cgbn_evm_word_t_ptr) & (data[idx].gas_cost));
+    cgbn_load(arith.env, gas_cost, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost));
     cgbn_sub(arith.env, gas_cost, gas_used, gas_cost);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost),
-               gas_cost);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].refund),
-               gas_refund);
+    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost), gas_cost);
+    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].refund), gas_refund);
 #ifdef EIP_3155_OPTIONAL
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[idx].error_code = error_code;
+    __ONE_GPU_THREAD_WOSYNC_END__
 // data[idx].storage = storage;
 #endif
 }
 
-__host__ __device__ void tracer_t::finish_transaction(
-    ArithEnv &arith, const CuEVM::evm_return_data_t &return_data,
-    const bn_t &gas_used, uint32_t error_code) {
+__host__ __device__ void tracer_t::finish_transaction(ArithEnv &arith, const CuEVM::evm_return_data_t &return_data,
+                                                      const bn_t &gas_used, uint32_t error_code) {
     this->return_data = return_data;
     cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (this->gas_used), gas_used);
     this->status = error_code;
@@ -258,9 +297,7 @@ __host__ void tracer_t::print_err() {
 
     fprintf(stderr, "\"gasUsed\":\"%s\",", gas_used.to_hex(hex_string_ptr, 1));
 
-    fprintf(stderr, "\"pass\":\"%s\",",
-            (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true"
-                                                                 : "false");
+    fprintf(stderr, "\"pass\":\"%s\",", (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true" : "false");
 
     // fprintf(stderr, "\"fork\":%s,", "\"\"\"\"");
 

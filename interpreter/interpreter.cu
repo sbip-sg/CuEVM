@@ -3,6 +3,7 @@
 #include <getopt.h>
 
 #include <CuEVM/evm.cuh>
+#include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
@@ -32,9 +33,11 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     printf("\nevm->run(arith) instance %d\n", instance);
     __SYNC_THREADS__
     evm->run(arith);
-    // #ifdef EIP_3155
-    // evm->tracer_ptr->print_err();
-    // #endif
+#ifdef EIP_3155
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    instances[0].tracer_ptr->print(arith);
+    __ONE_GPU_THREAD_WOSYNC_END__
+#endif
     // delete evm;
     // evm = nullptr;
 }
@@ -93,6 +96,11 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         CUDA_CHECK(cudaGetLastError());
         printf("GPU kernel finished\n");
         CGBN_CHECK(report);
+#ifdef EIP_3155
+        // print only the first instance
+
+        // CuEVM::utils::print_err_device_data(instances_data[0].tracer_ptr);
+#endif
         // CUDA_CHECK(cudaEventRecord(stop));
         // CUDA_CHECK(cudaEventSynchronize(stop));
         // CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
