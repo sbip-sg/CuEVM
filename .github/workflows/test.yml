@@ -63,7 +63,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
           docker exec cuevm-test-runner-${{ github.run_id }} /bin/bash -c "
-              cmake -S . -B build -DCPU='ON' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
+              cmake -S . -B build -DCPU='ON' -DTESTS='OFF' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
               cmake --build build -j 24
           "
 
@@ -94,7 +94,6 @@ jobs:
 
 
       - name: Archive test results
-        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: test-results
@@ -105,5 +104,6 @@ jobs:
         run: |
           docker exec cuevm-test-runner-${{ github.run_id }} rm -rf /workspaces/CuEVM || true
           rm -rf ${{ github.workspace }}/${{ github.run_id }} || true
+          docker stop cuevm-test-runner-${{ github.run_id }} || true
           docker kill -s -9 cuevm-test-runner-${{ github.run_id }} || true
-          docker rm cuevm-test-runner-${{ github.run_id }} || true
+          docker rm -f cuevm-test-runner-${{ github.run_id }} || true
