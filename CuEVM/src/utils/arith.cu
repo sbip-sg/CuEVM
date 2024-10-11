@@ -108,6 +108,7 @@ __host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
     return ERROR_SUCCESS;
 }
 
+
 __host__ __device__ void get_bit_array(uint8_t *dst_array,
                                        uint32_t &array_length,
                                        evm_word_t &src_cgbn_mem,

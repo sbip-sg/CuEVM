@@ -11,11 +11,11 @@ namespace CuEVM {
 __host__ __device__ contract_storage_t::~contract_storage_t() { free(); }
 
 __host__ __device__ void contract_storage_t::free() {
-    // __ONE_GPU_THREAD_BEGIN__
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if ((storage != nullptr) && (capacity > 0)) {
         delete[] storage;
     }
-    // __ONE_GPU_THREAD_END__
+    __ONE_GPU_THREAD_WOSYNC_END__
     clear();
 }
 
@@ -34,7 +34,7 @@ __host__ __device__ void contract_storage_t::clear() {
 
 __host__ __device__ contract_storage_t &contract_storage_t::operator=(const contract_storage_t &other) {
     __SHARED_MEMORY__ storage_element_t *tmp_storage;
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (this == &other) {
         return *this;
     }
@@ -42,17 +42,17 @@ __host__ __device__ contract_storage_t &contract_storage_t::operator=(const cont
         free();
         size = other.size;
         capacity = other.capacity;
-        // __ONE_GPU_THREAD_BEGIN__
+        __ONE_GPU_THREAD_BEGIN__
         if (capacity > 0) {
             tmp_storage = new storage_element_t[capacity];
         }
-        // __ONE_GPU_THREAD_END__
+        __ONE_GPU_THREAD_END__
         storage = tmp_storage;
     }
-    // __ONE_GPU_THREAD_BEGIN__
+    __ONE_GPU_THREAD_BEGIN__
     if (other.size > 0) memcpy(storage, other.storage, other.size * sizeof(storage_element_t));
-    // __ONE_GPU_THREAD_END__
-    __ONE_GPU_THREAD_WOSYNC_END__
+    __ONE_GPU_THREAD_END__
+    // __ONE_GPU_THREAD_WOSYNC_END__
     return *this;
 }
 
@@ -76,6 +76,10 @@ __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const
             return ERROR_SUCCESS;
         }
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("contract_storage_t::set_value before allocateidx %d size %d capacity %d\n", threadIdx.x, size,
+    //     capacity, storage);
+    // #endif
     if (size >= capacity) {
         if (capacity == 0) {
             capacity = CuEVM::initial_storage_capacity;
@@ -84,11 +88,21 @@ __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const
         }
         __ONE_GPU_THREAD_BEGIN__
         new_storage = new storage_element_t[capacity];
-        memcpy(new_storage, storage, size * sizeof(storage_element_t));
+        // printf("allocate new storage %p, capacity %d\n", new_storage, capacity);
+        if (size > 0) {
+            memcpy(new_storage, storage, size * sizeof(storage_element_t));
+        }
         delete[] storage;
         __ONE_GPU_THREAD_END__
+
         storage = new_storage;
+        printf("set storage %p, new_storage %p\n", storage, new_storage);
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("contract_storage_t::set_value idx %d size %d capacity %d, storage %p\n", threadIdx.x, size, capacity,
+    //     storage); printf("contract_storage_t::set_value idx %d storage 0 key %d val %d\n", threadIdx.x,
+    //     storage[0].key._limbs[0], storage[0].value._limbs[0]);
+    // #endif
     storage[size].set_key(arith, key);
     storage[size].set_value(arith, value);
     size++;

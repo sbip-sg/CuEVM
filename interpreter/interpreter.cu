@@ -30,7 +30,8 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     __ONE_GPU_THREAD_WOSYNC_END__
     CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance]);
     printf("\nevm->run(arith) instance %d\n", instance);
-    // evm->run(arith);
+    __SYNC_THREADS__
+    evm->run(arith);
     // #ifdef EIP_3155
     // evm->tracer_ptr->print_err();
     // #endif
@@ -50,6 +51,16 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     CUDA_CHECK(cgbn_error_report_alloc(&report));
     cudaEvent_t start, stop;
     float milliseconds = 0;
+
+    size_t stack_size;
+    cudaDeviceGetLimit(&stack_size, cudaLimitStackSize);
+    printf("current stack size %zu\n", stack_size);
+    size_t heap_size = (size_t(2) << 30);  // 2GB
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 96 * 1024));
+    cudaDeviceGetLimit(&stack_size, cudaLimitStackSize);
+    printf("current stack size %zu\n", stack_size);
+    CUDA_CHECK(cudaDeviceSynchronize());
     // CUDA_CHECK(cudaEventCreate(&start));
     // CUDA_CHECK(cudaEventCreate(&stop));
 #endif

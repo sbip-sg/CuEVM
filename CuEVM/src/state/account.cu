@@ -60,11 +60,11 @@ __host__ __device__ account_t::~account_t() { free(); }
 
 __host__ __device__ void account_t::free() {
     byte_code.free();
-    printf("after byte_code.free()\n");
+    // printf("after byte_code.free()\n");
     storage.free();
-    printf("after storage.free()\n");
+    // printf("after storage.free()\n");
     clear();
-    printf("after clear()\n");
+    // printf("after clear()\n");
 }
 
 __host__ void account_t::free_managed() {
@@ -132,7 +132,11 @@ __host__ __device__ void account_t::set_byte_code(const byte_array_t &byte_code)
 
 __host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const bn_t &address) {
     bn_t local_address;
+    //  #ifdef __CUDA_ARCH__
+    //     printf("has_address, accounts[index] %p thread %d\n", &(this->address),  threadIdx.x);
+    // #endif
     cgbn_load(arith.env, local_address, &this->address);
+
     return (cgbn_compare(arith.env, local_address, address) == 0);
 }
 

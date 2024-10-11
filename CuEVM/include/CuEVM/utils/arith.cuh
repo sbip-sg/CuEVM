@@ -124,6 +124,7 @@ __host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
                                                  const bn_t &length,
                                                  byte_array_t &out);
 
+
 /**
  * Get an array of maximum 256 bytes, each having value 1 or 0 indicating bit
  * set or not. Use as utility for Elliptic curve point multiplication

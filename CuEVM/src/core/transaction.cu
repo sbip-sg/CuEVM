@@ -303,12 +303,12 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     // warm up the access list
     access_list_warm_up(arith, touch_state);
     // printf("after warm up account\n");
-// warmup coinbase and precompile contracts
+    // warmup coinbase and precompile contracts
 
 #ifdef EIP_3651
     bn_t coin_base_address;
     block_info.get_coin_base(arith, coin_base_address);
-    
+
     touch_state.set_warm_account(arith, coin_base_address);
 
 #endif
@@ -358,6 +358,9 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     } else {
         CuEVM::account_t *to_account = nullptr;
         touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
+        // #ifdef __CUDA_ARCH__
+        //     printf("to_account %p size %d idx %d \n", to_account, to_account->byte_code.size  , threadIdx.x);
+        // #endif
         byte_code = to_account->byte_code;
     }
     uint32_t static_env = 0;
@@ -368,11 +371,13 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     evm_message_call_ptr = new CuEVM::evm_message_call_t(arith, sender_address, to_address, to_address, gas_limit,
                                                          value, depth, call_type, to_address, data_init, byte_code,
                                                          return_data_offset, return_data_size, static_env);
+    // #ifdef __CUDA_ARCH__
+    //     printf("bytecode size %d idx %d \n", byte_code.size , threadIdx.x);
+    // #endif
     return ERROR_SUCCESS;
 }
 
 __host__ __device__ void evm_transaction_t::print() {
-    
     printf("Transaction:\n");
     printf("Type: %d\n", type);
     printf("Nonce: ");
@@ -406,7 +411,6 @@ __host__ __device__ void evm_transaction_t::print() {
         }
     }
     printf("end printing transaction\n");
-    
 }
 
 __host__ cJSON *evm_transaction_t::to_json() {

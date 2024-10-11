@@ -84,24 +84,23 @@ __host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const b
 
 __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &account,
                                                         const CuEVM::account_flags_t flag) {
-                                                            
-
     state_t::add_account(account);
 
     uint32_t index = no_accounts - 1;
     __SHARED_MEMORY__ CuEVM::account_flags_t *tmp_flags;
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    __ONE_GPU_THREAD_BEGIN__
     // printf("no_accounts: %u\n", no_accounts);
     tmp_flags = (CuEVM::account_flags_t *)malloc(sizeof(CuEVM::account_flags_t) * no_accounts);
     memcpy(tmp_flags, flags, (no_accounts - 1) * sizeof(CuEVM::account_flags_t));
-   
+
     if (flags != nullptr) {
         delete[] flags;
     }
-    
+    __ONE_GPU_THREAD_END__
+
     flags = tmp_flags;
     flags[index] = flag;
-    __ONE_GPU_THREAD_WOSYNC_END__
+
     // printf("after clear flags\n");
     return ERROR_SUCCESS;
 }
@@ -111,16 +110,29 @@ __host__ __device__ int32_t state_access_t::add_duplicate_account(CuEVM::account
                                                                   const CuEVM::account_flags_t flag) {
     CuEVM::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
     __SHARED_MEMORY__ CuEVM::account_t *tmp_account_ptr;
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+
     tmp_account_ptr = new CuEVM::account_t(src_account_ptr, no_storage_copy);
-    __ONE_GPU_THREAD_WOSYNC_END__
+
+    // #ifdef __CUDA_ARCH__
+    //     printf("TouchState::add_duplicate_account before add_account %d\n" ,threadIdx.x);
+    // #endif
     int32_t error_code = add_account(*tmp_account_ptr, flag);
+    // #ifdef __CUDA_ARCH__
+    //     printf("TouchState::add_duplicate_account after add_account %d\n" ,threadIdx.x);
+    // #endif
     // printf("after add_account\n");
     account_ptr = &accounts[no_accounts - 1];
- 
+    //  #ifdef __CUDA_ARCH__
+    //     printf("TouchState::add_duplicate_account after assigning account_ptr %d, account_ptr %p\n" ,threadIdx.x,
+    //     account_ptr);
+    // #endif
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     delete tmp_account_ptr;
     __ONE_GPU_THREAD_WOSYNC_END__
+    //  #ifdef __CUDA_ARCH__
+    //     printf("TouchState::add_duplicate_account delete tmp_account_ptr %d, account_ptr %p\n" ,threadIdx.x,
+    //     account_ptr);
+    // #endif
     // printf("after delete tmp_account_ptr\n");
     return error_code;
 }

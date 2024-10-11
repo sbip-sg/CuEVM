@@ -66,6 +66,10 @@ generic_CALL(ArithEnv &arith, const bn_t &args_offset, const bn_t &args_size,
                                          contract_address);
     // positive value call cost (except delegate call)
     // empty account call cost
+#ifdef __CUDA_ARCH__
+    printf("After access_account_cost cost %d\n", threadIdx.x);
+#endif          
+    return error_code;  
     bn_t gas_stippend;
     cgbn_set_ui32(arith.env, gas_stippend, 0);
     if (new_state_ptr->message_ptr->get_call_type() != OP_DELEGATECALL) {
@@ -280,7 +284,9 @@ __host__ __device__ int32_t CALL(ArithEnv &arith,
                                  CuEVM::evm_call_state_t &current_state,
                                  CuEVM::evm_call_state_t *&new_state_ptr) {
     bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
-
+#ifdef __CUDA_ARCH__
+    printf("opcode CALL %d\n", threadIdx.x);
+#endif
     int32_t error_code = current_state.stack_ptr->pop(arith, gas);
     error_code |= current_state.stack_ptr->pop(arith, address);
     error_code |= current_state.stack_ptr->pop(arith, value);
@@ -288,7 +294,9 @@ __host__ __device__ int32_t CALL(ArithEnv &arith,
     error_code |= current_state.stack_ptr->pop(arith, args_size);
     error_code |= current_state.stack_ptr->pop(arith, ret_offset);
     error_code |= current_state.stack_ptr->pop(arith, ret_size);
-
+#ifdef __CUDA_ARCH__
+    printf("opcode CALL before error_code == ERROR_SUCCESS %d\n", threadIdx.x);
+#endif
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
@@ -302,7 +310,9 @@ __host__ __device__ int32_t CALL(ArithEnv &arith,
         cgbn_set(arith.env, storage_address, address);  // t
         CuEVM::byte_array_t call_data;
         CuEVM::byte_array_t code;
-
+#ifdef __CUDA_ARCH__
+    printf("opcode CALL before constructing message call t %d\n", threadIdx.x);
+#endif
         new_state_ptr = new CuEVM::evm_call_state_t(
             arith, &current_state,
             new CuEVM::evm_message_call_t(
@@ -310,10 +320,16 @@ __host__ __device__ int32_t CALL(ArithEnv &arith,
                 current_state.message_ptr->get_depth() + 1, OP_CALL,
                 storage_address, call_data, code, ret_offset, ret_size,
                 current_state.message_ptr->get_static_env()));
-
+    #ifdef __CUDA_ARCH__
+    printf("opcode CALL after constructing message call t  %d\n", threadIdx.x);
+    #endif
         error_code |= generic_CALL(arith, args_offset, args_size, current_state,
                                    new_state_ptr);
     }
+
+    #ifdef __CUDA_ARCH__
+    printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
+    #endif
     return error_code;
 }
 
