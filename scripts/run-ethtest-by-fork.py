@@ -24,9 +24,11 @@ def read_as_json_lines(filepath):
             yield json.loads(line)
 
 def check_output(output, error, without_state_root):
-    has_str = lambda s: s in (output + error)
+    all_output = output + error
+    print(all_output)
+    has_str = lambda s: s in all_output
     if without_state_root:
-        if has_str('error') and not has_str('stateRoot'):
+        if has_str('error') and all_output.count('stateRoot') < 2:
             raise ValueError(f"💥 Mismatch found {output}")
     else:
         if has_str('error'):
@@ -34,7 +36,9 @@ def check_output(output, error, without_state_root):
 
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root):
-    command = [runtest_bin, f'--outdir=./{uuid4()}', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
+    outdir = f'./{uuid4()}'
+    os.makedirs(outdir, exist_ok=True)
+    command = [runtest_bin, f'--outdir={outdir}', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 
     debug_print(' '.join(command))
 

@@ -35,7 +35,7 @@ struct trace_data_t {
 
     __host__ cJSON *to_json();
 
-    __host__ void print_err(char *hex_string_ptr = nullptr);
+    __host__ __device__ void print_err(char *hex_string_ptr = nullptr);
 };
 
 struct tracer_t {
@@ -71,11 +71,13 @@ struct tracer_t {
 
     __host__ __device__ void print(ArithEnv &arith);
 
-    __host__ void print_err();
+    __host__ __device__ void print_err();
+
+  __device__ void print_device_err();
 
     __host__ cJSON *to_json();
 };
-__host__ void print_err_device_data(tracer_t *device_tracer);
+__device__ void print_device_data(tracer_t *device_tracer);
 
 }  // namespace CuEVM::utils
 // EIP-3155

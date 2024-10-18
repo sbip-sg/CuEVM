@@ -46,16 +46,14 @@ struct byte_array_t {
      * @param[in] offset The offset of the array where we start to copy.
      * @param[in] size The size of the array.
      */
-    __host__ __device__ byte_array_t(const byte_array_t &src_byte_array,
-                                     uint32_t offset, uint32_t size);
+    __host__ __device__ byte_array_t(const byte_array_t &src_byte_array, uint32_t offset, uint32_t size);
     /**
      * The constructor with the hex string.
      * @param[in] hex_string The hex string.
      * @param[in] endian The endian format.
      * @param[in] padding The padding direction.
      */
-    __host__ byte_array_t(const char *hex_string,
-                          int32_t endian = LITTLE_ENDIAN,
+    __host__ byte_array_t(const char *hex_string, int32_t endian = LITTLE_ENDIAN,
                           PaddingDirection padding = NO_PADDING);
     /**
      * The constructor with the hex string and a fixed size.
@@ -64,8 +62,7 @@ struct byte_array_t {
      * @param[in] endian The endian format.
      * @param[in] padding The padding direction.
      */
-    __host__ byte_array_t(const char *hex_string, uint32_t size,
-                          int32_t endian = LITTLE_ENDIAN,
+    __host__ byte_array_t(const char *hex_string, uint32_t size, int32_t endian = LITTLE_ENDIAN,
                           PaddingDirection padding = NO_PADDING);
     /**
      * The destructor.
@@ -99,8 +96,7 @@ struct byte_array_t {
      * @param[in] zero_padding The zero padding flag.
      * @return The Error code. 0 for success, 1 for failure.
      */
-    __host__ __device__ int32_t grow(uint32_t new_size,
-                                     int32_t zero_padding = 0);
+    __host__ __device__ int32_t grow(uint32_t new_size, int32_t zero_padding = 0);
 
     /**
      * If the byte array has a given value.
@@ -117,7 +113,7 @@ struct byte_array_t {
      * The hex string is allocated on the heap and needs to be freed.
      * @return The hex string.
      */
-    __host__ char *to_hex() const;
+    __host__ __device__ char *to_hex() const;
     /**
      * Get the json object from the byte array.
      * @return The json object.
@@ -132,10 +128,8 @@ struct byte_array_t {
      * @param[in] managed The managed flag.
      * @return The Error code. 0 for success, 1 for failure.
      */
-    __host__ int32_t from_hex(const char *hex_string,
-                              int32_t endian = LITTLE_ENDIAN,
-                              PaddingDirection padding = NO_PADDING,
-                              int32_t managed = 0);
+    __host__ int32_t from_hex(const char *hex_string, int32_t endian = LITTLE_ENDIAN,
+                              PaddingDirection padding = NO_PADDING, int32_t managed = 0);
     /**
      * Copy the source byte array
      * considering a Big Endian format, the extra size
@@ -175,8 +169,7 @@ struct byte_array_t {
      * @param[in] count the number of instances
      * @return the gpu instances
      */
-    __host__ static byte_array_t *gpu_from_cpu(byte_array_t *cpu_instances,
-                                               uint32_t count);
+    __host__ static byte_array_t *gpu_from_cpu(byte_array_t *cpu_instances, uint32_t count);
 
     /**
      * Free the gpu instances
@@ -191,16 +184,14 @@ struct byte_array_t {
      * @param[in] count the number of instances
      * @return the cpu instances
      */
-    __host__ static byte_array_t *cpu_from_gpu(byte_array_t *gpu_instances,
-                                               uint32_t count);
+    __host__ static byte_array_t *cpu_from_gpu(byte_array_t *gpu_instances, uint32_t count);
 
     /**
      * Copy data content between two device memories
      * @param[out] dst the destination memory
      * @param[in] src the source memory
      */
-    __host__ __device__ static void transfer_memory(byte_array_t &dst,
-                                                    byte_array_t &src);
+    __host__ __device__ static void transfer_memory(byte_array_t &dst, byte_array_t &src);
 
     /**
      * Reset the reutnr data pointer, used frequently in finish sub context
@@ -209,8 +200,7 @@ struct byte_array_t {
      */
 
     __host__ __device__ static void reset_return_data(byte_array_t *&return_data_ptr) {
-        if(return_data_ptr != nullptr)
-            delete return_data_ptr;
+        if (return_data_ptr != nullptr) delete return_data_ptr;
         return_data_ptr = new byte_array_t();
     }
 
@@ -221,8 +211,7 @@ struct byte_array_t {
      * @param[in] length The length of the clean hex string.
      * @return The Error code. 0 for success, 1 for failure.
      */
-    __host__ __device__ int32_t from_hex_set_le(const char *clean_hex_string,
-                                                int32_t length);
+    __host__ __device__ int32_t from_hex_set_le(const char *clean_hex_string, int32_t length);
     /**
      * Get the byte array from a hex string in Big Endian format.
      * @param[in] clean_hex_string The clean hex string.
@@ -231,9 +220,7 @@ struct byte_array_t {
      * padding)
      * @return The Error code. 0 for success, 1 for failure.
      */
-    __host__ __device__ int32_t from_hex_set_be(const char *clean_hex_string,
-                                                int32_t length,
-                                                PaddingDirection padding);
+    __host__ __device__ int32_t from_hex_set_be(const char *clean_hex_string, int32_t length, PaddingDirection padding);
 };
 /**
  * Copy data content between two device memories
@@ -241,7 +228,5 @@ struct byte_array_t {
  * @param[in] src_instances the source memory
  * @param[in] count the number of instances to copy
  */
-__global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances,
-                                             byte_array_t *src_instances,
-                                             uint32_t count);
+__global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances, byte_array_t *src_instances, uint32_t count);
 }  // namespace CuEVM

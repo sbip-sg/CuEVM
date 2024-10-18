@@ -112,7 +112,11 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * limbs to convert
      * @return The hex string
      */
-    __host__ char *to_hex(char *hex_string = nullptr, int32_t pretty = 0, uint32_t count = CuEVM::cgbn_limbs) const;
+    __host__ __device__ char *to_hex(char *hex_string = nullptr, int32_t pretty = 0,
+                                     uint32_t count = CuEVM::cgbn_limbs) const;
+
+    __host__ __device__ void print_as_compact_hex() const;
+
     /**
      * Get the byte array from the evm_word_t.
      * The byte array is in Big Endian format.

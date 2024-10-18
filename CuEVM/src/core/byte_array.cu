@@ -176,7 +176,7 @@ __host__ __device__ void byte_array_t::print() const {
     __ONE_GPU_THREAD_WOSYNC_END__
 }
 
-__host__ char *byte_array_t::to_hex() const {
+__host__ __device__ char *byte_array_t::to_hex() const {
     char *hex_string = new char[size * 2 + 3];  // 3 - 0x and \0
     hex_string[0] = '0';
     hex_string[1] = 'x';

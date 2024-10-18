@@ -35,7 +35,8 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     evm->run(arith);
 #ifdef EIP_3155
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    instances[0].tracer_ptr->print(arith);
+    // instances[0].tracer_ptr->print(arith);
+    instances[0].tracer_ptr->print_err();
     __ONE_GPU_THREAD_WOSYNC_END__
 #endif
     // delete evm;

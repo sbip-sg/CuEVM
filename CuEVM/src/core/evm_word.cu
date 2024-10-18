@@ -129,14 +129,43 @@ __host__ __device__ void evm_word_t::print() const {
     __ONE_GPU_THREAD_WOSYNC_END__
 }
 
-__host__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty, uint32_t count) const {
+__host__ __device__ void evm_word_t::print_as_compact_hex() const {
+    int first_non_zero = 0;
+
+    printf("\"0x");
+
+    // Iterate over each limb, starting from the most significant one (_limbs[7] to _limbs[0])
+    for (int i = 7; i >= 0; --i) {
+        if (_limbs[i] != 0 || first_non_zero) {
+            // Print the current limb; use "%x" for the first non-zero limb, and "%08x" for the rest
+            if (first_non_zero) {
+                printf("%08x", _limbs[i]);  // Pad with zeros after the first non-zero limb
+            } else {
+                printf("%x", _limbs[i]);  // No padding for the first non-zero limb
+                first_non_zero = 1;       // Mark the first non-zero limb
+            }
+        }
+    }
+
+    // If all limbs are zero, print "0"
+    if (!first_non_zero) {
+        printf("0");
+    }
+
+    printf("\"");
+}
+
+__host__ __device__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty, uint32_t count) const {
     if (hex_string == nullptr) {
         hex_string = new char[count * 8 + 3];
     }
     hex_string[0] = '0';
     hex_string[1] = 'x';
     for (uint32_t idx = 0; idx < count; idx++) {
-        sprintf(hex_string + 2 + idx * 8, "%08x", _limbs[count - 1 - idx]);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + idx * 8, (_limbs[count - 1 - idx] >> 24) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + idx * 8 + 2, (_limbs[count - 1 - idx] >> 16) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + idx * 8 + 4, (_limbs[count - 1 - idx] >> 8) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + idx * 8 + 6, _limbs[count - 1 - idx] & 0xFF);
     }
     hex_string[count * 8 + 2] = '\0';
     if (pretty) {
