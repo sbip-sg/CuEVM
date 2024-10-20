@@ -82,11 +82,11 @@ __host__ __device__ account_t &account_t::operator=(const account_t &other) {
         memcpy(&address, &other.address, sizeof(evm_word_t));
         memcpy(&balance, &other.balance, sizeof(evm_word_t));
         memcpy(&nonce, &other.nonce, sizeof(evm_word_t));
-        printf("other.bytecode %p\n", other.byte_code.data);
-        printf("other.bytecode.size %d\n", other.byte_code.size);
-        printf("other.storage.size %d\n", other.storage.size);
-        printf("other.storage.capacity %d\n", other.storage.capacity);
-        printf("other.storage.storage %p\n", other.storage.storage);
+        // printf("other.bytecode %p\n", other.byte_code.data);
+        // printf("other.bytecode.size %d\n", other.byte_code.size);
+        // printf("other.storage.size %d\n", other.storage.size);
+        // printf("other.storage.capacity %d\n", other.storage.capacity);
+        // printf("other.storage.storage %p\n", other.storage.storage);
         __ONE_GPU_THREAD_END__
         byte_code = other.byte_code;
         storage = other.storage;

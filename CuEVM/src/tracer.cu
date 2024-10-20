@@ -64,10 +64,10 @@ __host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
     // print uint256 stack values
     printf("[");
     for (uint32_t i = 0; i < stack_size; i++) {
-      stack[i].print_as_compact_hex();
-      if (i != stack_size - 1) {
-        printf(",");
-      }
+        stack[i].print_as_compact_hex();
+        if (i != stack_size - 1) {
+            printf(",");
+        }
     }
     printf("],");
 
@@ -109,16 +109,17 @@ __host__ __device__ tracer_t::~tracer_t() {
 }
 
 __host__ __device__ void tracer_t::grow() {
+    trace_data_t *new_data;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    trace_data_t *new_data = new trace_data_t[capacity + 128];
+    new_data = new trace_data_t[capacity + 128];
     if (data != nullptr) {
         memcpy(new_data, data, sizeof(trace_data_t) * size);
         delete[] data;
     }
-
+    __ONE_GPU_THREAD_END__
     data = new_data;
+    __SYNC_THREADS__
     capacity += 128;
-    __ONE_GPU_THREAD_WOSYNC_END__
 }
 
 __host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const uint32_t pc, const uint8_t op,
@@ -129,15 +130,21 @@ __host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const ui
     if (size == capacity) {
         grow();
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("tracer op %d idx %d after  grow\n", op, threadIdx.x);
+    // #endif
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].pc = pc;
     data[size].op = op;
     data[size].mem_size = memory.get_size();
-    __ONE_GPU_THREAD_WOSYNC_END__
+    __ONE_GPU_THREAD_END__
     bn_t gas;
     cgbn_sub(arith.env, gas, gas_limit, gas_used);
     cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas), gas);
     cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas_cost), gas_used);
+    // #ifdef __CUDA_ARCH__
+    //     printf("tracer op %d idx %d after storing gas cost\n", op, threadIdx.x);
+    // #endif
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].stack_size = stack.size();
     if (data[size].stack_size > 0) {
@@ -145,13 +152,14 @@ __host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const ui
         // std::copy(stack.stack_base, stack.stack_base + stack.size(), data[size].stack);
         memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) * data[size].stack_size);
     }
+
     data[size].depth = depth;
     __ONE_GPU_THREAD_END__  // sync here
-
-#ifndef GPU  // reduce complication in gpu code
+#ifndef GPU                 // reduce complication in gpu code
         data[size]
             .return_data = new byte_array_t(return_data);
 #endif
+
 #ifdef EIP_3155_OPTIONAL
     data[size].memory = new uint8_t[data[size].mem_size];
     // std::copy(memory.data.data, memory.data.data + data[size].mem_size, data[size].memory);
@@ -225,7 +233,6 @@ __host__ __device__ void tracer_t::print_err() {
     for (uint32_t i = 0; i < size; i++) {
         data[i].print_err(hex_string_ptr);
     }
-
     printf("{\"stateRoot\":\"0x\",");
 
     char *return_data_hex = return_data.to_hex();

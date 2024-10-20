@@ -92,6 +92,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
                               ? call_state_ptr->touch_state.transfer(arith, sender, recipient, value)
                               : ERROR_SUCCESS);
 #ifdef __CUDA_ARCH__
+    __SYNC_THREADS__
     printf("start_CALL error code %d  idx %d \n", error_code, threadIdx.x);
     // call_state_ptr->message_ptr->sender.print();
 #endif
@@ -228,16 +229,15 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                       ? (call_state_ptr->message_ptr)->byte_code.data[call_state_ptr->pc]
                       : OP_STOP);
 #ifdef EIP_3155
+#ifdef __CUDA_ARCH__
+        // __SYNC_THREADS__
+        // printf("idx %d before start_operation call_state_ptr %p\n", threadIdx.x, call_state_ptr);
+#endif
         uint32_t trace_idx = tracer_ptr->start_operation(arith, call_state_ptr->pc, opcode, *call_state_ptr->memory_ptr,
                                                          *call_state_ptr->stack_ptr, call_state_ptr->depth,
                                                          *call_state_ptr->last_return_data_ptr,
                                                          call_state_ptr->gas_limit, call_state_ptr->gas_used);
-#ifdef __CUDA_ARCH__
-        printf("trace_idx %d idx %d \n", trace_idx, threadIdx.x);
-#endif
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         call_state_ptr->trace_idx = trace_idx;
-        __ONE_GPU_THREAD_WOSYNC_END__
 #endif
         // DEBUG PRINT
 
@@ -610,7 +610,11 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         // TODO: to see after calls
         // increase program counter
         call_state_ptr->pc++;
-
+#ifdef __CUDA_ARCH__
+        __SYNC_THREADS__
+        // printf("idx %d after increase pc %d , call_state_ptr->trace_idx %d , depth %d\n", threadIdx.x,
+        //        call_state_ptr->pc, call_state_ptr->trace_idx, call_state_ptr->depth);
+#endif
 #ifdef EIP_3155
         if (call_state_ptr->trace_idx > 0 || (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1)) {
             tracer_ptr->finish_operation(arith, call_state_ptr->trace_idx, call_state_ptr->gas_used,

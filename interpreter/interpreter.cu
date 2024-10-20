@@ -34,10 +34,12 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     __SYNC_THREADS__
     evm->run(arith);
 #ifdef EIP_3155
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    // instances[0].tracer_ptr->print(arith);
-    instances[0].tracer_ptr->print_err();
-    __ONE_GPU_THREAD_WOSYNC_END__
+    if (instance == 0) {
+        __ONE_GPU_THREAD_BEGIN__
+        // instances[0].tracer_ptr->print(arith);
+        instances[0].tracer_ptr->print_err();
+        __ONE_GPU_THREAD_WOSYNC_END__
+    }
 #endif
     // delete evm;
     // evm = nullptr;
@@ -90,7 +92,9 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         CuEVM::get_evm_instances(arith, instances_data, test_json, num_instances, managed);
 
 #ifdef GPU
-        printf("Running on GPU\n");
+        // TODO remove DEBUG num instances
+        // num_instances = 1;
+        printf("Running on GPU %d %d\n", num_instances, CuEVM::cgbn_tpi);
         // run the evm
         kernel_evm<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
         CUDA_CHECK(cudaDeviceSynchronize());
