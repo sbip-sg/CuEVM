@@ -155,15 +155,30 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         // compute the keccak gas cost
         CuEVM::gas_cost::keccak_cost(arith, current_state.gas_used, length);
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("Before has_gas %d error code %d\n", threadIdx.x, error_code);
+    //     print_bnt(arith, current_state.gas_limit);
+    //     print_bnt(arith, current_state.gas_used);
+    // #endif
 
     error_code |= CuEVM::gas_cost::has_gas(arith, current_state.gas_limit, current_state.gas_used);
+
     if (error_code == ERROR_SUCCESS) {
         // increase the memory cost
         current_state.memory_ptr->increase_memory_cost(arith, memory_expansion_cost);
+        // #ifdef __CUDA_ARCH__
+        //         printf("loading initialisation_code %d:\n", threadIdx.x);
+        //         print_bnt(arith, memory_offset);
+        //         print_bnt(arith, length);
+        //         current_state.memory_ptr->print();
+        // #endif
         // get the initialisation code
         CuEVM::byte_array_t initialisation_code;
         current_state.memory_ptr->get(arith, memory_offset, length, initialisation_code);
-
+#ifdef __CUDA_ARCH__
+        printf("initialisation_code %d:\n", threadIdx.x);
+        initialisation_code.print();
+#endif
         bn_t sender_address;
         current_state.message_ptr->get_recipient(arith, sender_address);
         bn_t contract_address;
@@ -226,9 +241,10 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
             // propagate to child state
             new_state_ptr->touch_state.set_nonce(arith, sender_address, sender_nonce);
         }
-    }
+    } else
+        cgbn_bitwise_mask_and(arith.env, current_state.gas_used, current_state.gas_used, 64);
 
-    printf("generic_CREATE error_code: %d\n", error_code);
+    // printf("generic_CREATE error_code: %d\n", error_code);
     return error_code;
 }
 

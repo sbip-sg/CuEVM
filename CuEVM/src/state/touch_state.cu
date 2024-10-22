@@ -16,9 +16,10 @@ __host__ __device__ int32_t TouchState::add_account(ArithEnv &arith, const bn_t 
                      acces_state_flag))  // if account found
     {
         // #ifdef __CUDA_ARCH__
-        //     printf("TouchState::add_account after get_account %d\n" ,threadIdx.x);
+        //         printf("TouchState::add_account after get_account %d tmp_account_ptr %p\n", threadIdx.x,
+        //         tmp_account_ptr);
         // #endif
-        return _state->add_duplicate_account(account_ptr, tmp_account_ptr, acces_state_flag);
+        return _state->add_duplicate_account(arith, account_ptr, tmp_account_ptr, acces_state_flag);
     }
     account_ptr = tmp_account_ptr;
     return ERROR_SUCCESS;
@@ -33,11 +34,11 @@ __host__ __device__ int32_t TouchState::get_account(ArithEnv &arith, const bn_t 
     while ((tmp != nullptr) && (tmp->_state->get_account(arith, address, account_ptr, acces_state_flag)))
         tmp = tmp->parent;
     if (account_ptr == nullptr) {
-#ifdef __CUDA_ARCH__
-// printf("get_account not found, add to current state %d\n", threadIdx.x);
-#endif
+        // #ifdef __CUDA_ARCH__
+        //         printf("get_account not found, add to current state %d\n", threadIdx.x);
+        // #endif
         _state->add_new_account(arith, address, account_ptr, acces_state_flag);
-        return ERROR_STATE_ADDRESS_NOT_FOUND;
+        return ERROR_SUCCESS;  // # ERROR_STATE_ADDRESS_NOT_FOUND;
     }
     return ERROR_SUCCESS;
 }
@@ -58,6 +59,8 @@ __host__ __device__ int32_t TouchState::get_account_index(ArithEnv &arith, const
 
 __host__ __device__ int32_t TouchState::get_balance(ArithEnv &arith, const bn_t &address, bn_t &balance) {
     account_t *account_ptr = nullptr;
+    // set to 0 first
+    cgbn_set_ui32(arith.env, balance, 0);
     int32_t error_code = get_account(arith, address, account_ptr, ACCOUNT_BALANCE_FLAG);
     if (error_code == ERROR_SUCCESS) {
         account_ptr->get_balance(arith, balance);
@@ -67,6 +70,8 @@ __host__ __device__ int32_t TouchState::get_balance(ArithEnv &arith, const bn_t 
 
 __host__ __device__ int32_t TouchState::get_nonce(ArithEnv &arith, const bn_t &address, bn_t &nonce) {
     account_t *account_ptr = nullptr;
+    // set to 0 first
+    cgbn_set_ui32(arith.env, nonce, 0);
     int32_t error_code = get_account(arith, address, account_ptr, ACCOUNT_NONCE_FLAG);
     if (error_code == ERROR_SUCCESS) {
         account_ptr->get_nonce(arith, nonce);
@@ -85,6 +90,12 @@ __host__ __device__ int32_t TouchState::get_code(ArithEnv &arith, const bn_t &ad
 
 __host__ __device__ int32_t TouchState::get_value(ArithEnv &arith, const bn_t &address, const bn_t &key, bn_t &value) {
     poke_value(arith, address, key, value);
+    // #ifdef __CUDA_ARCH__
+    //     printf("TouchState::get_value %d\n", threadIdx.x);
+    //     print_bnt(arith, address);
+    //     print_bnt(arith, key);
+    //     print_bnt(arith, value);
+    // #endif
     return this->set_warm_key(arith, address, key, value);
 }
 
@@ -158,8 +169,14 @@ __host__ __device__ bool TouchState::set_warm_key(ArithEnv &arith, const bn_t &a
                                                   const bn_t &value) {
     account_t *account_ptr = nullptr;
     if (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG) != ERROR_SUCCESS) {
+        // #ifdef __CUDA_ARCH__
+        //         printf("TouchState::set_warm_key not found account, adding %d\n", threadIdx.x);
+        // #endif
         add_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG);
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("TouchState::set_warm_key  %d found account %p, setting value\n", threadIdx.x, account_ptr);
+    // #endif
     // get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG, true);
     account_ptr->set_storage_value(arith, key, value);
 }

@@ -36,7 +36,10 @@ def check_output(output, error, without_state_root):
 
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root):
-    outdir = f'./{uuid4()}'
+    if '/tmp/' not in output_filepath:
+        outdir = f'./{uuid4()}'
+    else:
+        outdir = f'./tmp/{uuid4()}'
     os.makedirs(outdir, exist_ok=True)
     command = [runtest_bin, f'--outdir={outdir}', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 

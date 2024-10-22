@@ -42,6 +42,9 @@ __host__ __device__ contract_storage_t &contract_storage_t::operator=(const cont
         free();
         size = other.size;
         capacity = other.capacity;
+        // #ifdef __CUDA_ARCH__
+        //         printf("contract_storage_t::operator= idx %d size %d capacity %d\n", threadIdx.x, size, capacity);
+        // #endif
         __ONE_GPU_THREAD_BEGIN__
         if (capacity > 0) {
             tmp_storage = new storage_element_t[capacity];
@@ -58,6 +61,10 @@ __host__ __device__ contract_storage_t &contract_storage_t::operator=(const cont
 
 __host__ __device__ int32_t contract_storage_t::get_value(ArithEnv &arith, const bn_t &key, bn_t &value) const {
     uint32_t idx = 0;
+    // #ifdef __CUDA_ARCH__
+    //     printf("contract_storage_t::get_value idx %d size %d capacity %d storage %p\n", threadIdx.x, size, capacity,
+    //            storage);
+    // #endif
     for (idx = 0; idx < size; idx++) {
         if (storage[idx].has_key(arith, key)) {
             storage[idx].get_value(arith, value);
@@ -68,17 +75,19 @@ __host__ __device__ int32_t contract_storage_t::get_value(ArithEnv &arith, const
 }
 
 __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const bn_t &key, const bn_t &value) {
-    __SHARED_MEMORY__ storage_element_t *new_storage;
     uint32_t idx;
-    for (idx = 0; idx < size; idx++) {
+    __SYNC_THREADS__  // ? why is this needed?
+        for (idx = 0; idx < size; idx++) {
         if (storage[idx].has_key(arith, key)) {
             storage[idx].set_value(arith, value);
             return ERROR_SUCCESS;
         }
     }
+    __SHARED_MEMORY__ storage_element_t *new_storage;
     // #ifdef __CUDA_ARCH__
-    //     printf("contract_storage_t::set_value before allocateidx %d size %d capacity %d\n", threadIdx.x, size,
-    //     capacity, storage);
+    //     printf("contract_storage_t::set_value before allocateidx %d size %d capacity %d  storage %p\n", threadIdx.x,
+    //     size,
+    //            capacity, storage);
     // #endif
     if (size >= capacity) {
         if (capacity == 0) {
@@ -86,7 +95,7 @@ __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const
         } else {
             capacity *= 2;
         }
-        __ONE_GPU_THREAD_BEGIN__
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         new_storage = new storage_element_t[capacity];
         // printf("allocate new storage %p, capacity %d\n", new_storage, capacity);
         if (size > 0) {
@@ -96,13 +105,18 @@ __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const
         __ONE_GPU_THREAD_END__
 
         storage = new_storage;
-        printf("set storage %p, new_storage %p\n", storage, new_storage);
+        // printf("set storage size %d capacity %d  storage %p, new_storage %p\n", size, capacity, storage,
+        // new_storage);
     }
     // #ifdef __CUDA_ARCH__
     //     printf("contract_storage_t::set_value idx %d size %d capacity %d, storage %p\n", threadIdx.x, size, capacity,
     //     storage); printf("contract_storage_t::set_value idx %d storage 0 key %d val %d\n", threadIdx.x,
     //     storage[0].key._limbs[0], storage[0].value._limbs[0]);
     // #endif
+#ifdef __CUDA_ARCH__
+    printf("contract_storage_t::set_value idx %d size %d capacity %d, storage %p\n", threadIdx.x, size, capacity,
+           storage);
+#endif
     storage[size].set_key(arith, key);
     storage[size].set_value(arith, value);
     size++;
@@ -222,17 +236,17 @@ __host__ cJSON *contract_storage_t::merge_json(const contract_storage_t &storage
     return storage_json;
 }
 
-__host__ __device__ void contract_storage_t::transfer_memory(contract_storage_t &dst, contract_storage_t &src) {
-    if ((src.size > 0) && (src.storage != nullptr) && (src.capacity > 0)) {
-        memcpy(dst.storage, src.storage, src.size * sizeof(storage_element_t));
-        dst.size = src.size;
-        dst.capacity = src.size;
-    } else {
-        // TODO: check if this is necessary
-        dst.size = 0;
-    }
-    src.free();
-}
+// __host__ __device__ void contract_storage_t::transfer_memory(contract_storage_t &dst, contract_storage_t &src) {
+//     if ((src.size > 0) && (src.storage != nullptr) && (src.capacity > 0)) {
+//         memcpy(dst.storage, src.storage, src.size * sizeof(storage_element_t));
+//         dst.size = src.size;
+//         dst.capacity = src.size;
+//     } else {
+//         // TODO: check if this is necessary
+//         dst.size = 0;
+//     }
+//     src.free();
+// }
 
 __host__ contract_storage_t *contract_storage_t::get_cpu(uint32_t count) { return new contract_storage_t[count]; }
 
@@ -327,7 +341,8 @@ __global__ void contract_storage_t_transfer_kernel(contract_storage_t *dst_insta
                                                    uint32_t instance_count) {
     uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance < instance_count) {
-        contract_storage_t::transfer_memory(dst_instances[instance], src_instances[instance]);
+        // TODO Fix this later
+        // contract_storage_t::transfer_memory(dst_instances[instance], src_instances[instance]);
     }
 }
 

@@ -7,9 +7,9 @@
 namespace CuEVM::utils {
 __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &contract_address,
                                                         const bn_t &sender_address, const bn_t &sender_nonce) {
-    evm_word_t sender_address_word;
+    __SHARED_MEMORY__ evm_word_t sender_address_word;
     cgbn_store(arith.env, (cgbn_evm_word_t_ptr)(&sender_address_word), sender_address);
-    evm_word_t sender_nonce_word;
+    __SHARED_MEMORY__ evm_word_t sender_nonce_word;
     cgbn_store(arith.env, &sender_nonce_word, sender_nonce);
     CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
     sender_address_word.to_byte_array_t(sender_address_bytes);
@@ -61,9 +61,9 @@ __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &c
 __host__ __device__ int32_t get_contract_address_create2(ArithEnv &arith, bn_t &contract_address,
                                                          const bn_t &sender_address, const bn_t &salt,
                                                          const CuEVM::byte_array_t &init_code) {
-    evm_word_t sender_address_word;
+    __SHARED_MEMORY__ evm_word_t sender_address_word;
     cgbn_store(arith.env, &sender_address_word, sender_address);
-    evm_word_t salt_word;
+    __SHARED_MEMORY__ evm_word_t salt_word;
     cgbn_store(arith.env, &salt_word, salt);
     CuEVM::byte_array_t sender_address_bytes, salt_bytes;
     sender_address_word.to_byte_array_t(sender_address_bytes);

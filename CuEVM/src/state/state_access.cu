@@ -105,16 +105,20 @@ __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t state_access_t::add_duplicate_account(CuEVM::account_t *&account_ptr,
+__host__ __device__ int32_t state_access_t::add_duplicate_account(ArithEnv &arith, CuEVM::account_t *&account_ptr,
                                                                   CuEVM::account_t *&src_account_ptr,
                                                                   const CuEVM::account_flags_t flag) {
     CuEVM::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
     __SHARED_MEMORY__ CuEVM::account_t *tmp_account_ptr;
-
-    tmp_account_ptr = new CuEVM::account_t(src_account_ptr, no_storage_copy);
-
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    tmp_account_ptr = new CuEVM::account_t();
+    // tmp_account_ptr = new CuEVM::account_t(src_account_ptr, no_storage_copy);
+    __ONE_GPU_THREAD_END__
+    tmp_account_ptr->update(arith, *src_account_ptr, no_storage_copy);
     // #ifdef __CUDA_ARCH__
-    //     printf("TouchState::add_duplicate_account before add_account %d\n" ,threadIdx.x);
+    //     printf("TouchState::add_duplicate_account before add_account %d tmp_account_ptr %p storage %p\n",
+    //     threadIdx.x,
+    //            tmp_account_ptr, &tmp_account_ptr->storage);
     // #endif
     int32_t error_code = add_account(*tmp_account_ptr, flag);
     // #ifdef __CUDA_ARCH__
@@ -144,8 +148,15 @@ __host__ __device__ int32_t state_access_t::add_new_account(ArithEnv &arith, con
     bn_t zero;
     cgbn_set_ui32(arith.env, zero, 0);
     // printf("before new CuEVM::account_t();\n");
-
+    // #ifdef __CUDA_ARCH__
+    //     printf("state_access_t::add_new_account before new CuEVM::account_t() %d\n", threadIdx.x);
+    // #endif
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     tmp_account_ptr = new CuEVM::account_t();
+    __ONE_GPU_THREAD_END__
+    // #ifdef __CUDA_ARCH__
+    //     printf("state_access_t::add_new_account after new CuEVM::account_t() %d\n", threadIdx.x);
+    // #endif
     tmp_account_ptr->set_address(arith, address);
     // default constructor did not set balance + nonce
     tmp_account_ptr->set_balance(arith, zero);

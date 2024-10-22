@@ -108,7 +108,7 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t add_duplicate_account(CuEVM::account_t *&account_ptr,
+    __host__ __device__ int32_t add_duplicate_account(ArithEnv &arith, CuEVM::account_t *&account_ptr,
                                                       CuEVM::account_t *&src_account_ptr,
                                                       const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 

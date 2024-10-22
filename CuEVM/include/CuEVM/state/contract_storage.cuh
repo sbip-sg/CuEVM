@@ -123,7 +123,7 @@ struct contract_storage_t {
      * @param[in] dst The destination contract storage
      * @param[in] src The source contract storage
      */
-    __host__ __device__ static void transfer_memory(contract_storage_t &dst, contract_storage_t &src);
+    // __host__ __device__ static void transfer_memory(contract_storage_t &dst, contract_storage_t &src);
 
     /**
      * Get the cpu instance of the contract storage

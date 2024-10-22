@@ -94,7 +94,11 @@ __host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other) : size
 
 __host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &other) {
     __SHARED_MEMORY__ uint8_t *tmp_data;
-
+    // #ifdef __CUDA_ARCH__
+    //     printf("byte_array_t::operator= %d this %p other %p\n", threadIdx.x, this, &other);
+    //     printf("byte_array_t::operator= %d this size %d other size %d\n", threadIdx.x, size, other.size);
+    //     printf("byte_array_t::operator= %d this data %p other data %p\n", threadIdx.x, data, other.data);
+    // #endif
     if (this != &other) {
         if (size != other.size) {
             __ONE_GPU_THREAD_BEGIN__
@@ -124,13 +128,13 @@ __host__ __device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_p
     new_data = new uint8_t[new_size];
     if (zero_padding) memset(new_data, 0, new_size * sizeof(uint8_t));
     if (size > 0) {
-        if (new_size > size) {
-            memcpy(new_data, data, size * sizeof(uint8_t));
-            // if (zero_padding)
-            //   memset(new_data + size, 0, new_size - size);
-        } else {
-            memcpy(new_data, data, new_size * sizeof(uint8_t));
-        }
+        // if (new_size > size) {
+        memcpy(new_data, data, min(new_size, size) * sizeof(uint8_t));
+        // if (zero_padding)
+        //   memset(new_data + size, 0, new_size - size);
+        // } else {
+        //     memcpy(new_data, data, new_size * sizeof(uint8_t));
+        // }
         delete[] data;
     }
     __ONE_GPU_THREAD_END__

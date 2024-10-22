@@ -178,14 +178,18 @@ __host__ __device__ int32_t evm_word_t::to_byte_array_t(byte_array_t &byte_array
     byte_array.grow(CuEVM::word_size, 1);
     uint8_t *bytes = nullptr;
     if (endian == BIG_ENDIAN) {
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         bytes = byte_array.data + CuEVM::word_size - 1;
+        // todo : Parallel copy
         for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
             *(bytes--) = _limbs[idx] & 0xFF;
             *(bytes--) = (_limbs[idx] >> 8) & 0xFF;
             *(bytes--) = (_limbs[idx] >> 16) & 0xFF;
             *(bytes--) = (_limbs[idx] >> 24) & 0xFF;
         }
+        __ONE_GPU_THREAD_WOSYNC_END__
     } else if (endian == LITTLE_ENDIAN) {
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         bytes = byte_array.data;
         for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
             *(bytes++) = (_limbs[idx] >> 24) & 0xFF;
@@ -193,6 +197,7 @@ __host__ __device__ int32_t evm_word_t::to_byte_array_t(byte_array_t &byte_array
             *(bytes++) = (_limbs[idx] >> 8) & 0xFF;
             *(bytes++) = _limbs[idx] & 0xFF;
         }
+        __ONE_GPU_THREAD_WOSYNC_END__
     } else {
         return ERROR_NOT_IMPLEMENTED;
     }

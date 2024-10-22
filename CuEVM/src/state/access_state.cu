@@ -7,62 +7,46 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
-__host__ __device__ int32_t AccessState::add_account(
-    ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-    const CuEVM::account_flags_t flag) {
+__host__ __device__ int32_t AccessState::add_account(ArithEnv &arith, const bn_t &address,
+                                                     CuEVM::account_t *&account_ptr,
+                                                     const CuEVM::account_flags_t flag) {
     CuEVM::account_t *tmp_account_ptr = nullptr;
     return (_world_state->get_account(arith, address, tmp_account_ptr)
                 ? _state->add_new_account(arith, address, account_ptr, flag)
-                : _state->add_duplicate_account(account_ptr, tmp_account_ptr,
-                                                flag));
+                : _state->add_duplicate_account(arith, account_ptr, tmp_account_ptr, flag));
 }
 
-__host__ __device__ int32_t AccessState::get_account(
-    ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-    const CuEVM::account_flags_t flag) {
+__host__ __device__ int32_t AccessState::get_account(ArithEnv &arith, const bn_t &address,
+                                                     CuEVM::account_t *&account_ptr,
+                                                     const CuEVM::account_flags_t flag) {
     bool res = _state->get_account(arith, address, account_ptr, flag);
-    if (account_ptr == nullptr)
-        account_ptr = new CuEVM::account_t(arith, address);
-    return (res && flag.flags != ACCOUNT_POKE_FLAG
-                ? add_account(arith, address, account_ptr, flag)
-                : ERROR_SUCCESS);
+    if (account_ptr == nullptr) account_ptr = new CuEVM::account_t(arith, address);
+    return (res && flag.flags != ACCOUNT_POKE_FLAG ? add_account(arith, address, account_ptr, flag) : ERROR_SUCCESS);
 }
 
-__host__ __device__ int32_t AccessState::get_value(ArithEnv &arith,
-                                                   const bn_t &address,
-                                                   const bn_t &key,
-                                                   bn_t &value) {
+__host__ __device__ int32_t AccessState::get_value(ArithEnv &arith, const bn_t &address, const bn_t &key, bn_t &value) {
     account_t *account_ptr = nullptr;
-    int32_t error_code =
-        (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)
-             ? add_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)
-             : ERROR_SUCCESS);
-    error_code =
-        (error_code ||
-         (account_ptr->get_storage_value(arith, key, value)
-              ? (([&]() -> int32_t {
-                    _world_state->get_value(arith, address, key, value);
-                    return account_ptr->set_storage_value(arith, key, value);
-                })())
-              : ERROR_SUCCESS));
+    int32_t error_code = (_state->get_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)
+                              ? add_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG)
+                              : ERROR_SUCCESS);
+    error_code = (error_code || (account_ptr->get_storage_value(arith, key, value) ? (([&]() -> int32_t {
+                      _world_state->get_value(arith, address, key, value);
+                      return account_ptr->set_storage_value(arith, key, value);
+                  })())
+                                                                                   : ERROR_SUCCESS));
     return error_code;
 }
 
-__host__ __device__ int32_t AccessState::poke_value(ArithEnv &arith,
-                                                    const bn_t &address,
-                                                    const bn_t &key,
+__host__ __device__ int32_t AccessState::poke_value(ArithEnv &arith, const bn_t &address, const bn_t &key,
                                                     bn_t &value) const {
     account_t *account_ptr = nullptr;
-    return (
-        (_state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG) ||
-         account_ptr->get_storage_value(arith, key, value))
-            ? _world_state->get_value(arith, address, key, value)
-            : ERROR_SUCCESS);
+    return ((_state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG) ||
+             account_ptr->get_storage_value(arith, key, value))
+                ? _world_state->get_value(arith, address, key, value)
+                : ERROR_SUCCESS);
 }
 
-__host__ __device__ int32_t AccessState::poke_balance(ArithEnv &arith,
-                                                      const bn_t &address,
-                                                      bn_t &balance) const {
+__host__ __device__ int32_t AccessState::poke_balance(ArithEnv &arith, const bn_t &address, bn_t &balance) const {
     account_t *account_ptr = nullptr;
     _state->get_account(arith, address, account_ptr, ACCOUNT_NONE_FLAG);
     if (account_ptr != nullptr) {
@@ -95,8 +79,7 @@ __host__ __device__ int32_t AccessState::poke_balance(ArithEnv &arith,
 //                                  ACCOUNT_STORAGE_FLAG) ||
 //              account_ptr->get_storage_value(arith, key, value));
 // }
-__host__ __device__ int32_t
-AccessState::is_deleted_account(ArithEnv &arith, const bn_t &address) const {
+__host__ __device__ int32_t AccessState::is_deleted_account(ArithEnv &arith, const bn_t &address) const {
     CuEVM::account_t *account_ptr = nullptr;
     return _world_state->get_account(arith, address, account_ptr);
 }
@@ -112,15 +95,13 @@ AccessState::is_deleted_account(ArithEnv &arith, const bn_t &address) const {
 //                        : account_ptr->is_empty())
 //                 : error_code);
 // }
-__host__ __device__ int32_t
-AccessState::get_storage(ArithEnv &arith, const bn_t &address,
-                         CuEVM::contract_storage_t &storage) const {
+__host__ __device__ int32_t AccessState::get_storage(ArithEnv &arith, const bn_t &address,
+                                                     CuEVM::contract_storage_t &storage) const {
     CuEVM::account_t *account_ptr = nullptr;
     if (_state->get_account(arith, address, account_ptr) == ERROR_SUCCESS) {
         storage.update(arith, account_ptr->storage);
     }
-    if (_world_state->get_account(arith, address, account_ptr) ==
-        ERROR_SUCCESS) {
+    if (_world_state->get_account(arith, address, account_ptr) == ERROR_SUCCESS) {
         storage.update(arith, account_ptr->storage);
     }
     return ERROR_SUCCESS;

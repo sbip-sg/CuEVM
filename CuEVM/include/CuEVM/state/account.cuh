@@ -24,7 +24,7 @@ struct account_t {
     /**
      * The default constructor for the account data structure.
      */
-    __host__ __device__ account_t() : storage(), byte_code(0U) {};
+    __host__ __device__ account_t() : storage(), byte_code() {};
 
     /**
      * The copy constructor for the account data structure.
