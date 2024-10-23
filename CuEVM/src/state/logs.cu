@@ -11,8 +11,8 @@ namespace CuEVM {
 __host__ __device__ int32_t log_state_data_t::grow() {
     __SHARED_MEMORY__ log_data_t *new_logs;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    printf("allocate capacity %d new_logs %p\n", capacity + log_page_size);
     new_logs = new log_data_t[capacity + log_page_size];
+    // printf("allocate capacity  %d for logpointer %p new_logs %p\n", capacity + log_page_size, this, new_logs);
     __ONE_GPU_THREAD_END__
     if (new_logs == nullptr) {
         return ERROR_MEMORY_ALLOCATION_FAILED;
@@ -32,18 +32,14 @@ __host__ __device__ int32_t log_state_data_t::push(ArithEnv &arith, const bn_t &
                                                    const CuEVM::byte_array_t &record, const bn_t &topic_1,
                                                    const bn_t &topic_2, const bn_t &topic_3, const bn_t &topic_4,
                                                    const uint32_t &no_topics) {
-    // #ifdef __CUDA_ARCH__
-    //     printf("log_state_data_t::push %d capacity %d no_logs %d\n", threadIdx.x, capacity, no_logs);
-    // #endif
     int32_t error_code = ERROR_SUCCESS;
-    __SYNC_THREADS__
+
     if (no_logs == capacity) {
         error_code |= grow();
     }
-#ifdef __CUDA_ARCH__
-    printf("log_state_data_t::push after grow  idx %d capacity %d no_logs %d pointer %p, recordpointer %p \n",
-           threadIdx.x, capacity, no_logs, logs, &(logs[no_logs].record));
-#endif
+
+    __SYNC_THREADS__
+
     logs[no_logs].record = record;
     cgbn_store(arith.env, &(logs[no_logs].address), address);
     cgbn_store(arith.env, &(logs[no_logs].topics[0]), topic_1);
@@ -52,12 +48,14 @@ __host__ __device__ int32_t log_state_data_t::push(ArithEnv &arith, const bn_t &
     cgbn_store(arith.env, &(logs[no_logs].topics[3]), topic_4);
     logs[no_logs].no_topics = no_topics;
     no_logs++;
+
     return error_code;
 }
 
 __host__ __device__ int32_t log_state_data_t::update(ArithEnv &arith, const log_state_data_t &other) {
     int32_t error_code = ERROR_SUCCESS;
     bn_t address, topic_1, topic_2, topic_3, topic_4;
+
     for (uint32_t idx = 0; idx < other.no_logs; idx++) {
         cgbn_load(arith.env, address, &(other.logs[idx].address));
         cgbn_load(arith.env, topic_1, &(other.logs[idx].topics[0]));

@@ -60,14 +60,12 @@ __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size, int32
 __host__ __device__ byte_array_t::~byte_array_t() { free(); }
 
 __host__ __device__ void byte_array_t::free() {
-    // __ONE_GPU_THREAD_BEGIN__
     if ((size > 0) && (data != nullptr)) {
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
         delete[] data;
         __ONE_GPU_THREAD_WOSYNC_END__
+        clear();
     }
-    // __ONE_GPU_THREAD_END__
-    clear();
 }
 __host__ void byte_array_t::free_managed() {
     if ((size > 0) && (data != nullptr)) {
@@ -97,27 +95,35 @@ __host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &ot
     // #ifdef __CUDA_ARCH__
     //     printf("byte_array_t::operator= %d this %p other %p\n", threadIdx.x, this, &other);
     //     printf("byte_array_t::operator= %d this size %d other size %d\n", threadIdx.x, size, other.size);
-    //     printf("byte_array_t::operator= %d this data %p other data %p\n", threadIdx.x, data, other.data);
+    //     printf("byte_array_t::operator= %d this data %p other data %p tmp_data before allocated %p\n", threadIdx.x,
+    //     data,
+    //            other.data, tmp_data);
     // #endif
     if (this != &other) {
-        if (size != other.size) {
-            __ONE_GPU_THREAD_BEGIN__
-            free();
-            tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
-            __ONE_GPU_THREAD_END__
-        } else {
-            tmp_data = data;
-        }
+        // if (size != other.size) {
+        // __ONE_GPU_THREAD_BEGIN__
+        // free();
+        // tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
+        // __ONE_GPU_THREAD_END__
+        // } else {
+        // tmp_data = data; // cannot assign like this as data will be freed by others
+        // }
+        free();  // can do outside, all thread set to null
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         if (other.size > 0) {
-            __ONE_GPU_THREAD_BEGIN__
+            // printf("other size !=0 %p \n", tmp_data);
+            tmp_data = new uint8_t[other.size];
             memcpy(tmp_data, other.data, other.size * sizeof(uint8_t));
-            __ONE_GPU_THREAD_END__
-        }
-
+        } else
+            tmp_data = nullptr;
+        __ONE_GPU_THREAD_END__
         data = tmp_data;
         size = other.size;
     }
-
+    // __SYNC_THREADS__
+    // #ifdef __CUDA_ARCH__
+    //     printf("byte_array_t::operator= After %d this data %p other data %p\n", threadIdx.x, data, other.data);
+    // #endif
     return *this;
 }
 

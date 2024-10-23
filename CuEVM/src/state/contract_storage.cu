@@ -113,10 +113,10 @@ __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const
     //     storage); printf("contract_storage_t::set_value idx %d storage 0 key %d val %d\n", threadIdx.x,
     //     storage[0].key._limbs[0], storage[0].value._limbs[0]);
     // #endif
-#ifdef __CUDA_ARCH__
-    printf("contract_storage_t::set_value idx %d size %d capacity %d, storage %p\n", threadIdx.x, size, capacity,
-           storage);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("contract_storage_t::set_value idx %d size %d capacity %d, storage %p\n", threadIdx.x, size, capacity,
+    //            storage);
+    // #endif
     storage[size].set_key(arith, key);
     storage[size].set_value(arith, value);
     size++;

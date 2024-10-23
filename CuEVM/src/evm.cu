@@ -227,11 +227,15 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         opcode = ((call_state_ptr->pc < ((call_state_ptr->message_ptr)->byte_code).size)
                       ? (call_state_ptr->message_ptr)->byte_code.data[call_state_ptr->pc]
                       : OP_STOP);
-#ifdef EIP_3155
-#ifdef __CUDA_ARCH__
         __SYNC_THREADS__
-        printf("idx %d before start_operation opcode %d\n", threadIdx.x, opcode);
-#endif
+#ifdef EIP_3155
+        // #ifdef __CUDA_ARCH__
+        //         __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        //         printf("idx %d before start_operation opcode %d tracer_idx %d , tracer ptr %p, tracer size %d\n",
+        //         threadIdx.x,
+        //                opcode, call_state_ptr->trace_idx, tracer_ptr, tracer_ptr->size);
+        //         __ONE_GPU_THREAD_WOSYNC_END__
+        // #endif
         uint32_t trace_idx = tracer_ptr->start_operation(arith, call_state_ptr->pc, opcode, *call_state_ptr->memory_ptr,
                                                          *call_state_ptr->stack_ptr, call_state_ptr->depth,
                                                          *call_state_ptr->last_return_data_ptr,
@@ -243,7 +247,10 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         // __ONE_THREAD_PER_INSTANCE(
         // printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
 #ifdef __CUDA_ARCH__
-        printf("\npc: %d opcode: %d, thread %d\n", call_state_ptr->pc, opcode, threadIdx.x);
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        printf("\npc: %d opcode: %d, depth %d, thread %d \n", call_state_ptr->pc, opcode, call_state_ptr->depth,
+               threadIdx.x);
+        __ONE_GPU_THREAD_WOSYNC_END__
 #endif
         // printf("touch state BEGIN BEGIN BEGIN\n");
         // call_state_ptr->touch_state.print();
@@ -609,11 +616,12 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         // TODO: to see after calls
         // increase program counter
         call_state_ptr->pc++;
-#ifdef __CUDA_ARCH__
-        __SYNC_THREADS__
-        printf("idx %d after increase pc %d , call_state_ptr->trace_idx %d , depth %d\n", threadIdx.x,
-               call_state_ptr->pc, call_state_ptr->trace_idx, call_state_ptr->depth);
-#endif
+        // __SYNC_THREADS__
+// #ifdef __CUDA_ARCH__
+//         __SYNC_THREADS__
+//         printf("idx %d after increase pc %d , call_state_ptr %p, call_state_ptr->trace_idx %d , depth %d\n",
+//                threadIdx.x, call_state_ptr->pc, call_state_ptr, call_state_ptr->trace_idx, call_state_ptr->depth);
+// #endif
 #ifdef EIP_3155
         if (call_state_ptr->trace_idx > 0 || (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1)) {
             tracer_ptr->finish_operation(arith, call_state_ptr->trace_idx, call_state_ptr->gas_used,
@@ -625,9 +633,9 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
             );
         }
 #endif
-#ifdef __CUDA_ARCH__
-        printf("after finish_operation idx %d opcode %d error code %d\n", threadIdx.x, opcode, error_code);
-#endif
+        // #ifdef __CUDA_ARCH__
+        //         printf("after finish_operation idx %d opcode %d error code %d\n", threadIdx.x, opcode, error_code);
+        // #endif
         if ((opcode == OP_CALL) || (opcode == OP_CALLCODE) || (opcode == OP_DELEGATECALL) || (opcode == OP_CREATE) ||
             (opcode == OP_CREATE2) || (opcode == OP_STATICCALL)) {
             if (error_code == ERROR_SUCCESS) {

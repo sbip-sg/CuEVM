@@ -280,9 +280,9 @@ __host__ __device__ int32_t CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &cur
 __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
                                  CuEVM::evm_call_state_t *&new_state_ptr) {
     bn_t gas, address, value, args_offset, args_size, ret_offset, ret_size;
-#ifdef __CUDA_ARCH__
-    printf("opcode CALL %d\n", threadIdx.x);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("opcode CALL %d\n", threadIdx.x);
+    // #endif
     int32_t error_code = current_state.stack_ptr->pop(arith, gas);
     error_code |= current_state.stack_ptr->pop(arith, address);
     error_code |= current_state.stack_ptr->pop(arith, value);
@@ -290,9 +290,9 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
     error_code |= current_state.stack_ptr->pop(arith, args_size);
     error_code |= current_state.stack_ptr->pop(arith, ret_offset);
     error_code |= current_state.stack_ptr->pop(arith, ret_size);
-#ifdef __CUDA_ARCH__
-    printf("opcode CALL before error_code == ERROR_SUCCESS %d\n", threadIdx.x);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("opcode CALL before error_code == ERROR_SUCCESS %d\n", threadIdx.x);
+    // #endif
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
@@ -318,9 +318,9 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
     }
 
-#ifdef __CUDA_ARCH__
-    printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
+    // #endif
     return error_code;
 }
 

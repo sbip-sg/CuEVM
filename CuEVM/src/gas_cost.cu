@@ -12,15 +12,15 @@ __host__ __device__ void max_gas_call(ArithEnv &arith, bn_t &gas_capped, const b
     bn_t gas_left;
     cgbn_sub(arith.env, gas_left, gas_limit, gas_used);
     // cap to uint64_t in case overflow following go-ethereum
-#ifdef __CUDA_ARCH__
-    printf("gas_left: idx: %d\n", threadIdx.x);
-    print_bnt(arith, gas_left);
-#endif
-    cgbn_bitwise_mask_and(arith.env, gas_left, gas_left, 64);
-#ifdef __CUDA_ARCH__
-    printf("gas_left after mask: idx: %d\n", threadIdx.x);
-    print_bnt(arith, gas_left);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("gas_left: idx: %d\n", threadIdx.x);
+    //     print_bnt(arith, gas_left);
+    // #endif
+    //     cgbn_bitwise_mask_and(arith.env, gas_left, gas_left, 64);
+    // #ifdef __CUDA_ARCH__
+    //     printf("gas_left after mask: idx: %d\n", threadIdx.x);
+    //     print_bnt(arith, gas_left);
+    // #endif
     // gas capped = (63/64) * gas_left
     cgbn_div_ui32(arith.env, gas_capped, gas_left, 64);
     cgbn_sub(arith.env, gas_capped, gas_left, gas_capped);
