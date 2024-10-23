@@ -318,9 +318,9 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
     }
 
-    // #ifdef __CUDA_ARCH__
-    //     printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
-    // #endif
+#ifdef __CUDA_ARCH__
+    printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
+#endif
     return error_code;
 }
 

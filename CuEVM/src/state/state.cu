@@ -64,18 +64,20 @@ __host__ __device__ void state_t::clear() {
 }
 
 __host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const bn_t &address, uint32_t &index) {
+    // #ifdef __CUDA_ARCH__
+    //     printf("get_account_index, no_accounts %d thread %d\n", no_accounts, threadIdx.x);
+    //     print_bnt(arith, address);
+    // #endif
     for (index = 0; index < no_accounts; index++) {
         // #ifdef __CUDA_ARCH__
-        //     printf("get_account_index, %d , accounts[index] %p thread %d\n", index, &(accounts[index].address),
-        //     threadIdx.x);
+        //         printf("get_account_index, %d , accounts[index] %p thread %d\n", index, &(accounts[index].address),
+        //                threadIdx.x);
         // #endif
         if (accounts[index].has_address(arith, address)) {
-            // #ifdef __CUDA_ARCH__
-            //     printf("get_account_index, has adddress thread %d\n", threadIdx.x);
-            // #endif
             return ERROR_SUCCESS;
         }
     }
+
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 

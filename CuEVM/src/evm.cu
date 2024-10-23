@@ -96,6 +96,12 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         // call failed = account never warmed up
         return error_code;
     }
+#ifdef __CUDA_ARCH__
+    printf("start_CALL transfer error code %d idx %d \n", error_code, threadIdx.x);
+    __ONE_THREAD_PER_INSTANCE(printf("value ");)
+    print_bnt(arith, value);
+#endif
+
     if (call_state_ptr->message_ptr->call_type == OP_CALL || call_state_ptr->message_ptr->call_type == OP_CALLCODE ||
         call_state_ptr->message_ptr->call_type == OP_DELEGATECALL ||
         call_state_ptr->message_ptr->call_type == OP_STATICCALL) {
@@ -113,9 +119,11 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
 
     // error_code |=
     call_state_ptr->touch_state.get_account(arith, recipient, account_ptr, ACCOUNT_NONE_FLAG);
-    // #ifdef __CUDA_ARCH__
-    //     printf("call_state_ptr->touch_state.get_account error code %d,  idx %d:\n", error_code, threadIdx.x);
-    // #endif
+#ifdef __CUDA_ARCH__
+    printf("call_state_ptr->touch_state.get_account error code %d,  idx %d  pointer %p, balance\n", error_code,
+           threadIdx.x, account_ptr);
+    account_ptr->balance.print();
+#endif
 
     if ((call_state_ptr->message_ptr->call_type == OP_CREATE) ||
         (call_state_ptr->message_ptr->call_type == OP_CREATE2)) {

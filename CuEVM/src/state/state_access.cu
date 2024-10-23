@@ -89,7 +89,7 @@ __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &
     uint32_t index = no_accounts - 1;
     __SHARED_MEMORY__ CuEVM::account_flags_t *tmp_flags;
     __ONE_GPU_THREAD_BEGIN__
-    // printf("no_accounts: %u\n", no_accounts);
+    // printf(" state_access_t::add_account no_accounts: %u\n", no_accounts);
     tmp_flags = (CuEVM::account_flags_t *)malloc(sizeof(CuEVM::account_flags_t) * no_accounts);
     memcpy(tmp_flags, flags, (no_accounts - 1) * sizeof(CuEVM::account_flags_t));
 
@@ -101,6 +101,9 @@ __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &
     flags = tmp_flags;
     flags[index] = flag;
 
+    // #ifdef __CUDA_ARCH__
+    //     printf("TouchState::add_account before return %d, flag index %d, flag ptr %p \n", threadIdx.x, index, flags);
+    // #endif
     // printf("after clear flags\n");
     return ERROR_SUCCESS;
 }
@@ -109,6 +112,7 @@ __host__ __device__ int32_t state_access_t::add_duplicate_account(ArithEnv &arit
                                                                   CuEVM::account_t *&src_account_ptr,
                                                                   const CuEVM::account_flags_t flag) {
     CuEVM::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
+
     __SHARED_MEMORY__ CuEVM::account_t *tmp_account_ptr;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     tmp_account_ptr = new CuEVM::account_t();

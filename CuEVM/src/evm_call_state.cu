@@ -93,10 +93,11 @@ __host__ __device__ int32_t evm_call_state_t::update(ArithEnv& arith, evm_call_s
     // printf("\n\ntouch state update \n");
     // printf("this touch state \n");
     // this->touch_state.print();
-    // printf("\n------------------\n\n");
+    // // printf("\n------------------\n\n");
     // printf("other touch state \n");
     // other.touch_state.print();
     // printf("\n------------------\n\n");
+
     error_code |= this->touch_state.update(arith, &other.touch_state);
     // printf("touch state update done \n");
     // printf("this touch state \n");
