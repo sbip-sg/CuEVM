@@ -334,13 +334,17 @@ __host__ __device__ int32_t RETURNDATACOPY(ArithEnv &arith, const bn_t &gas_limi
         CuEVM::gas_cost::memory_grow_cost(arith, memory, memory_offset, length, memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
-#ifdef __CUDA_ARCH__
-    printf("RETURNDATACOPY: error_code: %d data_length %d idx %d\n", error_code, return_data.size, threadIdx.x);
-#endif
+
     bn_t temp_length;
-    cgbn_add(arith.env, temp_length, data_offset, length);
+    int32_t over_flow = cgbn_add(arith.env, temp_length, data_offset, length);
+    // #ifdef __CUDA_ARCH__
+    //     printf("RETURNDATACOPY: error_code: %d data_length %d idx %d\n", error_code, return_data.size, threadIdx.x);
+    //     print_bnt(arith, data_offset);
+    //     print_bnt(arith, length);
+    //     print_bnt(arith, temp_length);
+    // #endif
     // TODO: Check EOF format
-    if (cgbn_compare_ui32(arith.env, temp_length, return_data.size) > 0) {
+    if (over_flow || cgbn_compare_ui32(arith.env, temp_length, return_data.size) > 0) {
         return ERROR_RETURN_DATA_OVERFLOW;
     }
     if (error_code == ERROR_SUCCESS) {

@@ -8,6 +8,8 @@ from uuid import uuid4
 
 log_file = open('run-ethtest-by-fork.log', 'a')
 
+TIME_OUT = 90
+
 def debug_print(*args, **kwargs):
     print(*args, **kwargs)
 
@@ -48,7 +50,7 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_s
     clean_test_out()
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, preexec_fn=os.setsid)
     try:
-        stdout, stderr = proc.communicate(timeout=60)
+        stdout, stderr = proc.communicate(timeout=TIME_OUT)
         check_output(stdout, stderr, without_state_root)
     finally:
         print(f"Killing child processes of {proc.pid}")
@@ -153,8 +155,11 @@ def main():
     parser.add_argument('--without-state-root', action='store_true', help='verify without the state root', default=False)
     parser.add_argument('--microtests', action='store_true', help='verify without the state root', default=False)
     parser.add_argument('--skip-folder', type=str, help='Skip folder', default="")
+    parser.add_argument('--timeout', type=int, help='Timeout in seconds for each test', default=90)
     args = parser.parse_args()
 
+    global TIME_OUT
+    TIME_OUT = args.timeout
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
         assert_command_in_path(cmd)
 

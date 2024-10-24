@@ -341,7 +341,9 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     uint32_t call_type = OP_CALL;
     CuEVM::byte_array_t byte_code;
     // if is a contract creation
-    if (is_contract_creation(arith)) {
+    CuEVM::account_t *to_account = nullptr;
+    touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
+    if (is_create) {
         call_type = OP_CREATE;
         byte_code = data_init;
         // TODO: code size does not execede the maximul allowed
@@ -351,13 +353,16 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         // nonce is -1 in YP but here is before validating the transaction
         // and increasing the nonce
         sender_account->get_nonce(arith, sender_nonce);
-        if (CuEVM::utils::get_contract_address_create(arith, to_address, sender_address, sender_nonce) !=
-            ERROR_SUCCESS) {
-            return ERROR_FAILED;
-        }
+        // if (CuEVM::utils::get_contract_address_create(arith, to_address, sender_address, sender_nonce) !=
+        //     ERROR_SUCCESS) {
+        //     return ERROR_FAILED;
+        // }
+#ifdef __CUDA_ARCH__
+        printf("CREATE to_account %p init code size %d idx %d \n", to_account, to_account->byte_code.size, threadIdx.x);
+#endif
     } else {
-        CuEVM::account_t *to_account = nullptr;
-        touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
+        // CuEVM::account_t *to_account = nullptr;
+        // touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
         // #ifdef __CUDA_ARCH__
         //     printf("to_account %p size %d idx %d \n", to_account, to_account->byte_code.size  , threadIdx.x);
         // #endif
@@ -514,7 +519,7 @@ __host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transacti
         cgbn_load(arith.env, sender_nonce, &sender_account->nonce);
         CuEVM::utils::get_contract_address_create(arith, contract_address, sender, sender_nonce);
         cgbn_store(arith.env, &template_transaction_ptr->to, contract_address);
-
+        template_transaction_ptr->is_create = true;
     } else {
         template_transaction_ptr->to.from_hex(to_json->valuestring);
     }
