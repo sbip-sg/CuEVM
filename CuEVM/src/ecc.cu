@@ -46,88 +46,6 @@ namespace ecc {
 // __host__ __device__ static const int32_t FQ1_mod_coeffs[] = {1};
 // __host__ __device__ static const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
 
-template <size_t Degree>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs();
-
-template <>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs<2>() {
-    const int32_t FQ2_mod_coeffs[] = {1, 0};
-    return FQ2_mod_coeffs;
-}
-
-template <>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs<1>() {
-    const int32_t FQ1_mod_coeffs[] = {1};
-    return FQ1_mod_coeffs;
-}
-
-template <>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs<12>() {
-    const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
-    return FQ12_mod_coeffs;
-}
-
-/***
- * @brief helper function to print FQP in hex
- */
-template <size_t Degree>
-void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
-    __SHARED_MEMORY__ evm_word_t scratch_pad;
-    char *temp_str = new char[CuEVM::word_bits / 8 * 2 + 3];
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    printf("%s: \n", name);
-    __ONE_GPU_THREAD_END__
-    for (size_t i = 0; i < Degree; i++) {
-        cgbn_store(env, &scratch_pad, P.coeffs[i]);
-        // pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
-        scratch_pad.to_hex(temp_str);
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("%s[%d] : %s\n", name, i, temp_str);
-        __ONE_GPU_THREAD_END__
-    }
-}
-
-/**
- * @brief Get the curve object
- *
- * @param arith
- * @param curve_id 256 for secp256k1, 128 for alt_BN128
- * @return Curve
- */
-// __host__ __device__  Curve get_curve(ArithEnv &arith, int curve_id) {
-//     Curve curve;
-//     if (curve_id == 256) {
-//         curve.FP.from_hex(secp256k1_FieldPrime);
-//         curve.Order.from_hex(secp256k1_Order);
-//         curve.GX.from_hex(secp256k1_GX);
-//         curve.GY.from_hex(secp256k1_GY);
-//         curve.B = 7;
-//     } else if (curve_id == 128) {
-//         curve.FP.from_hex(alt_BN128_FieldPrime);
-//         curve.Order.from_hex(alt_BN128_Order);
-//         curve.GX.from_hex(alt_BN128_GX);
-//         curve.GY.from_hex(alt_BN128_GY);
-//         curve.B = 3;
-//     }
-//     return curve;
-// }
-
-// /***
-//  * @brief helper function to print FQP in hex
-// */
-// template <size_t Degree>
-// void print_fqp(ArithEnv &arith, FQ<Degree> &P, const char *name) {
-//     evm_word_t scratch_pad;
-//     char *temp_str = new char[CuEVM::word_bits/8 * 2 + 3];
-//     printf("%s: \n", name);
-//     for (size_t i = 0; i < Degree; i++) {
-//         cgbn_store(arith.env, &scratch_pad, P.coeffs[i]);
-//         arith.pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
-//         printf("%s[%d] : %s\n", name, i, temp_str);
-//     }
-
-// }
-
 __host__ __device__ void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
     env_t::cgbn_wide_t temp;
     cgbn_mul_wide(env, temp, a, b);
@@ -191,16 +109,6 @@ __host__ __device__ bool is_on_cuve_simple(env_t env, bn_t &Px, bn_t &Py, bn_t &
     cgbn_rem(env, temp, temp, mod);
     cgbn_mul_mod(env, temp2, Py, Py, mod);  // temp2 = Py^2
     return cgbn_equals(env, temp, temp2);
-}
-
-template <size_t Degree>
-__host__ __device__ bool FQP_equals(ArithEnv &arith, FQ<Degree> &P1, FQ<Degree> &P2) {
-    for (size_t i = 0; i < Degree; i++) {
-        if (!cgbn_equals(arith.env, P1.coeffs[i], P2.coeffs[i])) {
-            return false;
-        }
-    }
-    return true;
 }
 
 // Add two point on the curve P and Q
@@ -442,6 +350,99 @@ __host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_con
 
     convert_point_to_address(arith, signer, ResX, ResY);
     return 0;
+}
+
+#ifdef ENABLE_PAIRING_CODE
+template <size_t Degree>
+__host__ __device__ constexpr const int32_t *get_modulus_coeffs();
+
+template <>
+__host__ __device__ constexpr const int32_t *get_modulus_coeffs<2>() {
+    const int32_t FQ2_mod_coeffs[] = {1, 0};
+    return FQ2_mod_coeffs;
+}
+
+template <>
+__host__ __device__ constexpr const int32_t *get_modulus_coeffs<1>() {
+    const int32_t FQ1_mod_coeffs[] = {1};
+    return FQ1_mod_coeffs;
+}
+
+template <>
+__host__ __device__ constexpr const int32_t *get_modulus_coeffs<12>() {
+    const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
+    return FQ12_mod_coeffs;
+}
+
+/***
+ * @brief helper function to print FQP in hex
+ */
+template <size_t Degree>
+void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
+    __SHARED_MEMORY__ evm_word_t scratch_pad;
+    char *temp_str = new char[CuEVM::word_bits / 8 * 2 + 3];
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    printf("%s: \n", name);
+    __ONE_GPU_THREAD_END__
+    for (size_t i = 0; i < Degree; i++) {
+        cgbn_store(env, &scratch_pad, P.coeffs[i]);
+        // pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
+        scratch_pad.to_hex(temp_str);
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        printf("%s[%d] : %s\n", name, i, temp_str);
+        __ONE_GPU_THREAD_END__
+    }
+}
+
+/**
+ * @brief Get the curve object
+ *
+ * @param arith
+ * @param curve_id 256 for secp256k1, 128 for alt_BN128
+ * @return Curve
+ */
+// __host__ __device__  Curve get_curve(ArithEnv &arith, int curve_id) {
+//     Curve curve;
+//     if (curve_id == 256) {
+//         curve.FP.from_hex(secp256k1_FieldPrime);
+//         curve.Order.from_hex(secp256k1_Order);
+//         curve.GX.from_hex(secp256k1_GX);
+//         curve.GY.from_hex(secp256k1_GY);
+//         curve.B = 7;
+//     } else if (curve_id == 128) {
+//         curve.FP.from_hex(alt_BN128_FieldPrime);
+//         curve.Order.from_hex(alt_BN128_Order);
+//         curve.GX.from_hex(alt_BN128_GX);
+//         curve.GY.from_hex(alt_BN128_GY);
+//         curve.B = 3;
+//     }
+//     return curve;
+// }
+
+// /***
+//  * @brief helper function to print FQP in hex
+// */
+// template <size_t Degree>
+// void print_fqp(ArithEnv &arith, FQ<Degree> &P, const char *name) {
+//     evm_word_t scratch_pad;
+//     char *temp_str = new char[CuEVM::word_bits/8 * 2 + 3];
+//     printf("%s: \n", name);
+//     for (size_t i = 0; i < Degree; i++) {
+//         cgbn_store(arith.env, &scratch_pad, P.coeffs[i]);
+//         arith.pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
+//         printf("%s[%d] : %s\n", name, i, temp_str);
+//     }
+
+// }
+
+template <size_t Degree>
+__host__ __device__ bool FQP_equals(ArithEnv &arith, FQ<Degree> &P1, FQ<Degree> &P2) {
+    for (size_t i = 0; i < Degree; i++) {
+        if (!cgbn_equals(arith.env, P1.coeffs[i], P2.coeffs[i])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -1277,4 +1278,8 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     FQ<12> one_fq12 = get_one<12>(arith);
     return FQP_equals(arith, final_res, one_fq12) ? 1 : 0;
 }
+#else  // dummy delc to avoid compilation error
+__host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_constants_ptr, uint8_t *points_data,
+                                         size_t data_len) {}
+#endif
 }  // namespace ecc
