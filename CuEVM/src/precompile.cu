@@ -32,9 +32,9 @@ namespace precompile_operations {
  * @param[out] return_data The return data
  * @param[in] message The message
  */
-__host__ __device__ int32_t operation_IDENTITY(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_IDENTITY(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                               CuEVM::evm_return_data_t *return_data,
+                                               CuEVM::evm_message_call_t *message) {
     // static gas
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_IDENTITY);
 
@@ -66,9 +66,9 @@ __host__ __device__ int32_t operation_IDENTITY(
  * @param[out] return_data The return data
  * @param[in] message The message
  */
-__host__ __device__ int32_t operation_SHA256(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_SHA256(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                             CuEVM::evm_return_data_t *return_data,
+                                             CuEVM::evm_message_call_t *message) {
     // static gas
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_SHA256);
 
@@ -91,9 +91,9 @@ __host__ __device__ int32_t operation_SHA256(
     return ERROR_RETURN;
 }
 
-__host__ __device__ int32_t operation_RIPEMD160(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_RIPEMD160(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                                CuEVM::evm_return_data_t *return_data,
+                                                CuEVM::evm_message_call_t *message) {
     // static gas
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
 
@@ -120,9 +120,9 @@ __host__ __device__ int32_t operation_RIPEMD160(
     return ERROR_RETURN;
 }
 
-__host__ __device__ int32_t operation_MODEXP(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                             CuEVM::evm_return_data_t *return_data,
+                                             CuEVM::evm_message_call_t *message) {
     bn_t base_size, exponent_size, modulus_size;
 
     CuEVM::byte_array_t input_data(message->get_data(), 0, 96);
@@ -145,8 +145,7 @@ __host__ __device__ int32_t operation_MODEXP(
     error |= cgbn_get_uint32_t(arith.env, exp_len, exponent_size);
 
     // Handle a special case when both the base and mod length are zero.
-    if (cgbn_compare_ui32(arith.env, base_size, 0) == 0 &&
-        cgbn_compare_ui32(arith.env, modulus_size, 0) == 0) {
+    if (cgbn_compare_ui32(arith.env, base_size, 0) == 0 && cgbn_compare_ui32(arith.env, modulus_size, 0) == 0) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_MODEXP_MAX);
         error = CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
         return error;
@@ -220,9 +219,8 @@ __host__ __device__ int32_t operation_MODEXP(
     }
     cgbn_set_ui32(arith.env, exponent_bit_length_bn, bit_size);
 
-    error |= CuEVM::gas_cost::modexp_cost(arith, gas_used, exponent_size,
-                                          exponent_bit_length_bn,
-                                          multiplication_complexity);
+    error |=
+        CuEVM::gas_cost::modexp_cost(arith, gas_used, exponent_size, exponent_bit_length_bn, multiplication_complexity);
     error |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
 
     if (error) {
@@ -282,8 +280,7 @@ __host__ __device__ int32_t operation_MODEXP(
     }
 
     // convert to bigint values
-    bigint base_bigint = {}, exponent_bigint = {}, result_bigint = {},
-           modulus_bigint = {};
+    bigint base_bigint = {}, exponent_bigint = {}, result_bigint = {}, modulus_bigint = {};
     uint8_t result[32] = {0};
 
     bigint_from_bytes(&base_bigint, base_data.data, base_len);
@@ -291,17 +288,16 @@ __host__ __device__ int32_t operation_MODEXP(
     bigint_from_bytes(&modulus_bigint, mod_data.data, mod_len);
 
     // make the pow mod operation
-    bigint_pow_mod(&result_bigint, &base_bigint, &exponent_bigint,
-                   &modulus_bigint);
+    bigint_pow_mod(&result_bigint, &base_bigint, &exponent_bigint, &modulus_bigint);
     bigint_to_bytes(result, &result_bigint, mod_len);
     *return_data = byte_array_t(result, mod_len);
 
     return ERROR_RETURN;
 }
 
-__host__ __device__ int32_t operation_BLAKE2(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_BLAKE2(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                             CuEVM::evm_return_data_t *return_data,
+                                             CuEVM::evm_message_call_t *message) {
     // expecting 213 bytes inputs
     uint32_t length_size = message->data.size;
 
@@ -319,8 +315,8 @@ __host__ __device__ int32_t operation_BLAKE2(
     }
 
     uint32_t rounds;
-    rounds = (((uint32_t)input[0] << 24) | ((uint32_t)input[1] << 16) |
-              ((uint32_t)input[2] << 8) | ((uint32_t)input[3]));
+    rounds =
+        (((uint32_t)input[0] << 24) | ((uint32_t)input[1] << 16) | ((uint32_t)input[2] << 8) | ((uint32_t)input[3]));
 
     CuEVM::gas_cost::blake2_cost(arith, gas_used, rounds);
 
@@ -345,9 +341,9 @@ __host__ __device__ int32_t operation_BLAKE2(
     return ERROR_RETURN;
 }
 
-__host__ __device__ int32_t operation_ecRecover(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                                bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                                CuEVM::evm_message_call_t *message) {
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_ECRECOVER);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
@@ -363,7 +359,7 @@ __host__ __device__ int32_t operation_ecRecover(
         // complete with zeroes the remaing bytes
         // input = arith.padded_malloc_byte_array(tmp_input, size, 128);
         CuEVM::byte_array_t input(message->get_data(), 0, 128);
-        ecc::signature_t signature;
+        __SHARED_MEMORY__ ecc::signature_t signature;
         bn_t msg_hash, v, r, s, signer;
         cgbn_set_memory(arith.env, msg_hash, input.data, 32);
         cgbn_set_memory(arith.env, v, input.data + 32, 32);
@@ -374,17 +370,21 @@ __host__ __device__ int32_t operation_ecRecover(
         cgbn_store(arith.env, &signature.r, r);
         cgbn_store(arith.env, &signature.s, s);
         signature.v = cgbn_get_ui32(arith.env, v);
-        // printf("\n v %d\n", signature.v);
-        // printf("r : \n");
-        // print_bnt(arith, r);
-        // printf("s : \n");
-        // print_bnt(arith, s);
-        // printf("msgh: \n");
-        // print_bnt(arith, msg_hash);
+        printf("\n v %d\n", signature.v);
+        printf("r : \n");
+        print_bnt(arith, r);
+        printf("s : \n");
+        print_bnt(arith, s);
+        printf("msgh: \n");
+        print_bnt(arith, msg_hash);
         // TODO: is not 27 and 28, only?
         if (cgbn_compare_ui32(arith.env, v, 28) <= 0) {
             __SHARED_MEMORY__ uint8_t output[32];
-            size_t res = ecc::ec_recover(arith, signature, signer);
+            size_t res = ecc::ec_recover(arith, constants, signature, signer);
+#ifdef __CUDA_ARCH__
+            printf("ec recover %d\n", res);
+            print_bnt(arith, signer);
+#endif
             if (res == ERROR_SUCCESS) {
                 memory_from_cgbn(arith, output, signer);
                 *return_data = byte_array_t(output, 32);
@@ -400,9 +400,9 @@ __host__ __device__ int32_t operation_ecRecover(
     return error_code;
 }
 
-__host__ __device__ int32_t operation_ecAdd(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_ecAdd(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                            bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                            CuEVM::evm_message_call_t *message) {
     printf("ecAdd\n");
     int32_t error_code = ERROR_SUCCESS;
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_ECADD);
@@ -410,7 +410,7 @@ __host__ __device__ int32_t operation_ecAdd(
     if (error_code == ERROR_SUCCESS) {
         CuEVM::byte_array_t input(message->get_data(), 0, 128);
 
-        ecc::Curve curve = ecc::get_curve(arith, 128);
+        // ecc::Curve curve = ecc::get_curve(arith, 128);
 
         bn_t x1, y1, x2, y2;
         cgbn_set_memory(arith.env, x1, input.data);
@@ -423,7 +423,7 @@ __host__ __device__ int32_t operation_ecAdd(
         // printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
         // printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
         __SHARED_MEMORY__ uint8_t output[64];
-        int res = ecc::ec_add(arith, curve, x1, y1, x1, y1, x2, y2);
+        int res = ecc::ec_add(arith, constants->alt_BN128, x1, y1, x1, y1, x2, y2);
         if (res == 0) {
             memory_from_cgbn(arith, output, x1);
             memory_from_cgbn(arith, output + 32, y1);
@@ -438,15 +438,14 @@ __host__ __device__ int32_t operation_ecAdd(
     return error_code;
 }
 
-__host__ __device__ int32_t operation_ecMul(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_ecMul(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                            bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                            CuEVM::evm_message_call_t *message) {
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_ECMUL);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         CuEVM::byte_array_t input(message->get_data(), 0, 128);
-        ecc::Curve curve = ecc::get_curve(arith, 128);
 
         bn_t x, y, k;
         cgbn_set_memory(arith.env, x, input.data);
@@ -458,7 +457,7 @@ __host__ __device__ int32_t operation_ecMul(
         // printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
 
         __SHARED_MEMORY__ uint8_t output[64];
-        int res = ecc::ec_mul(arith, curve, x, y, x, y, k);
+        int res = ecc::ec_mul(arith, constants->alt_BN128, x, y, x, y, k);
         // print result
         // printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
         // printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
@@ -476,9 +475,9 @@ __host__ __device__ int32_t operation_ecMul(
     return error_code;
 }
 
-__host__ __device__ int32_t operation_ecPairing(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+__host__ __device__ int32_t operation_ecPairing(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                                bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                                CuEVM::evm_message_call_t *message) {
     size_t size = message->data.size;
     // printf("ecPairing\n");
     // printf("input size %d\n", size);
@@ -492,8 +491,7 @@ __host__ __device__ int32_t operation_ecPairing(
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         } else {
             // 0 inputs is valid and returns 1.
-            int res =
-                size == 0 ? 1 : ecc::pairing_multiple(arith, input.data, size);
+            int res = size == 0 ? 1 : ecc::pairing_multiple(arith, constants, input.data, size);
             // printf("res: %d", res);
             if (res == -1) {
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;

@@ -22,7 +22,9 @@ __host__ __device__ evm_word_t &evm_word_t::operator=(const evm_word_t &src) {
     _limbs[index] = src._limbs[index];
   }
   return *this;*/
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     memcpy(_limbs, src._limbs, CuEVM::cgbn_limbs * sizeof(uint32_t));
+    __ONE_GPU_THREAD_END__
     return *this;
 }
 
@@ -54,9 +56,13 @@ __host__ __device__ int32_t evm_word_t::operator==(const uint32_t &value) const 
     return 1;
 }
 
-__host__ int32_t evm_word_t::from_hex(const char *hex_string) {
+__host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) {
+#ifdef __CUDA_ARCH__
+
+#else
     CuEVM::byte_array_t byte_array(hex_string, CuEVM::word_size, BIG_ENDIAN, CuEVM::PaddingDirection::LEFT_PADDING);
     return from_byte_array_t(byte_array);
+#endif
 }
 
 __host__ __device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {

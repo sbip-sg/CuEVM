@@ -13,6 +13,7 @@
 #include <CuEVM/operations/system.cuh>
 #include <CuEVM/precompile.cuh>
 #include <CuEVM/utils/arith.cuh>
+#include <CuEVM/utils/ecc_constants.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
 
@@ -20,13 +21,16 @@ namespace CuEVM {
 __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_data_ptr,
                                  CuEVM::block_info_t *block_info_ptr, CuEVM::evm_transaction_t *transaction_ptr,
                                  CuEVM::state_access_t *touch_state_data_ptr, CuEVM::log_state_data_t *log_state_ptr,
-                                 CuEVM::evm_return_data_t *return_data_ptr
+                                 CuEVM::evm_return_data_t *return_data_ptr, CuEVM::EccConstants *ecc_constants_ptr
 #ifdef EIP_3155
                                  ,
                                  CuEVM::utils::tracer_t *tracer_ptr
 #endif
                                  )
-    : world_state(world_state_data_ptr), block_info_ptr(block_info_ptr), transaction_ptr(transaction_ptr) {
+    : world_state(world_state_data_ptr),
+      block_info_ptr(block_info_ptr),
+      transaction_ptr(transaction_ptr),
+      ecc_constants_ptr(ecc_constants_ptr) {
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
                                                  touch_state_data_ptr, return_data_ptr);
 
@@ -59,7 +63,8 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
 
 __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_instance)
     : evm_t(arith, evm_instance.world_state_data_ptr, evm_instance.block_info_ptr, evm_instance.transaction_ptr,
-            evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr, evm_instance.return_data_ptr
+            evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr, evm_instance.return_data_ptr,
+            evm_instance.ecc_constants_ptr
 #ifdef EIP_3155
             ,
             evm_instance.tracer_ptr
@@ -158,7 +163,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
                     case 0x01:
 
                         return CuEVM::precompile_operations::operation_ecRecover(
-                            arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
+                            arith, this->ecc_constants_ptr, call_state_ptr->gas_limit, call_state_ptr->gas_used,
                             call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
                         break;
                     case 0x02:
@@ -179,15 +184,15 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
                             call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
                     case 0x06:
                         return CuEVM::precompile_operations::operation_ecAdd(
-                            arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
+                            arith, this->ecc_constants_ptr, call_state_ptr->gas_limit, call_state_ptr->gas_used,
                             call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
                     case 0x07:
                         return CuEVM::precompile_operations::operation_ecMul(
-                            arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
+                            arith, this->ecc_constants_ptr, call_state_ptr->gas_limit, call_state_ptr->gas_used,
                             call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
                     case 0x08:
                         return CuEVM::precompile_operations::operation_ecPairing(
-                            arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
+                            arith, this->ecc_constants_ptr, call_state_ptr->gas_limit, call_state_ptr->gas_used,
                             call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
                     case 0x09:
                         return CuEVM::precompile_operations::operation_BLAKE2(
@@ -755,7 +760,7 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
         // set the eror code for a succesfull transaction
         status = error_code;
     } else {  // TODO: do we consider gas_priority_fee in revert?
-        cgbn_set(arith.env, gas_value, call_state_ptr->gas_limit);
+        cgbn_set(arith.env, call_state_ptr->parent->gas_used, call_state_ptr->gas_limit);
         // cgbn_mul(arith.env, gas_value, call_state_ptr->gas_limit, gas_priority_fee);
         // set z to the given error or 1 TODO: 1 in YP
 
@@ -992,6 +997,11 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
             CUDA_CHECK(cudaMallocManaged(&evm_instances[index].return_data_ptr, sizeof(CuEVM::evm_return_data_t)));
             memcpy(evm_instances[index].return_data_ptr, return_data, sizeof(CuEVM::evm_return_data_t));
             delete return_data;
+
+            CuEVM::EccConstants *ecc_constants_ptr = new CuEVM::EccConstants();
+            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].ecc_constants_ptr, sizeof(CuEVM::EccConstants)));
+            memcpy(evm_instances[index].ecc_constants_ptr, ecc_constants_ptr, sizeof(CuEVM::EccConstants));
+            delete ecc_constants_ptr;
 #ifdef EIP_3155
             CuEVM::utils::tracer_t *tracer = new CuEVM::utils::tracer_t();
             CUDA_CHECK(cudaMallocManaged(&evm_instances[index].tracer_ptr, sizeof(CuEVM::utils::tracer_t)));
