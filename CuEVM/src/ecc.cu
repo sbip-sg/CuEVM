@@ -196,6 +196,10 @@ __host__ __device__ int ec_mul(ArithEnv &arith, Curve curve, bn_t &ResX, bn_t &R
     bn_t mod_fp;
     __SHARED_MEMORY__ evm_word_t scratch_pad;
     cgbn_load(arith.env, mod_fp, &curve.FieldPrime);
+#ifdef __CUDA_ARCH__
+    printf("Mod_fp thread %d\n", threadIdx.x);
+    print_bnt(arith, mod_fp);
+#endif
 
     if (!is_on_cuve_simple(arith.env, Gx, Gy, mod_fp, curve.B)) {
         printf("Point not on curve\n");
@@ -234,8 +238,13 @@ __host__ __device__ int ec_mul(ArithEnv &arith, Curve curve, bn_t &ResX, bn_t &R
 
 __host__ __device__ void convert_point_to_address(ArithEnv &arith, bn_t &address, bn_t &X, bn_t &Y) {
     __SHARED_MEMORY__ evm_word_t scratch_pad;
+    // #ifdef __CUDA_ARCH__
+    //     printf("Converting point to address thread %d\n", threadIdx.x);
+    //     print_bnt(arith, X);
+    //     print_bnt(arith, Y);
+    // #endif
     uint8_t input[64];
-    uint8_t temp_array[32];
+    __SHARED_MEMORY__ uint8_t temp_array[32];
     size_t array_length = 0;
     cgbn_store(arith.env, &scratch_pad, X);
     byte_array_from_cgbn_memory(temp_array, array_length, scratch_pad);
@@ -251,8 +260,9 @@ __host__ __device__ void convert_point_to_address(ArithEnv &arith, bn_t &address
     // print the entire byte array
     // print_byte_array_as_hex(input, 64);
     uint32_t in_length = 64, out_length = 32;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     CuCrypto::keccak::sha3(input, in_length, (uint8_t *)temp_array, out_length);
-
+    __ONE_GPU_THREAD_END__
     cgbn_set_memory(arith.env, address, temp_array, 32);
     // cgbn_bitwise_mask_and(arith.env, address, address, 160);
     evm_address_conversion(arith, address);
@@ -274,15 +284,6 @@ __host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_con
         return -1;
     }
 
-#ifdef __CUDA_ARCH__
-    printf("Recovering signer idx %d curve.B\n", threadIdx.x);
-    ecc_constants_ptr->secp256k1.FieldPrime.print();
-    ecc_constants_ptr->secp256k1.Order.print();
-    ecc_constants_ptr->secp256k1.GX.print();
-    ecc_constants_ptr->secp256k1.GY.print();
-    printf("sig.r\n");
-#endif
-
     bn_t r, r_y, r_inv, temp_cgbn, mod_order, mod_fp, temp_compare;
     bn_t Gx, Gy, ResX, ResY, XY_x, XY_y;  // for the point multiplication
 
@@ -299,6 +300,7 @@ __host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_con
     // calculate r_y
     cgbn_mul_mod(arith.env, temp_cgbn, r, r, mod_fp);
     cgbn_mul_mod(arith.env, temp_cgbn, temp_cgbn, r, mod_fp);
+
     // cgbn_add_ui32(arith.env, r_y, temp_cgbn, curve.B);
     cgbn_add_ui32(arith.env, r_y, temp_cgbn, ecc_constants_ptr->secp256k1.B);
     cgbn_rem(arith.env, r_y, r_y, mod_fp);

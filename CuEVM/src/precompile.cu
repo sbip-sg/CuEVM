@@ -134,6 +134,15 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     error |= cgbn_set_byte_array_t(arith.env, exponent_size, esize_array);
     error |= cgbn_set_byte_array_t(arith.env, modulus_size, msize_array);
 
+#ifdef __CUDA_ARCH__
+    printf("base size\n");
+    print_bnt(arith, base_size);
+    printf("exponent size\n");
+    print_bnt(arith, exponent_size);
+    printf("modulus size\n");
+    print_bnt(arith, modulus_size);
+#endif
+
     if (error) {
         return error;
     }
@@ -172,20 +181,28 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     bn_t exponent_bit_length_bn;
 
     bool exp_is_zero = true;
-
+#ifdef __CUDA_ARCH__
+    printf("data len %d\n", data_len);
+    message->data.print();
+#endif
     // get a pointer to available bytes (call_exponent_size) of exponen
     // send through call data the remaining bytes are consider
     // 0 value bytes. The bytes of the call data are the most
     // significant bytes of the exponent
     // uint8_t *e_data = new uint8_t[exp_len];
     byte_array_t e_data = byte_array_t(exp_len);
+
     for (uint32_t i = 0; i < exp_len; i++) {
         auto idx = 96 + base_len + i;
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+
         if (idx < data_len) {
             e_data.data[i] = message->data.data[idx];
         } else {
             e_data.data[i] = 0;
         }
+        printf("idx %d e_data %d\n", idx, e_data.data[i]);
+        __ONE_GPU_THREAD_END__
         if (e_data.data[i] != 0) {
             exp_is_zero = false;
         }
@@ -221,8 +238,14 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
 
     error |=
         CuEVM::gas_cost::modexp_cost(arith, gas_used, exponent_size, exponent_bit_length_bn, multiplication_complexity);
-    error |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
 
+    error |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
+    // #ifdef __CUDA_ARCH__
+    //     printf("modexp cost %d\n", error);
+    //     print_bnt(arith, gas_used);
+    //     printf("exponent bit length\n");
+    //     printf("Thread idx %d error %d\n", threadIdx.x, error);
+    // #endif
     if (error) {
         return error;
     }
@@ -234,10 +257,13 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     for (uint32_t i = 0; i < base_len; i++) {
         auto idx = 96 + i;
         if (idx < data_len) {
+            __ONE_GPU_THREAD_WOSYNC_BEGIN__
             base_data.data[i] = message->data.data[idx];
+            __ONE_GPU_THREAD_END__
         } else {
             break;
         }
+        
         if (base_data.data[i] != 0) {
             base_is_zero = false;
         }
@@ -254,8 +280,9 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     bool mod_is_zero = true;
     for (uint32_t i = 0; i < mod_len; i++) {
         auto idx = 96 + base_len + exp_len + i;
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         mod_data.data[i] = (idx < data_len) ? message->data.data[idx] : 0;
-
+        __ONE_GPU_THREAD_END__
         if (mod_data.data[i] != 0) {
             mod_is_zero = false;
             if (mod_data.data[i] != 1 || i != mod_len - 1) {
@@ -265,6 +292,28 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
             mod_is_one = false;
         }
     }
+    // #ifdef __CUDA_ARCH__
+    //     __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    //     printf("mod data\n");
+    //     for (int i = 0; i < mod_len; i++) {
+    //         printf("%d ", mod_data.data[i]);
+    //     }
+    //     printf("\n");
+    //     printf("base data\n");
+    //     for (int i = 0; i < base_len; i++) {
+    //         printf("%d ", base_data.data[i]);
+    //     }
+    //     printf("\n");
+    //     printf("exp data\n");
+    //     for (int i = 0; i < exp_len; i++) {
+    //         printf("%d ", e_data.data[i]);
+    //     }
+    //     printf("\n");
+    //     __ONE_GPU_THREAD_WOSYNC_END__
+    //     printf("thread idx %d mod_is_zero %d, base_is_zero %d, exp_is_zero %d, mod_is_one %d\n", threadIdx.x,
+    //     mod_is_zero,
+    //            base_is_zero, exp_is_zero, mod_is_one);
+    // #endif
 
     // early return special cases
     if (mod_is_zero) {
@@ -370,21 +419,21 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
         cgbn_store(arith.env, &signature.r, r);
         cgbn_store(arith.env, &signature.s, s);
         signature.v = cgbn_get_ui32(arith.env, v);
-        printf("\n v %d\n", signature.v);
-        printf("r : \n");
-        print_bnt(arith, r);
-        printf("s : \n");
-        print_bnt(arith, s);
-        printf("msgh: \n");
-        print_bnt(arith, msg_hash);
+        // printf("\n v %d\n", signature.v);
+        // printf("r : \n");
+        // print_bnt(arith, r);
+        // printf("s : \n");
+        // print_bnt(arith, s);
+        // printf("msgh: \n");
+        // print_bnt(arith, msg_hash);
         // TODO: is not 27 and 28, only?
         if (cgbn_compare_ui32(arith.env, v, 28) <= 0) {
             __SHARED_MEMORY__ uint8_t output[32];
             size_t res = ecc::ec_recover(arith, constants, signature, signer);
-#ifdef __CUDA_ARCH__
-            printf("ec recover %d\n", res);
-            print_bnt(arith, signer);
-#endif
+            // #ifdef __CUDA_ARCH__
+            //             printf("ec recover %d\n", res);
+            //             print_bnt(arith, signer);
+            // #endif
             if (res == ERROR_SUCCESS) {
                 memory_from_cgbn(arith, output, signer);
                 *return_data = byte_array_t(output, 32);

@@ -63,12 +63,14 @@ struct EccConstants {
         secp256k1.Order.from_hex(secp256k1_Order_hex);
         secp256k1.GX.from_hex(secp256k1_GX_hex);
         secp256k1.GY.from_hex(secp256k1_GY_hex);
+        secp256k1.B = 7;
 
         // Initialize alt_BN128 curve
         alt_BN128.FieldPrime.from_hex(alt_BN128_FieldPrime_hex);
         alt_BN128.Order.from_hex(alt_BN128_Order_hex);
         alt_BN128.GX.from_hex(alt_BN128_GX_hex);
         alt_BN128.GY.from_hex(alt_BN128_GY_hex);
+        alt_BN128.B = 3;
 
         // Initialize other alt_BN128 constants
         alt_BN128_G2_B_0.from_hex(alt_BN128_G2_B_0_hex);

@@ -102,6 +102,7 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used, const b
     // bit of the least siginifcant 256 bits
     bn_t iteration_count, adjusted_exponent_bit_length;
     // cgbn_set_ui32(arith.env, iteration_count, 0);
+    cgbn_set_ui32(arith.env, adjusted_exponent_bit_length, 0);
     uint32_t iteration_count_overflow;
     iteration_count_overflow = 0;
     // if the size is less than 32 bytes (256 bits) we
@@ -128,8 +129,9 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used, const b
     if (cgbn_compare_ui32(arith.env, iteration_count, 1) < 0) {
         cgbn_set_ui32(arith.env, iteration_count, 1);
     }
-    // printf("iteration_count: %d\n",cgbn_get_ui32(arith.env, iteration_count));
+#ifdef __CUDA_ARCH__
 
+#endif
     bn_t dynamic_gas;
     uint32_t dynamic_gas_overflow;
     dynamic_gas_overflow = 0;
@@ -143,15 +145,32 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used, const b
     // entire gas given for the call
     cgbn_mul_high(arith.env, dynamic_gas, iteration_count, multiplication_complexity);
     dynamic_gas_overflow = (cgbn_compare_ui32(arith.env, dynamic_gas, 0) != 0);
+
+    // #ifdef __CUDA_ARCH__
+    //     print_bnt(arith, iteration_count);
+    //     print_bnt(arith, multiplication_complexity);
+    //     printf("dynamic_gas_overflow: %d\n", dynamic_gas_overflow);
+    //     printf("dynamic_gas: %d\n", cgbn_get_ui32(arith.env, dynamic_gas));
+
+    //     printf("iteration_count: %d\n", cgbn_get_ui32(arith.env, iteration_count));
+    //     printf("iteration_count_overflow: %d\n", iteration_count_overflow);
+    //     printf("multiplication complexity: %d\n", cgbn_get_ui32(arith.env, multiplication_complexity));
+    // #endif
+
     cgbn_mul(arith.env, dynamic_gas, iteration_count, multiplication_complexity);
-    dynamic_gas_overflow = dynamic_gas_overflow | (iteration_count_overflow &&
-                                                   (cgbn_compare_ui32(arith.env, multiplication_complexity, 0) != 0));
+    dynamic_gas_overflow = dynamic_gas_overflow || (iteration_count_overflow &&
+                                                    (cgbn_compare_ui32(arith.env, multiplication_complexity, 0) != 0));
+
     if (dynamic_gas_overflow) return ERROR_PRECOMPILE_MODEXP_OVERFLOW;
     cgbn_div_ui32(arith.env, dynamic_gas, dynamic_gas, 3);
     if (cgbn_compare_ui32(arith.env, dynamic_gas, 200) < 0) {
         cgbn_set_ui32(arith.env, dynamic_gas, 200);
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("dynamic_gas: %d\n", cgbn_get_ui32(arith.env, dynamic_gas));
+    // #endif
     cgbn_add(arith.env, gas_used, gas_used, dynamic_gas);
+    return ERROR_SUCCESS;
 }
 __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used, uint32_t data_size) {
     // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 *

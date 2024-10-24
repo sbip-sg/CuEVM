@@ -46,8 +46,19 @@ def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_s
     debug_print(' '.join(command))
 
     clean_test_out()
-    result = subprocess.run(command, capture_output=True, text=True, timeout=120)
-    check_output(result.stdout, result.stderr, without_state_root)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, preexec_fn=os.setsid)
+    try:
+        stdout, stderr = proc.communicate(timeout=60)
+        check_output(stdout, stderr, without_state_root)
+    finally:
+        print(f"Killing child processes of {proc.pid}")
+        try:
+            os.killpg(proc.pid, 9)
+            proc.wait()
+        except ProcessLookupError:
+            pass
+
+
 
     debug_print(f"🎉 Test passed for {output_filepath}")
 
