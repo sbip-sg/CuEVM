@@ -1105,6 +1105,28 @@ __host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccCon
     FQP_copy(arith, res, temp_res);
 }
 
+  void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv &arith, FQ<12> &temp1, FQ<12> &temp2, FQ<12> &Px, FQ<12> &Py,  FQ<12> &Qx, FQ<12> &Qy,
+                         FQ<12> &R_x, FQ<12> &R_y,
+                         FQ<12> &f, bn_t &mod_fp){
+    // f = f * f * linefunc(R, R, P)
+    FQP_mul(arith, temp1, f, f, mod_fp);
+    // temp 2 = linefunc(R, R, P)
+    FQP_linefunc(arith, temp2, R_x, R_y, R_x, R_y, Px, Py, mod_fp);
+    // print_fqp(env, temp2, "linefunc");
+    FQP_mul(arith, f, temp1, temp2, mod_fp);
+    // // R = double(R)
+    FQP_ec_add(arith, R_x, R_y, R_x, R_y, R_x, R_y, mod_fp);
+
+    // // if ate_loop_count & (2**i):
+    if (cgbn_extract_bits_ui32(arith.env, ate_loop_count, i, 1)) {
+      // f = f * linefunc(R, Q, P)
+      FQP_linefunc(arith, temp2, R_x, R_y, Qx, Qy, Px, Py, mod_fp);
+      FQP_mul(arith, f, f, temp2, mod_fp);
+      // R = add(R, Q)
+      FQP_ec_add(arith, R_x, R_y, R_x, R_y, Qx, Qy, mod_fp);
+    }
+  }
+
 /**
  * @brief MillerLoop algorithm
  * @param env
@@ -1131,23 +1153,7 @@ __host__ __device__ void miller_loop(ArithEnv &arith, FQ<12> &Result, FQ<12> &Qx
     FQP_copy(arith, R_y, Qy);
 
     for (int i = log_ate_loop_count; i >= 0; i--) {
-        // f = f * f * linefunc(R, R, P)
-        FQP_mul(arith, temp1, f, f, mod_fp);
-        // temp 2 = linefunc(R, R, P)
-        FQP_linefunc(arith, temp2, R_x, R_y, R_x, R_y, Px, Py, mod_fp);
-        // print_fqp(env, temp2, "linefunc");
-        FQP_mul(arith, f, temp1, temp2, mod_fp);
-        // // R = double(R)
-        FQP_ec_add(arith, R_x, R_y, R_x, R_y, R_x, R_y, mod_fp);
-
-        // // if ate_loop_count & (2**i):
-        if (cgbn_extract_bits_ui32(arith.env, ate_loop_count, i, 1)) {
-            // f = f * linefunc(R, Q, P)
-            FQP_linefunc(arith, temp2, R_x, R_y, Qx, Qy, Px, Py, mod_fp);
-            FQP_mul(arith, f, f, temp2, mod_fp);
-            // R = add(R, Q)
-            FQP_ec_add(arith, R_x, R_y, R_x, R_y, Qx, Qy, mod_fp);
-        }
+      miller_loop_inner(i, ate_loop_count, arith, temp1, temp2, Qx, Qy, Px, Py, R_x, R_y, f, mod_fp);
     }
 
     // Compute Q1 and nQ2, adapt for your representation of points
