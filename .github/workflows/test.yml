@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, gpu]
 
     services:
       docker:
@@ -54,17 +54,17 @@ jobs:
       - name: Start cuevm-test-runner container
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
-          docker run --memory="8g" --memory-swap="8g"  -d --name cuevm-test-runner-${{ github.run_id }} \
+          docker run --gpus all --memory="3g" --memory-swap="3g"  -d --name cuevm-test-runner-${{ github.run_id }} \
             -v ${{ github.workspace }}/${{ github.run_id }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
-            augustus/goevmlab-cuevm:20241008 /bin/bash -c "tail -f /dev/null"
+            augustus/goevmlab-cuevm:gpu /bin/bash -c "tail -f /dev/null"
 
       - name: Build binary inside the container
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
           docker exec cuevm-test-runner-${{ github.run_id }} /bin/bash -c "
-              cmake -DTESTS=OFF -DCMAKE_BUILD_TYPE=Debug cmake  -S . -B build
-              cmake --build build -j 24
+              cmake -S . -B build -DTESTS=OFF -DGPU=ON -DCPU=OFF -DCUDA_COMPUTE_CAPABILITY=86 -DENABLE_EIP_3155_OPTIONAL=OFF -DENABLE_EIP_3155=ON
+              cmake --build build -j 8
           "
 
       - name: Clone ethereum/tests
@@ -77,7 +77,7 @@ jobs:
       - name: Run tests concurrently using Python
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
-          python3 -u scripts/run-ci-tests.py
+          python3 -u scripts/run-ci-tests-gpu.py
 
       - name: Generate summary of test results in markdown
         run: |
