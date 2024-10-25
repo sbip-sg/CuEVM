@@ -11,14 +11,14 @@ timeout_secs = 1800
 max_workers = 1 # limited by RAM size set for each docker process and CPU cores
 
 # Run these most time-consuming folders first to have a better chance of completing them
-slow_folders_with_time = (
+slow_folders_with_time = [
     # ("stTimeConsuming", 1500,),
     # ("stRandom2", 1500,),
     # ("stBadOpcode", 1500,),
     # ("stRandom", 1500,),
     # ("stStaticFlagEnabled", 1500,),
     # ("stMemoryTest", 1500,),
-)
+]
 
 folders_to_test = [f for f in os.listdir(f"{workdir}/ethereum/tests/GeneralStateTests") if f not in [f[0] for f in slow_folders_with_time]]
 
@@ -43,19 +43,22 @@ def run_test(folder, timeout_value, run_id, workspace):
         with open(log_file, 'w') as log:
             process = subprocess.Popen(docker_cmd, stdout=log, stderr=log, text=True, preexec_fn=os.setsid)
             process.wait(timeout=timeout_value)
-        print(f"🕛 Test for {folder} completed.")
+        print(f"👌 Test for {folder} completed.")
     except subprocess.TimeoutExpired as e:
         print(f"🚫 Test for {folder} failed with timeout error {e}")
     except Exception as e:
         print(f"🚫 Test for {folder} failed with error {e}")
     finally:
         end_time = time.time()
-        print(f"⏰ Test for {folder} took {int(end_time - start_time)} seconds")
-        if process is not None and process.poll() is None:
+        print(f"➡️ Test for {folder} took {int(end_time - start_time)} seconds")
+        while process is not None and process.poll() is None:
             try:
                 os.killpg(process.pid, 9)
+                if process.poll() is None:
+                    time.sleep(1)
             except Exception as e:
                 print(f"⛔ Failed to kill process for test {folder} Error: {e}")
+                break
 
 # Main function to run the tests
 def main():
