@@ -220,15 +220,23 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
                                                         bn_t &gas_price, bn_t &gas_priority_fee) const {
     // printf("begin validating transaction\n");
     bn_t gas_intrinsic;
-    CuEVM::gas_cost::transaction_intrinsic_gas(arith, *this, gas_intrinsic);
+
     bn_t gas_limit;
     bn_t gas_value;
     bn_t up_front_cost;
     bn_t m;
-    if (get_transaction_fees(arith, block_info, gas_value, gas_limit, gas_price, gas_priority_fee, up_front_cost, m)) {
-        return ERROR_TRANSACTION_FEES;
-    }
+    int32_t error_code = ERROR_SUCCESS;
+    error_code |= CuEVM::gas_cost::transaction_intrinsic_gas(arith, *this, gas_intrinsic);
+    error_code |=
+        get_transaction_fees(arith, block_info, gas_value, gas_limit, gas_price, gas_priority_fee, up_front_cost, m);
+    // if (get_transaction_fees(arith, block_info, gas_value, gas_limit, gas_price, gas_priority_fee, up_front_cost, m))
+    // {
+    //     return ERROR_TRANSACTION_FEES;
+    // }
     // printf("after get_transaction_fees\n");
+    if (error_code) {
+        return error_code;
+    }
     bn_t sender_address;
     get_sender(arith, sender_address);
     // printf("after get_sender\n");
@@ -343,22 +351,22 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     // if is a contract creation
     CuEVM::account_t *to_account = nullptr;
     touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
+    uint32_t static_env = 0;
+    bn_t return_data_offset;
+    cgbn_set_ui32(arith.env, return_data_offset, 0);
+    bn_t return_data_size;
+    cgbn_set_ui32(arith.env, return_data_size, 0);
     if (is_create) {
         call_type = OP_CREATE;
         byte_code = data_init;
-        // TODO: code size does not execede the maximul allowed
-        bn_t sender_nonce;
-        CuEVM::account_t *sender_account = nullptr;
-        touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_NONCE_FLAG);
-        // nonce is -1 in YP but here is before validating the transaction
-        // and increasing the nonce
-        sender_account->get_nonce(arith, sender_nonce);
-        // if (CuEVM::utils::get_contract_address_create(arith, to_address, sender_address, sender_nonce) !=
-        //     ERROR_SUCCESS) {
-        //     return ERROR_FAILED;
-        // }
+        // blank call data in create
+        evm_message_call_ptr = new CuEVM::evm_message_call_t(
+            arith, sender_address, to_address, to_address, gas_limit, value, depth, call_type, to_address,
+            CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
 #ifdef __CUDA_ARCH__
-        printf("CREATE to_account %p init code size %d idx %d \n", to_account, to_account->byte_code.size, threadIdx.x);
+        printf("CREATE to_account %p init code size %d account code size %d idx %d \n", to_account,
+               to_account->byte_code.size, byte_code.size, threadIdx.x);
+        to_account->address.print();
 #endif
     } else {
         // CuEVM::account_t *to_account = nullptr;
@@ -367,15 +375,11 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         //     printf("to_account %p size %d idx %d \n", to_account, to_account->byte_code.size  , threadIdx.x);
         // #endif
         byte_code = to_account->byte_code;
+        evm_message_call_ptr = new CuEVM::evm_message_call_t(arith, sender_address, to_address, to_address, gas_limit,
+                                                             value, depth, call_type, to_address, data_init, byte_code,
+                                                             return_data_offset, return_data_size, static_env);
     }
-    uint32_t static_env = 0;
-    bn_t return_data_offset;
-    cgbn_set_ui32(arith.env, return_data_offset, 0);
-    bn_t return_data_size;
-    cgbn_set_ui32(arith.env, return_data_size, 0);
-    evm_message_call_ptr = new CuEVM::evm_message_call_t(arith, sender_address, to_address, to_address, gas_limit,
-                                                         value, depth, call_type, to_address, data_init, byte_code,
-                                                         return_data_offset, return_data_size, static_env);
+
     // #ifdef __CUDA_ARCH__
     //     printf("bytecode size %d idx %d \n", byte_code.size , threadIdx.x);
     // #endif
@@ -574,6 +578,10 @@ __host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transacti
         transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_idnex)->valuestring, LITTLE_ENDIAN,
                                                  CuEVM::PaddingDirection::NO_PADDING, managed);
         transactions_ptr[idx].gas_limit.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
+        // better refactorign the boundary checks
+        if (strlen(cJSON_GetArrayItem(value_json, value_index)->valuestring) > 66) {
+            return ERROR_FAILED;
+        }
         transactions_ptr[idx].value.from_hex(cJSON_GetArrayItem(value_json, value_index)->valuestring);
     }
 

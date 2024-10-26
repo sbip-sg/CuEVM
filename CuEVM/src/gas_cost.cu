@@ -213,11 +213,20 @@ __host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used, bn_t &g
                                         const bn_t &new_value) {
     // get the key warm
     if (touch_state.is_warm_key(arith, address, key) == false) {
+        // #ifdef __CUDA_ARCH__
+        //         printf("SSTORE cold %d\n", threadIdx.x);
+        // #endif
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_SLOAD);
     }
     bn_t original_value, current_value;
     touch_state.poke_original_value(arith, address, key, original_value);
     touch_state.poke_value(arith, address, key, current_value);
+    // #ifdef __CUDA_ARCH__
+    //     printf("SSTORE COST %d\n", threadIdx.x);
+    //     print_bnt(arith, original_value);
+    //     print_bnt(arith, current_value);
+    //     print_bnt(arith, new_value);
+    // #endif
     // EIP-2200
     if (cgbn_compare(arith.env, new_value, current_value) == 0) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SLOAD);
@@ -258,7 +267,7 @@ __host__ __device__ int32_t transaction_intrinsic_gas(ArithEnv &arith, const CuE
     cgbn_set_ui32(arith.env, gas_intrinsic, GAS_TRANSACTION);
 
     // gas_intrinsic += GAS_TRANSACTION_CREATE if transaction.create
-    if (transaction.is_contract_creation(arith)) {
+    if (transaction.is_create) {
         cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_TX_CREATE);
     }
 
@@ -285,7 +294,8 @@ __host__ __device__ int32_t transaction_intrinsic_gas(ArithEnv &arith, const CuE
 
 #ifdef EIP_3860
     // gas_intrinsic += GAS_INITCODE_COST if create transaction
-    if (transaction.is_contract_creation(arith)) {
+    if (transaction.is_create) {
+        if (transaction.data_init.size > max_initcode_size > 0) return ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
         bn_t initcode_length;
         cgbn_set_ui32(arith.env, initcode_length, transaction.data_init.size);
         initcode_cost(arith, gas_intrinsic, initcode_length);

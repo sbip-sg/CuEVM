@@ -196,10 +196,10 @@ __host__ __device__ int ec_mul(ArithEnv &arith, Curve curve, bn_t &ResX, bn_t &R
     bn_t mod_fp;
     __SHARED_MEMORY__ evm_word_t scratch_pad;
     cgbn_load(arith.env, mod_fp, &curve.FieldPrime);
-#ifdef __CUDA_ARCH__
-    printf("Mod_fp thread %d\n", threadIdx.x);
-    print_bnt(arith, mod_fp);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("Mod_fp thread %d\n", threadIdx.x);
+    //     print_bnt(arith, mod_fp);
+    // #endif
 
     if (!is_on_cuve_simple(arith.env, Gx, Gy, mod_fp, curve.B)) {
         printf("Point not on curve\n");
@@ -349,9 +349,12 @@ __host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_con
     // env_t::cgbn_t Q_x, Q_y;
     // calculate Q = Qr * r_inv %N
     ec_mul(arith, ecc_constants_ptr->secp256k1, ResX, ResY, ResX, ResY, r_inv);
-
-    convert_point_to_address(arith, signer, ResX, ResY);
-    return 0;
+    if (cgbn_equals_ui32(arith.env, ResX, 0) && cgbn_equals_ui32(arith.env, ResY, 0))
+        return -1;
+    else {
+        convert_point_to_address(arith, signer, ResX, ResY);
+        return 0;
+    }
 }
 
 #ifdef ENABLE_PAIRING_CODE
@@ -1105,9 +1108,8 @@ __host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccCon
     FQP_copy(arith, res, temp_res);
 }
 
-  void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv &arith, FQ<12> &temp1, FQ<12> &temp2, FQ<12> &Px, FQ<12> &Py,  FQ<12> &Qx, FQ<12> &Qy,
-                         FQ<12> &R_x, FQ<12> &R_y,
-                         FQ<12> &f, bn_t &mod_fp){
+void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv &arith, FQ<12> &temp1, FQ<12> &temp2, FQ<12> &Px,
+                       FQ<12> &Py, FQ<12> &Qx, FQ<12> &Qy, FQ<12> &R_x, FQ<12> &R_y, FQ<12> &f, bn_t &mod_fp) {
     // f = f * f * linefunc(R, R, P)
     FQP_mul(arith, temp1, f, f, mod_fp);
     // temp 2 = linefunc(R, R, P)
@@ -1119,13 +1121,13 @@ __host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccCon
 
     // // if ate_loop_count & (2**i):
     if (cgbn_extract_bits_ui32(arith.env, ate_loop_count, i, 1)) {
-      // f = f * linefunc(R, Q, P)
-      FQP_linefunc(arith, temp2, R_x, R_y, Qx, Qy, Px, Py, mod_fp);
-      FQP_mul(arith, f, f, temp2, mod_fp);
-      // R = add(R, Q)
-      FQP_ec_add(arith, R_x, R_y, R_x, R_y, Qx, Qy, mod_fp);
+        // f = f * linefunc(R, Q, P)
+        FQP_linefunc(arith, temp2, R_x, R_y, Qx, Qy, Px, Py, mod_fp);
+        FQP_mul(arith, f, f, temp2, mod_fp);
+        // R = add(R, Q)
+        FQP_ec_add(arith, R_x, R_y, R_x, R_y, Qx, Qy, mod_fp);
     }
-  }
+}
 
 /**
  * @brief MillerLoop algorithm
@@ -1153,7 +1155,7 @@ __host__ __device__ void miller_loop(ArithEnv &arith, FQ<12> &Result, FQ<12> &Qx
     FQP_copy(arith, R_y, Qy);
 
     for (int i = log_ate_loop_count; i >= 0; i--) {
-      miller_loop_inner(i, ate_loop_count, arith, temp1, temp2, Qx, Qy, Px, Py, R_x, R_y, f, mod_fp);
+        miller_loop_inner(i, ate_loop_count, arith, temp1, temp2, Qx, Qy, Px, Py, R_x, R_y, f, mod_fp);
     }
 
     // Compute Q1 and nQ2, adapt for your representation of points

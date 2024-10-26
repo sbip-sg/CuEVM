@@ -263,7 +263,7 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
         } else {
             break;
         }
-        
+
         if (base_data.data[i] != 0) {
             base_is_zero = false;
         }
@@ -399,7 +399,8 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
     // printf("has gas %d\n", error_code);
     // printf("gas limit \n");
     // print_bnt(arith, gas_limit);
-
+    printf("data size %d\n", message->data.size);
+    message->data.print();
     if (error_code == ERROR_SUCCESS) {
         bn_t length;
         cgbn_set_ui32(arith.env, length, message->data.size);
@@ -419,21 +420,21 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
         cgbn_store(arith.env, &signature.r, r);
         cgbn_store(arith.env, &signature.s, s);
         signature.v = cgbn_get_ui32(arith.env, v);
-        // printf("\n v %d\n", signature.v);
-        // printf("r : \n");
-        // print_bnt(arith, r);
-        // printf("s : \n");
-        // print_bnt(arith, s);
-        // printf("msgh: \n");
-        // print_bnt(arith, msg_hash);
+        printf("\n v %d\n", signature.v);
+        printf("r : \n");
+        print_bnt(arith, r);
+        printf("s : \n");
+        print_bnt(arith, s);
+        printf("msgh: \n");
+        print_bnt(arith, msg_hash);
         // TODO: is not 27 and 28, only?
         if (cgbn_compare_ui32(arith.env, v, 28) <= 0) {
             __SHARED_MEMORY__ uint8_t output[32];
             size_t res = ecc::ec_recover(arith, constants, signature, signer);
-            // #ifdef __CUDA_ARCH__
-            //             printf("ec recover %d\n", res);
-            //             print_bnt(arith, signer);
-            // #endif
+#ifdef __CUDA_ARCH__
+            printf("ec recover %d\n", res);
+            print_bnt(arith, signer);
+#endif
             if (res == ERROR_SUCCESS) {
                 memory_from_cgbn(arith, output, signer);
                 *return_data = byte_array_t(output, 32);
