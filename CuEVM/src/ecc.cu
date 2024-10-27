@@ -383,19 +383,15 @@ __host__ __device__ constexpr const int32_t *get_modulus_coeffs<12>() {
  * @brief helper function to print FQP in hex
  */
 template <size_t Degree>
-void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
+__host__ __device__ void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
     __SHARED_MEMORY__ evm_word_t scratch_pad;
-    char *temp_str = new char[CuEVM::word_bits / 8 * 2 + 3];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    printf("%s: \n", name);
+    printf("FQP %s: \n", name);
     __ONE_GPU_THREAD_END__
     for (size_t i = 0; i < Degree; i++) {
         cgbn_store(env, &scratch_pad, P.coeffs[i]);
         // pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
-        scratch_pad.to_hex(temp_str);
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("%s[%d] : %s\n", name, i, temp_str);
-        __ONE_GPU_THREAD_END__
+        scratch_pad.print();
     }
 }
 
@@ -1108,8 +1104,9 @@ __host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccCon
     FQP_copy(arith, res, temp_res);
 }
 
-void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv &arith, FQ<12> &temp1, FQ<12> &temp2, FQ<12> &Px,
-                       FQ<12> &Py, FQ<12> &Qx, FQ<12> &Qy, FQ<12> &R_x, FQ<12> &R_y, FQ<12> &f, bn_t &mod_fp) {
+__host__ __device__ void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv &arith, FQ<12> &temp1, FQ<12> &temp2,
+                                           FQ<12> &Px, FQ<12> &Py, FQ<12> &Qx, FQ<12> &Qy, FQ<12> &R_x, FQ<12> &R_y,
+                                           FQ<12> &f, bn_t &mod_fp) {
     // f = f * f * linefunc(R, R, P)
     FQP_mul(arith, temp1, f, f, mod_fp);
     // temp 2 = linefunc(R, R, P)
@@ -1244,7 +1241,7 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     FQ<12> final_res = get_one<12>(arith);
 
     size_t num_pairs = data_len / 192;  // 2 for G1, 4 for G2
-
+    printf("Pairing Multiple, numpairs %d \n", num_pairs);
     for (int i = 0; i < num_pairs; i++) {
         FQ<12> temp_res;
 
@@ -1257,10 +1254,11 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
         cgbn_set_memory(arith.env, Qy.coeffs[0], points_data + 160);
         points_data += 192;
         // print point for debugging
-        // print_fqp(arith.env, Px, "Px");
-        // print_fqp(arith.env, Py, "Py");
-        // print_fqp(arith.env, Qx, "Qx");
-        // print_fqp(arith.env, Qy, "Qy");
+        printf("before print_ fqp \n");
+        print_fqp(arith.env, Px, "Px");
+        print_fqp(arith.env, Py, "Py");
+        print_fqp(arith.env, Qx, "Qx");
+        print_fqp(arith.env, Qy, "Qy");
         bool on_curve = FQP_is_on_curve(arith, Px, Py, mod_fp, B1) && FQP_is_on_curve(arith, Qx, Qy, mod_fp, B2);
 
         bool valid = FQP_is_valid(arith, Px, mod_fp) && FQP_is_valid(arith, Py, mod_fp) &&

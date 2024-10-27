@@ -528,21 +528,22 @@ __host__ __device__ int32_t operation_ecMul(ArithEnv &arith, CuEVM::EccConstants
 __host__ __device__ int32_t operation_ecPairing(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
                                                 bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
                                                 CuEVM::evm_message_call_t *message) {
-    size_t size = message->data.size;
-    // printf("ecPairing\n");
-    // printf("input size %d\n", size);
+    __ONE_THREAD_PER_INSTANCE(printf("ecPairing\n"); printf("input size %d\n", message->data.size););
     // input = message.get_data(index, length, size);
-    CuEVM::byte_array_t input(message->get_data(), 0, size);
-    CuEVM::gas_cost::ecpairing_cost(arith, gas_used, size);
+    CuEVM::byte_array_t input(message->get_data(), 0, message->data.size);
+    CuEVM::gas_cost::ecpairing_cost(arith, gas_used, message->data.size);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        if (size % 192 != 0) {
+        if (message->data.size % 192 != 0) {
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         } else {
             // 0 inputs is valid and returns 1.
-            int res = size == 0 ? 1 : ecc::pairing_multiple(arith, constants, input.data, size);
-            // printf("res: %d", res);
+            int res =
+                message->data.size == 0 ? 1 : ecc::pairing_multiple(arith, constants, input.data, message->data.size);
+#ifdef __CUDA_ARCH__
+            printf("res: %d, idx %d \n", res, threadIdx.x);
+#endif
             if (res == -1) {
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
             } else {
