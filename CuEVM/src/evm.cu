@@ -33,17 +33,17 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
       ecc_constants_ptr(ecc_constants_ptr) {
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
                                                  touch_state_data_ptr, return_data_ptr);
-
+#ifdef EIP_3155
+    // printing debug when enabling tracer.
     printf("call_state_ptr allocated\n");
-
     transaction_ptr->print();
-
+#endif
     int32_t error_code = transaction_ptr->validate(arith, call_state_ptr->touch_state, *block_info_ptr,
                                                    call_state_ptr->gas_used, gas_price, gas_priority_fee);
-    printf("transaction validated\n");
-#ifdef __CUDA_ARCH__
-    printf("error  code %d idx %d \n", error_code, threadIdx.x);
-#endif
+    // printf("transaction validated\n");
+    // #ifdef __CUDA_ARCH__
+    //     printf("error  code %d idx %d \n", error_code, threadIdx.x);
+    // #endif
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t *transaction_call_message_ptr = nullptr;
         error_code =
@@ -101,10 +101,12 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         // call failed = account never warmed up
         return error_code;
     }
+#ifdef EIP_3155
 #ifdef __CUDA_ARCH__
     printf("start_CALL transfer error code %d idx %d \n", error_code, threadIdx.x);
     __ONE_THREAD_PER_INSTANCE(printf("value ");)
     print_bnt(arith, value);
+#endif
 #endif
 
     if (call_state_ptr->message_ptr->call_type == OP_CALL || call_state_ptr->message_ptr->call_type == OP_CALLCODE ||
@@ -124,10 +126,12 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
 
     // error_code |=
     call_state_ptr->touch_state.get_account(arith, recipient, account_ptr, ACCOUNT_NONE_FLAG);
+#ifdef EIP_3155
 #ifdef __CUDA_ARCH__
     printf("call_state_ptr->touch_state.get_account error code %d,  idx %d  pointer %p, balance\n", error_code,
            threadIdx.x, account_ptr);
     account_ptr->balance.print();
+#endif
 #endif
 
     if ((call_state_ptr->message_ptr->call_type == OP_CREATE) ||
@@ -221,19 +225,10 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
     if (status != ERROR_SUCCESS) {
         return;  // finish transaction
     }
-#ifdef __CUDA_ARCH__
-    printf("run BEGIN BEGIN BEGIN idx %d \n", threadIdx.x);
-#endif
     int32_t error_code = start_CALL(arith);
-#ifdef __CUDA_ARCH__
-    printf("run after start_CALL  before error code idx %d \n", threadIdx.x);
-#endif
     if (error_code != ERROR_SUCCESS) {
         return;  // finish call
     }
-#ifdef __CUDA_ARCH__
-    printf("run after start_CALL idx %d \n", threadIdx.x);
-#endif
     uint8_t opcode;
     CuEVM::evm_call_state_t *child_call_state_ptr = nullptr;
     while (status == ERROR_SUCCESS) {
@@ -254,17 +249,17 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                                                          *call_state_ptr->last_return_data_ptr,
                                                          call_state_ptr->gas_limit, call_state_ptr->gas_used);
         call_state_ptr->trace_idx = trace_idx;
-#endif
-        // DEBUG PRINT
-
-        // __ONE_THREAD_PER_INSTANCE(
-        // printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
 #ifdef __CUDA_ARCH__
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
         printf("\npc: %d opcode: %d, depth %d, thread %d \n", call_state_ptr->pc, opcode, call_state_ptr->depth,
                threadIdx.x);
         __ONE_GPU_THREAD_WOSYNC_END__
 #endif
+#endif
+        // DEBUG PRINT
+
+        // __ONE_THREAD_PER_INSTANCE(
+        // printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
         // printf("touch state BEGIN BEGIN BEGIN\n");
         // call_state_ptr->touch_state.print();
         // printf("touch state END END END\n");
@@ -706,11 +701,11 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
     bn_t gas_value;
     bn_t beneficiary;
     block_info_ptr->get_coin_base(arith, beneficiary);
-
+#ifdef EIP_3155
 #ifdef __CUDA_ARCH__
     printf("finish_TRANSACTION %d error_code: %d\n", threadIdx.x, error_code);
 #endif
-
+#endif
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         bn_t gas_left;
         // \f$T_{g} - g\f$
@@ -763,13 +758,14 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
         cgbn_set(arith.env, call_state_ptr->parent->gas_used, call_state_ptr->gas_limit);
         // cgbn_mul(arith.env, gas_value, call_state_ptr->gas_limit, gas_priority_fee);
         // set z to the given error or 1 TODO: 1 in YP
-
+#ifdef EIP_3155
 #ifdef __CUDA_ARCH__
         printf("finish_TRANSACTION %d error_code: %d\n", threadIdx.x, error_code);
         print_bnt(arith, gas_value);
         print_bnt(arith, call_state_ptr->gas_limit);
         print_bnt(arith, call_state_ptr->gas_used);
         print_bnt(arith, gas_priority_fee);
+#endif
 #endif
         status = error_code;
     }

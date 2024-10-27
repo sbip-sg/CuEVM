@@ -134,7 +134,7 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     error |= cgbn_set_byte_array_t(arith.env, exponent_size, esize_array);
     error |= cgbn_set_byte_array_t(arith.env, modulus_size, msize_array);
 
-#ifdef __CUDA_ARCH__
+#ifdef EIP_3155
     printf("base size\n");
     print_bnt(arith, base_size);
     printf("exponent size\n");
@@ -399,7 +399,7 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
     // printf("has gas %d\n", error_code);
     // printf("gas limit \n");
     // print_bnt(arith, gas_limit);
-    printf("data size %d\n", message->data.size);
+    // printf("data size %d\n", message->data.size);
     message->data.print();
     if (error_code == ERROR_SUCCESS) {
         bn_t length;
@@ -420,6 +420,7 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
         cgbn_store(arith.env, &signature.r, r);
         cgbn_store(arith.env, &signature.s, s);
         signature.v = cgbn_get_ui32(arith.env, v);
+#ifdef EIP_3155
         printf("\n v %d\n", signature.v);
         printf("r : \n");
         print_bnt(arith, r);
@@ -427,11 +428,12 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
         print_bnt(arith, s);
         printf("msgh: \n");
         print_bnt(arith, msg_hash);
+#endif
         // TODO: is not 27 and 28, only?
         if (cgbn_compare_ui32(arith.env, v, 28) <= 0) {
             __SHARED_MEMORY__ uint8_t output[32];
             size_t res = ecc::ec_recover(arith, constants, signature, signer);
-#ifdef __CUDA_ARCH__
+#ifdef EIP_3155
             printf("ec recover %d\n", res);
             print_bnt(arith, signer);
 #endif

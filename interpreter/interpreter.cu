@@ -18,7 +18,8 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
     CuEVM::bn_t test;
 
-    // printf("new instance %d\n", instance);
+// printf("new instance %d\n", instance);
+#ifdef EIP_3155
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     printf("instance %d\n", instance);
     printf("world state\n");
@@ -29,8 +30,9 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     printf("transaction\n");
     instances[instance].transaction_ptr->print();
     __ONE_GPU_THREAD_WOSYNC_END__
+#endif
     CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance]);
-    printf("\nevm->run(arith) instance %d\n", instance);
+    // printf("\nevm->run(arith) instance %d\n", instance);
     __SYNC_THREADS__
     evm->run(arith);
 #ifdef EIP_3155

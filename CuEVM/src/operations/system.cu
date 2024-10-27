@@ -175,10 +175,10 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         // get the initialisation code
         CuEVM::byte_array_t initialisation_code;
         current_state.memory_ptr->get(arith, memory_offset, length, initialisation_code);
-#ifdef __CUDA_ARCH__
-        printf("initialisation_code %d:\n", threadIdx.x);
-        initialisation_code.print();
-#endif
+        // #ifdef __CUDA_ARCH__
+        //         printf("initialisation_code %d:\n", threadIdx.x);
+        //         initialisation_code.print();
+        // #endif
         bn_t sender_address;
         current_state.message_ptr->get_recipient(arith, sender_address);
         bn_t contract_address;
@@ -318,9 +318,9 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
     }
 
-#ifdef __CUDA_ARCH__
-    printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
+    // #endif
     return error_code;
 }
 
