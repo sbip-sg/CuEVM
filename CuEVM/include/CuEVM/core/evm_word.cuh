@@ -24,11 +24,22 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * The copy constructor.
      */
     __host__ __device__ evm_word_t(const evm_word_t &src);
+    /**
+     * The constructor from a uint32_t.
+     * @param[in] value The source uint32_t
+     */
+    __host__ __device__ evm_word_t(uint32_t value);
 
     /**
      * The assignment operator.
+     * @param[in] src The source evm_word_t
      */
     __host__ __device__ evm_word_t &operator=(const evm_word_t &src);
+    /**
+     * The assignment operator for uint32_t.
+     * @param[in] value The source uint32_t
+     */
+    __host__ __device__ evm_word_t &operator=(uint32_t value);
 
     /**
      * The equality operator.
@@ -57,8 +68,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ int32_t
-    from_byte_array_t(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
+    __host__ __device__ int32_t from_byte_array_t(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
     /**
      * Set the evm_word_t from a size_t.
      * @param[in] value The source size_t
@@ -82,6 +92,15 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * Print the evm_word_t.
      */
     __host__ __device__ void print() const;
+
+    /**
+     * Compare two evm_word_t values.
+     * @param[in] a Pointer to the first evm_word_t
+     * @param[in] b Pointer to the second evm_word_t
+     * @return -1 if a < b, 0 if a == b, 1 if a > b
+     */
+    __host__ __device__ int32_t evm_word_t_compare(const evm_word_t *a, const evm_word_t *b);
+
     /**
      * Get the hex string from the evm_word_t.
      * The hex string is in Big Endian format.
@@ -93,8 +112,11 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * limbs to convert
      * @return The hex string
      */
-    __host__ char *to_hex(char *hex_string = nullptr, int32_t pretty = 0,
-                          uint32_t count = CuEVM::cgbn_limbs) const;
+    __host__ __device__ char *to_hex(char *hex_string = nullptr, int32_t pretty = 0,
+                                     uint32_t count = CuEVM::cgbn_limbs) const;
+
+    __host__ __device__ void print_as_compact_hex() const;
+
     /**
      * Get the byte array from the evm_word_t.
      * The byte array is in Big Endian format.
@@ -104,8 +126,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ int32_t to_byte_array_t(
-        byte_array_t &byte_array, int32_t endian = BIG_ENDIAN) const;
+    __host__ __device__ int32_t to_byte_array_t(byte_array_t &byte_array, int32_t endian = BIG_ENDIAN) const;
     /**
      * Get the bit array from the evm_word_t.
      * The bit array is in Big Endian format.
@@ -115,8 +136,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ int32_t to_bit_array_t(
-        byte_array_t &bit_array, int32_t endian = LITTLE_ENDIAN) const;
+    __host__ __device__ int32_t to_bit_array_t(byte_array_t &bit_array, int32_t endian = LITTLE_ENDIAN) const;
 };
 
 typedef cgbn_mem_t<CuEVM::word_bits> *cgbn_evm_word_t_ptr;

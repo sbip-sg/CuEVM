@@ -15,11 +15,9 @@
 #endif
 #ifdef MULTIPLE_THREADS_PER_INSTANCE
 #define __ONE_THREAD_PER_INSTANCE(X) \
-    __ __syncthreads();              \
     if (threadIdx.x == 0) {          \
         X                            \
-    }                                \
-    __syncthreads();
+    }                                
 #define __ONE_GPU_THREAD_BEGIN__ \
     __syncthreads();             \
     if (threadIdx.x == 0) {
@@ -33,7 +31,7 @@
 #define __SYNC_THREADS__ __syncthreads();
 #define __SHARED_MEMORY__ __shared__
 #else
-#define __ONE_THREAD_PER_INSTANCE(X) __ X
+#define __ONE_THREAD_PER_INSTANCE(X) X
 #define __ONE_GPU_THREAD_BEGIN__
 #define __ONE_GPU_THREAD_END__
 #define __ONE_GPU_THREAD_WOSYNC_BEGIN__

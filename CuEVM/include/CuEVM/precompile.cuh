@@ -18,6 +18,7 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/touch_state.cuh>
 #include <CuEVM/utils/arith.cuh>
+#include <CuEVM/utils/ecc_constants.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 namespace CuEVM {
 /**
@@ -38,9 +39,9 @@ namespace precompile_operations {
  * The Identity precompile contract
  * MEMCPY through the message data and return data
  */
-__host__ __device__ int32_t operation_IDENTITY(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_IDENTITY(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                               CuEVM::evm_return_data_t *return_data,
+                                               CuEVM::evm_message_call_t *message);
 
 /**
  * The SHA2-256 precompile contract
@@ -52,37 +53,34 @@ __host__ __device__ int32_t operation_IDENTITY(
  * @param[out] return_data The return data
  * @param[in] message The message
  */
-__host__ __device__ int32_t operation_SHA256(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_SHA256(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                             CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
 
-__host__ __device__ int32_t operation_RIPEMD160(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_RIPEMD160(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                                CuEVM::evm_return_data_t *return_data,
+                                                CuEVM::evm_message_call_t *message);
 
-__host__ __device__ int32_t operation_MODEXP(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                             CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
 
-__host__ __device__ int32_t operation_BLAKE2(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_BLAKE2(ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
+                                             CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
 
-__host__ __device__ int32_t operation_ecRecover(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                                bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                                CuEVM::evm_message_call_t *message);
 
-__host__ __device__ int32_t operation_ecAdd(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_ecAdd(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                            bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                            CuEVM::evm_message_call_t *message);
 
-__host__ __device__ int32_t operation_ecMul(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_ecMul(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                            bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                            CuEVM::evm_message_call_t *message);
 
-__host__ __device__ int32_t operation_ecPairing(
-    ArithEnv &arith, bn_t &gas_limit, bn_t &gas_used,
-    CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message);
+__host__ __device__ int32_t operation_ecPairing(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
+                                                bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
+                                                CuEVM::evm_message_call_t *message);
 
 }  // namespace precompile_operations
 }  // namespace CuEVM

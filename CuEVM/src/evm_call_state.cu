@@ -4,13 +4,13 @@
 #include <CuEVM/utils/opcodes.cuh>
 
 namespace CuEVM {
-__host__ __device__ evm_call_state_t::evm_call_state_t(
-    ArithEnv& arith, CuEVM::evm_call_state_t* parent, uint32_t depth,
-    uint32_t pc, bn_t gas_used, bn_t gas_refund,
-    CuEVM::evm_message_call_t* message_ptr, CuEVM::evm_stack_t* stack_ptr,
-    CuEVM::evm_memory_t* memory_ptr, CuEVM::log_state_data_t* log_state_ptr,
-    CuEVM::TouchState touch_state,
-    CuEVM::evm_return_data_t* last_return_data_ptr) {
+__host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent, uint32_t depth,
+                                                       uint32_t pc, bn_t gas_used, bn_t gas_refund,
+                                                       CuEVM::evm_message_call_t* message_ptr,
+                                                       CuEVM::evm_stack_t* stack_ptr, CuEVM::evm_memory_t* memory_ptr,
+                                                       CuEVM::log_state_data_t* log_state_ptr,
+                                                       CuEVM::TouchState touch_state,
+                                                       CuEVM::evm_return_data_t* last_return_data_ptr) {
     this->parent = parent;
     this->depth = depth;
     this->pc = pc;
@@ -31,9 +31,8 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(
 /**
  * The constructor with the parent state and message call
  */
-__host__ __device__ evm_call_state_t::evm_call_state_t(
-    ArithEnv& arith, CuEVM::evm_call_state_t* parent,
-    CuEVM::evm_message_call_t* message_ptr)
+__host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
+                                                       CuEVM::evm_message_call_t* message_ptr)
     : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
     this->parent = parent;
     this->depth = parent->depth + 1;
@@ -54,12 +53,11 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(
 /**
  * The constructor with no parent state and message call
  */
-__host__ __device__ evm_call_state_t::evm_call_state_t(
-    ArithEnv& arith, CuEVM::WorldState* word_state_ptr,
-    CuEVM::evm_stack_t* stack_ptr, CuEVM::evm_memory_t* memory_ptr,
-    CuEVM::log_state_data_t* log_state_ptr,
-    CuEVM::state_access_t* state_access_ptr,
-    CuEVM::evm_return_data_t* last_return_data_ptr)
+__host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::WorldState* word_state_ptr,
+                                                       CuEVM::evm_stack_t* stack_ptr, CuEVM::evm_memory_t* memory_ptr,
+                                                       CuEVM::log_state_data_t* log_state_ptr,
+                                                       CuEVM::state_access_t* state_access_ptr,
+                                                       CuEVM::evm_return_data_t* last_return_data_ptr)
     : touch_state(state_access_ptr, word_state_ptr) {
     this->parent = nullptr;
     this->depth = 0;
@@ -90,23 +88,25 @@ __host__ __device__ evm_call_state_t::~evm_call_state_t() {
     }
 }
 
-__host__ __device__ int32_t evm_call_state_t::update(ArithEnv& arith,
-                                                     evm_call_state_t& other) {
+__host__ __device__ int32_t evm_call_state_t::update(ArithEnv& arith, evm_call_state_t& other) {
     uint32_t error_code = ERROR_SUCCESS;
     // printf("\n\ntouch state update \n");
     // printf("this touch state \n");
     // this->touch_state.print();
-    // printf("\n------------------\n\n");
+    // // printf("\n------------------\n\n");
     // printf("other touch state \n");
     // other.touch_state.print();
     // printf("\n------------------\n\n");
+
     error_code |= this->touch_state.update(arith, &other.touch_state);
     // printf("touch state update done \n");
     // printf("this touch state \n");
     // this->touch_state.print();
     // printf("\n------------------\n\n");
     // printf("end touch state update\n\n");
+#ifdef ENABLE_LOGS
     error_code |= this->log_state_ptr->update(arith, *other.log_state_ptr);
+#endif
     return error_code;
 }
 

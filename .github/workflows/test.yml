@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, gpu]
 
     services:
       docker:
@@ -30,17 +30,6 @@ jobs:
           cd ${{ github.workspace }}/${{ github.run_id }}
           git submodule update --init --recursive
 
-      # - name: Set up Docker Buildx
-      #   uses: docker/setup-buildx-action@v2
-
-      # - name: Cache Docker layers
-      #   uses: actions/cache@v3
-      #   with:
-      #     path: /tmp/.buildx-cache
-      #     key: ${{ runner.os }}-buildx-${{ github.sha }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-buildx-
-
       - name: Cache Docker images.
         uses: ScribeMD/docker-cache@0.5.0
         with:
@@ -54,17 +43,17 @@ jobs:
       - name: Start cuevm-test-runner container
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
-          docker run --memory="8g" --memory-swap="8g"  -d --name cuevm-test-runner-${{ github.run_id }} \
+          docker run --gpus all --memory="3g" --memory-swap="3g"  -d --name cuevm-test-runner-${{ github.run_id }} \
             -v ${{ github.workspace }}/${{ github.run_id }}:/workspaces/CuEVM \
             -w /workspaces/CuEVM \
-            augustus/goevmlab-cuevm:20241008 /bin/bash -c "tail -f /dev/null"
+            augustus/goevmlab-cuevm:gpu /bin/bash -c "tail -f /dev/null"
 
       - name: Build binary inside the container
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
           docker exec cuevm-test-runner-${{ github.run_id }} /bin/bash -c "
-              cmake -S . -B build -DCPU='ON' -DCMAKE_EXPORT_COMPILE_COMMANDS=1 &&
-              cmake --build build -j 24
+              cmake -S . -B build -DTESTS=OFF -DGPU=ON -DCPU=OFF -DCUDA_COMPUTE_CAPABILITY=86 -DENABLE_EIP_3155_OPTIONAL=OFF -DENABLE_EIP_3155=ON
+              cmake --build build -j 8
           "
 
       - name: Clone ethereum/tests
@@ -77,7 +66,7 @@ jobs:
       - name: Run tests concurrently using Python
         run: |
           cd ${{ github.workspace }}/${{ github.run_id }}
-          python3 -u scripts/run-ci-tests.py
+          python3 -u scripts/run-ci-tests-gpu.py
 
       - name: Generate summary of test results in markdown
         run: |
@@ -94,7 +83,6 @@ jobs:
 
 
       - name: Archive test results
-        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: test-results
@@ -105,5 +93,6 @@ jobs:
         run: |
           docker exec cuevm-test-runner-${{ github.run_id }} rm -rf /workspaces/CuEVM || true
           rm -rf ${{ github.workspace }}/${{ github.run_id }} || true
+          docker stop cuevm-test-runner-${{ github.run_id }} || true
           docker kill -s -9 cuevm-test-runner-${{ github.run_id }} || true
-          docker rm cuevm-test-runner-${{ github.run_id }} || true
+          docker rm -f cuevm-test-runner-${{ github.run_id }} || true

@@ -22,32 +22,18 @@ struct state_access_t : state_t {
     /**
      * The default constructor.
      */
-    __host__ __device__ state_access_t() : state_t(), flags(nullptr) {}
-
-    /**
-     * The constructor with the accounts, the number of accounts and the flags.
-     * @param[in] accounts The accounts.
-     * @param[in] no_accounts The number of accounts.
-     * @param[in] flags The flags.
-     */
-    __host__ __device__ state_access_t(CuEVM::account_t *accounts,
-                                       uint32_t no_accounts,
-                                       CuEVM::account_flags_t *flags)
-        : state_t(accounts, no_accounts), flags(flags) {}
+    __host__ __device__ state_access_t();
 
     /**
      * THe copy constructor.
      * @param[in] other The other state access.
      */
-    __host__ __device__ state_access_t(const state_access_t &other) {
-        free();
-        duplicate(other);
-    }
+    __host__ __device__ state_access_t(const state_access_t &other);
 
     /**
      * The destructor.
      */
-    __host__ __device__ ~state_access_t() { free(); }
+    __host__ __device__ ~state_access_t();
 
     /**
      * The free function.
@@ -68,13 +54,7 @@ struct state_access_t : state_t {
      * @param[in] other The other state access.
      * @return The current state access.
      */
-    __host__ __device__ state_access_t &operator=(const state_access_t &other) {
-        if (this != &other) {
-            free();
-            duplicate(other);
-            return *this;
-        }
-    }
+    __host__ __device__ state_access_t &operator=(const state_access_t &other);
 
     /**
      * The duplicate function.
@@ -90,9 +70,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account,
-                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The get account function.
@@ -102,9 +81,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(
-        ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The get account index function.
@@ -112,8 +90,7 @@ struct state_access_t : state_t {
      * @param[out] index The index.
      * @return If found 0. otherwise error.
      */
-    __host__ int32_t get_account_index_evm(const evm_word_t &address,
-                                           uint32_t &index) const;
+    __host__ int32_t get_account_index_evm(const evm_word_t &address, uint32_t &index) const;
 
     /**
      * The add account function.
@@ -121,9 +98,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    add_account(const CuEVM::account_t &account,
-                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t add_account(const CuEVM::account_t &account,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The add duplicate account function.
@@ -132,9 +108,9 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t add_duplicate_account(
-        CuEVM::account_t *&account_ptr, CuEVM::account_t *&src_account_ptr,
-        const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t add_duplicate_account(ArithEnv &arith, CuEVM::account_t *&account_ptr,
+                                                      CuEVM::account_t *&src_account_ptr,
+                                                      const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The add new account function.
@@ -144,9 +120,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t add_new_account(
-        ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t add_new_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+                                                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
      * The set account function.
@@ -155,9 +130,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    set_account(ArithEnv &arith, const CuEVM::account_t &account,
-                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
+    __host__ __device__ int32_t set_account(ArithEnv &arith, const CuEVM::account_t &account,
+                                            const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
 
     /**
      * The update account function.
@@ -166,9 +140,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t
-    update_account(ArithEnv &arith, const CuEVM::account_t &account,
-                   const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
+    __host__ __device__ int32_t update_account(ArithEnv &arith, const CuEVM::account_t &account,
+                                               const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
 
     /**
      * The update state function.
@@ -176,8 +149,7 @@ struct state_access_t : state_t {
      * @param[in] other The other state access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t update(ArithEnv &arith,
-                                       const state_access_t &other);
+    __host__ __device__ int32_t update(ArithEnv &arith, const state_access_t &other);
 
     /**
      * The print function.
@@ -197,8 +169,47 @@ struct state_access_t : state_t {
      * @param[in] state2 The second state.
      * @return The merged state in JSON.
      */
-    __host__ static cJSON *merge_json(const state_t &state1,
-                                      const state_access_t &state2);
+    __host__ static cJSON *merge_json(const state_t &state1, const state_access_t &state2);
+    /**
+     * Get the cpu states.
+     * @param[in] count The count.
+     * @return The cpu states.
+     */
+    __host__ static state_access_t *get_cpu(uint32_t count);
+    /**
+     * Free the cpu states.
+     * @param[in] cpu_states The cpu states.
+     * @param[in] count The count.
+     */
+    __host__ static void cpu_free(state_access_t *cpu_states, uint32_t count);
+    /**
+     * Get the gpu states from the cpu.
+     * @param[in] cpu_states The cpu states.
+     * @param[in] count The count.
+     * @return The gpu states.
+     */
+    __host__ static state_access_t *get_gpu_from_cpu(const state_access_t *cpu_states, uint32_t count);
+    /**
+     * Free the gpu states.
+     * @param[in] gpu_states The gpu states.
+     * @param[in] count The count.
+     */
+    __host__ static void gpu_free(state_access_t *gpu_states, uint32_t count);
+    /**
+     * Get the cpu states from the gpu.
+     * @param[in] gpu_states The gpu states.
+     * @param[in] count The count.
+     * @return The cpu states.
+     */
+    __host__ static state_access_t *get_cpu_from_gpu(state_access_t *gpu_states, uint32_t count);
 };
 
+/**
+ * The state_access_t transfer kernel.
+ * @param[out] dst_instances The destination instances.
+ * @param[in] src_instances The source instances.
+ * @param[in] count The count.
+ */
+__global__ void state_access_t_transfer_kernel(state_access_t *dst_instances, state_access_t *src_instances,
+                                               uint32_t count);
 }  // namespace CuEVM

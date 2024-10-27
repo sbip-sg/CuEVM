@@ -20,8 +20,7 @@ __host__ cJSON *trace_data_t::to_json() {
     cJSON_AddNumberToObject(json, "memSize", mem_size);
     cJSON *stack_json = cJSON_CreateArray();
     for (uint32_t i = 0; i < stack_size; i++) {
-        cJSON_AddItemToArray(
-            stack_json, cJSON_CreateString(stack[i].to_hex(hex_string_ptr)));
+        cJSON_AddItemToArray(stack_json, cJSON_CreateString(stack[i].to_hex(hex_string_ptr)));
     }
     cJSON_AddItemToObject(json, "stack", stack_json);
     cJSON_AddNumberToObject(json, "depth", depth);
@@ -37,80 +36,64 @@ __host__ cJSON *trace_data_t::to_json() {
     return json;
 }
 
-__host__ void trace_data_t::print_err(char *hex_string_ptr) {
+// __device__ void tracer_t::print_tracer_data(trace_data_t *data, uint32_t size) {
+//     for (uint32_t i = 0; i < size; i++) {
+//         printf("pc %u op %u\n", data[i].pc, data[i].op);
+//     }
+// }
+// New device function to copy and print tracer data
+__device__ void tracer_t::print_device_err() {}
+
+__host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
     char *tmp = nullptr;
     if (hex_string_ptr == nullptr) {
         tmp = new char[CuEVM::word_size * 2 + 3];
         hex_string_ptr = tmp;
     }
-    std::string stack_str;
-    if (stack_size > 0) {
-        stack_str += "\"";
-        for (auto index = 0; index < stack_size; index++) {
-            std::string temp = stack[index].to_hex(hex_string_ptr, 1);
-            stack_str += temp;
-            if (index == stack_size - 1) {
-                stack_str += "\"";
-            } else {
-                stack_str += "\",\"";
-            }
+
+    printf("{\"pc\":%d,\"op\":%d,", pc, op);
+
+    printf("\"gas\":\"%s\",", gas.to_hex(hex_string_ptr, 1));
+
+    printf("\"gasCost\":\"%s\",", gas_cost.to_hex(hex_string_ptr, 1));
+
+    printf("\"memSize\":%u,", mem_size);
+
+    printf("\"stack\":");
+
+    // print uint256 stack values
+    printf("[");
+    for (uint32_t i = 0; i < stack_size; i++) {
+        stack[i].print_as_compact_hex();
+        if (i != stack_size - 1) {
+            printf(",");
         }
     }
-    // std::cerr << "{\"pc\":" << pc << ",\"op\":" << op << ",\"gas\":\"" <<
-    // gas.to_hex(hex_string_ptr, 1) << "\",\"gasCost\":\"" <<
-    // gas_cost.to_hex(hex_string_ptr, 1) << "\",\"stack\":[" << stack_str <<
-    // "],\"depth\":" << depth << ",\"memSize\":" << mem_size << "}\n";
-    // fprintf(stderr,
-    // "{\"pc\":%d,\"op\":%d,\"gas\":\"%s\",\"gasCost\":\"%s\",\"memSize\":%u,\"stack\":[%s],\"depth\":%d,
-    // \"refund\":%s}\n",
-    //     pc, op, gas.to_hex(hex_string_ptr, 1),
-    //     gas_cost.to_hex(hex_string_ptr, 1), mem_size, stack_str.c_str(),
-    //     depth, refund.to_hex(hex_string_ptr, 1));
+    printf("],");
 
-    fprintf(stderr, "{\"pc\":%d,\"op\":%d,", pc, op);
-
-    fprintf(stderr, "\"gas\":\"%s\",", gas.to_hex(hex_string_ptr, 1));
-
-    fprintf(stderr, "\"gasCost\":\"%s\",", gas_cost.to_hex(hex_string_ptr, 1));
-
-    fprintf(stderr, "\"memSize\":%u,", mem_size);
-
-    fprintf(stderr, "\"stack\":[%s],", stack_str.c_str());
-
-    fprintf(stderr, "\"depth\":%d,", depth);
+    printf("\"depth\":%d,", depth);
 
     // TODO: strupid to just show the least significant 32 bits
     // correct way is to show the whole 256 bits
     // fprintf(stderr, "\"refund\":\"%s\"}\n", refund.to_hex(hex_string_ptr,
     // 1));
-    fprintf(stderr, "\"refund\":%u", refund._limbs[0]);
+    printf("\"refund\":%u", refund._limbs[0]);
 #ifdef EIP_3155_OPTIONAL
-    fprintf(stderr, ",\"error\":%u", error_code);
-    fprintf(stderr, ",\"memory\":\"0x");
+    printf(",\"error\":%u", error_code);
+    printf(",\"memory\":\"0x");
     for (uint32_t j = 0; j < mem_size; j++) {
-        fprintf(stderr, "%02x", memory[j]);
+        printf("%02x", memory[j]);
     }
-    fprintf(stderr, "\"");
-// fprintf(stderr, ",\"storage\":{");
-// for (uint32_t idx = 0; idx < storage.size; idx++) {
-//     storage.storage[idx].key.to_hex(hex_string_ptr, 1);
-//     fprintf(stderr, "\"%s\":", hex_string_ptr);
-//     storage.storage[idx].value.to_hex(hex_string_ptr, 1);
-//     fprintf(stderr, "\"%s\"", hex_string_ptr);
-//     if (idx != storage.size - 1) {
-//         fprintf(stderr, ", ");
-//     }
-// }
-// fprintf(stderr, "}");
+    printf("\"");
+
 #endif
-    fprintf(stderr, "}\n");
+    printf("}\n");
     if (tmp != nullptr) {
         delete[] tmp;
     }
 }
 
-__host__ __device__ tracer_t::tracer_t()
-    : data(nullptr), size(0), capacity(0) {}
+__host__ __device__ tracer_t::tracer_t() : data(nullptr), size(0), capacity(0) {}
 
 __host__ __device__ tracer_t::~tracer_t() {
     if (data != nullptr) {
@@ -126,51 +109,67 @@ __host__ __device__ tracer_t::~tracer_t() {
 }
 
 __host__ __device__ void tracer_t::grow() {
-    trace_data_t *new_data = new trace_data_t[capacity + 128];
+    trace_data_t *new_data;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    new_data = new trace_data_t[capacity + 128];
     if (data != nullptr) {
         memcpy(new_data, data, sizeof(trace_data_t) * size);
         delete[] data;
     }
+    __ONE_GPU_THREAD_END__
     data = new_data;
+    __SYNC_THREADS__
     capacity += 128;
 }
 
-__host__ __device__ uint32_t tracer_t::start_operation(
-    ArithEnv &arith, const uint32_t pc, const uint8_t op,
-    const CuEVM::evm_memory_t &memory, const CuEVM::evm_stack_t &stack,
-    const uint32_t depth, const CuEVM::evm_return_data_t &return_data,
-    const bn_t &gas_limit, const bn_t &gas_used) {
+__host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const uint32_t pc, const uint8_t op,
+                                                       const CuEVM::evm_memory_t &memory,
+                                                       const CuEVM::evm_stack_t &stack, const uint32_t depth,
+                                                       const CuEVM::evm_return_data_t &return_data,
+                                                       const bn_t &gas_limit, const bn_t &gas_used) {
     if (size == capacity) {
         grow();
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("tracer op %d idx %d after  grow\n", op, threadIdx.x);
+    // #endif
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].pc = pc;
     data[size].op = op;
     data[size].mem_size = memory.get_size();
+    __ONE_GPU_THREAD_END__
     bn_t gas;
     cgbn_sub(arith.env, gas, gas_limit, gas_used);
     cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas), gas);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas_cost),
-               gas_used);
+    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas_cost), gas_used);
+    // #ifdef __CUDA_ARCH__
+    //     printf("tracer op %d idx %d after storing gas cost\n", op, threadIdx.x);
+    // #endif
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].stack_size = stack.size();
-    data[size].stack = new evm_word_t[data[size].stack_size];
-    std::copy(stack.stack_base, stack.stack_base + stack.size(),
-              data[size].stack);
-    // memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) *
-    // data[size].stack_size);
+    if (data[size].stack_size > 0) {
+        data[size].stack = new evm_word_t[data[size].stack_size];
+        // std::copy(stack.stack_base, stack.stack_base + stack.size(), data[size].stack);
+        memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) * data[size].stack_size);
+    }
+
     data[size].depth = depth;
-    data[size].return_data = new byte_array_t(return_data);
+    __ONE_GPU_THREAD_END__  // sync here
+#ifndef GPU                 // reduce complication in gpu code
+        data[size]
+            .return_data = new byte_array_t(return_data);
+#endif
+
 #ifdef EIP_3155_OPTIONAL
     data[size].memory = new uint8_t[data[size].mem_size];
-    std::copy(memory.data.data, memory.data.data + data[size].mem_size,
-              data[size].memory);
-// memcpy(data[size].memory, memory.data.data, data[size].mem_size);
+    // std::copy(memory.data.data, memory.data.data + data[size].mem_size, data[size].memory);
+    memcpy(data[size].memory, memory.data.data, data[size].mem_size);
 #endif
+
     return size++;
 }
 
-__host__ __device__ void tracer_t::finish_operation(ArithEnv &arith,
-                                                    const uint32_t idx,
-                                                    const bn_t &gas_used,
+__host__ __device__ void tracer_t::finish_operation(ArithEnv &arith, const uint32_t idx, const bn_t &gas_used,
                                                     const bn_t &gas_refund
 #ifdef EIP_3155_OPTIONAL
                                                     ,
@@ -179,22 +178,20 @@ __host__ __device__ void tracer_t::finish_operation(ArithEnv &arith,
 #endif
 ) {
     bn_t gas_cost;
-    cgbn_load(arith.env, gas_cost,
-              (cgbn_evm_word_t_ptr) & (data[idx].gas_cost));
+    cgbn_load(arith.env, gas_cost, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost));
     cgbn_sub(arith.env, gas_cost, gas_used, gas_cost);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost),
-               gas_cost);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].refund),
-               gas_refund);
+    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost), gas_cost);
+    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].refund), gas_refund);
 #ifdef EIP_3155_OPTIONAL
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[idx].error_code = error_code;
+    __ONE_GPU_THREAD_WOSYNC_END__
 // data[idx].storage = storage;
 #endif
 }
 
-__host__ __device__ void tracer_t::finish_transaction(
-    ArithEnv &arith, const CuEVM::evm_return_data_t &return_data,
-    const bn_t &gas_used, uint32_t error_code) {
+__host__ __device__ void tracer_t::finish_transaction(ArithEnv &arith, const CuEVM::evm_return_data_t &return_data,
+                                                      const bn_t &gas_used, uint32_t error_code) {
     this->return_data = return_data;
     cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (this->gas_used), gas_used);
     this->status = error_code;
@@ -231,40 +228,33 @@ __host__ __device__ void tracer_t::print(ArithEnv &arith) {
     }
 }
 
-__host__ void tracer_t::print_err() {
+__host__ __device__ void tracer_t::print_err() {
     char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
     for (uint32_t i = 0; i < size; i++) {
         data[i].print_err(hex_string_ptr);
     }
-    // fprintf(stderr,
-    // "{\"stateRoot\":\"0x\",\"output\":%s,\"gasUsed\":\"%s\",\"pass\":\"%s\",\"fork\":%s,\"time\":%lu}\n",
-    //     return_data.to_hex(), gas_used.to_hex(hex_string_ptr, 1), status ==
-    //     ERROR_SUCCESS ? "true" : "false", "\"\"\"\"", 2);
-
-    fprintf(stderr, "{\"stateRoot\":\"0x\",");
+    printf("{\"stateRoot\":\"0x\",");
 
     char *return_data_hex = return_data.to_hex();
 
     if (return_data_hex != nullptr) {
-        if (strlen(return_data_hex) > 2) {
-            fprintf(stderr, "\"output\":\"%s\",", return_data_hex);
+        if (return_data_hex[2] != '\0') {  // more than `0x` stored in the string
+            printf("\"output\":\"%s\",", return_data_hex);
         } else {
-            fprintf(stderr, "\"output\":\"\",");
+            printf("\"output\":\"\",");
         }
         delete[] return_data_hex;
     } else {
-        fprintf(stderr, "\"output\":\"\",");
+        printf("\"output\":\"\",");
     }
 
-    fprintf(stderr, "\"gasUsed\":\"%s\",", gas_used.to_hex(hex_string_ptr, 1));
+    printf("\"gasUsed\":\"%s\",", gas_used.to_hex(hex_string_ptr, 1));
 
-    fprintf(stderr, "\"pass\":\"%s\",",
-            (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true"
-                                                                 : "false");
+    printf("\"pass\":\"%s\",", (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true" : "false");
 
     // fprintf(stderr, "\"fork\":%s,", "\"\"\"\"");
 
-    fprintf(stderr, "\"time\":%u}\n", 2);
+    printf("\"time\":%u}\n", 2);
     delete[] hex_string_ptr;
 }
 

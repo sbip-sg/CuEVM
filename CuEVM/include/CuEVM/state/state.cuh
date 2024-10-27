@@ -24,16 +24,7 @@ struct state_t {
      * The default constructor.
      * It initializes the accounts to nullptr and the no_accounts to 0.
      */
-    __host__ __device__ state_t() : accounts(nullptr), no_accounts(0) {}
-
-    /**
-     * The constructor with the accounts and the number of accounts.
-     * @param[in] accounts The accounts.
-     * @param[in] no_accounts The number of accounts.
-     */
-    __host__ __device__ state_t(CuEVM::account_t *accounts,
-                                uint32_t no_accounts)
-        : accounts(accounts), no_accounts(no_accounts) {}
+    __host__ __device__ state_t();
 
     /**
      * The destructor.
@@ -81,9 +72,7 @@ struct state_t {
      * @param[out] index The index.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account_index(ArithEnv &arith,
-                                                  const bn_t &address,
-                                                  uint32_t &index);
+    __host__ __device__ int32_t get_account_index(ArithEnv &arith, const bn_t &address, uint32_t &index);
 
     /**
      * The get account function.
@@ -92,9 +81,7 @@ struct state_t {
      * @param[out] account The account.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith,
-                                            const bn_t &address,
-                                            CuEVM::account_t &account);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account);
 
     /**
      * The get account function.
@@ -103,9 +90,7 @@ struct state_t {
      * @param[out] account_ptr The account pointer.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith,
-                                            const bn_t &address,
-                                            CuEVM::account_t *&account_ptr);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr);
 
     /**
      * The add account function.
@@ -120,17 +105,15 @@ struct state_t {
      * @param[in] account The account.
      * @return If set 0. otherwise error.
      */
-    __host__ __device__ int32_t set_account(ArithEnv &arith,
-                                            const CuEVM::account_t &account);
+    __host__ __device__ int32_t set_account(ArithEnv &arith, const CuEVM::account_t &account);
 
     /**
      * The has account function.
      * @param[in] arith The arithmetic environment.
      * @param[in] address The address.
-     * @return If has 1. otherwise 0.
+     * @return If has ERROR_SUCCESS. otherwise ERROR_STATE_ADDRESS_NOT_FOUND.
      */
-    __host__ __device__ int32_t has_account(ArithEnv &arith,
-                                            const bn_t &address);
+    __host__ __device__ int32_t has_account(ArithEnv &arith, const bn_t &address);
 
     /**
      * The update account function.
@@ -138,8 +121,7 @@ struct state_t {
      * @param[in] account The account.
      * @return If updated 0. otherwise error.
      */
-    __host__ __device__ int32_t update_account(ArithEnv &arith,
-                                               const CuEVM::account_t &account);
+    __host__ __device__ int32_t update_account(ArithEnv &arith, const CuEVM::account_t &account);
 
     // /**
     //  * If an account is empty.
@@ -169,6 +151,48 @@ struct state_t {
      * @return The JSON.
      */
     __host__ cJSON *to_json();
+
+    // STATE FUNCTIONS
+    /**
+     * Get the cpu states.
+     * @param[in] count The count.
+     * @return The cpu states.
+     */
+    __host__ static state_t *get_cpu(uint32_t count);
+    /**
+     * Free the cpu states.
+     * @param[in] cpu_states The cpu states.
+     * @param[in] count The count.
+     */
+    __host__ static void cpu_free(state_t *cpu_states, uint32_t count);
+    /**
+     * Get the gpu states from the cpu.
+     * @param[in] cpu_states The cpu states.
+     * @param[in] count The count.
+     * @return The gpu states.
+     */
+    __host__ static state_t *get_gpu_from_cpu(const state_t *cpu_states, uint32_t count);
+    /**
+     * Free the gpu states.
+     * @param[in] gpu_states The gpu states.
+     * @param[in] count The count.
+     */
+    __host__ static void gpu_free(state_t *gpu_states, uint32_t count);
+    /**
+     * Get the cpu states from the gpu.
+     * @param[in] gpu_states The gpu states.
+     * @param[in] count The count.
+     * @return The cpu states.
+     */
+    __host__ static state_t *get_cpu_from_gpu(state_t *gpu_states, uint32_t count);
 };
+
+/**
+ * The state transfer kernel.
+ * @param[out] dst_instances The destination instances.
+ * @param[in] src_instances The source instances.
+ * @param[in] count The count.
+ */
+__global__ void state_t_transfer_kernel(state_t *dst_instances, state_t *src_instances, uint32_t count);
 
 }  // namespace CuEVM

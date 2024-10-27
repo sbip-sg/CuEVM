@@ -15,18 +15,16 @@ namespace CuEVM {
  * The account type.
  */
 struct account_t {
-    evm_word_t address; /**< The address of the account (YP: \f$a\f$) */
-    evm_word_t
-        balance; /**< The balance of the account (YP: \f$\sigma[a]_{b}\f$) */
-    evm_word_t nonce; /**< The nonce of the account (YP: \f$\sigma[a]_{n}\f$) */
-    byte_array_t byte_code; /**< The bytecode of the account (YP: \f$b\f$) */
-    CuEVM::contract_storage_t
-        storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
+    evm_word_t address;                /**< The address of the account (YP: \f$a\f$) */
+    evm_word_t balance;                /**< The balance of the account (YP: \f$\sigma[a]_{b}\f$) */
+    evm_word_t nonce;                  /**< The nonce of the account (YP: \f$\sigma[a]_{n}\f$) */
+    byte_array_t byte_code;            /**< The bytecode of the account (YP: \f$b\f$) */
+    CuEVM::contract_storage_t storage; /**< The storage of the account (YP: \f$\sigma[a]_{s}\f$) */
 
     /**
      * The default constructor for the account data structure.
      */
-    __host__ __device__ account_t() : storage(), byte_code(0U) {};
+    __host__ __device__ account_t() : storage(), byte_code() {};
 
     /**
      * The copy constructor for the account data structure.
@@ -39,16 +37,14 @@ struct account_t {
      * @param[in] account The account data structure
      * @param[in] flags The account flags
      */
-    __host__ __device__ account_t(const account_t &account,
-                                  const account_flags_t &flags);
+    __host__ __device__ account_t(const account_t &account, const account_flags_t &flags);
 
     /**
      * The copy constructor from the account ptr structure with flags.
      * @param[in] account_ptr The account data structure
      * @param[in] flags The account flags
      */
-    __host__ __device__ account_t(const account_t *account_ptr,
-                                  const account_flags_t &flags);
+    __host__ __device__ account_t(const account_t *account_ptr, const account_flags_t &flags);
 
     /**
      * Constructor for an empty account with the given address.
@@ -91,8 +87,7 @@ struct account_t {
      * @param[out] value The value
      * @return If found 0, otherwise error code
      */
-    __host__ __device__ int32_t get_storage_value(ArithEnv &arith,
-                                                  const bn_t &key, bn_t &value);
+    __host__ __device__ int32_t get_storage_value(ArithEnv &arith, const bn_t &key, bn_t &value);
     /**
      * Set the storage value for the given key.
      * @param[in] arith The arithmetical environment
@@ -100,9 +95,7 @@ struct account_t {
      * @param[in] value The value of the storage
      * @return If set succesfull 0, otherwise error code
      */
-    __host__ __device__ int32_t set_storage_value(ArithEnv &arith,
-                                                  const bn_t &key,
-                                                  const bn_t &value);
+    __host__ __device__ int32_t set_storage_value(ArithEnv &arith, const bn_t &key, const bn_t &value);
 
     /**
      * Get the address of the account.
@@ -164,8 +157,7 @@ struct account_t {
      * @param[in] address The address
      * @return If found 1, otherwise 0
      */
-    __host__ __device__ int32_t has_address(ArithEnv &arith,
-                                            const bn_t &address);
+    __host__ __device__ int32_t has_address(ArithEnv &arith, const bn_t &address);
 
     /**
      * Verify if the account has the the given address.
@@ -173,8 +165,7 @@ struct account_t {
      * @param[in] address The address as evm word
      * @return If found 1, otherwise 0
      */
-    __host__ __device__ int32_t has_address(ArithEnv &arith,
-                                            const evm_word_t &address);
+    __host__ __device__ int32_t has_address(ArithEnv &arith, const evm_word_t &address);
 
     /**
      * Update the current account with the information
@@ -183,9 +174,8 @@ struct account_t {
      * @param[in] other The given account
      * @param[in] flags The flags to indicate which fields should be updated
      */
-    __host__ __device__ void update(
-        ArithEnv &arith, const account_t &other,
-        const account_flags_t &flags = ACCOUNT_ALL_FLAG);
+    __host__ __device__ void update(ArithEnv &arith, const account_t &other,
+                                    const account_flags_t &flags = ACCOUNT_ALL_FLAG);
     /**
      * Verify if the account is empty.
      * @return If empty 1, otherwise 0
@@ -228,6 +218,13 @@ struct account_t {
     __host__ __device__ void print();
 
     /**
+     * To copy the account data structures.
+     * @param[out] dst The destination account data structure
+     * @param[in] src The source account data structure
+     */
+    __host__ __device__ static void transfer_memory(account_t &dst, account_t &src);
+
+    /**
      * Generate the cpu data structures for the account.
      * @param[in] count The number of instances
      * @return The cpu data structures
@@ -246,8 +243,7 @@ struct account_t {
      * @param[in] cpu_instances The cpu data structures
      * @param[in] count The number of instances
      */
-    __host__ static account_t *get_gpu_from_cpu(account_t *cpu_instances,
-                                                uint32_t count);
+    __host__ static account_t *get_gpu_from_cpu(account_t *cpu_instances, uint32_t count);
 
     /**
      * Free the gpu data structures for the account.
@@ -263,8 +259,7 @@ struct account_t {
      * @param[in] count The number of instances
      * @return The cpu data structures
      */
-    __host__ static account_t *get_cpu_from_gpu(account_t *gpu_instances,
-                                                uint32_t count);
+    __host__ static account_t *get_cpu_from_gpu(account_t *gpu_instances, uint32_t count);
     /**
      * The json from two account data structures pointers.
      * @param[in] account1_ptr The first account data structure
@@ -272,8 +267,7 @@ struct account_t {
      * @param[in] flags The account flags representig the fields
      * @return The json object
      */
-    __host__ static cJSON *merge_json(const account_t *&account1_ptr,
-                                      const account_t *&account2_ptr,
+    __host__ static cJSON *merge_json(const account_t *&account1_ptr, const account_t *&account2_ptr,
                                       const account_flags_t &flags);
 };
 
@@ -283,7 +277,5 @@ struct account_t {
  * @param[in] src The source account data structure
  * @param[in] count The number of instances
  */
-__global__ void account_t_transfer_kernel(account_t *dst_instances,
-                                          account_t *src_instances,
-                                          uint32_t count);
+__global__ void account_t_transfer_kernel(account_t *dst_instances, account_t *src_instances, uint32_t count);
 }  // namespace CuEVM

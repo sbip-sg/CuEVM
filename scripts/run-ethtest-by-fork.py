@@ -8,6 +8,8 @@ from uuid import uuid4
 
 log_file = open('run-ethtest-by-fork.log', 'a')
 
+TIME_OUT = 90
+
 def debug_print(*args, **kwargs):
     print(*args, **kwargs)
 
@@ -24,9 +26,11 @@ def read_as_json_lines(filepath):
             yield json.loads(line)
 
 def check_output(output, error, without_state_root):
-    has_str = lambda s: s in (output + error)
+    all_output = output + error
+    print(all_output)
+    has_str = lambda s: s in all_output
     if without_state_root:
-        if has_str('error') and not has_str('stateRoot'):
+        if has_str('error') and all_output.count('stateRoot') < 2:
             raise ValueError(f"💥 Mismatch found {output}")
     else:
         if has_str('error'):
@@ -34,13 +38,29 @@ def check_output(output, error, without_state_root):
 
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root):
-    command = [runtest_bin, f'--outdir=./{uuid4()}', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
+    if '/tmp/' not in output_filepath:
+        outdir = f'./{uuid4()}'
+    else:
+        outdir = f'./tmp/{uuid4()}'
+    os.makedirs(outdir, exist_ok=True)
+    command = [runtest_bin, f'--outdir={outdir}', f'--geth={geth_bin}', f'--cuevm={cuevm_bin}', output_filepath]
 
     debug_print(' '.join(command))
 
     clean_test_out()
-    result = subprocess.run(command, capture_output=True, text=True, timeout=120)
-    check_output(result.stdout, result.stderr, without_state_root)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, preexec_fn=os.setsid)
+    try:
+        stdout, stderr = proc.communicate(timeout=TIME_OUT)
+        check_output(stdout, stderr, without_state_root)
+    finally:
+        print(f"Killing child processes of {proc.pid}")
+        try:
+            os.killpg(proc.pid, 9)
+            proc.wait()
+        except ProcessLookupError:
+            pass
+
+
 
     debug_print(f"🎉 Test passed for {output_filepath}")
 
@@ -135,8 +155,11 @@ def main():
     parser.add_argument('--without-state-root', action='store_true', help='verify without the state root', default=False)
     parser.add_argument('--microtests', action='store_true', help='verify without the state root', default=False)
     parser.add_argument('--skip-folder', type=str, help='Skip folder', default="")
+    parser.add_argument('--timeout', type=int, help='Timeout in seconds for each test', default=90)
     args = parser.parse_args()
 
+    global TIME_OUT
+    TIME_OUT = args.timeout
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
         assert_command_in_path(cmd)
 
