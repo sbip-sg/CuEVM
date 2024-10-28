@@ -98,6 +98,61 @@ __host__ __device__ int32_t evm_stack_t::pop(ArithEnv &arith, bn_t &y) {
     return ERROR_SUCCESS;
 }
 
+#ifdef __CUDA_ARCH__
+__host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8_t *src_byte_data,
+                                               uint8_t src_byte_size) {
+    if (x > 32) {
+        return ERROR_STACK_INVALID_SIZE;
+    }
+    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    // printf("pushx %d data size %d data to insert: \n", x, src_byte_size);
+    // for (uint8_t idx = 0; idx < src_byte_size; idx++) {
+    //     printf("%02x", src_byte_data[idx]);
+    // }
+    // printf("\n");
+    // __ONE_GPU_THREAD_WOSYNC_END__
+
+    int32_t error_code = (size() >= capacity) ? grow() : ERROR_SUCCESS;
+    if (error_code == ERROR_SUCCESS) {
+        int last_idx_from_left = 31 - min(x, src_byte_size);
+        int my_idx = threadIdx.x % CuEVM::cgbn_tpi;
+        // printf("pushx data inserted %d myidx %d firstidxleft %d\n", threadIdx.x, my_idx, last_idx_from_left);
+        // if (my_idx < first_idx / 4) {
+        //     top_->_limbs[my_idx] = 0;
+        // } else {
+        // each thead will insert 4 bytes/ hardcoded big endian for now
+        int byte_start = (my_idx + 1) * 4 - 1;
+        uint32_t limb_value = 0;
+        if (byte_start > last_idx_from_left) {
+            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)];  //<< 24;
+        }
+        byte_start--;
+        if (byte_start > last_idx_from_left) {
+            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 8;  // << 16;
+        }
+        byte_start--;
+        if (byte_start > last_idx_from_left) {
+            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 16;  // << 8;
+        }
+        byte_start--;
+        if (byte_start > last_idx_from_left) {
+            // printf("bytestart %d src data idx %d thread idx %d, srcbyte %02x \n", byte_start, 31 - byte_start,
+            //        threadIdx.x, src_byte_data[31 - byte_start]);
+            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 24;
+        }
+
+        top()->_limbs[CuEVM::cgbn_tpi - my_idx - 1] = limb_value;
+    }
+
+    // __SYNC_THREADS__  // do we need to sync here?
+    //     printf("pushx data inserted %d\n", threadIdx.x);
+    // top()->print();
+
+    stack_offset++;
+    return error_code;
+}
+
+#else
 __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8_t *src_byte_data,
                                                uint8_t src_byte_size) {
     // TODO:: for sure is something more efficient here
@@ -112,6 +167,7 @@ __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8
 
     return push(arith, r);
 }
+#endif
 
 __host__ __device__ int32_t evm_stack_t::get_index(ArithEnv &arith, uint32_t index, bn_t &y) {
     if (index > size()) {

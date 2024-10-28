@@ -31,6 +31,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
       block_info_ptr(block_info_ptr),
       transaction_ptr(transaction_ptr),
       ecc_constants_ptr(ecc_constants_ptr) {
+    // TODO: store in local/shared memory
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
                                                  touch_state_data_ptr, return_data_ptr);
 #ifdef EIP_3155
@@ -232,8 +233,9 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
     uint8_t opcode;
     CuEVM::evm_call_state_t *child_call_state_ptr = nullptr;
     while (status == ERROR_SUCCESS) {
-        opcode = ((call_state_ptr->pc < ((call_state_ptr->message_ptr)->byte_code).size)
-                      ? (call_state_ptr->message_ptr)->byte_code.data[call_state_ptr->pc]
+        uint32_t current_pc = call_state_ptr->pc;  // TODO: store in local/shared memory
+        opcode = ((current_pc < ((call_state_ptr->message_ptr)->byte_code).size)
+                      ? (call_state_ptr->message_ptr)->byte_code.data[current_pc]
                       : OP_STOP);
         __SYNC_THREADS__
 #ifdef EIP_3155
@@ -244,28 +246,25 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         //                opcode, call_state_ptr->trace_idx, tracer_ptr, tracer_ptr->size);
         //         __ONE_GPU_THREAD_WOSYNC_END__
         // #endif
-        uint32_t trace_idx = tracer_ptr->start_operation(arith, call_state_ptr->pc, opcode, *call_state_ptr->memory_ptr,
-                                                         *call_state_ptr->stack_ptr, call_state_ptr->depth,
-                                                         *call_state_ptr->last_return_data_ptr,
-                                                         call_state_ptr->gas_limit, call_state_ptr->gas_used);
+        uint32_t trace_idx = tracer_ptr->start_operation(
+            arith, current_pc, opcode, *call_state_ptr->memory_ptr, *call_state_ptr->stack_ptr, call_state_ptr->depth,
+            *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_limit, call_state_ptr->gas_used);
         call_state_ptr->trace_idx = trace_idx;
 #ifdef __CUDA_ARCH__
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("\npc: %d opcode: %d, depth %d, thread %d \n", call_state_ptr->pc, opcode, call_state_ptr->depth,
-               threadIdx.x);
+        printf("\npc: %d opcode: %d, depth %d, thread %d \n", current_pc, opcode, call_state_ptr->depth, threadIdx.x);
         __ONE_GPU_THREAD_WOSYNC_END__
 #endif
 #endif
         // DEBUG PRINT
 
-        // __ONE_THREAD_PER_INSTANCE(
-        // printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
+        // __ONE_THREAD_PER_INSTANCE(printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
         // printf("touch state BEGIN BEGIN BEGIN\n");
         // call_state_ptr->touch_state.print();
         // printf("touch state END END END\n");
         if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70)) {
             error_code = CuEVM::operations::PUSHX(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
-                                                  call_state_ptr->pc, *call_state_ptr->stack_ptr,
+                                                  current_pc, *call_state_ptr->stack_ptr,
                                                   ((call_state_ptr->message_ptr)->byte_code), opcode);
         } else if ((opcode & 0xF0) == 0x80)  // DUPX
         {
@@ -275,11 +274,6 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         {
             error_code = CuEVM::operations::SWAPX(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
                                                   *call_state_ptr->stack_ptr, opcode);
-        } else if ((opcode >= 0xA0) && (opcode <= 0xA4))  // LOGX
-        {
-            error_code = CuEVM::operations::LOGX(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
-                                                 *call_state_ptr->stack_ptr, *call_state_ptr->memory_ptr,
-                                                 *call_state_ptr->message_ptr, *call_state_ptr->log_state_ptr, opcode);
         } else {
             switch (opcode) {
                 case OP_STOP:
@@ -531,19 +525,19 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                                                            call_state_ptr->touch_state, *call_state_ptr->message_ptr);
                     break;
                 case OP_JUMP:
-                    error_code = CuEVM::operations::JUMP(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
-                                                         call_state_ptr->pc, *call_state_ptr->stack_ptr,
-                                                         *call_state_ptr->message_ptr);
+                    error_code =
+                        CuEVM::operations::JUMP(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used, current_pc,
+                                                *call_state_ptr->stack_ptr, *call_state_ptr->message_ptr);
                     break;
                 case OP_JUMPI:
-                    error_code = CuEVM::operations::JUMPI(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
-                                                          call_state_ptr->pc, *call_state_ptr->stack_ptr,
-                                                          *call_state_ptr->message_ptr);
+                    error_code =
+                        CuEVM::operations::JUMPI(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used, current_pc,
+                                                 *call_state_ptr->stack_ptr, *call_state_ptr->message_ptr);
                     break;
 
                 case OP_PC:
                     error_code = CuEVM::operations::PC(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
-                                                       call_state_ptr->pc, *call_state_ptr->stack_ptr);
+                                                       current_pc, *call_state_ptr->stack_ptr);
                     break;
 
                 case OP_MSIZE:
@@ -616,15 +610,24 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
                     break;
 
                 default:
-                    error_code = CuEVM::operations::INVALID();
+                    if ((opcode >= 0xA0) && (opcode <= 0xA4))  // LOGX // not common
+                    {
+                        error_code = CuEVM::operations::LOGX(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
+                                                             *call_state_ptr->stack_ptr, *call_state_ptr->memory_ptr,
+                                                             *call_state_ptr->message_ptr,
+                                                             *call_state_ptr->log_state_ptr, opcode);
+                    } else
+                        error_code = CuEVM::operations::INVALID();
                     break;
             }
         }
 
         // TODO: to see after calls
         // increase program counter
-        call_state_ptr->pc++;
-        // __SYNC_THREADS__
+        call_state_ptr->pc = ++current_pc;  // current pc may be changed by pushx
+                                            // call_state_ptr->pc++;
+                                            // __SYNC_THREADS__
+
 // #ifdef __CUDA_ARCH__
 //         __SYNC_THREADS__
 //         printf("idx %d after increase pc %d , call_state_ptr %p, call_state_ptr->trace_idx %d , depth %d\n",
@@ -644,8 +647,8 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         // #ifdef __CUDA_ARCH__
         //         printf("after finish_operation idx %d opcode %d error code %d\n", threadIdx.x, opcode, error_code);
         // #endif
-        if ((opcode == OP_CALL) || (opcode == OP_CALLCODE) || (opcode == OP_DELEGATECALL) || (opcode == OP_CREATE) ||
-            (opcode == OP_CREATE2) || (opcode == OP_STATICCALL)) {
+        // all calls  + create
+        if (opcode >= OP_CREATE && opcode <= OP_STATICCALL && opcode != OP_RETURN) {
             if (error_code == ERROR_SUCCESS) {
                 call_state_ptr = child_call_state_ptr;
                 error_code = start_CALL(arith);
