@@ -5,8 +5,11 @@
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/ecc_constants.cuh>
 
+
 namespace ecc {
 using namespace CuEVM;
+
+
 
 typedef struct {
     evm_word_t r;
@@ -20,13 +23,16 @@ typedef struct {
 // Reuse Curve struct definition from CuEVM namespace
 using Curve = CuEVM::Curve;
 
-template <size_t Degree>
 struct FQ {
-    bn_t coeffs[Degree];
+    bn_t coeffs[13];
+  uint8_t degree;
+
+  __host__ __device__ FQ(uint8_t deg) : degree(deg) {}
+
 };
 
-template <size_t Degree>
-void print_fqp(env_t env, FQ<Degree> &P, const char *name);
+
+__host__ __device__ void print_fqp(env_t env, FQ &P, const char *name);
 
 __host__ __device__ void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod);
 
@@ -38,8 +44,7 @@ __host__ __device__ void cgbn_div_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn
 
 __host__ __device__ bool is_on_cuve_simple(env_t env, bn_t &Px, bn_t &Py, bn_t &mod, uint32_t B);
 
-template <size_t Degree>
-__host__ __device__ bool FQP_equals(ArithEnv &arith, FQ<Degree> &P1, FQ<Degree> &P2);
+__host__ __device__ bool FQP_equals(ArithEnv &arith, FQ &P1, FQ &P2);
 
 __host__ __device__ int ec_add(ArithEnv &arith, Curve curve, bn_t &ResX, bn_t &ResY, bn_t &Px, bn_t &Py, bn_t &Qx,
                                bn_t &Qy);
@@ -51,78 +56,72 @@ __host__ __device__ void convert_point_to_address(ArithEnv &arith, bn_t &address
 __host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_constants_ptr, signature_t &sig,
                                    bn_t &signer);
 
-template <size_t Degree>
-__host__ __device__ void getFQ12_from_cgbn_t(ArithEnv &arith, FQ<Degree> &res, bn_t (&coeffs)[Degree]);
+__host__ __device__ void getFQ12_from_cgbn_t(ArithEnv &arith, FQ &res, bn_t (&coeffs));
 
-template <size_t Degree>
-__host__ __device__ void FQP_add(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_sub(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t &mod);
+__host__ __device__ void FQP_add(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ uint deg(ArithEnv &arith, const FQ<Degree> &P);
+__host__ __device__ void FQP_sub(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ FQ<Degree> get_one(ArithEnv &arith);
+__host__ __device__ uint deg(ArithEnv &arith, const FQ &P);
 
-template <size_t Degree>
-__host__ __device__ void poly_rounded_div(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &A, FQ<Degree> &B, bn_t &mod);
+__host__ __device__ FQ get_one(ArithEnv &arith, uint8_t degree);
 
-template <size_t Degree>
-__host__ __device__ void FQP_copy(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P);
+__host__ __device__ void poly_rounded_div(ArithEnv &arith, FQ &Res, FQ &A, FQ &B, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_mul(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t &mod);
+__host__ __device__ void FQP_copy(ArithEnv &arith, FQ &Res, FQ &P);
 
-template <size_t Degree>
-__host__ __device__ void FQP_inv(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_div(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t &mod);
+__host__ __device__ void FQP_mul(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_neg(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_pow(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &n, bn_t &mod);
+__host__ __device__ void FQP_inv(ArithEnv &arith, FQ &Res, FQ &P, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_mul_scalar(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &n, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ bool FQP_is_on_curve(ArithEnv &arith, FQ<Degree> &Px, FQ<Degree> &Py, bn_t &mod, FQ<Degree> &B);
+__host__ __device__ void FQP_div(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ bool FQP_is_valid(ArithEnv &arith, FQ<Degree> &P, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ bool FQP_is_inf(ArithEnv &arith, FQ<Degree> &Px, FQ<Degree> &Py);
+__host__ __device__ void FQP_neg(ArithEnv &arith, FQ &Res, FQ &P, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_ec_add(ArithEnv &arith, FQ<Degree> &ResX, FQ<Degree> &ResY, FQ<Degree> &Px, FQ<Degree> &Py,
-                                    FQ<Degree> &Qx, FQ<Degree> &Qy, bn_t &mod_fp);
 
-template <size_t Degree>
-__host__ __device__ void FQP_ec_mul(ArithEnv &arith, FQ<Degree> &ResX, FQ<Degree> &ResY, FQ<Degree> &Gx, FQ<Degree> &Gy,
+__host__ __device__ void FQP_pow(ArithEnv &arith, FQ &Res, FQ &P, bn_t &n, bn_t &mod);
+
+
+__host__ __device__ void FQP_mul_scalar(ArithEnv &arith, FQ &Res, FQ &P, bn_t &n, bn_t &mod);
+
+
+__host__ __device__ bool FQP_is_on_curve(ArithEnv &arith, FQ &Px, FQ &Py, bn_t &mod, FQ &B);
+
+
+__host__ __device__ bool FQP_is_valid(ArithEnv &arith, FQ &P, bn_t &mod);
+
+
+__host__ __device__ bool FQP_is_inf(ArithEnv &arith, FQ &Px, FQ &Py);
+
+
+__host__ __device__ void FQP_ec_add(ArithEnv &arith, FQ &ResX, FQ &ResY, FQ &Px, FQ &Py,
+                                    FQ &Qx, FQ &Qy, bn_t &mod_fp);
+
+
+__host__ __device__ void FQP_ec_mul(ArithEnv &arith, FQ &ResX, FQ &ResY, FQ &Gx, FQ &Gy,
                                     bn_t &n, bn_t &mod_fp);
 
-template <size_t Degree>
-__host__ __device__ void FQP_linefunc(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1x, FQ<Degree> &P1y,
-                                      FQ<Degree> &P2x, FQ<Degree> &P2y, FQ<Degree> &Tx, FQ<Degree> &Ty, bn_t &mod);
 
-__host__ __device__ void FQP_twist(ArithEnv &arith, FQ<12> &Rx, FQ<12> &Ry, FQ<2> &Px, FQ<2> &Py, bn_t &mod_fp);
+__host__ __device__ void FQP_linefunc(ArithEnv &arith, FQ &Res, FQ &P1x, FQ &P1y,
+                                      FQ &P2x, FQ &P2y, FQ &Tx, FQ &Ty, bn_t &mod);
 
-template <size_t Degree>
-__host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, EccConstants *constants, FQ<Degree> &res,
-                                                  FQ<Degree> &p, bn_t &mod);
+__host__ __device__ void FQP_twist(ArithEnv &arith, FQ &Rx, FQ &Ry, FQ &Px, FQ &Py, bn_t &mod_fp);
 
-template <size_t Degree>
-__host__ __device__ void miller_loop(ArithEnv &arith, FQ<Degree> &Result, FQ<Degree> &Qx, FQ<Degree> &Qy,
-                                     FQ<Degree> &Px, FQ<Degree> &Py, bn_t &mod_fp, bn_t &curve_order,
+
+__host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, EccConstants *constants, FQ &res,
+                                                  FQ &p, bn_t &mod);
+
+
+__host__ __device__ void miller_loop(ArithEnv &arith, FQ &Result, FQ &Qx, FQ &Qy,
+                                     FQ &Px, FQ &Py, bn_t &mod_fp, bn_t &curve_order,
                                      bn_t &ate_loop_count, bool final_exp = true);
 
-__host__ __device__ void pairing(ArithEnv &arith, FQ<12> &Res, FQ<2> &Qx, FQ<2> &Qy, FQ<1> &Px, FQ<1> &Py, bn_t &mod_fp,
+__host__ __device__ void pairing(ArithEnv &arith, FQ &Res, FQ &Qx, FQ &Qy, FQ &Px, FQ &Py, bn_t &mod_fp,
                                  bn_t &curve_order, bn_t &ate_loop_count, bool final_exp = true);
 
 __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_constants_ptr, uint8_t *points_data,

@@ -4,47 +4,6 @@
 
 namespace ecc {
 
-// typedef struct {
-//     evm_word_t FP;
-//     evm_word_t Order;
-//     evm_word_t GX;
-//     evm_word_t GY;
-//     // A!=0 is not supported for simplicity
-//     uint32_t B;
-//     // y^2 = x^3 + 7 // y^2 = x^3 + 3
-//     // y^2 = x^3 + Ax + B
-//     // Constructor that accepts a curve name
-// } Curve;
-
-// __host__ __device__ static const int32_t FQ2_mod_coeffs[] = {1, 0};
-// __host__ __device__ static const int32_t FQ1_mod_coeffs[] = {1};
-// __host__ __device__ static const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
-
-// template <size_t Degree>
-// struct FQ {
-//     bn_t coeffs[Degree];
-// };
-
-// Constexpr function to return the appropriate modulus coefficients array based
-// on the template parameter Degree
-// template <size_t Degree>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs();
-
-// template <>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs<2>() {
-//     return FQ2_mod_coeffs;
-// }
-// template <>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs<1>() {
-//     return FQ1_mod_coeffs;
-// }
-// template <>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs<12>() {
-//     return FQ12_mod_coeffs;
-// }
-// __host__ __device__ static const int32_t FQ2_mod_coeffs[] = {1, 0};
-// __host__ __device__ static const int32_t FQ1_mod_coeffs[] = {1};
-// __host__ __device__ static const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
 
 __host__ __device__ void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
     env_t::cgbn_wide_t temp;
@@ -62,6 +21,7 @@ __host__ __device__ void cgbn_add_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn
         cgbn_rem(env, res, res, mod);
     }
 }
+
 __host__ __device__ void cgbn_sub_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
     // if b > a then a - b + mod
     if (cgbn_compare(env, a, b) < 0) {
@@ -358,37 +318,32 @@ __host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_con
 }
 
 #ifdef ENABLE_PAIRING_CODE
-template <size_t Degree>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs();
+__constant__ int32_t FQ1_MOD_COEFFS[] = {1};
+__constant__ int32_t FQ2_MOD_COEFFS[] = {1, 0};
+__constant__ int32_t FQ12_MOD_COEFFS[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
 
-template <>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs<2>() {
-    const int32_t FQ2_mod_coeffs[] = {1, 0};
-    return FQ2_mod_coeffs;
-}
 
-template <>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs<1>() {
-    const int32_t FQ1_mod_coeffs[] = {1};
-    return FQ1_mod_coeffs;
-}
-
-template <>
-__host__ __device__ constexpr const int32_t *get_modulus_coeffs<12>() {
-    const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
-    return FQ12_mod_coeffs;
+__host__ __device__ constexpr const int32_t *get_modulus_coeffs(uint8_t degree) {
+    if (degree == 2) {
+        return FQ2_MOD_COEFFS;
+    } else if (degree == 1) {
+        return FQ1_MOD_COEFFS;
+    } else if (degree == 12) {
+        return FQ12_MOD_COEFFS;
+    }
+    return nullptr;
 }
 
 /***
  * @brief helper function to print FQP in hex
  */
-template <size_t Degree>
-__host__ __device__ void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
+
+__host__ __device__ void print_fqp(env_t env, FQ &P, const char *name) {
     __SHARED_MEMORY__ evm_word_t scratch_pad;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     printf("FQP %s: \n", name);
     __ONE_GPU_THREAD_END__
-    for (size_t i = 0; i < Degree; i++) {
+    for (size_t i = 0; i < P.degree; i++) {
         cgbn_store(env, &scratch_pad, P.coeffs[i]);
         // pretty_hex_string_from_cgbn_memory(temp_str, scratch_pad);
         scratch_pad.print();
@@ -423,8 +378,8 @@ __host__ __device__ void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
 // /***
 //  * @brief helper function to print FQP in hex
 // */
-// template <size_t Degree>
-// void print_fqp(ArithEnv &arith, FQ<Degree> &P, const char *name) {
+//
+// void print_fqp(ArithEnv &arith, FQ &P, const char *name) {
 //     evm_word_t scratch_pad;
 //     char *temp_str = new char[CuEVM::word_bits/8 * 2 + 3];
 //     printf("%s: \n", name);
@@ -436,8 +391,8 @@ __host__ __device__ void print_fqp(env_t env, FQ<Degree> &P, const char *name) {
 
 // }
 
-template <size_t Degree>
-__host__ __device__ bool FQP_equals(ArithEnv &arith, FQ<Degree> &P1, FQ<Degree> &P2) {
+__host__ __device__ bool FQP_equals(ArithEnv &arith, FQ &P1, FQ &P2) {
+    auto Degree = P1.degree;
     for (size_t i = 0; i < Degree; i++) {
         if (!cgbn_equals(arith.env, P1.coeffs[i], P2.coeffs[i])) {
             return false;
@@ -453,10 +408,10 @@ __host__ __device__ bool FQP_equals(ArithEnv &arith, FQ<Degree> &P1, FQ<Degree> 
  * @param env
  * @param res
  */
-template <size_t Degree>
-__host__ __device__ void getFQ12_from_cgbn_t(ArithEnv &arith, FQ<Degree> &res, bn_t (&coeffs)[Degree]) {
-    for (uint32_t i = 0; i < Degree; i++) {
-        cgbn_set(arith.env, res.coeffs[i], coeffs[i]);
+
+__host__ __device__ void getFQ12_from_cgbn_t(ArithEnv &arith, FQ &res, bn_t *coeffs) {
+    for (uint32_t i = 0; i < res.degree; i++) {
+      cgbn_set(arith.env, res.coeffs[i], *(coeffs + i));
     }
 }
 
@@ -470,9 +425,9 @@ __host__ __device__ void getFQ12_from_cgbn_t(ArithEnv &arith, FQ<Degree> &res, b
  * @param P2
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void FQP_add(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t &mod) {
-    for (size_t i = 0; i < Degree; i++) {
+
+__host__ __device__ void FQP_add(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2, bn_t &mod) {
+    for (size_t i = 0; i < Res.degree; i++) {
         cgbn_add_mod(arith.env, Res.coeffs[i], P1.coeffs[i], P2.coeffs[i], mod);
     }
 }
@@ -487,9 +442,9 @@ __host__ __device__ void FQP_add(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
  * @param P2
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void FQP_sub(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t &mod) {
-    for (size_t i = 0; i < Degree; i++) {
+
+__host__ __device__ void FQP_sub(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2, bn_t &mod) {
+    for (size_t i = 0; i < Res.degree; i++) {
         // printf("P1[%d]: %s\n", i, bnt_to_string(env, P1.coeffs[i]));
         // printf("P2[%d]: %s\n", i, bnt_to_string(env, P2.coeffs[i]));
         // printf("mod: %s\n", bnt_to_string(env, mod));
@@ -507,9 +462,9 @@ __host__ __device__ void FQP_sub(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
  * @param P
  * @return uint
  */
-template <size_t Degree>
-__host__ __device__ uint deg(ArithEnv &arith, const FQ<Degree> &P) {
-    uint res = Degree - 1;
+
+__host__ __device__ uint deg(ArithEnv &arith, const FQ &P) {
+    uint res = P.degree - 1;
     while (cgbn_equals_ui32(arith.env, P.coeffs[res], 0) && res) res -= 1;
     return res;
 }
@@ -519,11 +474,11 @@ __host__ __device__ uint deg(ArithEnv &arith, const FQ<Degree> &P) {
  *
  * @tparam Degree
  * @param env
- * @return FQ<Degree>
+ * @return FQ
  */
-template <size_t Degree>
-__host__ __device__ FQ<Degree> get_one(ArithEnv &arith) {
-    FQ<Degree> res;
+
+  __host__ __device__ FQ get_one(ArithEnv &arith, uint8_t degree) {
+    FQ res(degree);
     cgbn_set_ui32(arith.env, res.coeffs[0], 1);
     return res;
 }
@@ -538,17 +493,18 @@ __host__ __device__ FQ<Degree> get_one(ArithEnv &arith) {
  * @param B
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void poly_rounded_div(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &A, FQ<Degree> &B, bn_t &mod) {
+
+__host__ __device__ void poly_rounded_div(ArithEnv &arith, FQ &Res, FQ &A, FQ &B, bn_t &mod) {
+    auto Degree = Res.degree;
     uint dega = deg(arith, A);
     uint degb = deg(arith, B);
-    FQ<Degree> temp;
+    FQ temp(Degree);
     for (size_t i = 0; i < Degree; i++) {
         cgbn_set(arith.env, temp.coeffs[i], A.coeffs[i]);
         cgbn_set_ui32(arith.env, Res.coeffs[i], 0);
     }
 
-    FQ<Degree> o;
+    FQ o(Degree);
     bn_t temp_res;
     for (int32_t i = dega - degb; i >= 0; i--) {
         // o[i] += temp[degb + i] / b[degb]
@@ -572,9 +528,9 @@ __host__ __device__ void poly_rounded_div(ArithEnv &arith, FQ<Degree> &Res, FQ<D
  * @param Res
  * @param P
  */
-template <size_t Degree>
-__host__ __device__ void FQP_copy(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P) {
-    for (size_t i = 0; i < Degree; i++) {
+
+__host__ __device__ void FQP_copy(ArithEnv &arith, FQ &Res, FQ &P) {
+    for (size_t i = 0; i < Res.degree; i++) {
         cgbn_set(arith.env, Res.coeffs[i], P.coeffs[i]);
     }
 }
@@ -589,13 +545,14 @@ __host__ __device__ void FQP_copy(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &
  * @param P2
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void FQP_mul(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2, bn_t &mod) {
+
+__host__ __device__ void FQP_mul(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2, bn_t &mod) {
+    auto Degree = Res.degree;
     if (Degree == 1) {
         cgbn_mul_mod(arith.env, Res.coeffs[0], P1.coeffs[0], P2.coeffs[0], mod);
         return;
     } else {
-        bn_t b[2 * Degree - 1];
+        bn_t b[2 * 13 - 1];
 
         bn_t temp;  // Temporary variable for intermediate results
 
@@ -610,8 +567,8 @@ __host__ __device__ void FQP_mul(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
             }
         }
 
-        bn_t mod_coeffs[Degree];
-        const int32_t *mod_coeffs_array = get_modulus_coeffs<Degree>();
+        bn_t mod_coeffs[13];
+        const int32_t *mod_coeffs_array = get_modulus_coeffs(Degree);
         for (size_t i = 0; i < Degree; i++) {
             if (mod_coeffs_array[i] < 0) {
                 // printf("negative mod coeffs\n");
@@ -646,19 +603,20 @@ __host__ __device__ void FQP_mul(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
  * @param P
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void FQP_inv(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &mod) {
+
+__host__ __device__ void FQP_inv(ArithEnv &arith, FQ &Res, FQ &P, bn_t &mod) {
+    auto Degree = Res.degree;
     if (Degree == 1) {
         cgbn_modular_inverse(arith.env, Res.coeffs[0], P.coeffs[0], mod);
         return;
     }
-    FQ<Degree + 1> lm, hm, low, high;
+    FQ lm(Degree + 1), hm(Degree + 1), low(Degree + 1), high(Degree + 1);
     bn_t temp;
     // lm[0] = 1;
     cgbn_set_ui32(arith.env, lm.coeffs[0], 1);
     // set low,high
     // Initialize high with modulus coefficients + [1]
-    const int32_t *mod_coeffs = get_modulus_coeffs<Degree>();
+    const int32_t *mod_coeffs = get_modulus_coeffs(Degree);
 
     for (size_t i = 0; i < Degree; i++) {
         cgbn_set(arith.env, low.coeffs[i], P.coeffs[i]);
@@ -671,11 +629,11 @@ __host__ __device__ void FQP_inv(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
     cgbn_set_ui32(arith.env, high.coeffs[Degree], 1);
 
     while (deg(arith, low) > 0) {  // Assuming a function `deg` to find the polynomial's degree
-        FQ<Degree + 1> r;
+        FQ r(Degree + 1);
         poly_rounded_div(arith, r, high, low,
                          mod);  // Needs to return FQ<Degree+1> or similar
 
-        FQ<Degree + 1> nm, new_h;
+        FQ nm(Degree + 1), new_h(Degree + 1);
         FQP_copy(arith, nm, hm);
         FQP_copy(arith, new_h, high);
         for (size_t i = 0; i <= Degree; ++i) {
@@ -716,8 +674,8 @@ __host__ __device__ void FQP_inv(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
  * @param P2
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void FQP_div(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P1, FQ<Degree> &P2,
+
+__host__ __device__ void FQP_div(ArithEnv &arith, FQ &Res, FQ &P1, FQ &P2,
                                  bn_t &mod) {  // P1/P2
     FQP_inv(arith, Res, P2, mod);
     FQP_mul(arith, Res, P1, Res, mod);
@@ -732,9 +690,9 @@ __host__ __device__ void FQP_div(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
  * @param P
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void FQP_neg(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &mod) {
-    for (size_t i = 0; i < Degree; i++) {
+
+__host__ __device__ void FQP_neg(ArithEnv &arith, FQ &Res, FQ &P, bn_t &mod) {
+    for (size_t i = 0; i < Res.degree; i++) {
         cgbn_sub_mod(arith.env, Res.coeffs[i], mod, P.coeffs[i], mod);
     }
 }
@@ -749,14 +707,14 @@ __host__ __device__ void FQP_neg(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P
  * @param n
  * @param mod
  */
-// template <size_t Degree>
-__host__ __device__ void FQP_pow(ArithEnv &arith, FQ<12> &Res, FQ<12> &P, bn_t &n, bn_t &mod) {
+//
+__host__ __device__ void FQP_pow(ArithEnv &arith, FQ &Res, FQ &P, bn_t &n, bn_t &mod) {
     // if (Degree == 1) {
     //     cgbn_modular_power(arith.env, Res.coeffs[0], P.coeffs[0], n, mod);
     //     return;
     // }
     bn_t temp_n;
-    FQ<12> temp;
+    FQ temp(12);
     FQP_copy(arith, temp, P);
     cgbn_set(arith.env, temp_n, n);
     // TODO, may not be necessary
@@ -784,9 +742,9 @@ __host__ __device__ void FQP_pow(ArithEnv &arith, FQ<12> &Res, FQ<12> &P, bn_t &
  * @param n
  * @param mod
  */
-template <size_t Degree>
-__host__ __device__ void FQP_mul_scalar(ArithEnv &arith, FQ<Degree> &Res, FQ<Degree> &P, bn_t &n, bn_t &mod) {
-    for (size_t i = 0; i < Degree; i++) {
+
+__host__ __device__ void FQP_mul_scalar(ArithEnv &arith, FQ &Res, FQ &P, bn_t &n, bn_t &mod) {
+    for (size_t i = 0; i < Res.degree; i++) {
         cgbn_mul_mod(arith.env, Res.coeffs[i], P.coeffs[i], n, mod);
     }
 }
@@ -804,11 +762,12 @@ __host__ __device__ void FQP_mul_scalar(ArithEnv &arith, FQ<Degree> &Res, FQ<Deg
  * @return true
  * @return false
  */
-template <size_t Degree>
-__host__ __device__ bool FQP_is_on_curve(ArithEnv &arith, FQ<Degree> &Px, FQ<Degree> &Py, bn_t &mod, FQ<Degree> &B) {
+
+__host__ __device__ bool FQP_is_on_curve(ArithEnv &arith, FQ &Px, FQ &Py, bn_t &mod, FQ &B) {
+    auto Degree = Px.degree;
     // y^2 = x^3 + B
     if (FQP_is_inf(arith, Px, Py)) return true;
-    FQ<Degree> temp, temp2;
+    FQ temp(Degree), temp2(Degree);
     FQP_mul(arith, temp, Px, Px, mod);
     FQP_mul(arith, temp, temp, Px, mod);
     FQP_add(arith, temp, temp, B, mod);
@@ -818,18 +777,17 @@ __host__ __device__ bool FQP_is_on_curve(ArithEnv &arith, FQ<Degree> &Px, FQ<Deg
 }
 
 // check if coordinates are valid (smaller than mod_fp)
-template <size_t Degree>
-__host__ __device__ bool FQP_is_valid(ArithEnv &arith, FQ<Degree> &P, bn_t &mod) {
-    for (size_t i = 0; i < Degree; i++) {
+
+__host__ __device__ bool FQP_is_valid(ArithEnv &arith, FQ &P, bn_t &mod) {
+    for (size_t i = 0; i < P.degree; i++) {
         if (cgbn_compare(arith.env, P.coeffs[i], mod) >= 0) return false;
     }
     return true;
 }
 
-template <size_t Degree>
-__host__ __device__ bool FQP_is_inf(ArithEnv &arith, FQ<Degree> &Px, FQ<Degree> &Py) {
+__host__ __device__ bool FQP_is_inf(ArithEnv &arith, FQ &Px, FQ &Py) {
     bool res = true;
-    for (size_t i = 0; i < Degree; i++) {
+    for (size_t i = 0; i < Px.degree; i++) {
         res = res && cgbn_equals_ui32(arith.env, Px.coeffs[i], 0) && cgbn_equals_ui32(arith.env, Py.coeffs[i], 0);
     }
     return res;
@@ -847,10 +805,9 @@ __host__ __device__ bool FQP_is_inf(ArithEnv &arith, FQ<Degree> &Px, FQ<Degree> 
  * @param Qy
  * @param mod_fp
  */
-// template <size_t Degree>
-__host__ __device__ void FQP_ec_add(ArithEnv &arith, FQ<12> &ResX, FQ<12> &ResY, FQ<12> &Px, FQ<12> &Py, FQ<12> &Qx,
-                                    FQ<12> &Qy, bn_t &mod_fp) {
-    FQ<12> lambda, numerator, denominator, temp, x_r, y_r;
+//
+__host__ __device__ void FQP_ec_add(ArithEnv &arith, FQ &ResX, FQ &ResY, FQ &Px, FQ &Py, FQ &Qx, FQ &Qy, bn_t &mod_fp) {
+    FQ lambda(12), numerator(12), denominator(12), temp(12), x_r(12), y_r(12);
     bn_t two, three;
     cgbn_set_ui32(arith.env, two, 2);
     cgbn_set_ui32(arith.env, three, 3);
@@ -913,8 +870,8 @@ __host__ __device__ void FQP_ec_add(ArithEnv &arith, FQ<12> &ResX, FQ<12> &ResY,
  * @param mod_fp
  */
 /*
-template <size_t Degree>
-__host__ __device__ void FQP_ec_mul(ArithEnv &arith, FQ<Degree> &ResX, FQ<Degree> &ResY, FQ<Degree> &Gx, FQ<Degree> &Gy,
+
+__host__ __device__ void FQP_ec_mul(ArithEnv &arith, FQ &ResX, FQ &ResY, FQ &Gx, FQ &Gy,
                                     bn_t &n, bn_t &mod_fp) {
     uint8_t bitArray[CuEVM::word_bits];
     uint32_t bit_array_length = 0;
@@ -939,7 +896,7 @@ __host__ __device__ void FQP_ec_mul(ArithEnv &arith, FQ<Degree> &ResX, FQ<Degree
         return;
     }
 
-    FQ<Degree> temp_ResX, temp_ResY;
+    FQ temp_ResX, temp_ResY;
     // Double-and-add algorithm
     FQP_copy(arith, temp_ResX, Gx);
     FQP_copy(arith, temp_ResY, Gy);
@@ -962,7 +919,7 @@ __host__ __device__ void FQP_ec_mul(ArithEnv &arith, FQ<Degree> &ResX, FQ<Degree
  *
  * @tparam Degree
  * @param env
- * @param Res Result in FQ<Degree>
+ * @param Res Result in FQ
  * @param P1x Point 1 x
  * @param P1y Point 1 y
  * @param P2x Point 2 x
@@ -971,10 +928,10 @@ __host__ __device__ void FQP_ec_mul(ArithEnv &arith, FQ<Degree> &ResX, FQ<Degree
  * @param Ty  Point T y
  * @param mod
  */
-// template <size_t Degree>
-__host__ __device__ void FQP_linefunc(ArithEnv &arith, FQ<12> &Res, FQ<12> &P1x, FQ<12> &P1y, FQ<12> &P2x, FQ<12> &P2y,
-                                      FQ<12> &Tx, FQ<12> &Ty, bn_t &mod) {
-    FQ<12> m, temp, temp2;
+//
+__host__ __device__ void FQP_linefunc(ArithEnv &arith, FQ &Res, FQ &P1x, FQ &P1y, FQ &P2x, FQ &P2y, FQ &Tx, FQ &Ty,
+                                      bn_t &mod) {
+    FQ m(12), temp(12), temp2(12);
     bn_t three, two;
     cgbn_set_ui32(arith.env, three, 3);
     cgbn_set_ui32(arith.env, two, 2);
@@ -1017,9 +974,9 @@ __host__ __device__ void FQP_linefunc(ArithEnv &arith, FQ<12> &Res, FQ<12> &P1x,
  * @param Py FQ<2> type (2 FQ elements)
  * @param mod_fp
  */
-__host__ __device__ void FQP_twist(ArithEnv &arith, FQ<12> &Rx, FQ<12> &Ry, FQ<2> &Px, FQ<2> &Py, bn_t &mod_fp) {
+__host__ __device__ void FQP_twist(ArithEnv &arith, FQ &Rx, FQ &Ry, FQ &Px, FQ &Py, bn_t &mod_fp) {
     // # "Twist" a point in E(FQ2) into a point in E(FQ12)
-    FQ<12> w;
+    FQ w(12);
     cgbn_set_ui32(arith.env, w.coeffs[1], 1);
 
     bn_t X[2];
@@ -1036,7 +993,7 @@ __host__ __device__ void FQP_twist(ArithEnv &arith, FQ<12> &Rx, FQ<12> &Ry, FQ<2
     cgbn_sub_mod(arith.env, Y[0], Py.coeffs[0], Y[0], mod_fp);
     cgbn_set(arith.env, Y[1], Py.coeffs[1]);
 
-    FQ<12> nx, ny, temp_fqp;
+    FQ nx(12), ny(12), temp_fqp(12);
     //     nx = FQ12([xcoeffs[0]] + [0] * 5 + [xcoeffs[1]] + [0] * 5)
     //     ny = FQ12([ycoeffs[0]] + [0] * 5 + [ycoeffs[1]] + [0] * 5)
     cgbn_set(arith.env, nx.coeffs[0], X[0]);
@@ -1060,9 +1017,9 @@ __host__ __device__ void FQP_twist(ArithEnv &arith, FQ<12> &Rx, FQ<12> &Ry, FQ<2
  * @param p FQ<12> type (12 FQ elements)
  * @param mod
  */
-// template <size_t Degree>
-__host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccConstants *constants, FQ<12> &res,
-                                                  FQ<12> &p, bn_t &mod) {
+//
+__host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccConstants *constants, FQ &res, FQ &p,
+                                                  bn_t &mod) {
     // __SHARED_MEMORY__ evm_word_t temp_mem;
     size_t final_exp_len = 11;
     // const char *final_exp[11] = {"0000002f4b6dc97020fddadf107d20bc842d43bf6369b1ff6a1c71015f3f7be2",
@@ -1077,7 +1034,7 @@ __host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccCon
     //                              "c230974d83561841d766f9c9d570bb7fbe04c7e8a6c3c760c0de81def35692da",
     //                              "361102b6b9b2b918837fa97896e84abb40a4efb7e54523a486964b64ca86f120"};
 
-    FQ<12> temp, temp_res;
+    FQ temp(12), temp_res(12);
     cgbn_set_ui32(arith.env, temp_res.coeffs[0], 1);
     for (int i = 1; i < 12; i++) {
         cgbn_set_ui32(arith.env, temp_res.coeffs[i], 0);
@@ -1104,9 +1061,8 @@ __host__ __device__ void FQP_final_exponentiation(ArithEnv &arith, CuEVM::EccCon
     FQP_copy(arith, res, temp_res);
 }
 
-__host__ __device__ void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv &arith, FQ<12> &temp1, FQ<12> &temp2,
-                                           FQ<12> &Px, FQ<12> &Py, FQ<12> &Qx, FQ<12> &Qy, FQ<12> &R_x, FQ<12> &R_y,
-                                           FQ<12> &f, bn_t &mod_fp) {
+__host__ __device__ void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv &arith, FQ &temp1, FQ &temp2, FQ &Px,
+                                           FQ &Py, FQ &Qx, FQ &Qy, FQ &R_x, FQ &R_y, FQ &f, bn_t &mod_fp) {
     // f = f * f * linefunc(R, R, P)
     FQP_mul(arith, temp1, f, f, mod_fp);
     // temp 2 = linefunc(R, R, P)
@@ -1135,18 +1091,17 @@ __host__ __device__ void miller_loop_inner(int i, bn_t &ate_loop_count, ArithEnv
  * @param curve_order
  * @param final_exp if true, do the final exponentiation
  */
-// template <size_t Degree>
-__host__ __device__ void miller_loop(ArithEnv &arith, FQ<12> &Result, FQ<12> &Qx, FQ<12> &Qy, FQ<12> &Px, FQ<12> &Py,
-                                     bn_t &mod_fp, bn_t &curve_order, bn_t &ate_loop_count, bool final_exp) {
+__host__ __device__ void miller_loop(ArithEnv &arith, FQ &Result, FQ &Qx, FQ &Qy, FQ &Px, FQ &Py, bn_t &mod_fp,
+                                     bn_t &curve_order, bn_t &ate_loop_count, bool final_exp) {
     //  if Q is None or P is None: return FQ12.one()
-    FQ<12> R_x, R_y, temp1, temp2;
+    FQ R_x(12), R_y(12), temp1(12), temp2(12);
     __SHARED_MEMORY__ evm_word_t scratch_pad;
     // bn_t ate_loop_count;
     // scratch_pad.from_hex(ate_loop_count_hex);
     // cgbn_load(arith.env, ate_loop_count, &scratch_pad);
 
     // f = FQ12.one()
-    FQ<12> f = get_one<12>(arith);
+    FQ f = get_one(arith, 12);
     // R = Q
     FQP_copy(arith, R_x, Qx);
     FQP_copy(arith, R_y, Qy);
@@ -1156,7 +1111,7 @@ __host__ __device__ void miller_loop(ArithEnv &arith, FQ<12> &Result, FQ<12> &Qx
     }
 
     // Compute Q1 and nQ2, adapt for your representation of points
-    FQ<12> Q1_x, Q1_y, nQ2_x, nQ2_y;
+    FQ Q1_x(12), Q1_y(12), nQ2_x(12), nQ2_y(12);
     // Q1 = (Q[0] ** field_modulus, Q[1] ** field_modulus)
     FQP_pow(arith, Q1_x, Qx, mod_fp, mod_fp);
     FQP_pow(arith, Q1_y, Qy, mod_fp, mod_fp);
@@ -1195,11 +1150,11 @@ __host__ __device__ void miller_loop(ArithEnv &arith, FQ<12> &Result, FQ<12> &Qx
  * @param curve_order
  * @param final_exp if true, do the final exponentiation
  */
-__host__ __device__ void pairing(ArithEnv &arith, FQ<12> &Res, FQ<2> &Qx, FQ<2> &Qy, FQ<1> &Px, FQ<1> &Py, bn_t &mod_fp,
+__host__ __device__ void pairing(ArithEnv &arith, FQ &Res, FQ &Qx, FQ &Qy, FQ &Px, FQ &Py, bn_t &mod_fp,
                                  bn_t &curve_order, bn_t &ate_loop_count, bool final_exp) {
     // assert is_on_curve(Q, b2) assert is_on_curve(P, b)
     // return miller_loop(twist(Q), cast_point_to_fq12(P))
-    FQ<12> Qx_tw, Qy_tw, Px_fp12, Py_fp12;
+    FQ Qx_tw(12), Qy_tw(12), Px_fp12(12), Py_fp12(12);
     FQP_twist(arith, Qx_tw, Qy_tw, Qx, Qy, mod_fp);
     cgbn_set(arith.env, Px_fp12.coeffs[0], Px.coeffs[0]);
     cgbn_set(arith.env, Py_fp12.coeffs[0], Py.coeffs[0]);
@@ -1225,8 +1180,8 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     // scratch_pad.from_hex(alt_BN128_FieldPrime);
     // cgbn_load(arith.env, mod_fp, &scratch_pad);
     cgbn_load(arith.env, mod_fp, &ecc_constants_ptr->alt_BN128.FieldPrime);
-    FQ<2> Qx, Qy, B2;
-    FQ<1> Px, Py, B1;
+    FQ Qx(2), Qy(2), B2(2);
+    FQ Px(1), Py(1), B1(1);
 
     cgbn_load(arith.env, ate_loop_count, &ecc_constants_ptr->ate_loop_count);
     // setup B1, B2
@@ -1238,12 +1193,12 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     // cgbn_load(arith.env, B2.coeffs[1], &scratch_pad);
     cgbn_load(arith.env, B2.coeffs[1], &ecc_constants_ptr->alt_BN128_G2_B_1);
 
-    FQ<12> final_res = get_one<12>(arith);
+    FQ final_res = get_one(arith, 12);
 
     size_t num_pairs = data_len / 192;  // 2 for G1, 4 for G2
-    printf("Pairing Multiple, numpairs %d \n", num_pairs);
+    printf("Pairing Multiple, numpairs %lu\n", num_pairs);
     for (int i = 0; i < num_pairs; i++) {
-        FQ<12> temp_res;
+        FQ temp_res(12);
 
         cgbn_set_memory(arith.env, Px.coeffs[0], points_data);
         cgbn_set_memory(arith.env, Py.coeffs[0], points_data + 32);
@@ -1268,7 +1223,7 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
             return -1;
         } else {
             if (FQP_is_inf(arith, Qx, Qy) || FQP_is_inf(arith, Px, Py)) {
-                FQ<12> one_fq12 = get_one<12>(arith);
+              FQ one_fq12 = get_one(arith, 12);
                 FQP_copy(arith, temp_res, one_fq12);
             } else
                 pairing(arith, temp_res, Qx, Qy, Px, Py, mod_fp, curve_order, ate_loop_count, false);
@@ -1283,7 +1238,7 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     FQP_final_exponentiation(arith, ecc_constants_ptr, final_res, final_res, mod_fp);
 
     // print_fqp(arith, final_res, "Final");
-    FQ<12> one_fq12 = get_one<12>(arith);
+    FQ one_fq12 = get_one(arith, 12);
     return FQP_equals(arith, final_res, one_fq12) ? 1 : 0;
 }
 #else  // dummy delc to avoid compilation error
