@@ -52,6 +52,7 @@ struct account_t {
      * @param[in] address The address of the account
      */
     __host__ __device__ account_t(ArithEnv &arith, const bn_t &address);
+    __host__ __device__ account_t(ArithEnv &arith, evm_word_t *address);
 
     /**
      * The destructor for the account data structure.
@@ -129,7 +130,7 @@ struct account_t {
      * @param[in] arith The arithmetical environment
      * @param[in] address The address of the account
      */
-    __host__ __device__ void set_address(ArithEnv &arith, const bn_t &address);
+    __host__ __device__ void set_address(ArithEnv &arith, const evm_word_t *address);
 
     /**
      * Set the balance of the account.
@@ -157,7 +158,7 @@ struct account_t {
      * @param[in] address The address
      * @return If found 1, otherwise 0
      */
-    __host__ __device__ int32_t has_address(ArithEnv &arith, const bn_t &address);
+    __host__ __device__ int32_t has_address(ArithEnv &arith, const evm_word_t *address);
 
     /**
      * Verify if the account has the the given address.
@@ -165,7 +166,7 @@ struct account_t {
      * @param[in] address The address as evm word
      * @return If found 1, otherwise 0
      */
-    __host__ __device__ int32_t has_address(ArithEnv &arith, const evm_word_t &address);
+    // __host__ __device__ int32_t has_address(ArithEnv &arith, const evm_word_t &address);
 
     /**
      * Update the current account with the information

@@ -59,8 +59,8 @@ __host__ __device__ void state_access_t::duplicate(const state_access_t &other) 
     flags = tmp_flags;
 }
 
-__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account,
-                                                        const CuEVM::account_flags_t flag) {
+__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const evm_word_t *address,
+                                                        CuEVM::account_t &account, const CuEVM::account_flags_t flag) {
     uint32_t index = 0;
     if (state_t::get_account_index(arith, address, index) == ERROR_SUCCESS) {
         flags[index].update(flag);
@@ -70,7 +70,7 @@ __host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const b
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const bn_t &address,
+__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const evm_word_t *address,
                                                         CuEVM::account_t *&account_ptr,
                                                         const CuEVM::account_flags_t flag) {
     uint32_t index = 0;
@@ -145,7 +145,7 @@ __host__ __device__ int32_t state_access_t::add_duplicate_account(ArithEnv &arit
     return error_code;
 }
 
-__host__ __device__ int32_t state_access_t::add_new_account(ArithEnv &arith, const bn_t &address,
+__host__ __device__ int32_t state_access_t::add_new_account(ArithEnv &arith, const evm_word_t *address,
                                                             CuEVM::account_t *&account_ptr,
                                                             const CuEVM::account_flags_t flag) {
     __SHARED_MEMORY__ CuEVM::account_t *tmp_account_ptr;
@@ -188,10 +188,8 @@ __host__ __device__ int32_t state_access_t::set_account(ArithEnv &arith, const C
 
 __host__ __device__ int32_t state_access_t::update_account(ArithEnv &arith, const CuEVM::account_t &account,
                                                            const CuEVM::account_flags_t flag) {
-    bn_t target_address;
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) & (account.address));
     uint32_t index = 0;
-    if (state_t::get_account_index(arith, target_address, index) == ERROR_SUCCESS) {
+    if (state_t::get_account_index(arith, &(account.address), index) == ERROR_SUCCESS) {
         accounts[index].update(arith, account, flag);
         flags[index].update(flag);
         return ERROR_SUCCESS;

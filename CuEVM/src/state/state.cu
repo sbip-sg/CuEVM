@@ -63,7 +63,7 @@ __host__ __device__ void state_t::clear() {
     no_accounts = 0;
 }
 
-__host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const bn_t &address, uint32_t &index) {
+__host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const evm_word_t *address, uint32_t &index) {
     // #ifdef __CUDA_ARCH__
     //     printf("get_account_index, no_accounts %d thread %d\n", no_accounts, threadIdx.x);
     //     print_bnt(arith, address);
@@ -81,7 +81,8 @@ __host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const bn
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account) {
+__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const evm_word_t *address,
+                                                 CuEVM::account_t &account) {
     uint32_t index;
     if (get_account_index(arith, address, index) == ERROR_SUCCESS) {
         account = accounts[index];
@@ -90,7 +91,8 @@ __host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const bn_t &ad
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr) {
+__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const evm_word_t *address,
+                                                 CuEVM::account_t *&account_ptr) {
     uint32_t index;
     if (get_account_index(arith, address, index) == ERROR_SUCCESS) {
         account_ptr = &accounts[index];
@@ -118,10 +120,8 @@ __host__ __device__ int32_t state_t::add_account(const CuEVM::account_t &account
 }
 
 __host__ __device__ int32_t state_t::set_account(ArithEnv &arith, const CuEVM::account_t &account) {
-    bn_t target_address;
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) & (account.address));
     for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        if (accounts[idx].has_address(arith, target_address)) {
+        if (accounts[idx].has_address(arith, &(account.address))) {
             accounts[idx] = account;
             return ERROR_SUCCESS;
         }
@@ -130,20 +130,9 @@ __host__ __device__ int32_t state_t::set_account(ArithEnv &arith, const CuEVM::a
     return add_account(account);
 }
 
-__host__ __device__ int32_t state_t::has_account(ArithEnv &arith, const bn_t &address) {
-    for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        if (accounts[idx].has_address(arith, address)) {
-            return ERROR_SUCCESS;
-        }
-    }
-    return ERROR_STATE_ADDRESS_NOT_FOUND;
-}
-
 __host__ __device__ int32_t state_t::update_account(ArithEnv &arith, const CuEVM::account_t &account) {
-    bn_t target_address;
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) & (account.address));
     for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        if (accounts[idx].has_address(arith, target_address)) {
+        if (accounts[idx].has_address(arith, &(account.address))) {
             accounts[idx].update(arith, account);
             return ERROR_SUCCESS;
         }

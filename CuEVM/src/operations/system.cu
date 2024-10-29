@@ -66,9 +66,11 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
     // #endif
 
     // adress warm call
-    bn_t contract_address;
-    new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
-    CuEVM::gas_cost::access_account_cost(arith, current_state.gas_used, current_state.touch_state, contract_address);
+    // bn_t contract_address;
+    evm_word_t *contract_address_ptr = &new_state_ptr->message_ptr->contract_address;
+    // new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
+    CuEVM::gas_cost::access_account_cost(arith, current_state.gas_used, current_state.touch_state,
+                                         contract_address_ptr);
     // positive value call cost (except delegate call)
     // empty account call cost
     // #ifdef __CUDA_ARCH__
@@ -85,7 +87,7 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
             cgbn_set_ui32(arith.env, gas_stippend, GAS_CALL_STIPEND);
             // If the empty account is called
             // only for call opcode
-            if ((new_state_ptr->touch_state.is_empty_account(arith, contract_address)) &&
+            if ((new_state_ptr->touch_state.is_empty_account(arith, contract_address_ptr)) &&
                 (new_state_ptr->message_ptr->get_call_type() == OP_CALL)) {
                 cgbn_add_ui32(arith.env, current_state.gas_used, current_state.gas_used, GAS_NEW_ACCOUNT);
             };
@@ -181,6 +183,7 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         // #endif
         bn_t sender_address;
         current_state.message_ptr->get_recipient(arith, sender_address);
+        const evm_word_t *sender_address_ptr = &current_state.message_ptr->recipient;
         bn_t contract_address;
 
         // // warm up the contract address
@@ -189,7 +192,7 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         //     contract_address);
 
         CuEVM::account_t *sender_account = nullptr;
-        current_state.touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_NON_STORAGE_FLAG);
+        current_state.touch_state.get_account(arith, sender_address_ptr, sender_account, ACCOUNT_NON_STORAGE_FLAG);
         // Do not get_account after this to reuse sender_account
         if (opcode == OP_CREATE2) {
             error_code |= CuEVM::utils::get_contract_address_create2(arith, contract_address, sender_address, salt,
@@ -200,9 +203,13 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
             error_code |=
                 CuEVM::utils::get_contract_address_create(arith, contract_address, sender_address, sender_nonce);
         }
-        if (!current_state.touch_state.is_empty_account_create(arith, contract_address)) {
+
+        __SHARED_MEMORY__ evm_word_t contract_address_shared;
+        cgbn_store(arith.env, &contract_address_shared, sender_address);
+
+        if (!current_state.touch_state.is_empty_account_create(arith, &contract_address_shared)) {
             // corner collision case: must set warm for the contract address
-            current_state.touch_state.set_warm_account(arith, contract_address);
+            current_state.touch_state.set_warm_account(arith, &contract_address_shared);
             error_code |= ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
         }
         // gas capped limit
@@ -239,7 +246,7 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
             cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
             sender_account->set_nonce(arith, sender_nonce);
             // propagate to child state
-            new_state_ptr->touch_state.set_nonce(arith, sender_address, sender_nonce);
+            new_state_ptr->touch_state.set_nonce(arith, sender_address_ptr, sender_nonce);
         }
     } else
         cgbn_bitwise_mask_and(arith.env, current_state.gas_used, current_state.gas_used, 64);
@@ -556,31 +563,32 @@ __host__ __device__ int32_t SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit,
     } else {
         bn_t recipient;
         error_code |= stack.pop(arith, recipient);
-
+        __SHARED_MEMORY__ evm_word_t recipient_shared;
+        cgbn_store(arith.env, &recipient_shared, recipient);
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SELFDESTRUCT);
-        bn_t contract_address;
-        message.get_contract_address(arith, contract_address);
+        // bn_t contract_address;
+        // message.get_contract_address(arith, contract_address);
 
         // custom logic, cannot use access_account_cost (no warm cost)
-        if (!touch_state.is_warm_account(arith, recipient))
+        if (!touch_state.is_warm_account(arith, &recipient_shared))
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
 
         bn_t sender_balance;
-        touch_state.get_balance(arith, contract_address, sender_balance);
+        touch_state.get_balance(arith, &message.contract_address, sender_balance);
 
         if (cgbn_compare_ui32(arith.env, sender_balance, 0) > 0) {
-            if (touch_state.is_empty_account(arith, recipient)) {
+            if (touch_state.is_empty_account(arith, &recipient_shared)) {
                 cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_NEW_ACCOUNT);
             }
         }
         error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
             bn_t recipient_balance;
-            touch_state.get_balance(arith, recipient, recipient_balance);
+            touch_state.get_balance(arith, &recipient_shared, recipient_balance);
             cgbn_add(arith.env, recipient_balance, recipient_balance, sender_balance);
             cgbn_set_ui32(arith.env, sender_balance, 0);
-            touch_state.set_balance(arith, recipient, recipient_balance);
-            touch_state.set_balance(arith, contract_address, sender_balance);
+            touch_state.set_balance(arith, &recipient_shared, recipient_balance);
+            touch_state.set_balance(arith, &recipient_shared, sender_balance);
             // receiver = self => 0 balance
             return_data = CuEVM::evm_return_data_t();
             error_code |= ERROR_RETURN;

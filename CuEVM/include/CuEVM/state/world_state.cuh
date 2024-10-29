@@ -38,9 +38,7 @@ class WorldState {
      * @param[out] account_ptr  The pointer to the account
      * @return if found 0, otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith,
-                                            const bn_t &address,
-                                            CuEVM::account_t *&account_ptr);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t *&account_ptr);
 
     /**
      * Get the value of a storage element
@@ -55,7 +53,6 @@ class WorldState {
      * if the account or the key within the account's storage could not be found
      * and the value is set to 0.
      */
-    __host__ __device__ int32_t get_value(ArithEnv &arith, const bn_t &address,
-                                          const bn_t &key, bn_t &value);
+    __host__ __device__ int32_t get_value(ArithEnv &arith, const evm_word_t *address, const bn_t &key, bn_t &value);
 };
 }  // namespace CuEVM

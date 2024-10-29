@@ -60,14 +60,16 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     cudaEvent_t start, stop;
     float milliseconds = 0;
 
-    size_t stack_size;
-    cudaDeviceGetLimit(&stack_size, cudaLimitStackSize);
-    printf("current stack size %zu\n", stack_size);
-    size_t heap_size = (size_t(2) << 30);  // 2GB
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 90 * 1024));
-    cudaDeviceGetLimit(&stack_size, cudaLimitStackSize);
-    printf("current stack size %zu\n", stack_size);
+    size_t size_value;
+    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+    printf("current stack size %zu\n", size_value);
+    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+    printf("current heap size %zu\n", size_value);
+    // size_t heap_size = (size_t(2) << 30);  // 2GB
+    // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 1 * 1024));
+    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+    printf("current stack size %zu\n", size_value);
     CUDA_CHECK(cudaDeviceSynchronize());
     // CUDA_CHECK(cudaEventCreate(&start));
     // CUDA_CHECK(cudaEventCreate(&stop));

@@ -56,6 +56,14 @@ __host__ __device__ account_t::account_t(ArithEnv &arith, const bn_t &address) :
     cgbn_store(arith.env, &this->nonce, tmp);
 }
 
+__host__ __device__ account_t::account_t(ArithEnv &arith, evm_word_t *address) : storage(), byte_code(0U) {
+    this->address = *address;
+    bn_t tmp;
+    cgbn_set_ui32(arith.env, tmp, 0);
+    cgbn_store(arith.env, &this->balance, tmp);
+    cgbn_store(arith.env, &this->nonce, tmp);
+}
+
 __host__ __device__ account_t::~account_t() { free(); }
 
 __host__ __device__ void account_t::free() {
@@ -127,27 +135,15 @@ __host__ __device__ void account_t::set_balance(ArithEnv &arith, const bn_t &bal
     cgbn_store(arith.env, &this->balance, balance);
 }
 
-__host__ __device__ void account_t::set_address(ArithEnv &arith, const bn_t &address) {
-    cgbn_store(arith.env, &this->address, address);
+__host__ __device__ void account_t::set_address(ArithEnv &arith, const evm_word_t *address) {
+    // cgbn_store(arith.env, &this->address, address);
+    this->address = *address;
 }
 
 __host__ __device__ void account_t::set_byte_code(const byte_array_t &byte_code) { this->byte_code = byte_code; }
 
-__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const bn_t &address) {
-    bn_t local_address;
-    //  #ifdef __CUDA_ARCH__
-    //     printf("has_address, accounts[index] %p thread %d\n", &(this->address),  threadIdx.x);
-    // #endif
-    cgbn_load(arith.env, local_address, &this->address);
-
-    return (cgbn_compare(arith.env, local_address, address) == 0);
-}
-
-__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const evm_word_t &address) {
-    bn_t local_address, target_address;
-    cgbn_load(arith.env, local_address, &this->address);
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr)&address);
-    return (cgbn_compare(arith.env, local_address, target_address) == 0);
+__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const evm_word_t *address) {
+    return this->address == *address;
 }
 
 __host__ __device__ void account_t::update(ArithEnv &arith, const account_t &other, const account_flags_t &flags) {

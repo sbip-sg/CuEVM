@@ -87,9 +87,12 @@ __host__ __device__ evm_t::~evm_t() {
 }
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
-    bn_t sender, recipient, value;
-    call_state_ptr->message_ptr->get_sender(arith, sender);
-    call_state_ptr->message_ptr->get_recipient(arith, recipient);
+    // bn_t sender, recipient, value;
+    // call_state_ptr->message_ptr->get_sender(arith, sender);
+    // call_state_ptr->message_ptr->get_recipient(arith, recipient);
+    bn_t value;
+    const evm_word_t *sender = &call_state_ptr->message_ptr->sender;
+    const evm_word_t *recipient = &call_state_ptr->message_ptr->recipient;
     call_state_ptr->message_ptr->get_value(arith, value);
 
     int32_t error_code = (((cgbn_compare_ui32(arith.env, value, 0) > 0) &&
@@ -114,8 +117,8 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         call_state_ptr->message_ptr->call_type == OP_DELEGATECALL ||
         call_state_ptr->message_ptr->call_type == OP_STATICCALL) {
         CuEVM::account_t *contract = nullptr;
-        bn_t contract_address;
-        call_state_ptr->message_ptr->get_contract_address(arith, contract_address);
+        const evm_word_t *contract_address = &call_state_ptr->message_ptr->contract_address;
+        // call_state_ptr->message_ptr->get_contract_address(arith, contract_address);
         // error_code |=
         call_state_ptr->touch_state.get_account(arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
         call_state_ptr->message_ptr->set_byte_code(contract->byte_code);
@@ -702,8 +705,8 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
 __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t error_code) {
     // sent the gas value to the block beneficiary
     bn_t gas_value;
-    bn_t beneficiary;
-    block_info_ptr->get_coin_base(arith, beneficiary);
+    const evm_word_t *beneficiary = &(block_info_ptr->coin_base);
+    // block_info_ptr->get_coin_base(arith, beneficiary);
 #ifdef EIP_3155
 #ifdef __CUDA_ARCH__
     printf("finish_TRANSACTION %d error_code: %d\n", threadIdx.x, error_code);
@@ -733,9 +736,9 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
         cgbn_mul(arith.env, send_back_gas, gas_value, gas_price);
         // add to sender balance g^{*}
         bn_t sender_balance;
-        bn_t sender_address;
+        // bn_t sender_address;
         // send back the gas left and gas refund to the sender
-        transaction_ptr->get_sender(arith, sender_address);
+        // transaction_ptr->get_sender(arith, sender_address);
         // deduct transaction value; TODO this probably should be done at some
         // other place _transaction->get_value(tx_value); cgbn_sub(arith.env,
         // sender_balance, sender_balance, tx_value); the gas value for the
@@ -751,9 +754,9 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
             call_state_ptr->parent->update(arith, *call_state_ptr);
         }
         // sent the value of unused gas to the sender
-        call_state_ptr->parent->touch_state.get_balance(arith, sender_address, sender_balance);
+        call_state_ptr->parent->touch_state.get_balance(arith, &transaction_ptr->sender, sender_balance);
         cgbn_add(arith.env, sender_balance, sender_balance, send_back_gas);
-        call_state_ptr->parent->touch_state.set_balance(arith, sender_address, sender_balance);
+        call_state_ptr->parent->touch_state.set_balance(arith, &transaction_ptr->sender, sender_balance);
 
         // set the eror code for a succesfull transaction
         status = error_code;
@@ -831,12 +834,12 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     //     printf("evm_t::finish_CALL %d before setting warm accounts error_code: %d\n", threadIdx.x, error_code);
     // #endif
     // warm the sender and receiver regardless of revert
-    bn_t sender, receiver;
-    call_state_ptr->message_ptr->get_sender(arith, sender);
-    call_state_ptr->parent->touch_state.set_warm_account(arith, sender);
+    // bn_t sender, receiver;
+    // call_state_ptr->message_ptr->get_sender(arith, sender);
+    call_state_ptr->parent->touch_state.set_warm_account(arith, &call_state_ptr->message_ptr->sender);
 
-    call_state_ptr->message_ptr->get_recipient(arith, receiver);
-    call_state_ptr->parent->touch_state.set_warm_account(arith, receiver);
+    // call_state_ptr->message_ptr->get_recipient(arith, receiver);
+    call_state_ptr->parent->touch_state.set_warm_account(arith, &call_state_ptr->message_ptr->recipient);
     // #ifdef __CUDA_ARCH__
     //     printf("evm_t::finish_CALL %d after setting warm accounts error_code: %d\n", threadIdx.x, error_code);
     // #endif
@@ -882,10 +885,11 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
 __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
     // TODO: increase sender nonce if the sender is a contract
     // to see if the contract is a contract
-    bn_t sender_address;
-    call_state_ptr->message_ptr->get_sender(arith, sender_address);
+    // bn_t sender_address;
+    // call_state_ptr->message_ptr->get_sender(arith, sender_address);
     CuEVM::account_t *sender_account = nullptr;
-    call_state_ptr->parent->touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_BYTE_CODE_FLAG);
+    call_state_ptr->parent->touch_state.get_account(arith, &call_state_ptr->message_ptr->sender, sender_account,
+                                                    ACCOUNT_BYTE_CODE_FLAG);
     // if (sender_account->is_contract()) {
     //     printf("\naccount is contract\n");
     //     bn_t sender_nonce;
@@ -909,8 +913,8 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
     error_code |= CuEVM::gas_cost::has_gas(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used);
     if (error_code == ERROR_SUCCESS) {
         // compute the address of the contract
-        bn_t contract_address;
-        call_state_ptr->message_ptr->get_recipient(arith, contract_address);
+        // bn_t contract_address;
+        // call_state_ptr->message_ptr->get_recipient(arith, contract_address);
 #ifdef EIP_3541
         uint8_t *code = call_state_ptr->parent->last_return_data_ptr->data;
 #endif
@@ -922,7 +926,7 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
                 error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
             }
 #endif
-            call_state_ptr->touch_state.set_code(arith, contract_address,
+            call_state_ptr->touch_state.set_code(arith, &call_state_ptr->message_ptr->recipient,
                                                  *call_state_ptr->parent->last_return_data_ptr);
         } else {
             error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
