@@ -11,8 +11,8 @@ __host__ __device__ int32_t TouchState::add_account(ArithEnv &arith, const evm_w
                                                     CuEVM::account_t *&account_ptr,
                                                     const CuEVM::account_flags_t acces_state_flag) {
     CuEVM::account_t *tmp_account_ptr = nullptr;
-#ifdef EIP_3155
-    __ONE_THREAD_PER_INSTANCE(printf("TouchState::add_account - account_ptr: %p\n", account_ptr););
+#ifdef __CUDA_ARCH__
+    printf("TouchState::add_account - account_ptr: %p idx %d\n", account_ptr, threadIdx.x);
     address->print();
     // print_bnt(arith, address);
 #endif
@@ -49,10 +49,15 @@ __host__ __device__ int32_t TouchState::get_account(ArithEnv &arith, const evm_w
                                                     const CuEVM::account_flags_t acces_state_flag,
                                                     bool add_to_current_state) {
     _world_state->get_account(arith, address, account_ptr);
+    // #ifdef __CUDA_ARCH__
+    //     printf("_world_state->get_account %d\n", threadIdx.x);
+    // #endif
     const TouchState *tmp = this;
     while ((tmp != nullptr) && (tmp->_state->get_account(arith, address, account_ptr, acces_state_flag)))
         tmp = tmp->parent;
-
+    // #ifdef __CUDA_ARCH__
+    //     printf("loop ->get_account %d\n", threadIdx.x);
+    // #endif
     if (account_ptr == nullptr) {
         // #ifdef __CUDA_ARCH__
         //         printf("get_account not found, add to current state %d\n", threadIdx.x);
@@ -60,6 +65,7 @@ __host__ __device__ int32_t TouchState::get_account(ArithEnv &arith, const evm_w
         _state->add_new_account(arith, address, account_ptr, acces_state_flag);
         return ERROR_STATE_ADDRESS_NOT_FOUND;  //  error code !+ ERROR_SUCCESS => just added
     }
+
     return ERROR_SUCCESS;
 }
 

@@ -21,7 +21,8 @@ namespace CuEVM {
 __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_data_ptr,
                                  CuEVM::block_info_t *block_info_ptr, CuEVM::evm_transaction_t *transaction_ptr,
                                  CuEVM::state_access_t *touch_state_data_ptr, CuEVM::log_state_data_t *log_state_ptr,
-                                 CuEVM::evm_return_data_t *return_data_ptr, CuEVM::EccConstants *ecc_constants_ptr
+                                 CuEVM::evm_return_data_t *return_data_ptr, CuEVM::EccConstants *ecc_constants_ptr,
+                                 CuEVM::evm_message_call_t *shared_message_call_ptr
 #ifdef EIP_3155
                                  ,
                                  CuEVM::utils::tracer_t *tracer_ptr
@@ -34,6 +35,9 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     // TODO: store in local/shared memory
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
                                                  touch_state_data_ptr, return_data_ptr);
+#ifndef __CUDA_ARCH__
+    shared_message_call_ptr = new evm_message_call_t();
+#endif
 #ifdef EIP_3155
     // printing debug when enabling tracer.
     printf("call_state_ptr allocated\n");
@@ -45,12 +49,29 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     // #ifdef __CUDA_ARCH__
     //     printf("error  code %d idx %d \n", error_code, threadIdx.x);
     // #endif
+    // __SHARED_MEMORY__ evm_message_call_t shared_message_call;
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t *transaction_call_message_ptr = nullptr;
         error_code =
             transaction_ptr->get_message_call(arith, call_state_ptr->touch_state, transaction_call_message_ptr);
+#ifdef __CUDA_ARCH__
+        // __SYNC_THREADS__
+        printf("message call before copy %d\n", threadIdx.x);
+#endif
+        // transaction_call_message_ptr->print();
+#ifdef __CUDA_ARCH__
+        printf("message call before copy after print %d\n", threadIdx.x);
+#endif
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        shared_message_call_ptr->copy_from(transaction_call_message_ptr);
+        __ONE_GPU_THREAD_END__
+#ifdef __CUDA_ARCH__
+        printf("message call copied %d\n", threadIdx.x);
+#endif
+        shared_message_call_ptr->print();
+
         CuEVM::evm_call_state_t *child_call_state_ptr =
-            new CuEVM::evm_call_state_t(arith, call_state_ptr, transaction_call_message_ptr);
+            new CuEVM::evm_call_state_t(arith, call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr);
         // subtract the gas used by the transaction initialization from the gas
         // limit
         cgbn_sub(arith.env, child_call_state_ptr->gas_limit, child_call_state_ptr->gas_limit, call_state_ptr->gas_used);
@@ -62,10 +83,11 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     status = error_code;
 }
 
-__host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_instance)
+__host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_instance,
+                                 CuEVM::evm_message_call_t *message_call)
     : evm_t(arith, evm_instance.world_state_data_ptr, evm_instance.block_info_ptr, evm_instance.transaction_ptr,
             evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr, evm_instance.return_data_ptr,
-            evm_instance.ecc_constants_ptr
+            evm_instance.ecc_constants_ptr, message_call
 #ifdef EIP_3155
             ,
             evm_instance.tracer_ptr
@@ -87,9 +109,14 @@ __host__ __device__ evm_t::~evm_t() {
 }
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
-    // bn_t sender, recipient, value;
-    // call_state_ptr->message_ptr->get_sender(arith, sender);
-    // call_state_ptr->message_ptr->get_recipient(arith, recipient);
+// bn_t sender, recipient, value;
+// call_state_ptr->message_ptr->get_sender(arith, sender);
+// call_state_ptr->message_ptr->get_recipient(arith, recipient);
+#ifdef __CUDA_ARCH__
+    printf("start_CALL %d\n", threadIdx.x);
+    __SYNC_THREADS__
+
+#endif
     bn_t value;
     const evm_word_t *sender = &call_state_ptr->message_ptr->sender;
     const evm_word_t *recipient = &call_state_ptr->message_ptr->recipient;
@@ -120,14 +147,34 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         const evm_word_t *contract_address = &call_state_ptr->message_ptr->contract_address;
         // call_state_ptr->message_ptr->get_contract_address(arith, contract_address);
         // error_code |=
+#ifdef __CUDA_ARCH__
+        printf("get byte code idx %d contract_address %p \n", threadIdx.x, contract_address);
+        contract_address->print();
+#endif
         call_state_ptr->touch_state.get_account(arith, contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
+#ifdef __CUDA_ARCH__
+        printf("call_state_ptr->touch_state.get_account idx %d  \n", threadIdx.x);
+        contract_address->print();
+#endif
         call_state_ptr->message_ptr->set_byte_code(contract->byte_code);
+#ifdef __CUDA_ARCH__
+        printf("call_state_ptr->message_ptr->set_byte_code %d  \n", threadIdx.x);
+        contract_address->print();
+#endif
     }
+#ifdef __CUDA_ARCH__
+    printf("before warmup sender %p recipient %p  idx %d\n", sender, recipient, threadIdx.x);
+#endif
     // warmup the accounts
     CuEVM::account_t *account_ptr = nullptr;
     call_state_ptr->touch_state.set_warm_account(arith, sender);
+#ifdef __CUDA_ARCH__
+    printf("after  set_warm_account first %d\n", threadIdx.x);
+#endif
     call_state_ptr->touch_state.set_warm_account(arith, recipient);
-
+#ifdef __CUDA_ARCH__
+    printf("after  set_warm_account %d\n", threadIdx.x);
+#endif
     // error_code |=
     call_state_ptr->touch_state.get_account(arith, recipient, account_ptr, ACCOUNT_NONE_FLAG);
 #ifdef EIP_3155
@@ -163,7 +210,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
         //         printf("else code size 0 code %d idx %d \n", error_code, threadIdx.x);
         // #endif
         // Dont use account ptr here, byte_code already set
-        if (call_state_ptr->message_ptr->byte_code.size == 0) {
+        if (call_state_ptr->message_ptr->byte_code->size == 0) {
             bn_t contract_address;
             call_state_ptr->message_ptr->get_contract_address(arith, contract_address);
             if (cgbn_compare_ui32(arith.env, contract_address, CuEVM::no_precompile_contracts) == -1) {
@@ -237,8 +284,8 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
     CuEVM::evm_call_state_t *child_call_state_ptr = nullptr;
     while (status == ERROR_SUCCESS) {
         uint32_t current_pc = call_state_ptr->pc;  // TODO: store in local/shared memory
-        opcode = ((current_pc < ((call_state_ptr->message_ptr)->byte_code).size)
-                      ? (call_state_ptr->message_ptr)->byte_code.data[current_pc]
+        opcode = ((current_pc < ((call_state_ptr->message_ptr)->byte_code)->size)
+                      ? (call_state_ptr->message_ptr)->byte_code->data[current_pc]
                       : OP_STOP);
         __SYNC_THREADS__
 #ifdef EIP_3155
@@ -268,7 +315,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith) {
         if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70)) {
             error_code = CuEVM::operations::PUSHX(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
                                                   current_pc, *call_state_ptr->stack_ptr,
-                                                  ((call_state_ptr->message_ptr)->byte_code), opcode);
+                                                  *((call_state_ptr->message_ptr)->byte_code), opcode);
         } else if ((opcode & 0xF0) == 0x80)  // DUPX
         {
             error_code = CuEVM::operations::DUPX(arith, call_state_ptr->gas_limit, call_state_ptr->gas_used,
@@ -874,7 +921,10 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
         // change the call state to the parent
         CuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
         delete call_state_ptr;
+
         call_state_ptr = parent_call_state_ptr;
+        // copy back the shadow message_call t to shared memory
+        call_state_ptr->message_ptr->copy_from(call_state_ptr->message_ptr_copy);
     }
     // #ifdef __CUDA_ARCH__
     //     printf("evm_t::finish_CALL %d before return error_code: %d\n", threadIdx.x, error_code);

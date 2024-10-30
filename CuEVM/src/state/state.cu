@@ -73,7 +73,7 @@ __host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const ev
         //         printf("get_account_index, %d , accounts[index] %p thread %d\n", index, &(accounts[index].address),
         //                threadIdx.x);
         // #endif
-        if (accounts[index].has_address(arith, address)) {
+        if (accounts[index].address == *address) {
             return ERROR_SUCCESS;
         }
     }

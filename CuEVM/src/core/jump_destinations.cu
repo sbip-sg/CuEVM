@@ -10,9 +10,8 @@
 #include <CuEVM/utils/opcodes.cuh>
 
 namespace CuEVM {
-__host__ __device__
-jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t &byte_code)
-    : destinations(0U) {
+__host__ __device__ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t &byte_code) : destinations(0U) {
+    /* temporarily disabled
     uint32_t size = 0;
     uint8_t opcode;
     uint8_t push_size;
@@ -44,14 +43,16 @@ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t &byte_code)
             }
         }
     }
+    */
 }
 
 __host__ __device__ jump_destinations_t::~jump_destinations_t() {}
 
 __host__ __device__ uint32_t jump_destinations_t::has(uint32_t pc) {
-    return destinations.has_value(pc) == ERROR_SUCCESS
-               ? ERROR_SUCCESS
-               : ERROR_INVALID_JUMP_DESTINATION;
+    return ERROR_SUCCESS;  // Temporarily disabled
+    // return destinations.has_value(pc) == ERROR_SUCCESS
+    //            ? ERROR_SUCCESS
+    //            : ERROR_INVALID_JUMP_DESTINATION;
 }
 
 __host__ __device__ void jump_destinations_t::print() { destinations.print(); }

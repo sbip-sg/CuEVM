@@ -12,14 +12,14 @@
 
 namespace CuEVM {
 struct evm_call_state_t {
-    CuEVM::evm_call_state_t* parent; /**< The parent state */
-    uint32_t depth;                  /**< The depth of the state */
-    uint32_t pc;                     /**< The program counter */
-    bn_t gas_used;                   /**< The gas */
-    bn_t gas_refund;                 /**< The gas refund */
-    CuEVM::evm_message_call_t*
-        message_ptr; /**< The message that started the execution */
-    bn_t gas_limit;  /**< The gas limit */
+    CuEVM::evm_call_state_t* parent;                /**< The parent state */
+    uint32_t depth;                                 /**< The depth of the state */
+    uint32_t pc;                                    /**< The program counter */
+    bn_t gas_used;                                  /**< The gas */
+    bn_t gas_refund;                                /**< The gas refund */
+    CuEVM::evm_message_call_t* message_ptr;         /**< The message that started the execution in shared memory*/
+    CuEVM::evm_message_call_t* message_ptr_copy;    /**< The copy of the message stored in global memory*/
+    bn_t gas_limit;                                 /**< The gas limit */
     CuEVM::evm_stack_t* stack_ptr;                  /**< The stack */
     CuEVM::evm_memory_t* memory_ptr;                /**< The memory */
     CuEVM::log_state_data_t* log_state_ptr;         /**< The logs state */
@@ -32,37 +32,37 @@ struct evm_call_state_t {
     /**
      * The complete constructor of the evm_state_t
      */
-    __host__ __device__ evm_call_state_t(
-        ArithEnv& arith, CuEVM::evm_call_state_t* parent, uint32_t depth,
-        uint32_t pc, bn_t gas_used, bn_t gas_refund,
-        CuEVM::evm_message_call_t* message_ptr, CuEVM::evm_stack_t* stack_ptr,
-        CuEVM::evm_memory_t* memory_ptr, CuEVM::log_state_data_t* log_state_ptr,
-        CuEVM::TouchState touch_state,
-        CuEVM::evm_return_data_t* last_return_data_ptr);
+    __host__ __device__ evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent, uint32_t depth, uint32_t pc,
+                                         bn_t gas_used, bn_t gas_refund, CuEVM::evm_message_call_t* message_ptr,
+                                         CuEVM::evm_stack_t* stack_ptr, CuEVM::evm_memory_t* memory_ptr,
+                                         CuEVM::log_state_data_t* log_state_ptr, CuEVM::TouchState touch_state,
+                                         CuEVM::evm_return_data_t* last_return_data_ptr);
 
     /**
      * The constructor with the parent state and message call
      */
-    __host__ __device__
-    evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
-                     CuEVM::evm_message_call_t* message_ptr);
-
+    __host__ __device__ evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
+                                         CuEVM::evm_message_call_t* shared_message_ptr);
+    /**
+     * The constructor with the parent state and message call
+     */
+    __host__ __device__ evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
+                                         CuEVM::evm_message_call_t* shared_message_ptr,
+                                         CuEVM::evm_message_call_t* shadow_message_ptr);
     /**
      * The constructor with no parent state and message call
      */
-    __host__ __device__ evm_call_state_t(
-        ArithEnv& arith, CuEVM::WorldState* word_state_ptr,
-        CuEVM::evm_stack_t* stack_ptr, CuEVM::evm_memory_t* memory_ptr,
-        CuEVM::log_state_data_t* log_state_ptr,
-        CuEVM::state_access_t* state_access_ptr,
-        CuEVM::evm_return_data_t* last_return_data_ptr);
+    __host__ __device__ evm_call_state_t(ArithEnv& arith, CuEVM::WorldState* word_state_ptr,
+                                         CuEVM::evm_stack_t* stack_ptr, CuEVM::evm_memory_t* memory_ptr,
+                                         CuEVM::log_state_data_t* log_state_ptr,
+                                         CuEVM::state_access_t* state_access_ptr,
+                                         CuEVM::evm_return_data_t* last_return_data_ptr);
     /**
      * The destructor of the evm_call_state_t
      */
     __host__ __device__ ~evm_call_state_t();
 
-    __host__ __device__ int32_t update(ArithEnv& arith,
-                                       evm_call_state_t& other);
+    __host__ __device__ int32_t update(ArithEnv& arith, evm_call_state_t& other);
 };
 }  // namespace CuEVM
 

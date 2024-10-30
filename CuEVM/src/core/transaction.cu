@@ -341,11 +341,15 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
  */
 __host__ __device__ int32_t evm_transaction_t::get_message_call(
     ArithEnv &arith, CuEVM::TouchState &touch_state, CuEVM::evm_message_call_t *&evm_message_call_ptr) const {
-    bn_t sender_address, to_address, value, gas_limit;
-    get_sender(arith, sender_address);
-    get_to(arith, to_address);
-    get_value(arith, value);
-    get_gas_limit(arith, gas_limit);
+    // bn_t sender_address, to_address, value, gas_limit;
+    // get_sender(arith, sender_address);
+    // printf("evm_transaction_t::get_message_call sender address\n");
+    // this->sender.print();
+    // get_to(arith, to_address);
+    // printf("to address\n");
+    // this->to.print();
+    // get_value(arith, value);
+    // get_gas_limit(arith, gas_limit);
     uint32_t depth = 0;
     uint32_t call_type = OP_CALL;
     CuEVM::byte_array_t byte_code;
@@ -362,7 +366,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         byte_code = data_init;
         // blank call data in create
         evm_message_call_ptr = new CuEVM::evm_message_call_t(
-            arith, sender_address, to_address, to_address, gas_limit, value, depth, call_type, to_address,
+            arith, &this->sender, &this->to, &this->to, &this->gas_limit, &this->value, depth, call_type, &this->to,
             CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
 #ifdef __CUDA_ARCH__
         printf("CREATE to_account %p init code size %d account code size %d idx %d \n", to_account,
@@ -376,14 +380,15 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         //     printf("to_account %p size %d idx %d \n", to_account, to_account->byte_code.size  , threadIdx.x);
         // #endif
         byte_code = to_account->byte_code;
-        evm_message_call_ptr = new CuEVM::evm_message_call_t(arith, sender_address, to_address, to_address, gas_limit,
-                                                             value, depth, call_type, to_address, data_init, byte_code,
-                                                             return_data_offset, return_data_size, static_env);
+        evm_message_call_ptr = new CuEVM::evm_message_call_t(
+            arith, &this->sender, &this->to, &this->to, &this->gas_limit, &this->value, depth, call_type, &this->to,
+            data_init, byte_code, return_data_offset, return_data_size, static_env);
     }
 
     // #ifdef __CUDA_ARCH__
-    //     printf("bytecode size %d idx %d \n", byte_code.size , threadIdx.x);
+    //     printf("bytecode size %d idx %d \n", byte_code.size, threadIdx.x);
     // #endif
+
     return ERROR_SUCCESS;
 }
 
