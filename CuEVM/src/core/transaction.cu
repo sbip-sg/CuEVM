@@ -340,7 +340,7 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
  * @return 1 for success, 0 for failure.
  */
 __host__ __device__ int32_t evm_transaction_t::get_message_call(
-    ArithEnv &arith, CuEVM::TouchState &touch_state, CuEVM::evm_message_call_t *&evm_message_call_ptr) const {
+    ArithEnv &arith, CuEVM::TouchState &touch_state, CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const {
     // bn_t sender_address, to_address, value, gas_limit;
     // get_sender(arith, sender_address);
     // printf("evm_transaction_t::get_message_call sender address\n");
@@ -365,7 +365,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         call_type = OP_CREATE;
         byte_code = data_init;
         // blank call data in create
-        evm_message_call_ptr = new CuEVM::evm_message_call_t(
+        evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
             arith, &this->sender, &this->to, &this->to, &this->gas_limit, &this->value, depth, call_type, &this->to,
             CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
 #ifdef __CUDA_ARCH__
@@ -380,7 +380,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         //     printf("to_account %p size %d idx %d \n", to_account, to_account->byte_code.size  , threadIdx.x);
         // #endif
         byte_code = to_account->byte_code;
-        evm_message_call_ptr = new CuEVM::evm_message_call_t(
+        evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
             arith, &this->sender, &this->to, &this->to, &this->gas_limit, &this->value, depth, call_type, &this->to,
             data_init, byte_code, return_data_offset, return_data_size, static_env);
     }

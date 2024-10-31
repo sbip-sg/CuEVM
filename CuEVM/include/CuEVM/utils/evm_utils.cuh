@@ -21,9 +21,8 @@ namespace CuEVM::utils {
  * @param[in] sender_address The sender address
  * @param[in] sender_nonce The sender nonce
  */
-__host__ __device__ int32_t get_contract_address_create(
-    ArithEnv &arith, bn_t &contract_address, const bn_t &sender_address,
-    const bn_t &sender_nonce);
+__host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &contract_address,
+                                                        const bn_t &sender_address, const bn_t &sender_nonce);
 
 /**
  * Get the contract address from the sender address, the salt, and the init
@@ -34,9 +33,9 @@ __host__ __device__ int32_t get_contract_address_create(
  * @param[in] salt The salt
  * @param[in] init_code The init code
  */
-__host__ __device__ int32_t get_contract_address_create2(
-    ArithEnv &arith, bn_t &contract_address, const bn_t &sender_address,
-    const bn_t &salt, const CuEVM::byte_array_t &init_code);
+__host__ __device__ int32_t get_contract_address_create2(ArithEnv &arith, bn_t &contract_address,
+                                                         const bn_t &sender_address, const bn_t &salt,
+                                                         const CuEVM::byte_array_t &init_code);
 
 /**
  * If it is a hex character.
@@ -67,8 +66,7 @@ __host__ __device__ int32_t is_hex(const char hex);
  * @param[in] high The high nibble.
  * @param[in] low The low nibble.
  */
-__host__ __device__ uint8_t byte_from_nibbles(const uint8_t high,
-                                              const uint8_t low);
+__host__ __device__ uint8_t byte_from_nibbles(const uint8_t high, const uint8_t low);
 /**
  * Get the hex string from a byte.
  * @param[in] byte The byte.
@@ -81,8 +79,7 @@ __host__ __device__ void hex_from_byte(char *dst, const uint8_t byte);
  * @param[in] low The low hex character.
  * @return The byte.
  */
-__host__ __device__ uint8_t byte_from_two_hex_char(const char high,
-                                                   const char low);
+__host__ __device__ uint8_t byte_from_two_hex_char(const char high, const char low);
 /**
  * Get the number of bytes oh a string
  * @param[in] hex_string

@@ -12,7 +12,7 @@ __host__ __device__ int32_t TouchState::add_account(ArithEnv &arith, const evm_w
                                                     const CuEVM::account_flags_t acces_state_flag) {
     CuEVM::account_t *tmp_account_ptr = nullptr;
 #ifdef __CUDA_ARCH__
-    printf("TouchState::add_account - account_ptr: %p idx %d\n", account_ptr, threadIdx.x);
+    __ONE_THREAD_PER_INSTANCE(printf("TouchState::add_account - account_ptr: %p idx %d\n", account_ptr, threadIdx.x);)
     address->print();
     // print_bnt(arith, address);
 #endif
@@ -175,6 +175,7 @@ __host__ __device__ int32_t TouchState::poke_balance(ArithEnv &arith, const evm_
 }
 
 __host__ __device__ bool TouchState::is_warm_account(ArithEnv &arith, const evm_word_t *address) const {
+    if (*address < EVM_PRECOMPILED_CONTRACTS + 1 && !(*address == 0)) return true;
     account_t *account_ptr = nullptr;
     return (poke_account(arith, address, account_ptr) == ERROR_SUCCESS);
 }

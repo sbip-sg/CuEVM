@@ -85,9 +85,9 @@ __host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const e
 __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &account,
                                                         const CuEVM::account_flags_t flag) {
     state_t::add_account(account);
-#ifdef __CUDA_ARCH__
-    printf("after state_t::add_account(account); before malloc(account_flags_t; %d\n", threadIdx.x);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("after state_t::add_account(account); before malloc(account_flags_t; %d\n", threadIdx.x);
+    // #endif
     uint32_t index = no_accounts - 1;
     __SHARED_MEMORY__ CuEVM::account_flags_t *tmp_flags;
     __ONE_GPU_THREAD_BEGIN__

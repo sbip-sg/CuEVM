@@ -181,6 +181,7 @@ __host__ __device__ bool account_t::is_empty() {
 
 __host__ __device__ bool account_t::is_empty_create() {
     // Goethereum: nonce ==0 && code == 0, can have balance
+
     return ((nonce == 0) && (byte_code.size == 0)) ? true : false;
 }
 

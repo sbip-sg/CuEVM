@@ -14,23 +14,56 @@
 #include <CuEVM/utils/arith.cuh>
 
 namespace CuEVM {
+
+struct evm_message_call_t_shadow {
+    // store in global mem to load back
+    /*
+        evm_word_t *sender;
+        evm_word_t *recipient;
+        evm_word_t *contract_address;
+        evm_word_t *gas_limit;
+        evm_word_t *value;
+        evm_word_t *storage_address;
+        evm_word_t *return_data_offset;
+        evm_word_t *return_data_size;
+    */
+    evm_word_t *params_data;  // store 8 evm_word_t elements
+
+    CuEVM::byte_array_t *data;      /**< The data YP: \f$d\f$ */
+    CuEVM::byte_array_t *byte_code; /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
+
+    uint32_t static_env; /**< The static flag (STATICCALL) YP: \f$w\f$ */
+    uint32_t depth;      /**< The depth YP: \f$e\f$ */
+    uint32_t call_type;  /**< The call type internal has the opcode */
+
+    CuEVM::jump_destinations_t *jump_destinations; /**< The jump destinations */
+    __host__ __device__ evm_message_call_t_shadow(ArithEnv &arith, const evm_word_t *sender,
+                                                  const evm_word_t *recipient, const evm_word_t *contract_address,
+                                                  const evm_word_t *gas_limit, const evm_word_t *value,
+                                                  const uint32_t depth, const uint32_t call_type,
+                                                  const evm_word_t *storage_address, const CuEVM::byte_array_t &data,
+                                                  const CuEVM::byte_array_t &byte_code, const bn_t &return_data_offset,
+                                                  const bn_t &return_data_size, const uint32_t static_env);
+};
+
 /**
- * The message call struct.
+ * The message call struct resides in shared memory
  * YP: \f$M\f$
  */
 struct evm_message_call_t {
-    evm_word_t sender;                             /**< The sender address YP: \f$s\f$ */
-    evm_word_t recipient;                          /**< The recipient address YP: \f$r\f$ also \f$I_{a}\f$ */
-    evm_word_t contract_address;                   /**< The contract address YP: \f$c\f$ */
-    evm_word_t gas_limit;                          /**< The gas limit YP: \f$g\f$ */
-    evm_word_t value;                              /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
+    evm_word_t sender;             /**< The sender address YP: \f$s\f$ */
+    evm_word_t recipient;          /**< The recipient address YP: \f$r\f$ also \f$I_{a}\f$ */
+    evm_word_t contract_address;   /**< The contract address YP: \f$c\f$ */
+    evm_word_t gas_limit;          /**< The gas limit YP: \f$g\f$ */
+    evm_word_t value;              /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
+    evm_word_t storage_address;    /**< The storage address YP: \f$a\f$ */
+    evm_word_t return_data_offset; /**< The return data offset in memory */
+    evm_word_t return_data_size;   /**< The return data size in memory */
+    // important store them adjacent in shared memory
     uint32_t depth;                                /**< The depth YP: \f$e\f$ */
     uint32_t call_type;                            /**< The call type internal has the opcode */
-    evm_word_t storage_address;                    /**< The storage address YP: \f$a\f$ */
     CuEVM::byte_array_t *data;                     /**< The data YP: \f$d\f$ */
     CuEVM::byte_array_t *byte_code;                /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
-    evm_word_t return_data_offset;                 /**< The return data offset in memory */
-    evm_word_t return_data_size;                   /**< The return data size in memory */
     uint32_t static_env;                           /**< The static flag (STATICCALL) YP: \f$w\f$ */
     CuEVM::jump_destinations_t *jump_destinations; /**< The jump destinations */
 
@@ -51,23 +84,23 @@ struct evm_message_call_t {
      * @param[in] return_data_size The return data size in memory.
      * @param[in] static_env The static flag (STATICCALL) YP: \f$w\f$.
      */
-    __host__ __device__ evm_message_call_t(ArithEnv &arith, const bn_t &sender, const bn_t &recipient,
-                                           const bn_t &contract_address, const bn_t &gas_limit, const bn_t &value,
-                                           const uint32_t depth, const uint32_t call_type, const bn_t &storage_address,
-                                           const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code,
-                                           const bn_t &return_data_offset, const bn_t &return_data_size,
-                                           const uint32_t static_env = 0);
-    __host__ __device__ evm_message_call_t(ArithEnv &arith, const evm_word_t *sender, const evm_word_t *recipient,
-                                           const evm_word_t *contract_address, const evm_word_t *gas_limit,
-                                           const evm_word_t *value, const uint32_t depth, const uint32_t call_type,
-                                           const evm_word_t *storage_address, const CuEVM::byte_array_t &data,
-                                           const CuEVM::byte_array_t &byte_code, const bn_t &return_data_offset,
-                                           const bn_t &return_data_size, const uint32_t static_env);
+    // __host__ __device__ evm_message_call_t(ArithEnv &arith, const bn_t &sender, const bn_t &recipient,
+    //                                        const bn_t &contract_address, const bn_t &gas_limit, const bn_t &value,
+    //                                        const uint32_t depth, const uint32_t call_type, const bn_t
+    //                                        &storage_address, const CuEVM::byte_array_t &data, const
+    //                                        CuEVM::byte_array_t &byte_code, const bn_t &return_data_offset, const bn_t
+    //                                        &return_data_size, const uint32_t static_env = 0);
+    // __host__ __device__ evm_message_call_t(ArithEnv &arith, const evm_word_t *sender, const evm_word_t *recipient,
+    //                                        const evm_word_t *contract_address, const evm_word_t *gas_limit,
+    //                                        const evm_word_t *value, const uint32_t depth, const uint32_t call_type,
+    //                                        const evm_word_t *storage_address, const CuEVM::byte_array_t &data,
+    //                                        const CuEVM::byte_array_t &byte_code, const bn_t &return_data_offset,
+    //                                        const bn_t &return_data_size, const uint32_t static_env);
     // Default constructor
-    __host__ __device__ evm_message_call_t() : jump_destinations(nullptr) {}
+    __host__ __device__ evm_message_call_t() {}
 
     // Copy function
-    __host__ __device__ void copy_from(const evm_message_call_t *other);
+    __host__ __device__ void copy_from(const evm_message_call_t_shadow *other);
     /**
      * The destructor.
      */
@@ -190,7 +223,7 @@ struct evm_message_call_t {
      * Get the jump destinations.
      * @return The jump destinations.
      */
-    __host__ __device__ CuEVM::jump_destinations_t *get_jump_destinations() const;
+    // __host__ __device__ CuEVM::jump_destinations_t *get_jump_destinations() const;
 
     /**
      * Print the message.

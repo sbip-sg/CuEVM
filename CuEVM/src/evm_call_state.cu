@@ -55,7 +55,7 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
  */
 __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
                                                        CuEVM::evm_message_call_t* shared_message_ptr,
-                                                       CuEVM::evm_message_call_t* shadow_message_ptr)
+                                                       CuEVM::evm_message_call_t_shadow* shadow_message_ptr)
     : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
     this->parent = parent;
     this->depth = parent->depth + 1;
@@ -105,6 +105,7 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::W
 __host__ __device__ evm_call_state_t::~evm_call_state_t() {
     if (parent != nullptr) {
         // delete message_ptr; TODO: fix this, currently using shared mem for message_ptr
+        delete message_ptr_copy;
         delete stack_ptr;
         delete memory_ptr;
         delete log_state_ptr;
