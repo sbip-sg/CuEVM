@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <CuEVM/utils/cuda_utils.cuh>
 namespace CuEVM {
 enum PaddingDirection { NO_PADDING = 0, LEFT_PADDING = 1, RIGHT_PADDING = 2 };
 
@@ -200,8 +201,10 @@ struct byte_array_t {
      */
 
     __host__ __device__ static void reset_return_data(byte_array_t *&return_data_ptr) {
-        if (return_data_ptr != nullptr) delete return_data_ptr;
-        return_data_ptr = new byte_array_t();
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        if (return_data_ptr->data != nullptr) delete return_data_ptr->data;
+        __ONE_GPU_THREAD_WOSYNC_END__
+        return_data_ptr->size = 0;
     }
 
    private:

@@ -149,8 +149,9 @@ __host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const ui
     data[size].stack_size = stack.size();
     if (data[size].stack_size > 0) {
         data[size].stack = new evm_word_t[data[size].stack_size];
-        // std::copy(stack.stack_base, stack.stack_base + stack.size(), data[size].stack);
-        memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) * data[size].stack_size);
+        stack.extract_data(data[size].stack);
+        // // std::copy(stack.stack_base, stack.stack_base + stack.size(), data[size].stack);
+        // memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) * data[size].stack_size);
     }
 
     data[size].depth = depth;

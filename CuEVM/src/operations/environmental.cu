@@ -128,6 +128,8 @@ __host__ __device__ int32_t CALLDATALOAD(ArithEnv &arith, const bn_t &gas_limit,
         uint32_t data_offset_ui32, length_ui32;
         // get values saturated to uint32_max, in overflow case
         data_offset_ui32 = cgbn_get_ui32(arith.env, index);
+        // printf("CALLDATALOAD: error_code: %d data_length %d idx %d\n", error_code, message.get_data().size,
+        //        data_offset_ui32);
         if (cgbn_compare_ui32(arith.env, index, data_offset_ui32) != 0) data_offset_ui32 = UINT32_MAX;
         length_ui32 = CuEVM::word_size;
         CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);

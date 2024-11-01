@@ -11,8 +11,8 @@ __host__ __device__ int32_t TouchState::add_account(ArithEnv &arith, const evm_w
                                                     CuEVM::account_t *&account_ptr,
                                                     const CuEVM::account_flags_t acces_state_flag) {
     CuEVM::account_t *tmp_account_ptr = nullptr;
-#ifdef __CUDA_ARCH__
-    __ONE_THREAD_PER_INSTANCE(printf("TouchState::add_account - account_ptr: %p idx %d\n", account_ptr, threadIdx.x);)
+#ifdef EIP_3155
+    __ONE_THREAD_PER_INSTANCE(printf("TouchState::add_account - account_ptr: %p idx %d\n", account_ptr, THREADIDX);)
     address->print();
     // print_bnt(arith, address);
 #endif

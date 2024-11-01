@@ -22,7 +22,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
                                  CuEVM::block_info_t *block_info_ptr, CuEVM::evm_transaction_t *transaction_ptr,
                                  CuEVM::state_access_t *touch_state_data_ptr, CuEVM::log_state_data_t *log_state_ptr,
                                  CuEVM::evm_return_data_t *return_data_ptr, CuEVM::EccConstants *ecc_constants_ptr,
-                                 CuEVM::evm_message_call_t *shared_message_call_ptr
+                                 CuEVM::evm_message_call_t *shared_message_call_ptr, CuEVM::evm_word_t *shared_stack_ptr
 #ifdef EIP_3155
                                  ,
                                  CuEVM::utils::tracer_t *tracer_ptr
@@ -35,12 +35,12 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     // TODO: store in local/shared memory
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
                                                  touch_state_data_ptr, return_data_ptr);
-#ifndef __CUDA_ARCH__
-    shared_message_call_ptr = new evm_message_call_t();
-#endif
+// #ifndef __CUDA_ARCH__
+//     shared_message_call_ptr = new evm_message_call_t();
+// #endif
 #ifdef EIP_3155
     // printing debug when enabling tracer.
-    printf("call_state_ptr allocated\n");
+    printf("call_state_ptr allocated %p, threadid %d\n", call_state_ptr, THREADIDX);
     // transaction_ptr->print();
 #endif
     int32_t error_code = transaction_ptr->validate(arith, call_state_ptr->touch_state, *block_info_ptr,
@@ -62,8 +62,8 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
         // #endif
         shared_message_call_ptr->print();
 
-        CuEVM::evm_call_state_t *child_call_state_ptr =
-            new CuEVM::evm_call_state_t(arith, call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr);
+        CuEVM::evm_call_state_t *child_call_state_ptr = new CuEVM::evm_call_state_t(
+            arith, call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr, shared_stack_ptr);
         // subtract the gas used by the transaction initialization from the gas
         // limit
         cgbn_sub(arith.env, child_call_state_ptr->gas_limit, child_call_state_ptr->gas_limit, call_state_ptr->gas_used);
@@ -76,10 +76,10 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
 }
 
 __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_instance,
-                                 CuEVM::evm_message_call_t *message_call)
+                                 CuEVM::evm_message_call_t *message_call, CuEVM::evm_word_t *shared_stack_ptr)
     : evm_t(arith, evm_instance.world_state_data_ptr, evm_instance.block_info_ptr, evm_instance.transaction_ptr,
             evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr, evm_instance.return_data_ptr,
-            evm_instance.ecc_constants_ptr, message_call
+            evm_instance.ecc_constants_ptr, message_call, shared_stack_ptr
 #ifdef EIP_3155
             ,
             evm_instance.tracer_ptr
@@ -104,8 +104,8 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
 // bn_t sender, recipient, value;
 // call_state_ptr->message_ptr->get_sender(arith, sender);
 // call_state_ptr->message_ptr->get_recipient(arith, recipient);
-#ifdef __CUDA_ARCH__
-    printf("start_CALL %d\n", threadIdx.x);
+#ifdef EIP_3155
+    printf("start_CALL %d\n", THREADIDX);
     __SYNC_THREADS__
 #endif
 
@@ -256,8 +256,9 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith) {
             } else {
                 // operation stop
                 // clear return data
-                call_state_ptr->parent->last_return_data_ptr->free();
-                call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
+                // call_state_ptr->parent->last_return_data_ptr->free();
+                // call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
+                CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
                 return ERROR_RETURN;
             }
         }
@@ -850,7 +851,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     // #endif
     // if the child call return from normal halting
     // no errors
+#ifdef EIP_3155
     printf(" finish_CALL error_code: %d\n", error_code);
+#endif
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
@@ -878,6 +881,7 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
             }
         }
     }
+    // printf("end finish_CALL before set warm account %d idx %d\n", error_code, THREADIDX);
     // #ifdef __CUDA_ARCH__
     //     printf("evm_t::finish_CALL %d before setting warm accounts error_code: %d\n", threadIdx.x, error_code);
     // #endif
@@ -894,11 +898,12 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
         // abnormal halting where return data ptr is not handled, need to reset
         // it
-        if (call_state_ptr->parent->last_return_data_ptr != nullptr)
-            delete call_state_ptr->parent->last_return_data_ptr;
-        call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
-        // CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
+        // if (call_state_ptr->parent->last_return_data_ptr != nullptr)
+        //     delete call_state_ptr->parent->last_return_data_ptr;
+        // call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
+        CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
     }
+    // printf("end finish_CALL after checking and allocating return data: %d idx %d\n", error_code, THREADIDX);
     // get the memory offset and size of the return data
     // in the parent memory
     bn_t ret_offset, ret_size;
@@ -930,6 +935,7 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     // #ifdef __CUDA_ARCH__
     //     printf("evm_t::finish_CALL %d before return error_code: %d\n", threadIdx.x, error_code);
     // #endif
+    // printf("end finish_CALL error_code: %d idx %d\n", error_code, THREADIDX);
     return error_code;
 }
 
@@ -983,10 +989,10 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith) {
             error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
         }
         // reset last return data after CREATE
-        if (call_state_ptr->parent->last_return_data_ptr != nullptr)
-            delete call_state_ptr->parent->last_return_data_ptr;
-        call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
-        // CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
+        // if (call_state_ptr->parent->last_return_data_ptr != nullptr)
+        //     delete call_state_ptr->parent->last_return_data_ptr;
+        // call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
+        CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
     }
     // if success, return ERROR_RETURN to continue finish call
     return error_code ? error_code : ERROR_RETURN;

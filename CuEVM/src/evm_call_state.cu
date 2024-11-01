@@ -26,36 +26,38 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
 #ifdef EIP_3155
     this->trace_idx = 0;
 #endif
+    printf("evm_call_state_t constructor no parent %d\n", THREADIDX);
 }
 
-/**
- * The constructor with the parent state and message call
- */
-__host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
-                                                       CuEVM::evm_message_call_t* message_ptr)
-    : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
-    this->parent = parent;
-    this->depth = parent->depth + 1;
-    this->pc = 0;
-    cgbn_set_ui32(arith.env, this->gas_used, 0);
-    cgbn_set(arith.env, this->gas_refund, parent->gas_refund);
-    this->message_ptr = message_ptr;
-    this->message_ptr->get_gas_limit(arith, this->gas_limit);
-    this->stack_ptr = new CuEVM::evm_stack_t();
-    this->memory_ptr = new CuEVM::evm_memory_t();
-    this->log_state_ptr = new CuEVM::log_state_data_t();
-    this->last_return_data_ptr = new CuEVM::evm_return_data_t();
-#ifdef EIP_3155
-    this->trace_idx = 0;
-#endif
-}
+// /**
+//  * The constructor with the parent state and message call
+//  */
+// __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
+//                                                        CuEVM::evm_message_call_t* message_ptr)
+//     : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
+//     this->parent = parent;
+//     this->depth = parent->depth + 1;
+//     this->pc = 0;
+//     cgbn_set_ui32(arith.env, this->gas_used, 0);
+//     cgbn_set(arith.env, this->gas_refund, parent->gas_refund);
+//     this->message_ptr = message_ptr;
+//     this->message_ptr->get_gas_limit(arith, this->gas_limit);
+//     this->stack_ptr = new CuEVM::evm_stack_t();
+//     this->memory_ptr = new CuEVM::evm_memory_t();
+//     this->log_state_ptr = new CuEVM::log_state_data_t();
+//     this->last_return_data_ptr = new CuEVM::evm_return_data_t();
+// #ifdef EIP_3155
+//     this->trace_idx = 0;
+// #endif
+// }
 
 /**
  * The constructor with the parent state and message call
  */
 __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
                                                        CuEVM::evm_message_call_t* shared_message_ptr,
-                                                       CuEVM::evm_message_call_t_shadow* shadow_message_ptr)
+                                                       CuEVM::evm_message_call_t_shadow* shadow_message_ptr,
+                                                       evm_word_t* shared_stack_ptr)
     : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
     this->parent = parent;
     this->depth = parent->depth + 1;
@@ -65,13 +67,55 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     this->message_ptr = shared_message_ptr;
     this->message_ptr_copy = shadow_message_ptr;  // point to global memory, deallocate in destructor
     this->message_ptr->get_gas_limit(arith, this->gas_limit);
-    this->stack_ptr = new CuEVM::evm_stack_t();
-    this->memory_ptr = new CuEVM::evm_memory_t();
-    this->log_state_ptr = new CuEVM::log_state_data_t();
-    this->last_return_data_ptr = new CuEVM::evm_return_data_t();
+    __SHARED_MEMORY__ evm_stack_t* stack_ptr;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    if (parent->stack_ptr != nullptr) {
+        stack_ptr = new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base + parent->stack_ptr->stack_offset,
+                                           parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
+        // printf("parent stack found %p thread %d\n", parent->stack_ptr, THREADIDX);
+    } else {
+        stack_ptr = new CuEVM::evm_stack_t(shared_stack_ptr);
+        // printf("parent stack not found %p thread %d\n", parent->stack_ptr, THREADIDX);
+    }
+    // printf("Stack constructor done stack base %p stack base offset %d stack offset %d\n",
+    // stack_ptr->shared_stack_base,
+    //        stack_ptr->stack_base_offset, stack_ptr->stack_offset);
+    // stack_ptr = new CuEVM::evm_stack_t(shared_stack_ptr);
+    __ONE_GPU_THREAD_END__
+    this->stack_ptr = stack_ptr;
+
+    // printf("evm_call_state_t initialized stack pointer %p thread %d\n", stack_ptr, THREADIDX);
+
+    __SHARED_MEMORY__ evm_memory_t* memory_ptr;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    memory_ptr = new CuEVM::evm_memory_t();
+    __ONE_GPU_THREAD_END__
+
+    // printf("evm_call_state_t initialized memory pointer %p thread %d\n", memory_ptr, THREADIDX);
+
+    this->memory_ptr = memory_ptr;
+    __SHARED_MEMORY__ log_state_data_t* log_state_ptr;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    log_state_ptr = new CuEVM::log_state_data_t();
+    __ONE_GPU_THREAD_END__
+    this->log_state_ptr = log_state_ptr;
+
+    // printf("evm_call_state_t initialized log state pointer %p thread %d\n", log_state_ptr, THREADIDX);
+
+    __SHARED_MEMORY__ evm_return_data_t* last_return_data_ptr;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    last_return_data_ptr = new CuEVM::evm_return_data_t();
+    __ONE_GPU_THREAD_END__
+    this->last_return_data_ptr = last_return_data_ptr;
+
+    // printf("evm_call_state_t initialized return data pointer %p thread %d\n", last_return_data_ptr, THREADIDX);
+    // this->memory_ptr = new CuEVM::evm_memory_t();
+    // this->log_state_ptr = new CuEVM::log_state_data_t();
+    // this->last_return_data_ptr = new CuEVM::evm_return_data_t();
 #ifdef EIP_3155
     this->trace_idx = 0;
 #endif
+    // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
 }
 
 /**
@@ -105,11 +149,15 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::W
 __host__ __device__ evm_call_state_t::~evm_call_state_t() {
     if (parent != nullptr) {
         // delete message_ptr; TODO: fix this, currently using shared mem for message_ptr
+        // printf("evm_call_state_t destructor thread %d\n", THREADIDX);
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         delete message_ptr_copy;
         delete stack_ptr;
         delete memory_ptr;
         delete log_state_ptr;
         delete last_return_data_ptr;
+        __ONE_GPU_THREAD_WOSYNC_END__
+        // printf("evm_call_state_t done destructor thread %d\n", THREADIDX);
     }
 }
 

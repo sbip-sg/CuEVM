@@ -237,6 +237,8 @@ constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
 // specific implementation constants
 constexpr CONSTANT uint32_t initial_storage_capacity = 4;
 
+constexpr CONSTANT uint32_t shared_stack_size = 1024;
+
 /**
  * The CGBN context type.  This is a template type that takes
  * the number of threads per instance and the

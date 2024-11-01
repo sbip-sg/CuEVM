@@ -671,12 +671,14 @@ __host__ __device__ int32_t SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit,
             cgbn_add(arith.env, recipient_balance, recipient_balance, sender_balance);
             cgbn_set_ui32(arith.env, sender_balance, 0);
             touch_state.set_balance(arith, &recipient_shared, recipient_balance);
-            touch_state.set_balance(arith, &recipient_shared, sender_balance);
+            touch_state.set_balance(arith, &message.contract_address, sender_balance);
             // receiver = self => 0 balance
             return_data = CuEVM::evm_return_data_t();
             error_code |= ERROR_RETURN;
         }
     }
+    // printf("touch state after SELFDESTRUCT %d\n", THREADIDX);
+    // touch_state.print();
     return error_code;
 }
 }  // namespace CuEVM::operations
