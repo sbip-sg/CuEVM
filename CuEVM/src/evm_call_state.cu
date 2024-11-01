@@ -51,6 +51,30 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
 }
 
 /**
+ * The constructor with the parent state and message call
+ */
+__host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
+                                                       CuEVM::evm_message_call_t* shared_message_ptr,
+                                                       CuEVM::evm_message_call_t_shadow* shadow_message_ptr)
+    : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
+    this->parent = parent;
+    this->depth = parent->depth + 1;
+    this->pc = 0;
+    cgbn_set_ui32(arith.env, this->gas_used, 0);
+    cgbn_set(arith.env, this->gas_refund, parent->gas_refund);
+    this->message_ptr = shared_message_ptr;
+    this->message_ptr_copy = shadow_message_ptr;  // point to global memory, deallocate in destructor
+    this->message_ptr->get_gas_limit(arith, this->gas_limit);
+    this->stack_ptr = new CuEVM::evm_stack_t();
+    this->memory_ptr = new CuEVM::evm_memory_t();
+    this->log_state_ptr = new CuEVM::log_state_data_t();
+    this->last_return_data_ptr = new CuEVM::evm_return_data_t();
+#ifdef EIP_3155
+    this->trace_idx = 0;
+#endif
+}
+
+/**
  * The constructor with no parent state and message call
  */
 __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::WorldState* word_state_ptr,
@@ -80,7 +104,8 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::W
  */
 __host__ __device__ evm_call_state_t::~evm_call_state_t() {
     if (parent != nullptr) {
-        delete message_ptr;
+        // delete message_ptr; TODO: fix this, currently using shared mem for message_ptr
+        delete message_ptr_copy;
         delete stack_ptr;
         delete memory_ptr;
         delete log_state_ptr;

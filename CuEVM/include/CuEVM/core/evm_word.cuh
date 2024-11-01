@@ -54,6 +54,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * @return 1 for equal, 0 otherwise
      */
     __host__ __device__ int32_t operator==(const uint32_t &value) const;
+    __host__ __device__ int32_t operator<(const uint32_t &value) const;
     /**
      * Set the evm_word_t from a hex string.
      * The hex string is in Big Endian format.

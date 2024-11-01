@@ -73,6 +73,7 @@
 #define EIP_4895
 #define EIP_6049
 #define PARIS
+
 #endif
 
 #ifdef PARIS
@@ -80,6 +81,7 @@
 #define EIP_4399
 #define EIP_5133
 #define LONDON
+
 #endif
 
 #ifdef LONDON
@@ -109,6 +111,7 @@
 #define EIP_2718
 #define EIP_2929
 #define EIP_2930
+#define EVM_PRECOMPILED_CONTRACTS 9  // 9 precompiled contracts
 #endif
 
 #ifdef EIP_2070

@@ -73,7 +73,9 @@ __host__ __device__ int32_t MSTORE8(ArithEnv &arith, const bn_t &gas_limit, bn_t
                                     CuEVM::evm_memory_t &memory) {
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_VERY_LOW);
     int32_t error_code = CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
-
+    // #ifdef __CUDA_ARCH__
+    //     printf("MSTORE8 %d\n", threadIdx.x);
+    // #endif
     bn_t memory_offset;
     error_code |= stack.pop(arith, memory_offset);
     bn_t value;

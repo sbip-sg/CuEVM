@@ -72,7 +72,7 @@ struct state_t {
      * @param[out] index The index.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account_index(ArithEnv &arith, const bn_t &address, uint32_t &index);
+    __host__ __device__ int32_t get_account_index(ArithEnv &arith, const evm_word_t *address, uint32_t &index);
 
     /**
      * The get account function.
@@ -81,7 +81,7 @@ struct state_t {
      * @param[out] account The account.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t &account);
 
     /**
      * The get account function.
@@ -90,7 +90,7 @@ struct state_t {
      * @param[out] account_ptr The account pointer.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr);
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t *&account_ptr);
 
     /**
      * The add account function.
@@ -106,14 +106,6 @@ struct state_t {
      * @return If set 0. otherwise error.
      */
     __host__ __device__ int32_t set_account(ArithEnv &arith, const CuEVM::account_t &account);
-
-    /**
-     * The has account function.
-     * @param[in] arith The arithmetic environment.
-     * @param[in] address The address.
-     * @return If has ERROR_SUCCESS. otherwise ERROR_STATE_ADDRESS_NOT_FOUND.
-     */
-    __host__ __device__ int32_t has_account(ArithEnv &arith, const bn_t &address);
 
     /**
      * The update account function.

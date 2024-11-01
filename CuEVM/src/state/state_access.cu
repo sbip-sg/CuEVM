@@ -59,8 +59,8 @@ __host__ __device__ void state_access_t::duplicate(const state_access_t &other) 
     flags = tmp_flags;
 }
 
-__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account,
-                                                        const CuEVM::account_flags_t flag) {
+__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const evm_word_t *address,
+                                                        CuEVM::account_t &account, const CuEVM::account_flags_t flag) {
     uint32_t index = 0;
     if (state_t::get_account_index(arith, address, index) == ERROR_SUCCESS) {
         flags[index].update(flag);
@@ -70,7 +70,7 @@ __host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const b
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const bn_t &address,
+__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const evm_word_t *address,
                                                         CuEVM::account_t *&account_ptr,
                                                         const CuEVM::account_flags_t flag) {
     uint32_t index = 0;
@@ -85,7 +85,9 @@ __host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const b
 __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &account,
                                                         const CuEVM::account_flags_t flag) {
     state_t::add_account(account);
-
+    // #ifdef __CUDA_ARCH__
+    //     printf("after state_t::add_account(account); before malloc(account_flags_t; %d\n", threadIdx.x);
+    // #endif
     uint32_t index = no_accounts - 1;
     __SHARED_MEMORY__ CuEVM::account_flags_t *tmp_flags;
     __ONE_GPU_THREAD_BEGIN__
@@ -145,35 +147,30 @@ __host__ __device__ int32_t state_access_t::add_duplicate_account(ArithEnv &arit
     return error_code;
 }
 
-__host__ __device__ int32_t state_access_t::add_new_account(ArithEnv &arith, const bn_t &address,
+__host__ __device__ int32_t state_access_t::add_new_account(ArithEnv &arith, const evm_word_t *address,
                                                             CuEVM::account_t *&account_ptr,
                                                             const CuEVM::account_flags_t flag) {
     __SHARED_MEMORY__ CuEVM::account_t *tmp_account_ptr;
     bn_t zero;
     cgbn_set_ui32(arith.env, zero, 0);
     // printf("before new CuEVM::account_t();\n");
-    // #ifdef __CUDA_ARCH__
-    //     printf("state_access_t::add_new_account before new CuEVM::account_t() %d\n", threadIdx.x);
-    // #endif
+
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     tmp_account_ptr = new CuEVM::account_t();
     __ONE_GPU_THREAD_END__
-    // #ifdef __CUDA_ARCH__
-    //     printf("state_access_t::add_new_account after new CuEVM::account_t() %d\n", threadIdx.x);
-    // #endif
+
     tmp_account_ptr->set_address(arith, address);
     // default constructor did not set balance + nonce
     tmp_account_ptr->set_balance(arith, zero);
     tmp_account_ptr->set_nonce(arith, zero);
 
-#ifdef __CUDA_ARCH__
-    // printf("before add_account(*tmp_account_ptr, flag); %d\n", threadIdx.x);
-#endif
     int32_t error_code = add_account(*tmp_account_ptr, flag);
+
     account_ptr = &accounts[no_accounts - 1];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     delete tmp_account_ptr;
     __ONE_GPU_THREAD_WOSYNC_END__
+
     return error_code;
 }
 
@@ -188,10 +185,8 @@ __host__ __device__ int32_t state_access_t::set_account(ArithEnv &arith, const C
 
 __host__ __device__ int32_t state_access_t::update_account(ArithEnv &arith, const CuEVM::account_t &account,
                                                            const CuEVM::account_flags_t flag) {
-    bn_t target_address;
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) & (account.address));
     uint32_t index = 0;
-    if (state_t::get_account_index(arith, target_address, index) == ERROR_SUCCESS) {
+    if (state_t::get_account_index(arith, &(account.address), index) == ERROR_SUCCESS) {
         accounts[index].update(arith, account, flag);
         flags[index].update(flag);
         return ERROR_SUCCESS;

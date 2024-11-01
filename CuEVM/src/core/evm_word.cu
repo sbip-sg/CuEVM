@@ -22,7 +22,7 @@ __host__ __device__ evm_word_t &evm_word_t::operator=(const evm_word_t &src) {
     _limbs[index] = src._limbs[index];
   }
   return *this;*/
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    __ONE_GPU_THREAD_BEGIN__
     memcpy(_limbs, src._limbs, CuEVM::cgbn_limbs * sizeof(uint32_t));
     __ONE_GPU_THREAD_END__
     return *this;
@@ -37,6 +37,19 @@ __host__ __device__ int32_t evm_word_t::operator==(const evm_word_t &other) cons
 #pragma unroll
     for (int32_t index = 0; index < CuEVM::cgbn_limbs; index++) {
         if (_limbs[index] != other._limbs[index]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+// todo optimize
+__host__ __device__ int32_t evm_word_t::operator<(const uint32_t &value) const {
+    if (_limbs[0] >= value) {
+        return 0;
+    }
+#pragma unroll
+    for (int32_t index = 1; index < CuEVM::cgbn_limbs; index++) {
+        if (_limbs[index] != 0) {
             return 0;
         }
     }

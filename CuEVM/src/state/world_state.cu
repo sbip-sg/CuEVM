@@ -7,19 +7,15 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
-__host__ __device__ int32_t
-WorldState::get_account(ArithEnv &arith, const bn_t &address,
-                        CuEVM::account_t *&account_ptr) {
+__host__ __device__ int32_t WorldState::get_account(ArithEnv &arith, const evm_word_t *address,
+                                                    CuEVM::account_t *&account_ptr) {
     return _state->get_account(arith, address, account_ptr);
 }
 
-__host__ __device__ int32_t WorldState::get_value(ArithEnv &arith,
-                                                  const bn_t &address,
-                                                  const bn_t &key,
+__host__ __device__ int32_t WorldState::get_value(ArithEnv &arith, const evm_word_t *address, const bn_t &key,
                                                   bn_t &value) {
     account_t *account_ptr = nullptr;
     cgbn_set_ui32(arith.env, value, 0);
-    return (_state->get_account(arith, address, account_ptr) ||
-            account_ptr->get_storage_value(arith, key, value));
+    return (_state->get_account(arith, address, account_ptr) || account_ptr->get_storage_value(arith, key, value));
 }
 }  // namespace CuEVM

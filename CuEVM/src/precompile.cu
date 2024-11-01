@@ -41,7 +41,7 @@ __host__ __device__ int32_t operation_IDENTITY(ArithEnv &arith, bn_t &gas_limit,
     // dynamic gas
     // compute the dynamic gas cost
     bn_t length;
-    uint32_t length_size = message->data.size;
+    uint32_t length_size = message->data->size;
     cgbn_set_ui32(arith.env, length, length_size);
     CuEVM::gas_cost::memory_cost(arith, gas_used, length);
 
@@ -51,7 +51,7 @@ __host__ __device__ int32_t operation_IDENTITY(ArithEnv &arith, bn_t &gas_limit,
         return error;
     }
 
-    *return_data = byte_array_t(message->data.data, length_size);
+    *return_data = byte_array_t(message->data->data, length_size);
 
     return ERROR_RETURN;
 }
@@ -75,7 +75,7 @@ __host__ __device__ int32_t operation_SHA256(ArithEnv &arith, bn_t &gas_limit, b
     // dynamic gas
     // compute the dynamic gas cost
     bn_t length;
-    uint32_t length_size = message->data.size;
+    uint32_t length_size = message->data->size;
     cgbn_set_ui32(arith.env, length, length_size);
     CuEVM::gas_cost::sha256_cost(arith, gas_used, length);
 
@@ -86,7 +86,7 @@ __host__ __device__ int32_t operation_SHA256(ArithEnv &arith, bn_t &gas_limit, b
     }
 
     uint8_t hash[32] = {0};
-    CuCrypto::sha256::sha(message->data.data, length_size, &(hash[0]));
+    CuCrypto::sha256::sha(message->data->data, length_size, &(hash[0]));
     *return_data = byte_array_t(hash, 32);
     return ERROR_RETURN;
 }
@@ -97,7 +97,7 @@ __host__ __device__ int32_t operation_RIPEMD160(ArithEnv &arith, bn_t &gas_limit
     // static gas
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_RIPEMD160);
 
-    uint32_t data_size = message->data.size;
+    uint32_t data_size = message->data->size;
 
     bn_t length;
     cgbn_set_ui32(arith.env, length, data_size);
@@ -114,7 +114,7 @@ __host__ __device__ int32_t operation_RIPEMD160(ArithEnv &arith, bn_t &gas_limit
     uint8_t output[32] = {0};
     uint8_t *hash;
     hash = output + 12;
-    CuCrypto::ripemd160::ripemd160(message->data.data, data_size, hash);
+    CuCrypto::ripemd160::ripemd160(message->data->data, data_size, hash);
     *return_data = byte_array_t(output, 32);
 
     return ERROR_RETURN;
@@ -148,7 +148,7 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     }
 
     uint32_t base_len, exp_len, mod_len, data_len;
-    data_len = message->data.size;
+    data_len = message->data->size;
     error = cgbn_get_uint32_t(arith.env, base_len, base_size);
     error |= cgbn_get_uint32_t(arith.env, mod_len, modulus_size);
     error |= cgbn_get_uint32_t(arith.env, exp_len, exponent_size);
@@ -183,7 +183,7 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     bool exp_is_zero = true;
 #ifdef __CUDA_ARCH__
     printf("data len %d\n", data_len);
-    message->data.print();
+    message->data->print();
 #endif
     // get a pointer to available bytes (call_exponent_size) of exponen
     // send through call data the remaining bytes are consider
@@ -197,7 +197,7 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
 
         if (idx < data_len) {
-            e_data.data[i] = message->data.data[idx];
+            e_data.data[i] = message->data->data[idx];
         } else {
             e_data.data[i] = 0;
         }
@@ -258,7 +258,7 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
         auto idx = 96 + i;
         if (idx < data_len) {
             __ONE_GPU_THREAD_WOSYNC_BEGIN__
-            base_data.data[i] = message->data.data[idx];
+            base_data.data[i] = message->data->data[idx];
             __ONE_GPU_THREAD_END__
         } else {
             break;
@@ -281,7 +281,7 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     for (uint32_t i = 0; i < mod_len; i++) {
         auto idx = 96 + base_len + exp_len + i;
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        mod_data.data[i] = (idx < data_len) ? message->data.data[idx] : 0;
+        mod_data.data[i] = (idx < data_len) ? message->data->data[idx] : 0;
         __ONE_GPU_THREAD_END__
         if (mod_data.data[i] != 0) {
             mod_is_zero = false;
@@ -348,14 +348,14 @@ __host__ __device__ int32_t operation_BLAKE2(ArithEnv &arith, bn_t &gas_limit, b
                                              CuEVM::evm_return_data_t *return_data,
                                              CuEVM::evm_message_call_t *message) {
     // expecting 213 bytes inputs
-    uint32_t length_size = message->data.size;
+    uint32_t length_size = message->data->size;
 
     if (length_size != 213) {
         return ERROR_PRECOMPILE_UNEXPECTED_INPUT_LENGTH;
     }
 
     uint8_t *input;
-    input = message->data.data;
+    input = message->data->data;
     uint8_t f = input[212];
 
     // final byte must be 1 or 0
@@ -399,11 +399,11 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
     // printf("has gas %d\n", error_code);
     // printf("gas limit \n");
     // print_bnt(arith, gas_limit);
-    // printf("data size %d\n", message->data.size);
-    message->data.print();
+    // printf("data size %d\n", message->data->size);
+    message->data->print();
     if (error_code == ERROR_SUCCESS) {
         bn_t length;
-        cgbn_set_ui32(arith.env, length, message->data.size);
+        cgbn_set_ui32(arith.env, length, message->data->size);
         bn_t index;
         cgbn_set_ui32(arith.env, index, 0);
         // complete with zeroes the remaing bytes
@@ -530,19 +530,19 @@ __host__ __device__ int32_t operation_ecMul(ArithEnv &arith, CuEVM::EccConstants
 __host__ __device__ int32_t operation_ecPairing(ArithEnv &arith, CuEVM::EccConstants *constants, bn_t &gas_limit,
                                                 bn_t &gas_used, CuEVM::evm_return_data_t *return_data,
                                                 CuEVM::evm_message_call_t *message) {
-    __ONE_THREAD_PER_INSTANCE(printf("ecPairing\n"); printf("input size %d\n", message->data.size););
+    __ONE_THREAD_PER_INSTANCE(printf("ecPairing\n"); printf("input size %d\n", message->data->size););
     // input = message.get_data(index, length, size);
-    CuEVM::byte_array_t input(message->get_data(), 0, message->data.size);
-    CuEVM::gas_cost::ecpairing_cost(arith, gas_used, message->data.size);
+    CuEVM::byte_array_t input(message->get_data(), 0, message->data->size);
+    CuEVM::gas_cost::ecpairing_cost(arith, gas_used, message->data->size);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        if (message->data.size % 192 != 0) {
+        if (message->data->size % 192 != 0) {
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         } else {
             // 0 inputs is valid and returns 1.
             int res =
-                message->data.size == 0 ? 1 : ecc::pairing_multiple(arith, constants, input.data, message->data.size);
+                message->data->size == 0 ? 1 : ecc::pairing_multiple(arith, constants, input.data, message->data->size);
 #ifdef __CUDA_ARCH__
             printf("res: %d, idx %d \n", res, threadIdx.x);
 #endif

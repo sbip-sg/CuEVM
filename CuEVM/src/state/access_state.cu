@@ -5,7 +5,7 @@
 
 #include <CuEVM/state/access_state.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-
+/*
 namespace CuEVM {
 __host__ __device__ int32_t AccessState::add_account(ArithEnv &arith, const bn_t &address,
                                                      CuEVM::account_t *&account_ptr,
@@ -107,3 +107,5 @@ __host__ __device__ int32_t AccessState::get_storage(ArithEnv &arith, const bn_t
     return ERROR_SUCCESS;
 }
 }  // namespace CuEVM
+
+*/

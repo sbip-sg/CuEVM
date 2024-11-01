@@ -55,10 +55,10 @@ __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &c
 
     cgbn_set_byte_array_t(arith.env, contract_address, hash_address_bytes);
     cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
-#ifdef __CUDA_ARCH__
-    printf("contract_address: thread id %d ", threadIdx.x);
-    print_bnt(arith, contract_address);
-#endif
+    // #ifdef __CUDA_ARCH__
+    //     printf("contract_address: thread id %d ", threadIdx.x);
+    //     print_bnt(arith, contract_address);
+    // #endif
     return ERROR_SUCCESS;
 }
 

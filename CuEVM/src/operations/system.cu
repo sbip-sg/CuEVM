@@ -19,6 +19,9 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
     // try to send value in call
     bn_t value;
     new_state_ptr->message_ptr->get_value(arith, value);
+    // #ifdef __CUDA_ARCH__
+    //     printf("generic_CALL message_ptr->get_value %d\n", threadIdx.x);
+    // #endif
     int32_t error_code =
         ((new_state_ptr->message_ptr->get_static_env() && (cgbn_compare_ui32(arith.env, value, 0) != 0) &&
           (new_state_ptr->message_ptr->get_call_type() == OP_CALL))
@@ -42,6 +45,16 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
 
     error_code |= CuEVM::gas_cost::memory_grow_cost(arith, *current_state.memory_ptr, args_offset, args_size,
                                                     memory_expansion_cost_args, temp_memory_gas_used);
+    // #ifdef __CUDA_ARCH__
+    //     printf("generic_CALL memory_expansion_cost_args idx %d error_code %d mempointer %p memsize %d\n",
+    //     threadIdx.x,
+    //            error_code, current_state.memory_ptr, current_state.memory_ptr->size);
+    //     __SYNC_THREADS__
+    //     print_bnt(arith, temp_memory_gas_used);
+    //     print_bnt(arith, args_offset);
+    //     print_bnt(arith, args_size);
+    // #endif
+
     // memory return data
     bn_t ret_offset, ret_size;
     new_state_ptr->message_ptr->get_return_data_offset(arith, ret_offset);
@@ -50,6 +63,14 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
     error_code |= CuEVM::gas_cost::memory_grow_cost(arith, *current_state.memory_ptr, ret_offset, ret_size,
                                                     memory_expansion_cost_ret, temp_memory_gas_used);
 
+    // #ifdef __CUDA_ARCH__
+    //     printf("generic_CALL memory_expansion_cost_ret idx %d error_code %d mempointer %p memsize %d\n", threadIdx.x,
+    //            error_code, current_state.memory_ptr, current_state.memory_ptr->size);
+    //     __SYNC_THREADS__
+    //     print_bnt(arith, temp_memory_gas_used);
+    //     print_bnt(arith, ret_offset);
+    //     print_bnt(arith, ret_size);
+    // #endif
     // compute the total memory expansion cost
     bn_t memory_expansion_cost;
     if (cgbn_compare(arith.env, memory_expansion_cost_args, memory_expansion_cost_ret) > 0) {
@@ -66,9 +87,11 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
     // #endif
 
     // adress warm call
-    bn_t contract_address;
-    new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
-    CuEVM::gas_cost::access_account_cost(arith, current_state.gas_used, current_state.touch_state, contract_address);
+    // bn_t contract_address;
+    evm_word_t *contract_address_ptr = &new_state_ptr->message_ptr->contract_address;
+    // new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
+    CuEVM::gas_cost::access_account_cost(arith, current_state.gas_used, current_state.touch_state,
+                                         contract_address_ptr);
     // positive value call cost (except delegate call)
     // empty account call cost
     // #ifdef __CUDA_ARCH__
@@ -85,7 +108,7 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
             cgbn_set_ui32(arith.env, gas_stippend, GAS_CALL_STIPEND);
             // If the empty account is called
             // only for call opcode
-            if ((new_state_ptr->touch_state.is_empty_account(arith, contract_address)) &&
+            if ((new_state_ptr->touch_state.is_empty_account(arith, contract_address_ptr)) &&
                 (new_state_ptr->message_ptr->get_call_type() == OP_CALL)) {
                 cgbn_add_ui32(arith.env, current_state.gas_used, current_state.gas_used, GAS_NEW_ACCOUNT);
             };
@@ -120,8 +143,11 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
         //     contract->byte_code);
 
         // get/set the call data
-        error_code |= current_state.memory_ptr->get(arith, args_offset, args_size, new_state_ptr->message_ptr->data);
+        error_code |= current_state.memory_ptr->get(arith, args_offset, args_size, *new_state_ptr->message_ptr->data);
     }
+    // #ifdef __CUDA_ARCH__
+    //     printf("generic_CALL error_code: %d idx %d\n", error_code, threadIdx.x);
+    // #endif
     return error_code;
 }
 
@@ -181,30 +207,36 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         // #endif
         bn_t sender_address;
         current_state.message_ptr->get_recipient(arith, sender_address);
+        const evm_word_t *sender_address_ptr = &current_state.message_ptr->recipient;
         bn_t contract_address;
 
         // // warm up the contract address
         // error_code |=
         //     current_state.touch_state.set_warm_account(arith,
         //     contract_address);
-
+        printf("generic_CREATE senderaddress ptr %p\n", sender_address_ptr);
+        sender_address_ptr->print();
         CuEVM::account_t *sender_account = nullptr;
-        current_state.touch_state.get_account(arith, sender_address, sender_account, ACCOUNT_NON_STORAGE_FLAG);
+        current_state.touch_state.get_account(arith, sender_address_ptr, sender_account, ACCOUNT_NON_STORAGE_FLAG);
         // Do not get_account after this to reuse sender_account
         if (opcode == OP_CREATE2) {
-            error_code |= CuEVM::utils::get_contract_address_create2(arith, contract_address, sender_address, salt,
-                                                                     initialisation_code);
+            CuEVM::utils::get_contract_address_create2(arith, contract_address, sender_address, salt,
+                                                       initialisation_code);
         } else {
             bn_t sender_nonce;
             sender_account->get_nonce(arith, sender_nonce);
-            error_code |=
-                CuEVM::utils::get_contract_address_create(arith, contract_address, sender_address, sender_nonce);
+            CuEVM::utils::get_contract_address_create(arith, contract_address, sender_address, sender_nonce);
         }
-        if (!current_state.touch_state.is_empty_account_create(arith, contract_address)) {
+
+        __SHARED_MEMORY__ evm_word_t contract_address_shared, gas_shared, value_shared;
+        cgbn_store(arith.env, &contract_address_shared, contract_address);
+
+        if (!current_state.touch_state.is_empty_account_create(arith, &contract_address_shared)) {
             // corner collision case: must set warm for the contract address
-            current_state.touch_state.set_warm_account(arith, contract_address);
+            current_state.touch_state.set_warm_account(arith, &contract_address_shared);
             error_code |= ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
         }
+
         // gas capped limit
         bn_t gas_capped;
         CuEVM::gas_cost::max_gas_call(arith, gas_capped, current_state.gas_limit, current_state.gas_used);
@@ -215,13 +247,19 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         cgbn_set_ui32(arith.env, ret_offset, 0);
         cgbn_set_ui32(arith.env, ret_size, 0);
         CuEVM::byte_array_t call_data;
+
+        cgbn_store(arith.env, &gas_shared, gas_capped);
+        cgbn_store(arith.env, &value_shared, value);
+
+        evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+            arith, &current_state.message_ptr->recipient, &contract_address_shared, &contract_address_shared,
+            &gas_shared, &value_shared, current_state.message_ptr->get_depth() + 1, opcode, &contract_address_shared,
+            call_data, initialisation_code, ret_offset, ret_size, current_state.message_ptr->get_static_env());
+
+        current_state.message_ptr->copy_from(message_call_ptr);
         // create the new evm call state
-        new_state_ptr = new CuEVM::evm_call_state_t(
-            arith, &current_state,
-            new CuEVM::evm_message_call_t(arith, sender_address, contract_address, contract_address, gas_capped, value,
-                                          current_state.message_ptr->get_depth() + 1, opcode, contract_address,
-                                          call_data, initialisation_code, ret_offset, ret_size,
-                                          current_state.message_ptr->get_static_env()));
+        new_state_ptr = new CuEVM::evm_call_state_t(arith, &current_state, current_state.message_ptr, message_call_ptr);
+
         error_code |=
             (current_state.message_ptr->get_static_env() ? ERROR_STATIC_CALL_CONTEXT_CREATE :
 #ifdef EIP_3860
@@ -232,19 +270,22 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
                                                          ERROR_SUCCESS
 #endif
             );
-
+        // printf("generic_CREATE error_code: %d\n", error_code);
         if (sender_account->is_contract()) {
             bn_t sender_nonce;
             sender_account->get_nonce(arith, sender_nonce);
             cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
             sender_account->set_nonce(arith, sender_nonce);
             // propagate to child state
-            new_state_ptr->touch_state.set_nonce(arith, sender_address, sender_nonce);
+            // printf("generic_CREATE set_nonce %p\n", sender_address_ptr);
+            // sender_address_ptr->print();
+            // sender_account->address.print();
+            new_state_ptr->touch_state.set_nonce(arith, &sender_account->address, sender_nonce);
         }
     } else
         cgbn_bitwise_mask_and(arith.env, current_state.gas_used, current_state.gas_used, 64);
 
-    // printf("generic_CREATE error_code: %d\n", error_code);
+    printf("generic_CREATE error_code: %d\n", error_code);
     return error_code;
 }
 
@@ -290,33 +331,62 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
     error_code |= current_state.stack_ptr->pop(arith, args_size);
     error_code |= current_state.stack_ptr->pop(arith, ret_offset);
     error_code |= current_state.stack_ptr->pop(arith, ret_size);
+
+    // printf("opcode CALL params after pop\n");
+    // print_bnt(arith, gas);
+    // print_bnt(arith, address);
+    // print_bnt(arith, value);
+    // print_bnt(arith, args_offset);
+    // print_bnt(arith, args_size);
+    // print_bnt(arith, ret_offset);
+    // print_bnt(arith, ret_size);
     // #ifdef __CUDA_ARCH__
     //     printf("opcode CALL before error_code == ERROR_SUCCESS %d\n", threadIdx.x);
     // #endif
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
-        bn_t sender;
-        current_state.message_ptr->get_recipient(arith, sender);  // I_{a}
-        bn_t recipient;
-        cgbn_set(arith.env, recipient, address);  // t
-        bn_t contract_address;
-        cgbn_set(arith.env, contract_address, address);  // t
-        bn_t storage_address;
-        cgbn_set(arith.env, storage_address, address);  // t
+        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
+        cgbn_store(arith.env, &target_address, address);
+        cgbn_store(arith.env, &gas_shared, gas);
+        cgbn_store(arith.env, &value_shared, value);
+        // bn_t sender;
+        // current_state.message_ptr->get_recipient(arith, sender);  // I_{a}
+        // bn_t recipient;
+        // cgbn_set(arith.env, recipient, address);  // t
+        // bn_t contract_address;
+        // cgbn_set(arith.env, contract_address, address);  // t
+        // bn_t storage_address;
+        // cgbn_set(arith.env, storage_address, address);  // t
         CuEVM::byte_array_t call_data;
         CuEVM::byte_array_t code;
-        new_state_ptr = new CuEVM::evm_call_state_t(
-            arith, &current_state,
-            new CuEVM::evm_message_call_t(arith, sender, recipient, contract_address, gas, value,
-                                          current_state.message_ptr->get_depth() + 1, OP_CALL, storage_address,
-                                          call_data, code, ret_offset, ret_size,
-                                          current_state.message_ptr->get_static_env()));
+        // #ifdef __CUDA_ARCH__
+        //         printf("opcode CALL before constructing message call t %d\n", threadIdx.x);
+        // #endif
+        evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+            arith, &current_state.message_ptr->recipient, &target_address, &target_address, &gas_shared, &value_shared,
+            current_state.message_ptr->get_depth() + 1, OP_CALL, &target_address, call_data, code, ret_offset, ret_size,
+            current_state.message_ptr->get_static_env());
+
+        current_state.message_ptr->copy_from(message_call_ptr);
+
+        // printf("after copy return data offset and size\n");
+        // current_state.message_ptr->return_data_offset.print();
+        // current_state.message_ptr->return_data_size.print();
+        // message_call_ptr->params_data[6].print();
+        // message_call_ptr->params_data[7].print();
+
+        new_state_ptr = new CuEVM::evm_call_state_t(arith, &current_state, current_state.message_ptr, message_call_ptr);
+
+        // #ifdef __CUDA_ARCH__
+        //         printf("opcode CALL after constructing message call t  %d\n", threadIdx.x);
+        // #endif
         // #ifdef __CUDA_ARCH__
         // printf("opcode CALL after constructing message call t  %d\n", threadIdx.x);
         // #endif
-        error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
     }
+    if (error_code == ERROR_SUCCESS)  // break down scope to avoid stack problems
+        error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
 
     // #ifdef __CUDA_ARCH__
     //     printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
@@ -345,23 +415,30 @@ __host__ __device__ int32_t CALLCODE(ArithEnv &arith, CuEVM::evm_call_state_t &c
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
-        bn_t sender;
-        current_state.message_ptr->get_recipient(arith, sender);  // I_{a}
-        bn_t recipient;
-        cgbn_set(arith.env, recipient, sender);  // I_{a}
-        bn_t contract_address;
-        cgbn_set(arith.env, contract_address, address);  // t
-        bn_t storage_address;
-        cgbn_set(arith.env, storage_address, sender);  // I_{a}
+        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
+        cgbn_store(arith.env, &target_address, address);
+        cgbn_store(arith.env, &gas_shared, gas);
+        cgbn_store(arith.env, &value_shared, value);
+
+        // bn_t sender;
+        // current_state.message_ptr->get_recipient(arith, sender);  // I_{a}
+        // bn_t recipient;
+        // cgbn_set(arith.env, recipient, sender);  // I_{a}
+        // bn_t contract_address;
+        // cgbn_set(arith.env, contract_address, address);  // t
+        // bn_t storage_address;
+        // cgbn_set(arith.env, storage_address, sender);  // I_{a}
         CuEVM::byte_array_t call_data;
         CuEVM::byte_array_t code;
 
-        new_state_ptr = new CuEVM::evm_call_state_t(
-            arith, &current_state,
-            new CuEVM::evm_message_call_t(arith, sender, recipient, contract_address, gas, value,
-                                          current_state.message_ptr->get_depth() + 1, OP_CALLCODE, storage_address,
-                                          call_data, code, ret_offset, ret_size,
-                                          current_state.message_ptr->get_static_env()));
+        evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+            arith, &current_state.message_ptr->recipient, &current_state.message_ptr->recipient, &target_address,
+            &gas_shared, &value_shared, current_state.message_ptr->get_depth() + 1, OP_CALLCODE,
+            &current_state.message_ptr->recipient, call_data, code, ret_offset, ret_size,
+            current_state.message_ptr->get_static_env());
+
+        current_state.message_ptr->copy_from(message_call_ptr);
+        new_state_ptr = new CuEVM::evm_call_state_t(arith, &current_state, current_state.message_ptr, message_call_ptr);
 
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
     }
@@ -421,23 +498,30 @@ __host__ __device__ int32_t DELEGATECALL(ArithEnv &arith, CuEVM::evm_call_state_
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
-        bn_t sender;
-        current_state.message_ptr->get_sender(arith, sender);  // keep the message call sender I_{s}
-        bn_t recipient;
-        current_state.message_ptr->get_recipient(arith, recipient);  // I_{a}
-        bn_t contract_address;
-        cgbn_set(arith.env, contract_address, address);  // t
-        bn_t storage_address;
-        cgbn_set(arith.env, storage_address, recipient);  // I_{a}
+        // bn_t sender;
+        // current_state.message_ptr->get_sender(arith, sender);  // keep the message call sender I_{s}
+        // bn_t recipient;
+        // current_state.message_ptr->get_recipient(arith, recipient);  // I_{a}
+        // bn_t contract_address;
+        // cgbn_set(arith.env, contract_address, address);  // t
+        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
+
+        cgbn_store(arith.env, &target_address, address);
+        cgbn_store(arith.env, &gas_shared, gas);
+        cgbn_store(arith.env, &value_shared, value);
+        // bn_t storage_address;
+        // cgbn_set(arith.env, storage_address, recipient);  // I_{a}
         CuEVM::byte_array_t call_data;
         CuEVM::byte_array_t code;
 
-        new_state_ptr = new CuEVM::evm_call_state_t(
-            arith, &current_state,
-            new CuEVM::evm_message_call_t(arith, sender, recipient, contract_address, gas, value,
-                                          current_state.message_ptr->get_depth() + 1, OP_DELEGATECALL, storage_address,
-                                          call_data, code, ret_offset, ret_size,
-                                          current_state.message_ptr->get_static_env()));
+        evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+            arith, &current_state.message_ptr->sender, &current_state.message_ptr->recipient, &target_address,
+            &gas_shared, &value_shared, current_state.message_ptr->get_depth() + 1, OP_DELEGATECALL,
+            &current_state.message_ptr->recipient, call_data, code, ret_offset, ret_size,
+            current_state.message_ptr->get_static_env());
+        current_state.message_ptr->copy_from(message_call_ptr);
+
+        new_state_ptr = new CuEVM::evm_call_state_t(arith, &current_state, current_state.message_ptr, message_call_ptr);
 
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
     }
@@ -477,22 +561,28 @@ __host__ __device__ int32_t STATICCALL(ArithEnv &arith, CuEVM::evm_call_state_t 
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
-        bn_t sender;
-        current_state.message_ptr->get_recipient(arith, sender);  //  I_{a}
-        bn_t recipient;
-        cgbn_set(arith.env, recipient, address);  // t
-        bn_t contract_address;
-        cgbn_set(arith.env, contract_address, address);  // t
-        bn_t storage_address;
-        cgbn_set(arith.env, storage_address, address);  // t
+        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
+        cgbn_store(arith.env, &target_address, address);
+        cgbn_store(arith.env, &gas_shared, gas);
+        cgbn_store(arith.env, &value_shared, value);
+        // bn_t sender;
+        // current_state.message_ptr->get_recipient(arith, sender);  //  I_{a}
+        // bn_t recipient;
+        // cgbn_set(arith.env, recipient, address);  // t
+        // bn_t contract_address;
+        // cgbn_set(arith.env, contract_address, address);  // t
+        // bn_t storage_address;
+        // cgbn_set(arith.env, storage_address, address);  // t
         CuEVM::byte_array_t call_data;
         CuEVM::byte_array_t code;
 
-        new_state_ptr = new CuEVM::evm_call_state_t(
-            arith, &current_state,
-            new CuEVM::evm_message_call_t(arith, sender, recipient, contract_address, gas, value,
-                                          current_state.message_ptr->get_depth() + 1, OP_STATICCALL, storage_address,
-                                          call_data, code, ret_offset, ret_size, 1));
+        evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+            arith, &current_state.message_ptr->recipient, &target_address, &target_address, &gas_shared, &value_shared,
+            current_state.message_ptr->get_depth() + 1, OP_STATICCALL, &target_address, call_data, code, ret_offset,
+            ret_size, 1);
+        current_state.message_ptr->copy_from(message_call_ptr);
+
+        new_state_ptr = new CuEVM::evm_call_state_t(arith, &current_state, current_state.message_ptr, message_call_ptr);
 
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr);
     }
@@ -556,31 +646,32 @@ __host__ __device__ int32_t SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit,
     } else {
         bn_t recipient;
         error_code |= stack.pop(arith, recipient);
-
+        __SHARED_MEMORY__ evm_word_t recipient_shared;
+        cgbn_store(arith.env, &recipient_shared, recipient);
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SELFDESTRUCT);
-        bn_t contract_address;
-        message.get_contract_address(arith, contract_address);
+        // bn_t contract_address;
+        // message.get_contract_address(arith, contract_address);
 
         // custom logic, cannot use access_account_cost (no warm cost)
-        if (!touch_state.is_warm_account(arith, recipient))
+        if (!touch_state.is_warm_account(arith, &recipient_shared))
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
 
         bn_t sender_balance;
-        touch_state.get_balance(arith, contract_address, sender_balance);
+        touch_state.get_balance(arith, &message.contract_address, sender_balance);
 
         if (cgbn_compare_ui32(arith.env, sender_balance, 0) > 0) {
-            if (touch_state.is_empty_account(arith, recipient)) {
+            if (touch_state.is_empty_account(arith, &recipient_shared)) {
                 cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_NEW_ACCOUNT);
             }
         }
         error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
             bn_t recipient_balance;
-            touch_state.get_balance(arith, recipient, recipient_balance);
+            touch_state.get_balance(arith, &recipient_shared, recipient_balance);
             cgbn_add(arith.env, recipient_balance, recipient_balance, sender_balance);
             cgbn_set_ui32(arith.env, sender_balance, 0);
-            touch_state.set_balance(arith, recipient, recipient_balance);
-            touch_state.set_balance(arith, contract_address, sender_balance);
+            touch_state.set_balance(arith, &recipient_shared, recipient_balance);
+            touch_state.set_balance(arith, &recipient_shared, sender_balance);
             // receiver = self => 0 balance
             return_data = CuEVM::evm_return_data_t();
             error_code |= ERROR_RETURN;

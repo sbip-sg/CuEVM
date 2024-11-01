@@ -2,6 +2,7 @@
 #include <cjson/cJSON.h>
 #include <getopt.h>
 
+#include <CuEVM/core/message.cuh>
 #include <CuEVM/evm.cuh>
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/arith.cuh>
@@ -31,7 +32,8 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     instances[instance].transaction_ptr->print();
     __ONE_GPU_THREAD_WOSYNC_END__
 #endif
-    CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance]);
+    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
+    CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call);
     // printf("\nevm->run(arith) instance %d\n", instance);
     __SYNC_THREADS__
     evm->run(arith);
@@ -60,14 +62,16 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     cudaEvent_t start, stop;
     float milliseconds = 0;
 
-    size_t stack_size;
-    cudaDeviceGetLimit(&stack_size, cudaLimitStackSize);
-    printf("current stack size %zu\n", stack_size);
-    size_t heap_size = (size_t(2) << 30);  // 2GB
+    size_t size_value;
+    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+    printf("current stack size %zu\n", size_value);
+    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+    printf("current heap size %zu\n", size_value);
+    size_t heap_size = (size_t(500) << 20);  // 500MB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 90 * 1024));
-    cudaDeviceGetLimit(&stack_size, cudaLimitStackSize);
-    printf("current stack size %zu\n", stack_size);
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 2 * 1024));
+    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+    printf("current stack size %zu\n", size_value);
     CUDA_CHECK(cudaDeviceSynchronize());
     // CUDA_CHECK(cudaEventCreate(&start));
     // CUDA_CHECK(cudaEventCreate(&stop));
