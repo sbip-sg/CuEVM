@@ -33,7 +33,8 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     __ONE_GPU_THREAD_WOSYNC_END__
 #endif
     __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
-    CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call);
+    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
+    CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
     // printf("\nevm->run(arith) instance %d\n", instance);
     __SYNC_THREADS__
     evm->run(arith);

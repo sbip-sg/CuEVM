@@ -38,17 +38,18 @@ struct evm_call_state_t {
                                          CuEVM::log_state_data_t* log_state_ptr, CuEVM::TouchState touch_state,
                                          CuEVM::evm_return_data_t* last_return_data_ptr);
 
-    /**
-     * The constructor with the parent state and message call
-     */
-    __host__ __device__ evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
-                                         CuEVM::evm_message_call_t* shared_message_ptr);
+    // /**
+    //  * The constructor with the parent state and message call
+    //  */
+    // __host__ __device__ evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
+    //                                      CuEVM::evm_message_call_t* shared_message_ptr);
     /**
      * The constructor with the parent state and message call
      */
     __host__ __device__ evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
                                          CuEVM::evm_message_call_t* shared_message_ptr,
-                                         CuEVM::evm_message_call_t_shadow* shadow_message_ptr);
+                                         CuEVM::evm_message_call_t_shadow* shadow_message_ptr = nullptr,
+                                         CuEVM::evm_word_t* shared_stack_ptr = nullptr);
     /**
      * The constructor with no parent state and message call
      */

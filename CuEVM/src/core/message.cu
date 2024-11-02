@@ -86,7 +86,7 @@ __host__ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
 
 // Copy function , only words global -> shared mem
 __host__ __device__ void evm_message_call_t::copy_from(const evm_message_call_t_shadow *other) {
-    printf("evm_message_call_t copy_from other\n ");
+    // printf("evm_message_call_t copy_from other\n ");
 
     // sender = other.sender;
     // recipient = other.recipient;

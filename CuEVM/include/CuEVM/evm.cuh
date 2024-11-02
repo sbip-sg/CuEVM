@@ -52,7 +52,7 @@ struct evm_t {
                               CuEVM::block_info_t* block_info_ptr, CuEVM::evm_transaction_t* transaction_ptr,
                               CuEVM::state_access_t* touch_state_data_ptr, CuEVM::log_state_data_t* log_state_ptr,
                               CuEVM::evm_return_data_t* return_data_ptr, CuEVM::EccConstants* ecc_constants_ptr,
-                              CuEVM::evm_message_call_t* shared_message_call_ptr
+                              CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
                               ,
                               CuEVM::utils::tracer_t* tracer_ptr
@@ -66,7 +66,8 @@ struct evm_t {
      * @param[in] evm_instance The evm instance
      */
     __host__ __device__ evm_t(ArithEnv& arith, CuEVM::evm_instance_t& evm_instance,
-                              CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr);
+                              CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
+                              CuEVM::evm_word_t* shared_stack_ptr = nullptr);
 
     /**
      * @brief Destroy the evm_t object
