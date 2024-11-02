@@ -27,11 +27,14 @@ struct evm_t {
     CuEVM::WorldState world_state;                   /**< The world state */
     const CuEVM::block_info_t* block_info_ptr;       /**< The block info pointer */
     const CuEVM::evm_transaction_t* transaction_ptr; /**< The transaction pointer */
-    CuEVM::evm_call_state_t* call_state_ptr;         /**< The call state pointer */
-    CuEVM::EccConstants* ecc_constants_ptr;          /**< The ecc constants pointer*/
-    bn_t gas_price;                                  /**< The gas price */
-    bn_t gas_priority_fee;                           /**< The gas priority fee */
-    uint32_t status;                                 /**< The status */
+    CuEVM::evm_call_state_t* call_state_ptr;         /**< The call state pointer store in global mem*/
+    // CuEVM::cached_evm_call_state
+    //     cached_call_state; /**< The state pointer store in local mem (constant register usage)*/
+    // CuEVM::evm_call_state_t call_state_local; /**< The state pointer store in local mem (constant register usage)*/
+    CuEVM::EccConstants* ecc_constants_ptr; /**< The ecc constants pointer*/
+    bn_t gas_price;                         /**< The gas price */
+    bn_t gas_priority_fee;                  /**< The gas priority fee */
+    uint32_t status;                        /**< The status */
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer */
 #endif
@@ -82,7 +85,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t start_CALL(ArithEnv& arith);
+    __host__ __device__ int32_t start_CALL(ArithEnv& arith, cached_evm_call_state& cache_call_state);
 
     /**
      * @brief Finish a call operation
@@ -93,7 +96,8 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_CALL(ArithEnv& arith, int32_t error_code);
+    __host__ __device__ int32_t finish_CALL(ArithEnv& arith, int32_t error_code,
+                                            cached_evm_call_state& cache_call_state);
 
     /**
      * @brief Finish a CREATEX operation.
@@ -102,7 +106,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_CREATE(ArithEnv& arith);
+    __host__ __device__ int32_t finish_CREATE(ArithEnv& arith, cached_evm_call_state& cache_call_state);
 
     /**
      * @brief Finish a transaction operation.
@@ -114,13 +118,15 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_TRANSACTION(ArithEnv& arith, int32_t error_code);
+    __host__ __device__ int32_t finish_TRANSACTION(ArithEnv& arith, int32_t error_code,
+                                                   cached_evm_call_state& cache_call_state);
 
     /**
      * @brief run the EVM for the given transaction
      * Run the EVM for the given transaction
      * @param[in] arith The arithmetic environment
      */
+    __host__ __device__ void run(ArithEnv& arith, cached_evm_call_state& cache_call_state);
     __host__ __device__ void run(ArithEnv& arith);
 };
 

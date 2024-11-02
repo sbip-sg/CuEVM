@@ -90,7 +90,7 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
     // bn_t contract_address;
     evm_word_t *contract_address_ptr = &new_state_ptr->message_ptr->contract_address;
     // new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
-    CuEVM::gas_cost::access_account_cost(arith, current_state.gas_used, current_state.touch_state,
+    CuEVM::gas_cost::access_account_cost(arith, current_state.gas_used, *current_state.touch_state_ptr,
                                          contract_address_ptr);
     // positive value call cost (except delegate call)
     // empty account call cost
@@ -108,7 +108,7 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
             cgbn_set_ui32(arith.env, gas_stippend, GAS_CALL_STIPEND);
             // If the empty account is called
             // only for call opcode
-            if ((new_state_ptr->touch_state.is_empty_account(arith, contract_address_ptr)) &&
+            if ((new_state_ptr->touch_state_ptr->is_empty_account(arith, contract_address_ptr)) &&
                 (new_state_ptr->message_ptr->get_call_type() == OP_CALL)) {
                 cgbn_add_ui32(arith.env, current_state.gas_used, current_state.gas_used, GAS_NEW_ACCOUNT);
             };
@@ -217,7 +217,7 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         printf("generic_CREATE senderaddress ptr %p\n", sender_address_ptr);
         sender_address_ptr->print();
         CuEVM::account_t *sender_account = nullptr;
-        current_state.touch_state.get_account(arith, sender_address_ptr, sender_account, ACCOUNT_NON_STORAGE_FLAG);
+        current_state.touch_state_ptr->get_account(arith, sender_address_ptr, sender_account, ACCOUNT_NON_STORAGE_FLAG);
         // Do not get_account after this to reuse sender_account
         if (opcode == OP_CREATE2) {
             CuEVM::utils::get_contract_address_create2(arith, contract_address, sender_address, salt,
@@ -231,9 +231,9 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         __SHARED_MEMORY__ evm_word_t contract_address_shared, gas_shared, value_shared;
         cgbn_store(arith.env, &contract_address_shared, contract_address);
 
-        if (!current_state.touch_state.is_empty_account_create(arith, &contract_address_shared)) {
+        if (!current_state.touch_state_ptr->is_empty_account_create(arith, &contract_address_shared)) {
             // corner collision case: must set warm for the contract address
-            current_state.touch_state.set_warm_account(arith, &contract_address_shared);
+            current_state.touch_state_ptr->set_warm_account(arith, &contract_address_shared);
             error_code |= ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
         }
 
@@ -280,7 +280,7 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
             // printf("generic_CREATE set_nonce %p\n", sender_address_ptr);
             // sender_address_ptr->print();
             // sender_account->address.print();
-            new_state_ptr->touch_state.set_nonce(arith, &sender_account->address, sender_nonce);
+            new_state_ptr->touch_state_ptr->set_nonce(arith, &sender_account->address, sender_nonce);
         }
     } else
         cgbn_bitwise_mask_and(arith.env, current_state.gas_used, current_state.gas_used, 64);

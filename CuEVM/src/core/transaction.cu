@@ -199,23 +199,23 @@ __host__ __device__ int32_t evm_transaction_t::get_transaction_fees(ArithEnv &ar
 }
 
 __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(ArithEnv &arith,
-                                                                   CuEVM::TouchState &touch_state) const {
+                                                                   CuEVM::TouchState *touch_state_ptr) const {
     for (uint32_t i = 0; i < access_list.accounts_count; i++) {
         // bn_t address;
         // cgbn_load(arith.env, address, (cgbn_evm_word_t_ptr) & (access_list.accounts[i].address));
         CuEVM::account_t *account_ptr = nullptr;
-        touch_state.set_warm_account(arith, &(access_list.accounts[i].address));
+        touch_state_ptr->set_warm_account(arith, &(access_list.accounts[i].address));
         for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
             bn_t key;
             cgbn_load(arith.env, key, (cgbn_evm_word_t_ptr) & (access_list.accounts[i].storage_keys[j]));
             bn_t value;
-            touch_state.set_warm_key(arith, &(access_list.accounts[i].address), key, value);
+            touch_state_ptr->set_warm_key(arith, &(access_list.accounts[i].address), key, value);
         }
     }
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
+__host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr,
                                                         CuEVM::block_info_t &block_info, bn_t &gas_used,
                                                         bn_t &gas_price, bn_t &gas_priority_fee) const {
     // printf("begin validating transaction\n");
@@ -241,8 +241,8 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     // get_sender(arith, sender_address);
     // printf("after get_sender\n");
     CuEVM::account_t *sender_account = nullptr;
-    touch_state.get_account(arith, &this->sender, sender_account,
-                            ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
+    touch_state_ptr->get_account(arith, &this->sender, sender_account,
+                                 ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
 
     bn_t sender_balance;
     sender_account->get_balance(arith, sender_balance);
@@ -297,11 +297,11 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     // if transaction is valid update the touch state
     // \f$\simga(T_{s})_{b} = \simga(T_{s})_{b} - (p \dot T_{g})\f$
     cgbn_sub(arith.env, sender_balance, sender_balance, gas_value);
-    touch_state.set_balance(arith, &this->sender, sender_balance);
+    touch_state_ptr->set_balance(arith, &this->sender, sender_balance);
     // printf("after set balance  account\n");
     // \f$\simga(T_{s})_{n} = T_{n} + 1\f$
     cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
-    touch_state.set_nonce(arith, &this->sender, sender_nonce);
+    touch_state_ptr->set_nonce(arith, &this->sender, sender_nonce);
     // set the gas used to the intrisinc gas
     cgbn_set(arith.env, gas_used, gas_intrinsic);
     // TODO: maybe sent the priority fee to the miner
@@ -309,7 +309,7 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     // by asking the balacne of the coinbase accountq
     // printf("after set nonce  account\n");
     // warm up the access list
-    access_list_warm_up(arith, touch_state);
+    access_list_warm_up(arith, touch_state_ptr);
     // printf("after warm up account\n");
     // warmup coinbase and precompile contracts
 
@@ -317,7 +317,7 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     // bn_t coin_base_address;
     // block_info.get_coin_base(arith, coin_base_address);
 
-    touch_state.set_warm_account(arith, &block_info.coin_base);
+    touch_state_ptr->set_warm_account(arith, &block_info.coin_base);
 
 #endif
     // printf("after warm up coinbase\n");
@@ -339,8 +339,9 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
  * @param[out] evm_message_call_ptr the message call.
  * @return 1 for success, 0 for failure.
  */
-__host__ __device__ int32_t evm_transaction_t::get_message_call(
-    ArithEnv &arith, CuEVM::TouchState &touch_state, CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const {
+__host__ __device__ int32_t
+evm_transaction_t::get_message_call(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr,
+                                    CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const {
     // bn_t sender_address, to_address, value, gas_limit;
     // get_sender(arith, sender_address);
     // printf("evm_transaction_t::get_message_call sender address\n");
@@ -355,7 +356,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     CuEVM::byte_array_t byte_code;
     // if is a contract creation
     CuEVM::account_t *to_account = nullptr;
-    touch_state.get_account(arith, &this->to, to_account, ACCOUNT_BYTE_CODE_FLAG);
+    touch_state_ptr->get_account(arith, &this->to, to_account, ACCOUNT_BYTE_CODE_FLAG);
     uint32_t static_env = 0;
     bn_t return_data_offset;
     cgbn_set_ui32(arith.env, return_data_offset, 0);

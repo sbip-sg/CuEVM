@@ -4,6 +4,7 @@
 
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/evm.cuh>
+#include <CuEVM/evm_call_state.cuh>
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>
@@ -17,7 +18,7 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
     if (instance >= count) return;
     CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
-    CuEVM::bn_t test;
+    // CuEVM::bn_t test;
 
 // printf("new instance %d\n", instance);
 #ifdef EIP_3155
@@ -35,9 +36,11 @@ __global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *i
     __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
     __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
     CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
+    CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
     // printf("\nevm->run(arith) instance %d\n", instance);
     __SYNC_THREADS__
-    evm->run(arith);
+    evm->run(arith, cached_state);
+
 #ifdef EIP_3155
     if (instance == 0) {
         __ONE_GPU_THREAD_BEGIN__

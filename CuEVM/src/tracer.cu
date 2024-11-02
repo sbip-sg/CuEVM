@@ -136,7 +136,7 @@ __host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const ui
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].pc = pc;
     data[size].op = op;
-    data[size].mem_size = memory.get_size();
+    data[size].mem_size = memory.size;
     __ONE_GPU_THREAD_END__
     bn_t gas;
     cgbn_sub(arith.env, gas, gas_limit, gas_used);
