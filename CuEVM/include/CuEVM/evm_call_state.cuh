@@ -80,8 +80,10 @@ struct cached_evm_call_state {
     CuEVM::evm_stack_t* stack_ptr; /**< The stack */
     uint32_t byte_code_size;       /**< The size of the byte code */
     uint8_t* byte_code_data;       /**< The byte code */
+
     __host__ __device__ cached_evm_call_state(ArithEnv& arith, evm_call_state_t* state);  // copy from state to cache
     __host__ __device__ cached_evm_call_state() {};
+    __host__ __device__ void set_byte_code(const byte_array_t* byte_code);
     __host__ __device__ void write_cache_to_state(ArithEnv& arith,
                                                   evm_call_state_t* state);  // copy from cache to state
 };

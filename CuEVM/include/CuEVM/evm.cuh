@@ -96,8 +96,7 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_CALL(ArithEnv& arith, int32_t error_code,
-                                            cached_evm_call_state& cache_call_state);
+    __host__ __device__ int32_t finish_CALL(ArithEnv& arith, int32_t error_code);
 
     /**
      * @brief Finish a CREATEX operation.
@@ -118,8 +117,7 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_TRANSACTION(ArithEnv& arith, int32_t error_code,
-                                                   cached_evm_call_state& cache_call_state);
+    __host__ __device__ int32_t finish_TRANSACTION(ArithEnv& arith, int32_t error_code);
 
     /**
      * @brief run the EVM for the given transaction

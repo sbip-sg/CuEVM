@@ -17,6 +17,10 @@ __host__ __device__ void cached_evm_call_state::write_cache_to_state(ArithEnv& a
     state->pc = pc;
     cgbn_set(arith.env, state->gas_used, gas_used);
 }  // copy from cache to state
+__host__ __device__ void cached_evm_call_state::set_byte_code(const byte_array_t* byte_code) {
+    byte_code_size = byte_code->size;
+    byte_code_data = byte_code->data;
+}
 __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent, uint32_t depth,
                                                        uint32_t pc, bn_t gas_used, bn_t gas_refund,
                                                        CuEVM::evm_message_call_t* message_ptr,
