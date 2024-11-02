@@ -205,7 +205,7 @@ struct evm_transaction_t {
      * @param[in] touch_state the touch state.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t access_list_warm_up(ArithEnv &arith, CuEVM::TouchState &touch_state) const;
+    __host__ __device__ int32_t access_list_warm_up(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr) const;
 
     /**
      * validate the transaction
@@ -217,7 +217,7 @@ struct evm_transaction_t {
      * @param[out] gas_priority_fee the gas priority fee YP: \f$f\f$.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t validate(ArithEnv &arith, CuEVM::TouchState &touch_state,
+    __host__ __device__ int32_t validate(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr,
                                          CuEVM::block_info_t &block_info, bn_t &gas_used, bn_t &gas_price,
                                          bn_t &gas_priority_fee) const;
 
@@ -228,7 +228,7 @@ struct evm_transaction_t {
      * @param[out] evm_message_call_ptr the message call.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t get_message_call(ArithEnv &arith, CuEVM::TouchState &touch_state,
+    __host__ __device__ int32_t get_message_call(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr,
                                                  CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const;
 
     __host__ __device__ void print();
