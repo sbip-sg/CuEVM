@@ -83,40 +83,92 @@ if(CPU)
 endif()
 
 if(GPU)
-    set(GPU_INTERPRETER ${PROJECT_NAME}_GPU)
+    # Check if building as a library or an executable
+    if(BUILD_LIBRARY)
+        # Add the BUILD_LIB flag
+        add_definitions(-DBUILD_LIB)
+        # Find Python libraries only when building the library
+        find_package(PythonLibs REQUIRED)
+        include_directories(${PYTHON_INCLUDE_DIRS})
 
-    # GPU
-    add_executable(${GPU_INTERPRETER}
-        "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
-        $<TARGET_OBJECTS:CuEVM>
-        $<TARGET_OBJECTS:CuCrypto>
-        $<TARGET_OBJECTS:CGBN>
-        $<TARGET_OBJECTS:CuBigInt>
-    )
+        # Build as a shared library
+        add_library(${PROJECT_NAME} SHARED 
+            "${PROJECT_SOURCE_DIR}/interpreter/libcuevm.cu"
+            "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
+            "${PROJECT_SOURCE_DIR}/interpreter/python_utils.cu"
+            $<TARGET_OBJECTS:CuEVM>
+            $<TARGET_OBJECTS:CuCrypto>
+            $<TARGET_OBJECTS:CGBN>
+            $<TARGET_OBJECTS:CuBigInt>
+        )
 
-    set_target_properties(${GPU_INTERPRETER}
+        # Apply flags for library
+        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--shared -Xcompiler '-fPIC'>)
+        if(CMAKE_BUILD_TYPE MATCHES Debug)
+            target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-g>)
+        endif()
+        # set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "cuevm")
+        set_target_properties(${PROJECT_NAME}
         PROPERTIES
+            OUTPUT_NAME "cuevm"
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_RESOLVE_DEVICE_SYMBOLS ON
-            POSITION_INDEPENDENT_CODE ON
-    )
+            CUDA_RUNTIME_LIBRARY Shared  # Ensure CUDA runtime library is shared
+        )
 
-    # Link the library to its dependencies
-    # our own libraries first
-    target_link_libraries(${GPU_INTERPRETER} PRIVATE CGBN CuCrypto CuBigInt CuEVM)
-    # then the external ones
-    target_link_libraries(${GPU_INTERPRETER} PUBLIC gmp cjson ${CUDA_LIBRARIES})
+        # Link the library to its dependencies
+        # our own libraries first
+        target_link_libraries(${PROJECT_NAME} PRIVATE CGBN CuCrypto CuBigInt CuEVM)
+        # then the external ones
+        target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${PYTHON_LIBRARIES} ${CUDA_LIBRARIES})
 
-    target_compile_options(${GPU_INTERPRETER}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
-    if(ENABLE_EIP_3155)
-        target_compile_definitions(${GPU_INTERPRETER} PRIVATE EIP_3155)
+        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
+        if(ENABLE_EIP_3155)
+            target_compile_definitions(${PROJECT_NAME} PRIVATE EIP_3155)
+        endif()
+        if(ENABLE_EIP_3155_OPTIONAL)
+            target_compile_definitions(${PROJECT_NAME} PRIVATE EIP_3155_OPTIONAL)
+        endif()
+        target_compile_definitions(${PROJECT_NAME} PRIVATE EVM_VERSION=${EVM_VERSION})
+
+        target_compile_definitions(${PROJECT_NAME} PRIVATE GPU)
+    else()
+
+        set(GPU_INTERPRETER ${PROJECT_NAME}_GPU)
+
+        # GPU
+        add_executable(${GPU_INTERPRETER}
+            "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
+            $<TARGET_OBJECTS:CuEVM>
+            $<TARGET_OBJECTS:CuCrypto>
+            $<TARGET_OBJECTS:CGBN>
+            $<TARGET_OBJECTS:CuBigInt>
+        )
+
+        set_target_properties(${GPU_INTERPRETER}
+            PROPERTIES
+                CUDA_SEPARABLE_COMPILATION ON
+                CUDA_RESOLVE_DEVICE_SYMBOLS ON
+                POSITION_INDEPENDENT_CODE ON
+        )
+
+        # Link the library to its dependencies
+        # our own libraries first
+        target_link_libraries(${GPU_INTERPRETER} PRIVATE CGBN CuCrypto CuBigInt CuEVM)
+        # then the external ones
+        target_link_libraries(${GPU_INTERPRETER} PUBLIC gmp cjson ${CUDA_LIBRARIES})
+
+        target_compile_options(${GPU_INTERPRETER} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
+        if(ENABLE_EIP_3155)
+            target_compile_definitions(${GPU_INTERPRETER} PRIVATE EIP_3155)
+        endif()
+        if(ENABLE_EIP_3155_OPTIONAL)
+            target_compile_definitions(${GPU_INTERPRETER} PRIVATE EIP_3155_OPTIONAL)
+        endif()
+        target_compile_definitions(${GPU_INTERPRETER} PRIVATE EVM_VERSION=${EVM_VERSION})
+
+        target_compile_definitions(${GPU_INTERPRETER} PRIVATE GPU)
     endif()
-    if(ENABLE_EIP_3155_OPTIONAL)
-        target_compile_definitions(${GPU_INTERPRETER} PRIVATE EIP_3155_OPTIONAL)
-    endif()
-    target_compile_definitions(${GPU_INTERPRETER} PRIVATE EVM_VERSION=${EVM_VERSION})
-
-    target_compile_definitions(${GPU_INTERPRETER} PRIVATE GPU)
 endif()
 
 if(TESTS)

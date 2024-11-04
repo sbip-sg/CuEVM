@@ -71,7 +71,7 @@ __host__ __device__ int32_t evm_word_t::operator==(const uint32_t &value) const 
 
 __host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) {
 #ifdef __CUDA_ARCH__
-    // todo: make host function
+    // todo: make device function
 #else
     CuEVM::byte_array_t byte_array(hex_string, CuEVM::word_size, BIG_ENDIAN, CuEVM::PaddingDirection::LEFT_PADDING);
     return from_byte_array_t(byte_array);

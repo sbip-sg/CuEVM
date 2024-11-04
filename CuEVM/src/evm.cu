@@ -325,13 +325,17 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                                                          call_state_ptr->depth, *call_state_ptr->last_return_data_ptr,
                                                          cached_call_state.gas_limit, cached_call_state.gas_used);
         call_state_ptr->trace_idx = trace_idx;
-#ifdef __CUDA_ARCH__
+
+        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
+        //        THREADIDX);
+        // __ONE_GPU_THREAD_WOSYNC_END__
+
+#endif
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
         printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-               threadIdx.x);
+               THREADIDX);
         __ONE_GPU_THREAD_WOSYNC_END__
-#endif
-#endif
         // DEBUG PRINT
 
         // __ONE_THREAD_PER_INSTANCE(printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
