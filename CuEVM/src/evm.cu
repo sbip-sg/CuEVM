@@ -301,7 +301,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
     }
     uint8_t opcode;
     CuEVM::evm_call_state_t *child_call_state_ptr = nullptr;
-    while (status == ERROR_SUCCESS) {
+    while (true) {
         // uint32_t current_pc = call_state_ptr->pc;  // TODO: store in local/shared memory
         // opcode = ((current_pc < ((call_state_ptr->message_ptr)->byte_code)->size)
         //               ? (call_state_ptr->message_ptr)->byte_code->data[current_pc]
@@ -793,7 +793,8 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                 // #endif
                 cached_call_state.write_cache_to_state(arith, call_state_ptr);
                 finish_CALL(arith, error_code);
-                error_code |= finish_TRANSACTION(arith, error_code);
+                finish_TRANSACTION(arith, error_code);
+                return;
             } else {
                 // TODO: finish call
                 // printf("Finish call\n");
