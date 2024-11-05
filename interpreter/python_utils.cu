@@ -693,8 +693,42 @@ PyObject* pyobject_from_transaction_content(arith_t& _arith, transaction_data_t*
     delete[] hex_string_ptr;
     return transaction_json;
 }
+*/
+PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* serialized_worldstate_instance) {
+    PyObject* state_dict = PyDict_New();
 
-static PyObject* pyobject_from_evm_instances_t(arith_t& arith, evm_instances_t instances) {
+    // Add accounts and storage elements
+    // PyObject* accounts_list = PyList_New(0);
+    uint32_t account_idx = 0;
+    uint32_t storage_idx = 0;
+    for (uint32_t i = 0; i < serialized_worldstate_instance->no_accounts; i++) {
+        PyObject* account_dict = PyDict_New();
+
+        PyDict_SetItemString(account_dict, "balance", PyUnicode_FromString(serialized_worldstate_instance->balance[i]));
+        PyDict_SetItemString(account_dict, "nonce", PyLong_FromUnsignedLong(serialized_worldstate_instance->nonce[i]));
+
+        // Add storage elements for the account if they exist
+        PyObject* storage_dict = PyDict_New();
+        while (storage_idx < serialized_worldstate_instance->no_storage_elements &&
+               serialized_worldstate_instance->storage_indexes[storage_idx] == i) {
+            PyObject* storage_key_value = PyDict_New();
+
+            PyDict_SetItem(storage_dict,
+                           PyUnicode_FromString(serialized_worldstate_instance->storage_keys[storage_idx]),
+                           PyUnicode_FromString(serialized_worldstate_instance->storage_values[storage_idx]));
+            Py_DECREF(storage_key_value);
+            storage_idx++;
+        }
+
+        PyDict_SetItemString(account_dict, "storage", storage_dict);
+        // PyList_Append(accounts_list, account_dict);
+        PyDict_SetItemString(state_dict, serialized_worldstate_instance->addresses[i], account_dict);
+        Py_DECREF(account_dict);
+    }
+    return state_dict;
+}
+
+PyObject* pyobject_from_evm_instances(CuEVM::evm_instance_t* instances, uint32_t num_instances) {
     PyObject* root = PyDict_New();
     // PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
     // PyDict_SetItemString(root, "pre", world_state_json);
@@ -703,63 +737,34 @@ static PyObject* pyobject_from_evm_instances_t(arith_t& arith, evm_instances_t i
     PyDict_SetItemString(root, "post", instances_json);
     Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
 
-    for (uint32_t idx = 0; idx < instances.count; idx++) {
-        state_data_t* world_state_instance = instances.world_state_data[idx];  // update on this
-        touch_state_data_t prev_state, updated_state;
-        touch_state_data_t ref_touch_state = instances.touch_states_data[idx];
-        world_state_t world_state(arith, world_state_instance);
-        accessed_state_t accessed_state_1(&world_state);
-        accessed_state_t accessed_state_2(&world_state);
-        updated_state.touch = new uint8_t[ref_touch_state.touch_accounts.no_accounts];
-
-        for (size_t j = 0; j < ref_touch_state.touch_accounts.no_accounts; j++) {
-            updated_state.touch[j] = ref_touch_state.touch[j];
-        }
-
-        updated_state.touch_accounts.no_accounts = ref_touch_state.touch_accounts.no_accounts;
-        updated_state.touch_accounts.accounts = ref_touch_state.touch_accounts.accounts;
-
-        prev_state.touch_accounts.no_accounts = world_state_instance->no_accounts;
-        prev_state.touch_accounts.accounts = world_state_instance->accounts;
-        prev_state.touch = new uint8_t[world_state_instance->no_accounts];
-
-        // touch_state_t tx_result_state(&updated_state, &accessed_state_1, arith);
-        // touch_state_t final_state(&prev_state, &accessed_state_2, arith);
-
-        // final_state.update_with_child_state(tx_result_state);
-
-        char* temp = new char[arith_t::BYTES * 2 + 3];
-
-        delete[] prev_state.touch;
-        delete[] updated_state.touch;
-        prev_state.touch = nullptr;
-        updated_state.touch = nullptr;
+    for (uint32_t idx = 0; idx < num_instances; idx++) {
+        CuEVM::state_t* world_state_instance = instances[idx].world_state_data_ptr;  // update on this
+        CuEVM::serialized_worldstate_data* serialized_worldstate = instances[idx].serialized_worldstate_data_ptr;
 
         PyObject* instance_json = PyDict_New();
 
         // TODO: Print resultant state. to check with state_root branch
-        PyObject* state_json = pyobject_from_state_data_t(&prev_state.touch_accounts);  // PyList_New(0);
-        // print_dict_recursive(state_json, 0);
-        PyObject* transaction_json = pyobject_from_transaction_content(&instances.transactions_data[idx]);
-        PyDict_SetItemString(instance_json, "msg", transaction_json);
-
+        PyObject* state_json = pyobject_from_serialized_state(serialized_worldstate);  // PyList_New(0);
+        printf("state json result\n");
+        print_dict_recursive(state_json, 0);
         PyDict_SetItemString(instance_json, "state", state_json);
 
-#ifdef EIP_3155
-        PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
-        PyDict_SetItemString(instance_json, "traces", tracer_json);
-        Py_DECREF(tracer_json);
-#endif
+        // #ifdef EIP_3155
+        //         PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
+        //         PyDict_SetItemString(instance_json, "traces", tracer_json);
+        //         Py_DECREF(tracer_json);
+        // #endif
 
-        PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances.errors[idx]));
-        PyDict_SetItemString(
-            instance_json, "success",
-            PyBool_FromLong((instances.errors[idx] == ERR_NONE) || (instances.errors[idx] == ERR_RETURN) ||
-                            (instances.errors[idx] == ERR_SUCCESS)));
+        // PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances[idx].status));
+        // PyDict_SetItemString(instance_json, "success",
+        //                      PyBool_FromLong((instances[idx].status == CuEVM::ERR_NONE) ||
+        //                                      (instances[idx].status == CuEVM::ERR_RETURN) ||
+        //                                      (instances[idx].status == CuEVM::ERR_SUCCESS)));
+
         PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
     }
 
     return root;
 }
-*/
+
 }  // namespace python_utils

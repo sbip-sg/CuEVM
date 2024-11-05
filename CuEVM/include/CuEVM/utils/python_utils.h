@@ -70,12 +70,12 @@ std::unordered_set<int> const revert_opcodes = {OP_REVERT, OP_INVALID};
 //  */
 // PyObject* pyobject_from_transaction_content(transaction_data_t* _content);
 
-// /**
-//  * Get the pyobject from the evm instances after the transaction execution.
-//  * @param[in] arith arithmetic environment
-//  * @param[in] instances evm instances
-//  * @return pyobject
-//  */
-// static PyObject* pyobject_from_evm_instances_t(evm_instances_t instances);
+PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* serialized_worldstate_instance);
 
+/**
+ * Get the pyobject from the evm instances after the transaction execution.
+ * @param[in] instances evm instances
+ * @return pyobject
+ */
+PyObject* pyobject_from_evm_instances(CuEVM::evm_instance_t* instances, uint32_t num_instances);
 }  // namespace python_utils

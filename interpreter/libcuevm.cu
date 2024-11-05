@@ -109,14 +109,14 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots) {
 
     printf("\n\ntesting world state printing on host\n\n");
     instances_data[0].serialized_worldstate_data_ptr->print();
-    PyObject* write_root = python_utils::pyobject_from_evm_instances_t(arith, instances_data);
+    PyObject* write_root = python_utils::pyobject_from_evm_instances(instances_data, num_instances);
 
     CuEVM::free_evm_instances(instances_data, num_instances, managed);
 
     CUDA_CHECK(cgbn_error_report_free(report));
     CUDA_CHECK(cudaDeviceReset());
-    // return write_root;
-    Py_RETURN_NONE;
+    return write_root;
+    // Py_RETURN_NONE;
 }
 
 static PyObject* run_dict(PyObject* self, PyObject* args) {
