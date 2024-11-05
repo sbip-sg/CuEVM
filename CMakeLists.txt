@@ -86,7 +86,7 @@ if(GPU)
     # Check if building as a library or an executable
     if(BUILD_LIBRARY)
         # Add the BUILD_LIB flag
-        add_definitions(-DBUILD_LIB)
+        add_definitions(-DBUILD_LIBRARY)
         # Find Python libraries only when building the library
         find_package(PythonLibs REQUIRED)
         include_directories(${PYTHON_INCLUDE_DIRS})
@@ -103,7 +103,7 @@ if(GPU)
         )
 
         # Apply flags for library
-        target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--shared -Xcompiler '-fPIC'>)
+        target_compile_options(${PROJECT_NAME} PRIVATE  $<$<COMPILE_LANGUAGE:CUDA>:--shared -Xcompiler '-fPIC'>)
         if(CMAKE_BUILD_TYPE MATCHES Debug)
             target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-g>)
         endif()

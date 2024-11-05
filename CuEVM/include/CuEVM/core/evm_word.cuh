@@ -116,6 +116,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
     __host__ __device__ char *to_hex(char *hex_string = nullptr, int32_t pretty = 0,
                                      uint32_t count = CuEVM::cgbn_limbs) const;
 
+    __host__ __device__ char *address_to_hex(char *hex_string = nullptr, uint32_t count = CuEVM::cgbn_limbs) const;
     __host__ __device__ void print_as_compact_hex() const;
 
     /**

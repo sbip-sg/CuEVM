@@ -130,14 +130,28 @@ __host__ __device__ int32_t state_t::set_account(ArithEnv &arith, const CuEVM::a
     return add_account(account);
 }
 
-__host__ __device__ int32_t state_t::update_account(ArithEnv &arith, const CuEVM::account_t &account) {
+__host__ __device__ int32_t state_t::update_account(ArithEnv &arith, const CuEVM::account_t &account,
+                                                    const CuEVM::account_flags_t flag) {
     for (uint32_t idx = 0; idx < no_accounts; idx++) {
         if (accounts[idx].has_address(arith, &(account.address))) {
-            accounts[idx].update(arith, account);
+            accounts[idx].update(arith, account, flag);
             return ERROR_SUCCESS;
         }
     }
     return add_account(account);
+}
+
+// __host__ __device__ int32_t update(ArithEnv &arith, CuEVM::account_t *accounts, CuEVM::account_flags_t *flags,
+__host__ __device__ int32_t state_t::update(ArithEnv &arith, const CuEVM::account_t *_accounts,
+                                            const CuEVM::account_flags_t *_flags, uint32_t account_count) {
+    int32_t error_code = ERROR_SUCCESS;
+    for (uint32_t i = 0; i < account_count; i++) {
+        // if update failed (not exist), add the account
+        if (update_account(arith, _accounts[i], _flags[i]) != ERROR_SUCCESS) {
+            error_code |= add_account(_accounts[i]);
+        }
+    }
+    return error_code;
 }
 
 // __host__ __device__ int32_t state_t::is_empty_account(ArithEnv &arith,

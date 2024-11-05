@@ -44,6 +44,10 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
         __ONE_GPU_THREAD_WOSYNC_END__
     }
 #endif
+    // print the final world state
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    instances[instance].world_state_data_ptr->print();
+    __ONE_GPU_THREAD_WOSYNC_END__
     // delete evm;
     // evm = nullptr;
 }
@@ -103,8 +107,9 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots) {
     printf("GPU kernel finished\n");
     CGBN_CHECK(report);
 
-    // PyObject* write_root = python_utils::pyobject_from_evm_instances_t(arith, cpu_instances);
-    // evm_t::free_instances(cpu_instances);
+    printf("\n\ntesting world state printing on host\n\n");
+    instances_data[0].serialized_worldstate_data_ptr->print();
+    PyObject* write_root = python_utils::pyobject_from_evm_instances_t(arith, instances_data);
 
     CuEVM::free_evm_instances(instances_data, num_instances, managed);
 

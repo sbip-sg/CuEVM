@@ -27,10 +27,17 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
                                  ,
                                  CuEVM::utils::tracer_t *tracer_ptr
 #endif
+
+                                 ,
+                                 CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr
+
                                  )
     : world_state(world_state_data_ptr),
       block_info_ptr(block_info_ptr),
       transaction_ptr(transaction_ptr),
+
+      serialized_worldstate_data_ptr(serialized_worldstate_data_ptr),
+
       ecc_constants_ptr(ecc_constants_ptr) {
     // TODO: store in local/shared memory
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
@@ -98,6 +105,9 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_ins
             ,
             evm_instance.tracer_ptr
 #endif
+            ,
+            evm_instance.serialized_worldstate_data_ptr
+
       ) {
 }
 
@@ -906,6 +916,12 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
 #ifdef EIP_3155
     tracer_ptr->finish_transaction(arith, *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_used, status);
 #endif
+    // update the final world state : TODO combine both
+
+    this->world_state.update(arith, call_state_ptr->touch_state_ptr->get_state());
+    this->world_state.serialize_data(arith, serialized_worldstate_data_ptr);
+    printf("updated final world state\n");
+
     return status;
 }
 
@@ -1146,6 +1162,13 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
             memcpy(evm_instances[index].tracer_ptr, tracer, sizeof(CuEVM::utils::tracer_t));
             delete tracer;
 #endif
+
+            CuEVM::serialized_worldstate_data *serialized_worldstate_data = new CuEVM::serialized_worldstate_data();
+            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].serialized_worldstate_data_ptr,
+                                         sizeof(CuEVM::serialized_worldstate_data)));
+            memcpy(evm_instances[index].serialized_worldstate_data_ptr, serialized_worldstate_data,
+                   sizeof(CuEVM::serialized_worldstate_data));
+            delete serialized_worldstate_data;
         }
     }
     num_instances = num_transactions;

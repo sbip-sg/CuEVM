@@ -303,7 +303,7 @@ CuEVM::state_t* getStateDataFromPyObject(PyObject* data) {
 
 void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyObject* read_roots,
                                      uint32_t& num_instances) {
-      uint32_t num_transactions = PyList_Size(read_roots);
+    uint32_t num_transactions = PyList_Size(read_roots);
     // CuEVM::transaction::get_transactions(arith, transactions_ptr, test_json, num_transactions, managed,
     //                                      world_state_data_ptr);
 
@@ -346,6 +346,13 @@ void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyOb
         memcpy(evm_instances[index].tracer_ptr, tracer, sizeof(CuEVM::utils::tracer_t));
         delete tracer;
 #endif
+
+        CuEVM::serialized_worldstate_data* serialized_worldstate_data = new CuEVM::serialized_worldstate_data();
+        CUDA_CHECK(cudaMallocManaged(&evm_instances[index].serialized_worldstate_data_ptr,
+                                     sizeof(CuEVM::serialized_worldstate_data)));
+        memcpy(evm_instances[index].serialized_worldstate_data_ptr, serialized_worldstate_data,
+               sizeof(CuEVM::serialized_worldstate_data));
+        delete serialized_worldstate_data;
     }
 
     num_instances = num_transactions;
@@ -353,7 +360,6 @@ void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyOb
 // OP_SSTORE
 // OP_JUMPI
 // OP_SELFDESTRUCT
-
 /*
 static PyObject* pyobject_from_tracer_data_t(arith_t& arith, tracer_data_t tracer_data) {
     char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
@@ -530,8 +536,9 @@ static PyObject* pyobject_from_tracer_data_t(arith_t& arith, tracer_data_t trace
     delete[] hex_string_ptr;
     return tracer_root;
 }
-
-__host__ static PyObject* pyobject_from_account_t(arith_t& arith, account_t account) {
+*/
+/*
+static PyObject* pyobject_from_account_t(account_t account) {
     PyObject* account_json = PyDict_New();
     PyObject* storage_json = PyDict_New();
     char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
@@ -580,8 +587,7 @@ __host__ static PyObject* pyobject_from_account_t(arith_t& arith, account_t acco
     return account_json;
 }
 
-
-__host__ __forceinline__ static PyObject* pyobject_from_state_data_t(arith_t& arith, state_data_t* state_data) {
+static PyObject* pyobject_from_state_data_t(arith_t& arith, state_data_t* state_data) {
     PyObject* state_json = PyDict_New();
     PyObject* account_json = NULL;
     char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
@@ -688,7 +694,6 @@ PyObject* pyobject_from_transaction_content(arith_t& _arith, transaction_data_t*
     return transaction_json;
 }
 
-
 static PyObject* pyobject_from_evm_instances_t(arith_t& arith, evm_instances_t instances) {
     PyObject* root = PyDict_New();
     // PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
@@ -740,7 +745,7 @@ static PyObject* pyobject_from_evm_instances_t(arith_t& arith, evm_instances_t i
 
         PyDict_SetItemString(instance_json, "state", state_json);
 
-#ifdef TRACER
+#ifdef EIP_3155
         PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
         PyDict_SetItemString(instance_json, "traces", tracer_json);
         Py_DECREF(tracer_json);
@@ -757,5 +762,4 @@ static PyObject* pyobject_from_evm_instances_t(arith_t& arith, evm_instances_t i
     return root;
 }
 */
-
 }  // namespace python_utils

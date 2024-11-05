@@ -9,8 +9,8 @@
 
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/state/account.cuh>
+#include <CuEVM/state/account_flags.cuh>
 #include <CuEVM/utils/arith.cuh>
-
 namespace CuEVM {
 /**
  * The state struct.
@@ -113,8 +113,11 @@ struct state_t {
      * @param[in] account The account.
      * @return If updated 0. otherwise error.
      */
-    __host__ __device__ int32_t update_account(ArithEnv &arith, const CuEVM::account_t &account);
+    __host__ __device__ int32_t update_account(ArithEnv &arith, const CuEVM::account_t &account,
+                                               const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
 
+    __host__ __device__ int32_t update(ArithEnv &arith, const CuEVM::account_t *accounts,
+                                       const CuEVM::account_flags_t *flags, uint32_t account_count);
     // /**
     //  * If an account is empty.
     //  * @param[in] arith The arithmetic environment.
