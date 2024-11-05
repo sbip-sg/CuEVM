@@ -13,6 +13,7 @@ option(ENABLE_PAIRING_CODE "Enable ec pairing precompile code" OFF)
 option(ENABLE_EIP_3155_OPTIONAL "Enable EIP_3155 optional tracer" ON)
 option(TESTS "Enable tests" ON)
 option(TESTS_GPU "Enable GPU tests" OFF)
+option(BUILD_LIBRARY "Build Python library" OFF)
 set(EVM_VERSION "SHANGHAI" CACHE STRING "EVM version to use")
 
 project("cuevm"
@@ -35,8 +36,11 @@ if(DOCS)
         add_subdirectory("${PROJECT_SOURCE_DIR}/docs")
 endif()
 
-if (CPU OR GPU OR TESTS)
+if (CPU OR GPU OR TESTS OR BUILD_LIBRARY)
     add_subdirectory("${PROJECT_SOURCE_DIR}/CuEVM")
+    if(BUILD_LIBRARY)
+        target_compile_definitions(CuEVM PRIVATE BUILD_LIBRARY)
+    endif()
     if(ENABLE_EIP_3155)
         target_compile_definitions(CuEVM PRIVATE EIP_3155)
     endif()
@@ -58,20 +62,20 @@ if(CPU)
         $<TARGET_OBJECTS:CGBN>
         $<TARGET_OBJECTS:CuBigInt>
     )
-    
+
     set_target_properties(${CPU_INTERPRETER}
         PROPERTIES
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_RESOLVE_DEVICE_SYMBOLS ON
             POSITION_INDEPENDENT_CODE ON
     )
-    
+
     # Link the library to its dependencies
     # our own libraries first
     target_link_libraries(${CPU_INTERPRETER} PRIVATE CGBN CuCrypto CuBigInt CuEVM)
     # then the external ones
     target_link_libraries(${CPU_INTERPRETER} PUBLIC gmp cjson ${CUDA_LIBRARIES})
-    
+
     target_compile_options(${CPU_INTERPRETER}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
     if(ENABLE_EIP_3155)
         target_compile_definitions(${CPU_INTERPRETER} PRIVATE EIP_3155)
@@ -85,14 +89,12 @@ endif()
 if(GPU)
     # Check if building as a library or an executable
     if(BUILD_LIBRARY)
-        # Add the BUILD_LIB flag
-        add_definitions(-DBUILD_LIBRARY)
         # Find Python libraries only when building the library
         find_package(PythonLibs REQUIRED)
         include_directories(${PYTHON_INCLUDE_DIRS})
 
         # Build as a shared library
-        add_library(${PROJECT_NAME} SHARED 
+        add_library(${PROJECT_NAME} SHARED
             "${PROJECT_SOURCE_DIR}/interpreter/libcuevm.cu"
             "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
             "${PROJECT_SOURCE_DIR}/interpreter/python_utils.cu"
