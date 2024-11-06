@@ -14,8 +14,8 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
     if (instance >= count) return;
     CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
     // CuEVM::bn_t test;
-    printf("print simplified trace data device\n");
-    instances[instance].simplified_trace_data_ptr->print();
+    // printf("print simplified trace data device\n");
+    // instances[instance].simplified_trace_data_ptr->print();
 // printf("new instance %d\n", instance);
 #ifdef EIP_3155
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
@@ -34,8 +34,8 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
     CuEVM::evm_t* evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
     CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
     // printf("\nevm->run(arith) instance %d\n", instance);
-    printf("print simplified trace data device inside evm\n");
-    evm->simplified_trace_data_ptr->print();
+    // printf("print simplified trace data device inside evm\n");
+    // evm->simplified_trace_data_ptr->print();
     __SYNC_THREADS__
     evm->run(arith, cached_state);
 
@@ -48,11 +48,11 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
     }
 #endif
     // print the final world state
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    instances[instance].world_state_data_ptr->print();
-    printf("simplified trace data\n");
-    instances[instance].simplified_trace_data_ptr->print();
-    __ONE_GPU_THREAD_WOSYNC_END__
+    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    // instances[instance].world_state_data_ptr->print();
+    // printf("simplified trace data\n");
+    // instances[instance].simplified_trace_data_ptr->print();
+    // __ONE_GPU_THREAD_WOSYNC_END__
     // delete evm;
     // evm = nullptr;
 }
@@ -104,8 +104,8 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots) {
     //                                      uint32_t& num_instances);
 
     python_utils::get_evm_instances_from_PyObject(instances_data, read_roots, num_instances);
-    printf("print simplified trace data host\n");
-    instances_data[0].simplified_trace_data_ptr->print();
+    // printf("print simplified trace data host\n");
+    // instances_data[0].simplified_trace_data_ptr->print();
     printf("Running on GPU %d %d\n", num_instances, CuEVM::cgbn_tpi);
     // run the evm
     kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
@@ -114,8 +114,13 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots) {
     printf("GPU kernel finished\n");
     CGBN_CHECK(report);
 
-    printf("\n\ntesting world state printing on host\n\n");
-    instances_data[0].serialized_worldstate_data_ptr->print();
+    // printf("\n\ntesting world state printing on host\n\n");
+    // instances_data[0].serialized_worldstate_data_ptr->print();
+    printf("print simplified trace data host\n");
+    for (uint32_t i = 0; i < num_instances; i++) {
+        printf("\n\ninstance %d\n", i);
+        instances_data[i].simplified_trace_data_ptr->print();
+    }
     PyObject* write_root = python_utils::pyobject_from_evm_instances(instances_data, num_instances);
 
     CuEVM::free_evm_instances(instances_data, num_instances, managed);

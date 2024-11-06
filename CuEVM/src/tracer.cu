@@ -5,73 +5,99 @@
 
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/error_codes.cuh>
+#include <CuEVM/utils/opcodes.cuh>
 #include <iostream>
 #include <string>
 
 namespace CuEVM::utils {
 
 __host__ __device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
-                                                                const CuEVM::evm_stack_t *stack_ptr) {
+                                                                const CuEVM::evm_stack_t &stack_ptr) {
     if (no_events >= MAX_TRACE_EVENTS) return;
     events[no_events].pc = pc;
     events[no_events].op = op;
-    // events[no_events].address_idx = current_address_idx;
-    // events[no_events].operand_1 = *stack_ptr->get_address_at_index(1);
-    // events[no_events].operand_2 = *stack_ptr->get_address_at_index(2);
+    if (op != OP_INVALID && op != OP_SELFDESTRUCT) {
+        // printf("add new operation, src data %d \n", THREADIDX);
+        // printf("stack size %d\n", stack_ptr.size());
+
+        events[no_events].operand_1 = *stack_ptr.get_address_at_index(1);
+        events[no_events].operand_2 = *stack_ptr.get_address_at_index(2);
+    }
 }
 
-__host__ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t *stack_ptr,
+__host__ __device__ void simplified_trace_data::record_branch(uint32_t pc_src, uint32_t pc_dst) {
+    if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
+    branches[no_branches].pc_src = pc_src;
+    branches[no_branches].pc_dst = pc_dst;
+    branches[no_branches].distance = last_distance;
+    no_branches++;
+}
+
+__host__ __device__ void simplified_trace_data::record_distance(ArithEnv &arith, uint8_t op,
+                                                                const CuEVM::evm_stack_t &stack_ptr) {
+    bn_t distance, op1, op2;
+    uint32_t stack_size = stack_ptr.size();
+
+    cgbn_load(arith.env, op1, stack_ptr.get_address_at_index(1));
+    cgbn_load(arith.env, op2, stack_ptr.get_address_at_index(2));
+
+    if (cgbn_compare(arith.env, op1, op2) >= 1)
+        cgbn_sub(arith.env, distance, op1, op2);
+    else
+        cgbn_sub(arith.env, distance, op2, op1);
+
+    if (op != OP_EQ) cgbn_add_ui32(arith.env, distance, distance, 1);
+
+    cgbn_store(arith.env, &last_distance, distance);
+}
+
+__host__ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t &stack_ptr,
                                                                  uint32_t error_code) {
     if (no_events >= MAX_TRACE_EVENTS) return;
-    // events[no_events].res = *stack_ptr->get_address_at_index(1);
+    if (events[no_events].op < OP_REVERT && events[no_events].op != OP_SSTORE)
+        events[no_events].res = *stack_ptr.get_address_at_index(1);
     no_events++;
 }
-__host__ __device__ void simplified_trace_data::start_call(evm_call_state_t *call_state_ptr) {
+__host__ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_message_call_t *message_call_ptr) {
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
-    int32_t current_address_idx = -1;
-    // search if the address is already in the addresses array
-    for (uint32_t i = 0; i < no_addresses; i++) {
-        if (addresses[i] == call_state_ptr->message_ptr->recipient) {
-            current_address_idx = i;
-            break;
-        }
-    }
-
-    if (current_address_idx == -1 && no_addresses < MAX_ADDRESSES_TRACING) {
-        current_address_idx = no_addresses;
-        no_addresses++;
-        // addresses[current_address_idx] = call_state_ptr->message_ptr->recipient;
-    }
-
-    calls[no_calls].address_idx = current_address_idx >= 0 ? current_address_idx : 0;
-    calls[no_calls].pc = call_state_ptr->pc;
-    calls[no_calls].op = call_state_ptr->message_ptr->get_call_type();
+    printf("start call simplified trace data pc %d op %d\n", pc, message_call_ptr->call_type);
+    calls[no_calls].sender = message_call_ptr->sender;
+    calls[no_calls].receiver = message_call_ptr->recipient;
+    calls[no_calls].pc = pc;
+    calls[no_calls].op = message_call_ptr->call_type;
+    calls[no_calls].value = message_call_ptr->value;
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    no_calls++;
+    __ONE_GPU_THREAD_END__
 }
 __host__ __device__ void simplified_trace_data::finish_call(uint8_t success) {
-    if (no_calls >= MAX_CALLS_TRACING) return;
-    calls[no_calls].success = success;
-    no_calls++;
+    if (no_calls > MAX_CALLS_TRACING) return;
+    printf("finish call simplified trace data\n");
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    no_returns++;
+    printf("no_calls %u no_returns %u\n", no_calls, no_returns);
+    if (no_calls >= no_returns) calls[no_calls - no_returns].success = success;
+    __ONE_GPU_THREAD_END__
 }
 __host__ __device__ void simplified_trace_data::print() {
-    printf("no_addresses %u\n", no_addresses);
     printf("no_events %u\n", no_events);
     printf("no_calls %u\n", no_calls);
-    printf("addresses\n");
-    for (uint32_t i = 0; i < no_addresses; i++) {
-        printf("%s\n", addresses[i].to_hex());
-    }
     printf("events\n");
     for (uint32_t i = 0; i < no_events; i++) {
-        printf("pc %u op %u address_idx %u operand_1 %s operand_2 %s res %s\n", events[i].pc, events[i].op,
-               events[i].address_idx, events[i].operand_1.to_hex(), events[i].operand_2.to_hex(),
-               events[i].res.to_hex());
+        printf("pc %u op %u operand_1 %s operand_2 %s res %s\n", events[i].pc, events[i].op,
+               events[i].operand_1.to_hex(), events[i].operand_2.to_hex(), events[i].res.to_hex());
     }
     printf("calls\n");
     for (uint32_t i = 0; i < no_calls; i++) {
-        printf("pc %u op %u address_idx %u receiver %s value %s success %u\n", calls[i].pc, calls[i].op,
-               calls[i].address_idx, calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].success);
+        printf("pc %u op %u sender %s receiver %s value %s success %u\n", calls[i].pc, calls[i].op,
+               calls[i].sender.to_hex(), calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].success);
+    }
+    printf("branches\n");
+    for (uint32_t i = 0; i < no_branches; i++) {
+        printf("pc_src %u pc_dst %u distance %s\n", branches[i].pc_src, branches[i].pc_dst,
+               branches[i].distance.to_hex());
     }
 }
 

@@ -25,9 +25,15 @@ class CuEVMLib:
         contract_name=None,
         detect_bug=False,
         sender="0x1111111111111111111111111111111111111111",
+        contract_bin_runtime=None,
     ):
         self.initiate_instance_data(
-            source_file, num_instances, config, contract_name, detect_bug
+            source_file,
+            num_instances,
+            config,
+            contract_name,
+            detect_bug,
+            contract_bin_runtime,
         )
         self.sender = sender
 
@@ -161,6 +167,7 @@ class CuEVMLib:
         config=None,
         contract_name=None,
         detect_bug=False,
+        contract_bin_runtime=None,
     ):
         default_config = json.loads(open("configurations/default.json").read())
         print(default_config)
@@ -177,7 +184,8 @@ class CuEVMLib:
         if self.contract_instance is None:
             print("Error in compiling the contract {self.contract_name} {source_file}")
             return
-        contract_bin_runtime = self.contract_instance.get("binary_runtime")
+        if contract_bin_runtime is None:
+            contract_bin_runtime = self.contract_instance.get("binary_runtime")
         # the merged config fields : "env", "pre" (populated with code), "transaction" (populated with tx data and value)
         pre_env = tx_sequence_config.get("pre", {})
 
@@ -221,11 +229,12 @@ class CuEVMLib:
             # TODO: add other fuzz-able fields
 
 
-if __name__ == "__main__":
+def test_state_change():
     my_lib = CuEVMLib(
         "contracts/state_change.sol",
-        1,
+        2,
         "configurations/state_change.json",
+        # contract_bin_runtime="6011602201600460110260005560015561123460015561ffff60ff5500",
     )
     test_case = {
         "function": "increase",
@@ -250,34 +259,35 @@ if __name__ == "__main__":
 
     # for debugging, altering tx2 data
     tx_2["data"] = ["0x12"]
-    # tx_2["value"] = [hex(10)]
+    tx_2["value"] = [hex(10)]
     # for debugging, altering the state 2
-    # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
-    #     "0x00"
-    # ] = "0x22"
+    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
+        "0x00"
+    ] = "0x22"
     # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"][
     #     "balance"
     # ] = "0x00"
     # my_lib.instances[2]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
     #     "0x00"
     # ] = "0x33"
-    # trace_res = my_lib.run_transactions([tx_1, tx_1, tx_1])
-    trace_res = my_lib.run_transactions([tx_1])
+    trace_res = my_lib.run_transactions([tx_1, tx_1])
+    # trace_res = my_lib.run_transactions([tx_1])
     print("\n\n trace res \n\n")
     pprint(trace_res)
     print("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()
 
-    # trace_res = my_lib.run_transactions([tx_1, tx_2])
+    trace_res = my_lib.run_transactions([tx_1, tx_1])
 
     # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
     # # trace_res = my_lib.run_transactions([tx_1, tx_1])
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
     # print("\n\n Updated instance data \n\n")
-    # my_lib.print_instance_data()
+    my_lib.print_instance_data()
 
-    exit(0)
+
+def test_erc20():
     my_lib = CuEVMLib(
         "contracts/erc20.sol",
         2,
@@ -308,3 +318,72 @@ if __name__ == "__main__":
     trace_res = my_lib.run_transactions([tx_1, tx_2])
     print("\n\n trace res \n\n")
     pprint(trace_res)
+
+
+def test_branching():
+    my_lib = CuEVMLib(
+        "contracts/branching.sol",
+        2,
+        "configurations/test_branching.json",
+    )
+    test_case_1 = {
+        "function": "test_branch",
+        "type": "exec",
+        "input_types": ["uint256"],
+        "input": [12345],
+        "sender": 0,
+    }
+    test_case_2 = {
+        "function": "test_branch",
+        "type": "exec",
+        "input_types": ["uint256"],
+        "input": [50],
+        "sender": 0,
+    }
+
+    tx_1 = {
+        "data": get_transaction_data_from_config(test_case_1, my_lib.contract_instance),
+        "value": [hex(0)],
+    }
+
+    tx_2 = {
+        "data": get_transaction_data_from_config(test_case_2, my_lib.contract_instance),
+        "value": [hex(0)],
+    }
+    trace_res = my_lib.run_transactions([tx_1, tx_2])
+    print("\n\n trace res \n\n")
+    pprint(trace_res)
+
+
+def test_cross_contract():
+    my_lib = CuEVMLib(
+        "contracts/cross_contract.sol",
+        1,
+        "configurations/cross_contract.json",
+    )
+    test_case = {
+        "function": "underflow",
+        "type": "exec",
+        "input_types": ["address", "address"],
+        "input": [
+            "0x1000000000000000000000000000000000000000",
+            "0x2000000000000000000000000000000000000000",
+        ],
+        "value": 300,
+        "sender": 0,
+        "receiver": "0x1000000000000000000000000000000000000000",
+    }
+
+    tx_1 = {
+        "data": get_transaction_data_from_config(test_case, my_lib.contract_instance),
+        "value": [hex(300)],
+    }
+
+    trace_res = my_lib.run_transactions([tx_1])
+    print("\n\n trace res \n\n")
+    pprint(trace_res)
+
+
+if __name__ == "__main__":
+
+    test_cross_contract()

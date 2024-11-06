@@ -203,9 +203,6 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_s
     // #endif
 
     cached_call_state.set_byte_code(call_state_ptr->message_ptr->byte_code);
-#ifdef BUILD_LIBRARY
-    simplified_trace_data_ptr->start_call(call_state_ptr);
-#endif
 
     if ((call_state_ptr->message_ptr->call_type == OP_CREATE) ||
         (call_state_ptr->message_ptr->call_type == OP_CREATE2)) {
@@ -305,11 +302,20 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
     if (status != ERROR_SUCCESS) {
         return;  // finish transaction
     }
+#ifdef BUILD_LIBRARY
+    simplified_trace_data_ptr->start_call(0, call_state_ptr->message_ptr);
+#endif
     int32_t error_code = start_CALL(arith, cached_call_state);
     if (error_code != ERROR_SUCCESS) {
+#ifdef BUILD_LIBRARY
+        simplified_trace_data_ptr->finish_call(0);
+#endif
         return;  // finish call
     }
     uint8_t opcode;
+#ifdef BUILD_LIBRARY
+    uint32_t pc_src;
+#endif
     CuEVM::evm_call_state_t *child_call_state_ptr = nullptr;
     while (true) {
         // uint32_t current_pc = call_state_ptr->pc;  // TODO: store in local/shared memory
@@ -342,16 +348,18 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         // __ONE_GPU_THREAD_WOSYNC_END__
 
 #endif
-#ifdef BUILD_LIBRARY
-        // comparison, arithmetic, revert/invalid
-        if (opcode <= OP_EQ || opcode >= OP_REVERT) {
-            simplified_trace_data_ptr->start_operation(cached_call_state.pc, opcode, cached_call_state.stack_ptr);
-        }
-#endif
+
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
         printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
                THREADIDX);
         __ONE_GPU_THREAD_WOSYNC_END__
+#ifdef BUILD_LIBRARY
+        // comparison, arithmetic, revert/invalid
+        if ((opcode <= OP_EQ || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
+            simplified_trace_data_ptr->start_operation(cached_call_state.pc, opcode, *cached_call_state.stack_ptr);
+        }
+        if (opcode == OP_JUMPI) pc_src = cached_call_state.pc;
+#endif
         // DEBUG PRINT
 
         // __ONE_THREAD_PER_INSTANCE(printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
@@ -420,22 +428,37 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                         arith, cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr);
                     break;
                 case OP_LT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::LT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        *cached_call_state.stack_ptr);
                     break;
                 case OP_GT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::GT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        *cached_call_state.stack_ptr);
                     break;
                 case OP_SLT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::SLT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         *cached_call_state.stack_ptr);
                     break;
                 case OP_SGT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::SGT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         *cached_call_state.stack_ptr);
                     break;
                 case OP_EQ:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::EQ(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        *cached_call_state.stack_ptr);
                     break;
@@ -639,9 +662,13 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                                                          *call_state_ptr->message_ptr);
                     break;
                 case OP_JUMPI:
+
                     error_code = CuEVM::operations::JUMPI(arith, cached_call_state.gas_limit,
                                                           cached_call_state.gas_used, cached_call_state.pc,
                                                           *cached_call_state.stack_ptr, *call_state_ptr->message_ptr);
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_branch(pc_src, cached_call_state.pc);
+#endif
                     break;
 
                 case OP_PC:
@@ -762,8 +789,8 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         }
 #endif
 #ifdef BUILD_LIBRARY
-        if (opcode <= OP_EQ || opcode >= OP_REVERT) {
-            simplified_trace_data_ptr->finish_operation(cached_call_state.stack_ptr, error_code);
+        if ((opcode <= OP_EQ || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
+            simplified_trace_data_ptr->finish_operation(*cached_call_state.stack_ptr, error_code);
         }
 #endif
         // #ifdef __CUDA_ARCH__
@@ -779,6 +806,9 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                 call_state_ptr = child_call_state_ptr;
                 cached_call_state = cached_evm_call_state(arith, call_state_ptr);
                 error_code = start_CALL(arith, cached_call_state);
+#ifdef BUILD_LIBRARY
+                simplified_trace_data_ptr->start_call(call_state_ptr->parent->pc, call_state_ptr->message_ptr);
+#endif
             } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                 // Logic: when op_create or create2 does not succeed,
                 // there is no start_CALL but do not revert parent contract:
