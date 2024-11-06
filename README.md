@@ -241,21 +241,21 @@ To be updated.
 ## Contributors
 
 <div>
-  <span style="text-align: center; margin-right: 2rem;">
+  <span style="text-align: center; margin-right: 12px;">
     <a href="https://github.com/minhhn2910">
-      <img src="https://github.com/minhhn2910.png" width="50px;" alt="minhhn2910"/>
+      <img src="https://github.com/minhhn2910.png" width="50px;" alt="minhhn2910" class="avatar circle" style="margin-right:6px;"/>
     </a>
     <span>Nhut-Minh Ho</span>
   </span>
-  <span style="text-align: center; margin-right: 2rem;">
+  <span style="text-align: center; margin-right: 12px;">
     <a href="https://github.com/sdcioc">
-      <img src="https://github.com/sdcioc.png" width="50px;" alt="sdcioc"/>
+      <img src="https://github.com/sdcioc.png" width="50px;" alt="sdcioc" class="avatar circle" style="margin-right:6px;"/>
     </a>
     <span>Stefan-Dan Ciocirlan</span>
   </span>
-  <span style="text-align: center; margin-right: 2rem;">
+  <span style="text-align: center; margin-right: 12px;">
     <a href="https://github.com/cassc">
-      <img src="https://github.com/cassc.png" width="50px;" alt="cassc"/>
+      <img src="https://github.com/cassc.png" width="50px;" alt="cassc" class="avatar circle" style="margin-right:6px;"/>
     </a>
     <span>Chen Li</span>
   </span>
