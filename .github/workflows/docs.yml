@@ -1,13 +1,10 @@
-name: Docs
+# Simple workflow for deploying static content to GitHub Pages
+name: Deploy static content to Pages
 
 on:
-  #push:
-  #  branches-ignore:
-  #    - '**'  
+  # Runs on pushes targeting the default branch
   push:
-    branches: [ yellow_paper ]
-  pull_request:
-    branches: [ master ]
+    branches: ["main"]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -23,55 +20,34 @@ permissions:
 concurrency:
   group: "pages"
   cancel-in-progress: false
-  
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-    container:
-      image: nvidia/cuda:12.0.0-devel-ubuntu22.04
-      credentials:
-        username: ${{ secrets.DOCKER_USER }}
-        password: ${{ secrets.DOCKER_TOKEN }}
-    env:
-      DEBIAN_FRONTEND: "noninteractive"
-      TZ: "Asia/Singapore"
 
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4.1.1
-    - name: Apt Requirements
-      run: DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y doxygen sphinx cmake python3-pip libgmp-dev libcjson1 libcjson-dev git
-    - name: Pip3 Requirements
-      run: pip3 install -r docs/requirements.txt
-    - name: Configure CMake
-      run: cmake -S . -B build -G "Unix Makefiles" -DWITH_DOCS=ON
-    - name: Build docs
-      run:  cmake --build build --target docs
-    - name: Upload page artficat
-      uses: actions/upload-artifact@v4
-      with:
-        name: cuevm-docs-artifact
-        path: build/docs/docs/sphinx/
-  
+jobs:
+  # Single deploy job since we're just deploying
   deploy:
-    runs-on: ubuntu-22.04
-    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
+    runs-on: ubuntu-latest
     steps:
-    - name: Download artficat
-      uses: actions/download-artifact@v4
-      with:
-        name: cuevm-docs-artifact
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        # Upload entire repository
-        path: '.'
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Update package list
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+
+      - name: Install Doxygen and Graphviz
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y doxygen graphviz
+
+      - name: Install
+        run: doxygen
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs/html'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,14 @@
+PROJECT_NAME           = "CuEVM"
+DOXYFILE_ENCODING      = UTF-8
+EXTENSION_MAPPING      = cu=c++
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+OUTPUT_DIRECTORY       = ./docs
+GENERATE_MAINPAGE      = YES
+INPUT                  = ./CuEVM/ ./interpreter/
+FILE_PATTERNS          = *.cpp *.h *.cu *.cuh
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
