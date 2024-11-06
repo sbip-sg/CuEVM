@@ -12,10 +12,57 @@
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/stack.cuh>
+#include <CuEVM/evm_call_state.cuh>
 #include <CuEVM/state/touch_state.cuh>
 #include <CuEVM/utils/arith.cuh>
-
 namespace CuEVM::utils {
+// PyObject* branches = PyList_New(0);
+// PyObject* bugs = PyList_New(0);
+// PyObject* calls = PyList_New(0);
+// PyObject* storage_write = PyList_New(0);
+
+// PyObject* tracer_json = PyList_New(0);
+// PyObject* item = NULL;
+// PyObject* stack_json = NULL;
+// add sub mul div mod exp
+// sstore
+#define MAX_TRACE_EVENTS 1024
+#define MAX_ADDRESSES_TRACING 32
+#define MAX_CALLS_TRACING 32
+struct simple_event_trace {
+    // pc // op //  operand 1, operand 2, res
+    uint32_t pc;
+    uint8_t op;
+    uint8_t address_idx;
+    evm_word_t operand_1;
+    evm_word_t operand_2;
+    evm_word_t res;  // blank in some cases
+};
+struct call_trace {
+    uint32_t pc;
+    uint8_t op;
+    uint8_t address_idx;
+    evm_word_t receiver;
+    evm_word_t value;
+    uint8_t success;  // 0 or 1
+    // todo add more depth + result etc
+};
+
+struct simplified_trace_data {
+    simple_event_trace events[MAX_TRACE_EVENTS];
+    evm_word_t addresses[MAX_ADDRESSES_TRACING];
+    call_trace calls[MAX_CALLS_TRACING];
+    uint32_t no_addresses = 0;
+    uint32_t current_address_idx = 0;
+    uint32_t no_events = 0;
+    uint32_t no_calls = 0;
+
+    __host__ __device__ void start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_stack_t *stack_ptr);
+    __host__ __device__ void finish_operation(const CuEVM::evm_stack_t *stack_ptr, uint32_t error_code);
+    __host__ __device__ void start_call(evm_call_state_t *call_state_ptr);
+    __host__ __device__ void finish_call(uint8_t success);
+    __host__ __device__ void print();
+};
 struct trace_data_t {
     uint32_t pc;                      /**< The program counter */
     uint8_t op;                       /**< The opcode */
@@ -73,7 +120,7 @@ struct tracer_t {
 
     __host__ __device__ void print_err();
 
-  __device__ void print_device_err();
+    __device__ void print_device_err();
 
     __host__ cJSON *to_json();
 };

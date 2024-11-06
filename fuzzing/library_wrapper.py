@@ -224,7 +224,7 @@ class CuEVMLib:
 if __name__ == "__main__":
     my_lib = CuEVMLib(
         "contracts/state_change.sol",
-        2,
+        1,
         "configurations/state_change.json",
     )
     test_case = {
@@ -249,30 +249,33 @@ if __name__ == "__main__":
     }
 
     # for debugging, altering tx2 data
-    tx_2["data"] = ["0x22"]
-    tx_2["value"] = [hex(10)]
+    tx_2["data"] = ["0x12"]
+    # tx_2["value"] = [hex(10)]
     # for debugging, altering the state 2
-    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
-        "0x00"
-    ] = "0x22"
-    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"][
-        "balance"
-    ] = "0x00"
+    # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
+    #     "0x00"
+    # ] = "0x22"
+    # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"][
+    #     "balance"
+    # ] = "0x00"
+    # my_lib.instances[2]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
+    #     "0x00"
+    # ] = "0x33"
+    # trace_res = my_lib.run_transactions([tx_1, tx_1, tx_1])
+    trace_res = my_lib.run_transactions([tx_1])
+    print("\n\n trace res \n\n")
+    pprint(trace_res)
+    print("\n\n Updated instance data \n\n")
+    my_lib.print_instance_data()
+
     # trace_res = my_lib.run_transactions([tx_1, tx_2])
-    trace_res = my_lib.run_transactions([tx_1])
-    print("\n\n trace res \n\n")
-    pprint(trace_res)
-    print("\n\n Updated instance data \n\n")
-    my_lib.print_instance_data()
 
-    trace_res = my_lib.run_transactions([tx_1])
-
-    trace_res = my_lib.run_transactions([tx_1])
-    # trace_res = my_lib.run_transactions([tx_1, tx_1])
-    print("\n\n trace res \n\n")
-    pprint(trace_res)
-    print("\n\n Updated instance data \n\n")
-    my_lib.print_instance_data()
+    # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
+    # # trace_res = my_lib.run_transactions([tx_1, tx_1])
+    # print("\n\n trace res \n\n")
+    # pprint(trace_res)
+    # print("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
 
     exit(0)
     my_lib = CuEVMLib(

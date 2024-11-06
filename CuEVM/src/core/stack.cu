@@ -247,7 +247,7 @@ __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8
 
 #ifdef __CUDA_ARCH__
 // The caller must check underflow
-__host__ __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) {
+__host__ __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) const {
     if (stack_base_offset + stack_offset - index < CuEVM::shared_stack_size)
         return shared_stack_base + stack_offset - index;
     else {
@@ -293,7 +293,7 @@ __host__ __device__ int32_t evm_stack_t::swapx(ArithEnv &arith, uint32_t x) {
 }
 
 #else
-__host__ __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) {}
+__host__ __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) const {}
 __host__ __device__ int32_t evm_stack_t::get_index(ArithEnv &arith, uint32_t index, bn_t &y) {
     if (index > size()) {
         return ERROR_STACK_INVALID_INDEX;

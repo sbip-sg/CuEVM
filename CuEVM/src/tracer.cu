@@ -9,6 +9,72 @@
 #include <string>
 
 namespace CuEVM::utils {
+
+__host__ __device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
+                                                                const CuEVM::evm_stack_t *stack_ptr) {
+    if (no_events >= MAX_TRACE_EVENTS) return;
+    events[no_events].pc = pc;
+    events[no_events].op = op;
+    // events[no_events].address_idx = current_address_idx;
+    // events[no_events].operand_1 = *stack_ptr->get_address_at_index(1);
+    // events[no_events].operand_2 = *stack_ptr->get_address_at_index(2);
+}
+
+__host__ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t *stack_ptr,
+                                                                 uint32_t error_code) {
+    if (no_events >= MAX_TRACE_EVENTS) return;
+    // events[no_events].res = *stack_ptr->get_address_at_index(1);
+    no_events++;
+}
+__host__ __device__ void simplified_trace_data::start_call(evm_call_state_t *call_state_ptr) {
+    if (no_calls >= MAX_CALLS_TRACING) return;
+    // add address and increment current_address_idx
+    // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
+    int32_t current_address_idx = -1;
+    // search if the address is already in the addresses array
+    for (uint32_t i = 0; i < no_addresses; i++) {
+        if (addresses[i] == call_state_ptr->message_ptr->recipient) {
+            current_address_idx = i;
+            break;
+        }
+    }
+
+    if (current_address_idx == -1 && no_addresses < MAX_ADDRESSES_TRACING) {
+        current_address_idx = no_addresses;
+        no_addresses++;
+        // addresses[current_address_idx] = call_state_ptr->message_ptr->recipient;
+    }
+
+    calls[no_calls].address_idx = current_address_idx >= 0 ? current_address_idx : 0;
+    calls[no_calls].pc = call_state_ptr->pc;
+    calls[no_calls].op = call_state_ptr->message_ptr->get_call_type();
+}
+__host__ __device__ void simplified_trace_data::finish_call(uint8_t success) {
+    if (no_calls >= MAX_CALLS_TRACING) return;
+    calls[no_calls].success = success;
+    no_calls++;
+}
+__host__ __device__ void simplified_trace_data::print() {
+    printf("no_addresses %u\n", no_addresses);
+    printf("no_events %u\n", no_events);
+    printf("no_calls %u\n", no_calls);
+    printf("addresses\n");
+    for (uint32_t i = 0; i < no_addresses; i++) {
+        printf("%s\n", addresses[i].to_hex());
+    }
+    printf("events\n");
+    for (uint32_t i = 0; i < no_events; i++) {
+        printf("pc %u op %u address_idx %u operand_1 %s operand_2 %s res %s\n", events[i].pc, events[i].op,
+               events[i].address_idx, events[i].operand_1.to_hex(), events[i].operand_2.to_hex(),
+               events[i].res.to_hex());
+    }
+    printf("calls\n");
+    for (uint32_t i = 0; i < no_calls; i++) {
+        printf("pc %u op %u address_idx %u receiver %s value %s success %u\n", calls[i].pc, calls[i].op,
+               calls[i].address_idx, calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].success);
+    }
+}
+
 __host__ cJSON *trace_data_t::to_json() {
     char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
     cJSON *json = cJSON_CreateObject();

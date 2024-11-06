@@ -29,15 +29,14 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
 #endif
 
                                  ,
-                                 CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr
-
-                                 )
+                                 CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr,
+                                 CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr)
     : world_state(world_state_data_ptr),
       block_info_ptr(block_info_ptr),
       transaction_ptr(transaction_ptr),
 
       serialized_worldstate_data_ptr(serialized_worldstate_data_ptr),
-
+      simplified_trace_data_ptr(simplified_trace_data_ptr),
       ecc_constants_ptr(ecc_constants_ptr) {
     // TODO: store in local/shared memory
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
@@ -106,9 +105,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_ins
             evm_instance.tracer_ptr
 #endif
             ,
-            evm_instance.serialized_worldstate_data_ptr
-
-      ) {
+            evm_instance.serialized_worldstate_data_ptr, evm_instance.simplified_trace_data_ptr) {
 }
 
 __host__ __device__ evm_t::~evm_t() {
@@ -206,6 +203,9 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_s
     // #endif
 
     cached_call_state.set_byte_code(call_state_ptr->message_ptr->byte_code);
+#ifdef BUILD_LIBRARY
+    simplified_trace_data_ptr->start_call(call_state_ptr);
+#endif
 
     if ((call_state_ptr->message_ptr->call_type == OP_CREATE) ||
         (call_state_ptr->message_ptr->call_type == OP_CREATE2)) {
@@ -341,6 +341,12 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         //        THREADIDX);
         // __ONE_GPU_THREAD_WOSYNC_END__
 
+#endif
+#ifdef BUILD_LIBRARY
+        // comparison, arithmetic, revert/invalid
+        if (opcode <= OP_EQ || opcode >= OP_REVERT) {
+            simplified_trace_data_ptr->start_operation(cached_call_state.pc, opcode, cached_call_state.stack_ptr);
+        }
 #endif
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
         printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
@@ -755,6 +761,11 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
             );
         }
 #endif
+#ifdef BUILD_LIBRARY
+        if (opcode <= OP_EQ || opcode >= OP_REVERT) {
+            simplified_trace_data_ptr->finish_operation(cached_call_state.stack_ptr, error_code);
+        }
+#endif
         // #ifdef __CUDA_ARCH__
         //         printf("after finish_operation idx %d opcode %d error code %d\n", threadIdx.x, opcode, error_code);
         // #endif
@@ -965,6 +976,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
             }
         }
     }
+#ifdef BUILD_LIBRARY
+    simplified_trace_data_ptr->finish_call((error_code == ERROR_RETURN));
+#endif
     // printf("end finish_CALL before set warm account %d idx %d\n", error_code, THREADIDX);
     // #ifdef __CUDA_ARCH__
     //     printf("evm_t::finish_CALL %d before setting warm accounts error_code: %d\n", threadIdx.x, error_code);
@@ -1169,6 +1183,13 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
             memcpy(evm_instances[index].serialized_worldstate_data_ptr, serialized_worldstate_data,
                    sizeof(CuEVM::serialized_worldstate_data));
             delete serialized_worldstate_data;
+
+            CuEVM::utils::simplified_trace_data *simplified_trace_data = new CuEVM::utils::simplified_trace_data();
+            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].simplified_trace_data_ptr,
+                                         sizeof(CuEVM::utils::simplified_trace_data)));
+            memcpy(evm_instances[index].simplified_trace_data_ptr, simplified_trace_data,
+                   sizeof(CuEVM::utils::simplified_trace_data));
+            delete simplified_trace_data;
         }
     }
     num_instances = num_transactions;

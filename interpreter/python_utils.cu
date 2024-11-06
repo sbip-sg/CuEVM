@@ -353,6 +353,15 @@ void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyOb
         memcpy(evm_instances[index].serialized_worldstate_data_ptr, serialized_worldstate_data,
                sizeof(CuEVM::serialized_worldstate_data));
         delete serialized_worldstate_data;
+
+        CuEVM::utils::simplified_trace_data* simplified_trace_data = new CuEVM::utils::simplified_trace_data();
+        CUDA_CHECK(cudaMallocManaged(&evm_instances[index].simplified_trace_data_ptr,
+                                     sizeof(CuEVM::utils::simplified_trace_data)));
+        memcpy(evm_instances[index].simplified_trace_data_ptr, simplified_trace_data,
+               sizeof(CuEVM::utils::simplified_trace_data));
+        delete simplified_trace_data;
+        printf("size of serialized worldstate data %u\n", sizeof(CuEVM::serialized_worldstate_data));
+        printf("size of simplified trace data %u\n", sizeof(CuEVM::utils::simplified_trace_data));
     }
 
     num_instances = num_transactions;
@@ -537,163 +546,7 @@ static PyObject* pyobject_from_tracer_data_t(arith_t& arith, tracer_data_t trace
     return tracer_root;
 }
 */
-/*
-static PyObject* pyobject_from_account_t(account_t account) {
-    PyObject* account_json = PyDict_New();
-    PyObject* storage_json = PyDict_New();
-    char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-    char* value_hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-    size_t jdx = 0;
 
-    // Set the address
-    arith.hex_string_from_cgbn_memory(hex_string_ptr, account.address, 5);
-    PyDict_SetItemString(account_json, "address", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the balance
-    arith.pretty_hex_string_from_cgbn_memory(hex_string_ptr, account.balance);
-    PyDict_SetItemString(account_json, "balance", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the nonce
-    arith.pretty_hex_string_from_cgbn_memory(hex_string_ptr, account.nonce);
-    PyDict_SetItemString(account_json, "nonce", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the code
-    if (account.code_size > 0) {
-        char* bytes_string =
-            hex_from_bytes(account.bytecode, account.code_size);  // Assuming hex_from_bytes is defined elsewhere
-        PyDict_SetItemString(account_json, "code", PyUnicode_FromString(bytes_string));
-        delete[] bytes_string;
-    } else {
-        PyDict_SetItemString(account_json, "code", PyUnicode_FromString("0x"));
-    }
-
-    // Set the storage
-    PyDict_SetItemString(account_json, "storage", storage_json);
-    if (account.storage_size > 0) {
-        for (jdx = 0; jdx < account.storage_size; jdx++) {
-            arith.pretty_hex_string_from_cgbn_memory(hex_string_ptr, account.storage[jdx].key);
-            arith.pretty_hex_string_from_cgbn_memory(value_hex_string_ptr, account.storage[jdx].value);
-            PyDict_SetItemString(storage_json, hex_string_ptr, PyUnicode_FromString(value_hex_string_ptr));
-        }
-    }
-
-    // Clean up
-    delete[] hex_string_ptr;
-    delete[] value_hex_string_ptr;
-
-    // Decrement the reference count of storage_json since it's now owned by account_json
-    Py_DECREF(storage_json);
-
-    return account_json;
-}
-
-static PyObject* pyobject_from_state_data_t(arith_t& arith, state_data_t* state_data) {
-    PyObject* state_json = PyDict_New();
-    PyObject* account_json = NULL;
-    char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-    size_t idx = 0;
-
-    for (idx = 0; idx < state_data->no_accounts; idx++) {
-        // Assuming an equivalent function or method exists that returns a PyObject* for an account
-        account_json =
-            pyobject_from_account_t(arith, state_data->accounts[idx]);  // Replace with actual function/method
-
-        // Convert account address to hex string
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, state_data->accounts[idx].address, 5);
-
-        // Add account PyObject to the state dictionary using the address as the key
-        PyDict_SetItemString(state_json, hex_string_ptr, account_json);
-
-        // Decrement the reference count of account_json since PyDict_SetItemString increases it
-        Py_DECREF(account_json);
-    }
-
-    delete[] hex_string_ptr;
-    return state_json;
-}
-
-PyObject* pyobject_from_transaction_content(arith_t& _arith, transaction_data_t* _content) {
-    PyObject* transaction_json = PyDict_New();
-    char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
-    char* bytes_string = NULL;
-
-    // Set the type
-    PyDict_SetItemString(transaction_json, "type", PyLong_FromLong(_content->type));
-
-    // Set the nonce
-    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->nonce);
-    PyDict_SetItemString(transaction_json, "nonce", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the gas limit
-    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->gas_limit);
-    PyDict_SetItemString(transaction_json, "gasLimit", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the to address
-    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->to, 5);
-    PyDict_SetItemString(transaction_json, "to", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the value
-    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->value);
-    PyDict_SetItemString(transaction_json, "value", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the sender
-    _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->sender, 5);
-    PyDict_SetItemString(transaction_json, "sender", PyUnicode_FromString(hex_string_ptr));
-    // TODO: delete this from revmi comparator
-    PyDict_SetItemString(transaction_json, "origin", PyUnicode_FromString(hex_string_ptr));
-
-    // Set the access list
-    if (_content->type >= 1) {
-        PyObject* access_list_json = PyList_New(0);
-        PyDict_SetItemString(transaction_json, "accessList", access_list_json);
-        Py_DECREF(access_list_json);  // Decrement because PyDict_SetItemString increases the ref count
-
-        for (size_t idx = 0; idx < _content->access_list.no_accounts; idx++) {
-            PyObject* account_json = PyDict_New();
-            PyList_Append(access_list_json, account_json);  // Append steals the reference, so no need to DECREF
-
-            _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->access_list.accounts[idx].address, 5);
-            PyDict_SetItemString(account_json, "address", PyUnicode_FromString(hex_string_ptr));
-
-            PyObject* storage_keys_json = PyList_New(0);
-            PyDict_SetItemString(account_json, "storageKeys", storage_keys_json);
-            Py_DECREF(storage_keys_json);  // Decrement because PyDict_SetItemString increases the ref count
-
-            for (size_t jdx = 0; jdx < _content->access_list.accounts[idx].no_storage_keys; jdx++) {
-                _arith.hex_string_from_cgbn_memory(hex_string_ptr,
-                                                   _content->access_list.accounts[idx].storage_keys[jdx]);
-                PyList_Append(storage_keys_json, PyUnicode_FromString(hex_string_ptr));
-            }
-        }
-    }
-
-    // Set the gas price
-    if (_content->type == 2) {
-        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->max_fee_per_gas);
-        PyDict_SetItemString(transaction_json, "maxFeePerGas", PyUnicode_FromString(hex_string_ptr));
-
-        // Set the max priority fee per gas
-        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->max_priority_fee_per_gas);
-        PyDict_SetItemString(transaction_json, "maxPriorityFeePerGas", PyUnicode_FromString(hex_string_ptr));
-    } else {
-        // Set the gas price
-        _arith.hex_string_from_cgbn_memory(hex_string_ptr, _content->gas_price);
-        PyDict_SetItemString(transaction_json, "gasPrice", PyUnicode_FromString(hex_string_ptr));
-    }
-
-    // Set the data
-    if (_content->data_init.size > 0) {
-        bytes_string = hex_from_data_content(_content->data_init);
-        PyDict_SetItemString(transaction_json, "data", PyUnicode_FromString(bytes_string));
-        delete[] bytes_string;
-    } else {
-        PyDict_SetItemString(transaction_json, "data", PyUnicode_FromString("0x"));
-    }
-
-    delete[] hex_string_ptr;
-    return transaction_json;
-}
-*/
 PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* serialized_worldstate_instance) {
     PyObject* state_dict = PyDict_New();
 

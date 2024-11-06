@@ -126,7 +126,7 @@ struct evm_stack_t {
      */
     __host__ __device__ int32_t get_index(ArithEnv &arith, uint32_t index, bn_t &y);
 
-    __host__ __device__ evm_word_t *get_address_at_index(uint32_t index);
+    __host__ __device__ evm_word_t *get_address_at_index(uint32_t index) const;
     /**
      * Duplicvate the value at the given index and push
      * it at the top of the stack.
