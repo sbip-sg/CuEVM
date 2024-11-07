@@ -33,7 +33,12 @@ __host__ __device__ int32_t JUMP(ArithEnv &arith, const bn_t &gas_limit, bn_t &g
 }
 
 __host__ __device__ int32_t JUMPI(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used, uint32_t &pc,
-                                  CuEVM::evm_stack_t &stack, const CuEVM::evm_message_call_t &message) {
+                                  CuEVM::evm_stack_t &stack, const CuEVM::evm_message_call_t &message
+#ifdef BUILD_LIBRARY
+                                  ,
+                                  CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
+#endif
+) {
     cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_HIGH);
     int32_t error_code = CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -41,12 +46,15 @@ __host__ __device__ int32_t JUMPI(ArithEnv &arith, const bn_t &gas_limit, bn_t &
         error_code |= stack.pop(arith, destination);
         bn_t condition;
         error_code |= stack.pop(arith, condition);
-
+        uint32_t destination_u32;
+        error_code = cgbn_get_uint32_t(arith.env, destination_u32, destination) == ERROR_VALUE_OVERFLOW
+                         ? ERROR_INVALID_JUMP_DESTINATION
+                         : error_code;
         if ((error_code == ERROR_SUCCESS) && (cgbn_compare_ui32(arith.env, condition, 0) != 0)) {
-            uint32_t destination_u32;
-            error_code = cgbn_get_uint32_t(arith.env, destination_u32, destination) == ERROR_VALUE_OVERFLOW
-                             ? ERROR_INVALID_JUMP_DESTINATION
-                             : error_code;
+#ifdef BUILD_LIBRARY
+            simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
+#endif
+
             if (error_code == ERROR_SUCCESS) {
                 pc = message.jump_destinations->has(destination_u32) == ERROR_SUCCESS
                          ? destination_u32 - 1
@@ -56,6 +64,11 @@ __host__ __device__ int32_t JUMPI(ArithEnv &arith, const bn_t &gas_limit, bn_t &
                            })();
             }
         }
+#ifdef BUILD_LIBRARY
+        else {
+            simplified_trace_data_ptr->record_branch(pc, pc + 1, destination_u32);
+        }
+#endif
     }
     return error_code;
 }

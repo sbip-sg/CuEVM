@@ -665,10 +665,13 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
 
                     error_code = CuEVM::operations::JUMPI(arith, cached_call_state.gas_limit,
                                                           cached_call_state.gas_used, cached_call_state.pc,
-                                                          *cached_call_state.stack_ptr, *call_state_ptr->message_ptr);
+                                                          *cached_call_state.stack_ptr, *call_state_ptr->message_ptr
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_branch(pc_src, cached_call_state.pc);
+                                                          ,
+                                                          simplified_trace_data_ptr
 #endif
+                    );
+
                     break;
 
                 case OP_PC:
@@ -976,9 +979,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     // #endif
     // if the child call return from normal halting
     // no errors
-#ifdef EIP_3155
-    printf(" finish_CALL error_code: %d\n", error_code);
-#endif
+    // #ifdef EIP_3155
+    printf(" finish_CALL error_code: %d %d\n", error_code, THREADIDX);
+    // #endif
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation

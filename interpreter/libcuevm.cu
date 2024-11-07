@@ -116,11 +116,11 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots) {
 
     // printf("\n\ntesting world state printing on host\n\n");
     // instances_data[0].serialized_worldstate_data_ptr->print();
-    printf("print simplified trace data host\n");
-    for (uint32_t i = 0; i < num_instances; i++) {
-        printf("\n\ninstance %d\n", i);
-        instances_data[i].simplified_trace_data_ptr->print();
-    }
+    // printf("print simplified trace data host\n");
+    // for (uint32_t i = 0; i < num_instances; i++) {
+    //     printf("\n\ninstance %d\n", i);
+    //     instances_data[i].simplified_trace_data_ptr->print();
+    // }
     PyObject* write_root = python_utils::pyobject_from_evm_instances(instances_data, num_instances);
 
     CuEVM::free_evm_instances(instances_data, num_instances, managed);

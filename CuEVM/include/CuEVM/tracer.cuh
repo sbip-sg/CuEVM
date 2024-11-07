@@ -47,12 +47,13 @@ struct call_trace {
     evm_word_t sender;
     evm_word_t receiver;
     evm_word_t value;
-    uint8_t success;  // 0 or 1
+    uint8_t success = UINT8_MAX;  // 0 or 1
     // todo add more depth + result etc
 };
 struct branch_trace {
     uint32_t pc_src;
     uint32_t pc_dst;
+    uint32_t pc_missed;
     evm_word_t distance;  // distance between pc_src and pc_dst
 
     // todo: use evm_word_t for distance
@@ -67,7 +68,6 @@ struct simplified_trace_data {
     // uint32_t current_address_idx = 0;
     uint32_t no_events = 0;
     uint32_t no_calls = 0;
-    uint32_t no_returns = 0;
     uint32_t no_branches = 0;
     evm_word_t last_distance;  // use to track branch distance by comparison opcodes
 
@@ -75,7 +75,7 @@ struct simplified_trace_data {
     __host__ __device__ void finish_operation(const CuEVM::evm_stack_t &stack_ptr, uint32_t error_code);
     __host__ __device__ void start_call(uint32_t pc, evm_message_call_t *message_call_ptr);
     __host__ __device__ void finish_call(uint8_t success);
-    __host__ __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst);
+    __host__ __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
     __host__ __device__ void record_distance(ArithEnv &arith, uint8_t op, const CuEVM::evm_stack_t &stack_ptr);
     __host__ __device__ void print();
 };

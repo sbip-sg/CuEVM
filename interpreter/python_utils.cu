@@ -366,186 +366,55 @@ void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyOb
 
     num_instances = num_transactions;
 }
-// OP_SSTORE
-// OP_JUMPI
-// OP_SELFDESTRUCT
-/*
-static PyObject* pyobject_from_tracer_data_t(arith_t& arith, tracer_data_t tracer_data) {
-    char* hex_string_ptr = new char[arith_t::BYTES * 2 + 3];
+
+static PyObject* pyobject_from_simplified_trace(CuEVM::utils::simplified_trace_data trace_data) {
     PyObject* tracer_root = PyDict_New();
 
     PyObject* branches = PyList_New(0);
-    PyObject* bugs = PyList_New(0);
+    PyObject* events = PyList_New(0);
     PyObject* calls = PyList_New(0);
-    PyObject* storage_write = PyList_New(0);
 
-    PyObject* tracer_json = PyList_New(0);
-    PyObject* item = NULL;
-    PyObject* stack_json = NULL;
+    // process call
+    for (size_t idx = 0; idx < trace_data.no_calls; idx++) {
+        PyObject* call_item = PyDict_New();
+        PyDict_SetItemString(call_item, "sender", PyUnicode_FromString(trace_data.calls[idx].sender.to_hex()));
+        PyDict_SetItemString(call_item, "receiver", PyUnicode_FromString(trace_data.calls[idx].receiver.to_hex()));
 
-    size_t previous_distance;
-
-    for (size_t idx = 0; idx < tracer_data.size; idx++) {
-        uint8_t current_opcode = tracer_data.opcodes[idx];
-        uint32_t current_pc = tracer_data.pcs[idx];
-
-        if (interesting_opcodes.find(current_opcode) == interesting_opcodes.end()) {
-            continue;
-        }
-
-        item = PyDict_New();
-        arith.hex_string_from_cgbn_memory(hex_string_ptr, tracer_data.addresses[idx], 5);
-        PyDict_SetItemString(item, "address", PyUnicode_FromString(hex_string_ptr));
-
-        PyDict_SetItemString(item, "pc", PyLong_FromSize_t(current_pc));
-        PyDict_SetItemString(item, "opcode", PyLong_FromSize_t(current_opcode));
-
-        stack_json = stack_t::pyobject_from_stack_data_t(
-            arith, tracer_data.stacks[idx]);  // Assuming toPyObject() is implemented
-        PyDict_SetItemString(item, "stack", stack_json);
-        Py_DECREF(stack_json);
-
-        PyList_Append(tracer_json, item);
-        Py_DECREF(item);  // Decrement reference count since PyList_Append increases it
-
-        if (bug_opcodes.find(current_opcode) != bug_opcodes.end()) {
-            // Simple OP:
-            if (current_opcode == OP_SELFDESTRUCT || current_opcode == OP_ORIGIN) {
-                PyObject* bug_item = PyDict_New();
-                PyDict_SetItemString(bug_item, "address", PyUnicode_FromString(hex_string_ptr));
-                PyDict_SetItemString(bug_item, "pc", PyLong_FromSize_t(current_pc));
-                PyDict_SetItemString(bug_item, "opcode", PyLong_FromSize_t(current_opcode));
-                PyList_Append(bugs, bug_item);
-                Py_DECREF(bug_item);
-            } else {
-                PyObject* bug_item = PyDict_New();
-                PyDict_SetItemString(bug_item, "address", PyUnicode_FromString(hex_string_ptr));
-                PyDict_SetItemString(bug_item, "pc", PyLong_FromSize_t(current_pc));
-                PyDict_SetItemString(bug_item, "opcode", PyLong_FromSize_t(current_opcode));
-
-                uint32_t stack_size = tracer_data.stacks[idx].stack_offset;
-
-                evm_word_t* operand_1 = tracer_data.stacks[idx].stack_base + (stack_size - 1);
-                arith.hex_string_from_cgbn_memory(hex_string_ptr, *operand_1);
-                PyDict_SetItemString(bug_item, "operand_1", PyUnicode_FromString(hex_string_ptr));
-
-                evm_word_t* operand_2 = tracer_data.stacks[idx].stack_base + (stack_size - 2);
-                arith.hex_string_from_cgbn_memory(hex_string_ptr, *operand_2);
-                PyDict_SetItemString(bug_item, "operand_2", PyUnicode_FromString(hex_string_ptr));
-                PyList_Append(bugs, bug_item);
-                Py_DECREF(bug_item);
-            }
-        }
-
-        if (current_opcode == OP_JUMPI) {
-            // process jumpi
-            PyObject* branch_item = PyDict_New();
-            PyDict_SetItemString(branch_item, "address", PyUnicode_FromString(hex_string_ptr));
-            PyDict_SetItemString(branch_item, "pc", PyLong_FromSize_t(current_pc));
-
-            bn_t jump_cond, destination;
-            uint32_t stack_size = tracer_data.stacks[idx].stack_offset;
-            cgbn_load(arith._env, destination, tracer_data.stacks[idx].stack_base + stack_size - 1);
-            cgbn_load(arith._env, jump_cond, tracer_data.stacks[idx].stack_base + stack_size - 2);
-
-            // printf("\n\n JumpI %d %d\n\n", cgbn_get_ui32(arith._env, jump_cond), cgbn_get_ui32(arith._env,
-            // destination));
-            PyDict_SetItemString(branch_item, "distance", PyLong_FromSize_t(previous_distance));
-            if (cgbn_get_ui32(arith._env, jump_cond) == 0) {
-                PyDict_SetItemString(branch_item, "destination", PyLong_FromSize_t(current_pc + 1));
-                PyDict_SetItemString(branch_item, "missed_destination",
-                                     PyLong_FromSize_t(cgbn_get_ui32(arith._env, destination)));
-            } else {
-                PyDict_SetItemString(branch_item, "destination",
-                                     PyLong_FromSize_t(cgbn_get_ui32(arith._env, destination)));
-                PyDict_SetItemString(branch_item, "missed_destination", PyLong_FromSize_t(current_pc + 1));
-            }
-            PyList_Append(branches, branch_item);
-        }
-
-        // process comparison
-        if (comparison_opcodes.find(current_opcode) != comparison_opcodes.end()) {
-            // process comparison
-            // stack_size = computation._stack.__len__()
-            uint32_t stack_size = tracer_data.stacks[idx].stack_offset;
-            bn_t distance, op1, op2;
-
-            cgbn_load(arith._env, op1, tracer_data.stacks[idx].stack_base + stack_size - 1);
-            if (stack_size > 1) cgbn_load(arith._env, op2, tracer_data.stacks[idx].stack_base + stack_size - 2);
-
-            if (cgbn_compare(arith._env, op1, op2) >= 1)
-                cgbn_sub(arith._env, distance, op1, op2);
-            else
-                cgbn_sub(arith._env, distance, op2, op1);
-
-            if (current_opcode != OP_EQ) cgbn_add_ui32(arith._env, distance, distance, 1);
-
-            arith.size_t_from_cgbn(previous_distance, distance);
-        }
-
-        // process calls
-        if (call_opcodes.find(current_opcode) != call_opcodes.end()) {
-            bn_t value;
-            PyObject* call_item = PyDict_New();
-
-            if (current_opcode != OP_DELEGATECALL) {
-                evm_word_t* value = tracer_data.stacks[idx].stack_base + tracer_data.stacks[idx].stack_offset - 3;
-                arith.hex_string_from_cgbn_memory(hex_string_ptr, *value);
-                PyDict_SetItemString(call_item, "value", PyUnicode_FromString(hex_string_ptr));
-            } else {
-                PyDict_SetItemString(call_item, "value", PyUnicode_FromString("0x00"));
-            }
-
-            evm_word_t* address = tracer_data.stacks[idx].stack_base + tracer_data.stacks[idx].stack_offset - 2;
-
-            arith.hex_string_from_cgbn_memory(hex_string_ptr, *address, 5);
-
-            PyDict_SetItemString(call_item, "address", PyUnicode_FromString(hex_string_ptr));
-            PyDict_SetItemString(call_item, "pc", PyLong_FromSize_t(current_pc));
-
-            PyList_Append(calls, call_item);
-        }
-        // process revert
-        if (current_opcode == OP_REVERT || current_opcode == OP_INVALID) {
-            PyObject* revert_item = PyDict_New();
-            PyDict_SetItemString(revert_item, "address", PyUnicode_FromString("0x00"));
-            PyDict_SetItemString(revert_item, "pc", PyLong_FromSize_t(0));
-            PyDict_SetItemString(revert_item, "value", PyUnicode_FromString("0x00"));
-
-            PyList_Append(calls, revert_item);
-            Py_DECREF(revert_item);
-        }
-
-        if (current_opcode == OP_SSTORE) {
-            PyObject* storage_item = PyDict_New();
-            PyDict_SetItemString(storage_item, "address", PyUnicode_FromString(hex_string_ptr));
-            PyDict_SetItemString(storage_item, "pc", PyLong_FromSize_t(current_pc));
-
-            uint32_t stack_size = tracer_data.stacks[idx].stack_offset;
-            evm_word_t* value = tracer_data.stacks[idx].stack_base + stack_size - 2;
-            evm_word_t* key = tracer_data.stacks[idx].stack_base + stack_size - 1;
-
-            arith.hex_string_from_cgbn_memory(hex_string_ptr, *key);
-            PyDict_SetItemString(storage_item, "key", PyUnicode_FromString(hex_string_ptr));
-
-            arith.hex_string_from_cgbn_memory(hex_string_ptr, *value);
-            PyDict_SetItemString(storage_item, "value", PyUnicode_FromString(hex_string_ptr));
-
-            PyList_Append(storage_write, storage_item);
-            Py_DECREF(storage_item);
-        }
+        PyDict_SetItemString(call_item, "pc", PyLong_FromSize_t(trace_data.calls[idx].pc));
+        PyDict_SetItemString(call_item, "op", PyLong_FromSize_t(trace_data.calls[idx].op));
+        PyDict_SetItemString(call_item, "value", PyUnicode_FromString(trace_data.calls[idx].value.to_hex()));
+        PyDict_SetItemString(call_item, "success", PyLong_FromSize_t(trace_data.calls[idx].success));
+        PyList_Append(calls, call_item);
+        Py_DECREF(call_item);
     }
 
-    PyDict_SetItemString(tracer_root, "traces", tracer_json);
-    PyDict_SetItemString(tracer_root, "branches", branches);
-    PyDict_SetItemString(tracer_root, "bugs", bugs);
-    PyDict_SetItemString(tracer_root, "calls", calls);
-    PyDict_SetItemString(tracer_root, "storage_write", storage_write);
+    for (size_t idx = 0; idx < trace_data.no_events; idx++) {
+        PyObject* event_item = PyDict_New();
+        PyDict_SetItemString(event_item, "pc", PyLong_FromSize_t(trace_data.events[idx].pc));
+        PyDict_SetItemString(event_item, "op", PyLong_FromSize_t(trace_data.events[idx].op));
+        PyDict_SetItemString(event_item, "operand_1", PyUnicode_FromString(trace_data.events[idx].operand_1.to_hex()));
+        PyDict_SetItemString(event_item, "operand_2", PyUnicode_FromString(trace_data.events[idx].operand_2.to_hex()));
+        PyDict_SetItemString(event_item, "res", PyUnicode_FromString(trace_data.events[idx].res.to_hex()));
+        PyList_Append(events, event_item);
+        Py_DECREF(event_item);
+    }
 
-    delete[] hex_string_ptr;
+    for (size_t idx = 0; idx < trace_data.no_branches; idx++) {
+        PyObject* branch_item = PyDict_New();
+        PyDict_SetItemString(branch_item, "pc_src", PyLong_FromSize_t(trace_data.branches[idx].pc_src));
+        PyDict_SetItemString(branch_item, "pc_dst", PyLong_FromSize_t(trace_data.branches[idx].pc_dst));
+        PyDict_SetItemString(branch_item, "pc_missed", PyLong_FromSize_t(trace_data.branches[idx].pc_missed));
+        PyDict_SetItemString(branch_item, "distance", PyUnicode_FromString(trace_data.branches[idx].distance.to_hex()));
+        PyList_Append(branches, branch_item);
+        Py_DECREF(branch_item);
+    }
+
+    PyDict_SetItemString(tracer_root, "events", events);
+    PyDict_SetItemString(tracer_root, "branches", branches);
+    PyDict_SetItemString(tracer_root, "calls", calls);
+
     return tracer_root;
 }
-*/
 
 PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* serialized_worldstate_instance) {
     PyObject* state_dict = PyDict_New();
@@ -598,22 +467,14 @@ PyObject* pyobject_from_evm_instances(CuEVM::evm_instance_t* instances, uint32_t
 
         // TODO: Print resultant state. to check with state_root branch
         PyObject* state_json = pyobject_from_serialized_state(serialized_worldstate);  // PyList_New(0);
-        printf("state json result\n");
-        print_dict_recursive(state_json, 0);
+
         PyDict_SetItemString(instance_json, "state", state_json);
-
-        // #ifdef EIP_3155
-        //         PyObject* tracer_json = pyobject_from_tracer_data_t(arith, instances.tracers_data[idx]);
-        //         PyDict_SetItemString(instance_json, "traces", tracer_json);
-        //         Py_DECREF(tracer_json);
-        // #endif
-
-        // PyDict_SetItemString(instance_json, "error", PyLong_FromLong(instances[idx].status));
-        // PyDict_SetItemString(instance_json, "success",
-        //                      PyBool_FromLong((instances[idx].status == CuEVM::ERR_NONE) ||
-        //                                      (instances[idx].status == CuEVM::ERR_RETURN) ||
-        //                                      (instances[idx].status == CuEVM::ERR_SUCCESS)));
-
+        PyObject* tracer_json = pyobject_from_simplified_trace(*instances[idx].simplified_trace_data_ptr);
+        PyDict_SetItemString(instance_json, "trace", tracer_json);
+        // printf("state json result\n");
+        // print_dict_recursive(state_json, 0);
+        // printf("tracer json result\n");
+        // print_dict_recursive(tracer_json, 0);
         PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
     }
 
