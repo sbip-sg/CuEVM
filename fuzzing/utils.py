@@ -36,9 +36,30 @@ arith_ops = [OPADD, OPMUL, OPSUB, OPEXP]
 class EVMCall:
     pc: int
     opcode: int
-    to: str
+    _from: str
+    _to: str
     value: int
-    revert: bool
+    result: bool
+@dataclass 
+class EVMStorageWrite:
+    pc: int
+    key: int
+    value: int
+
+@dataclass
+class EVMBranch:
+    pc_src: int
+    pc_dst: int
+    pc_missed: int
+    distance: int
+
+@dataclass
+class TraceEvent:
+    pc: int
+    opcode: int
+    operand_1: int
+    operand_2: int
+    result: int
 
 @dataclass 
 class EVMBug:
@@ -164,7 +185,6 @@ def compile_file(
     # The input can be a file path or source code
     parser = CombinedJsonParser(file_path, try_install_solc=True)
     compiler_output = parser.original_compilation_output
-    # print (compiler_output)
     compiled_sol = {k.split(":")[-1]: v for k, v in compiler_output.items()}
 
     m_contracts = decode_abi_bin_from_compiled_json(compiled_sol)

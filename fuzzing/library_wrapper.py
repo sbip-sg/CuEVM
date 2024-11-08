@@ -7,6 +7,7 @@ import ctypes
 import json
 import copy
 from pprint import pprint
+import time
 from utils import *
 
 # Add the directory containing your .so file to the Python path
@@ -41,6 +42,10 @@ class CuEVMLib:
         trace_values = json_result
         # print ("trace value result")
         # pprint(json_result)
+
+        if trace_values is None or trace_values.get("post") is None:
+            print("Skipping updating state")
+            return
         for i in range(len(trace_values.get("post"))):
             post_state = trace_values.get("post")[i].get("state")
             # print("\n\n post_state %d \n\n" % i)
@@ -67,86 +72,96 @@ class CuEVMLib:
     ## 1. run transactions on the EVM instances
     ## 2. update the persistent state of the EVM instances
     ## 3. return the simplified trace during execution
-    def run_transactions(self, tx_data):
+    def run_transactions(self, tx_data, skip_trace_parsing=False, measure_performance=False):
         self.build_instance_data(tx_data)
         # self.print_instance_data()
         # print ("before running")
-
-        result_state = libcuevm.run_dict(self.instances)
+        if measure_performance:
+            time_start = time.time()
+        result_state = libcuevm.run_dict(self.instances, skip_trace_parsing)
+        if measure_performance:
+            time_end = time.time()
+            print(f"Time taken: {time_end - time_start} seconds")
         self.update_persistent_state(result_state)
         return self.post_process_trace(result_state)
 
     # post process the trace to detect integer bugs and simplify the distance
     def post_process_trace(self, json_result):
+        if json_result is None or json_result.get("post") is None:
+            print("Skipping post processing")
+            return []
         final_trace = []
         # print("\ntrace\n")
         # pprint(trace)
         for i in range(len(json_result.get("post"))):
             tx_trace = json_result.get("post")[i].get("trace")
-            print("tx trace")
-            pprint(tx_trace)
+            # print("tx trace")
+            # pprint(tx_trace)
             branches = []
             events = []
             storage_write = []
             bugs = []
             for branch in tx_trace.get("branches", [])[3:]:
                 branches.append(
-                    {
-                        "pc_src": branch.get("pc_src"),
-                        "pc_dst": branch.get("pc_dst"),
-                        "pc_missed": branch.get("pc_missed"),
-                        "distance": int(branch.get("distance"), 16),
-                    }
+                    EVMBranch(
+                        pc_src=branch.get("pc_src"),
+                        pc_dst=branch.get("pc_dst"),
+                        pc_missed=branch.get("pc_missed"),
+                        distance=int(branch.get("distance"), 16),
+                    )
                 )
+                
             for event in tx_trace.get("events", []):
                 if event.get("opcode") == OP_SSTORE:
                     storage_write.append(
-                        {
-                            "pc": event.get("pc"),
-                            "key": event.get("operand_1"),
-                            "value": event.get("operand_2"),
-                        }
+                        EVMStorageWrite(
+                            pc=event.get("pc"),
+                            key=event.get("operand_1"),
+                            value=event.get("operand_2"),
+                        )
                     )
                 else:
                     events.append(
-                        {
-                            "pc": event.get("pc"),
-                            "opcode": event.get("opcode"),
-                            "operand_1": int(event.get("operand_1"), 16),
-                            "operand_2": int(event.get("operand_2"), 16),
-                            "result": int(event.get("res"), 16),
-                        }
+                        TraceEvent(
+                            pc=event.get("pc"),
+                            opcode=event.get("op"),
+                            operand_1=int(event.get("operand_1"), 16),
+                            operand_2=int(event.get("operand_2"), 16),
+                            result=int(event.get("res"), 16),
+                        )
                     )
                     if self.detect_bug:
-                        opcode = event.get("opcode")
-                        if (opcode == OPADD and event.get("operand_1") + event.get("operand_2") > 2**256):
-                            bugs.append(EVMBug(event.get("pc"), opcode, "integer overflow"))
-                        elif (opcode == OPMUL and event.get("operand_1") * event.get("operand_2") > 2**256):
-                            bugs.append(EVMBug(event.get("pc"), opcode, "integer overflow"))
-                        elif (opcode == OPSUB and event.get("operand_1") < event.get("operand_2")):
-                            bugs.append(EVMBug(event.get("pc"), opcode, "integer underflow"))
-                        elif (opcode == OPEXP and event.get("operand_1") ** event.get("operand_2") > 2**256):
-                            bugs.append(EVMBug(event.get("pc"), opcode, "integer overflow"))
-                        elif opcode == OP_SELFDESTRUCT:
-                            bugs.append(EVMBug(event.get("pc"), opcode, "selfdestruct"))
+                        current_event = events[-1]
+                        if (current_event.opcode == OPADD and current_event.operand_1 + current_event.operand_2 >= 2**256):
+                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
+                        elif (current_event.opcode == OPMUL and current_event.operand_1 * current_event.operand_2 >= 2**256):
+                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
+                        elif (current_event.opcode == OPSUB and current_event.operand_1 < current_event.operand_2):
+                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer underflow"))
+                        elif (current_event.opcode == OPEXP and current_event.operand_1 ** current_event.operand_2 >= 2**256):
+                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
+                        elif current_event.opcode == OP_SELFDESTRUCT:
+                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "selfdestruct"))
 
             all_call = []
             for call in tx_trace.get("calls", []):
                 all_call.append(
-                    {
-                        "pc": call.get("pc"),
-                        "opcode": call.get("opcode"),
-                        "to": call.get("to"),
-                        "value": int(call.get("value"), 16),
-                    }
+                    EVMCall(
+                        pc=call.get("pc"),
+                        opcode=call.get("op"),
+                        _from=call.get("sender"),
+                        _to=call.get("receiver"),
+                        value=int(call.get("value"), 16),
+                        result=call.get("success")
+                    )
                 )
                 if self.detect_bug:
-                    if all_call[-1].get("value") > 0:
+                    if all_call[-1].value > 0 and all_call[-1].pc != 0:
                         bugs.append(
                             EVMBug(
-                                all_call[-1].get("pc"),
-                                all_call[-1].get("opcode"),
-                                "Unauthorized call",
+                                pc=all_call[-1].pc,
+                                opcode=all_call[-1].opcode,
+                                bug_type="Leaking Ether",
                             )
                         )
 
@@ -174,7 +189,7 @@ class CuEVMLib:
         contract_bin_runtime=None,
     ):
         default_config = json.loads(open("configurations/default.json").read())
-        print(default_config)
+        # print(default_config)
         self.detect_bug = detect_bug
         # tx_sequence_list
         tx_sequence_config = json.loads(open(config).read())
@@ -193,23 +208,29 @@ class CuEVMLib:
             contract_bin_runtime = self.contract_instance.get("binary_runtime")
         # the merged config fields : "env", "pre" (populated with code), "transaction" (populated with tx data and value)
         pre_env = tx_sequence_config.get("pre", {})
-
+        
         new_test = {}
         new_test["env"] = default_config["env"].copy()
         new_test["pre"] = default_config["pre"].copy()
+        
+        
+        new_test["pre"].update(pre_env)
+
         target_address = default_config["target_address"]
+
         new_test["pre"][target_address]["code"] = contract_bin_runtime
+
         new_test["pre"][target_address]["storage"] = tx_sequence_config.get(
             "storage", {}
         )
-        new_test["pre"].update(pre_env)
+
         new_test["transaction"] = default_config["transaction"].copy()
 
         new_test["transaction"]["to"] = target_address
         new_test["transaction"]["data"] = ["0x00"]
         new_test["transaction"]["value"] = [0]
         new_test["transaction"]["nonce"] = "0x00"
-        # print (f"new_test {new_test}")
+    
         self.instances = [copy.deepcopy(new_test) for _ in range(num_instances)]
 
     def print_instance_data(self):
@@ -383,12 +404,41 @@ def test_system_operation():
     print("\n\n trace res \n\n")
     pprint(trace_res)
 
+def test_bugs_simple():
+    my_lib = CuEVMLib(
+        "contracts/test_bugs_simple.sol",
+        5000,
+        "configurations/default.json",
+        contract_name="TestBug",
+        detect_bug=True,
+    )
+    test_case = {
+        "function": "bug_combined",
+        "type": "exec",
+        "input_types": [],
+        "input": [],
+        "sender": 0,
+        
+    }
+    # print("instance data")
+    # pprint(my_lib.instances)
+
+    tx_1 = {
+        "data": get_transaction_data_from_config(test_case, my_lib.contract_instance),
+        "value": [hex(0)],
+    }
+
+    trace_res = my_lib.run_transactions([tx_1], measure_performance=True, skip_trace_parsing=True)
+    print("\n\n trace res \n\n")
+    if trace_res is not None and len(trace_res) > 0:
+        pprint(trace_res[0])
 
 def test_cross_contract():
     my_lib = CuEVMLib(
         "contracts/cross_contract.sol",
         1,
         "configurations/cross_contract.json",
+        detect_bug=True,
     )
     test_case = {
         "function": "underflow",
@@ -415,4 +465,6 @@ def test_cross_contract():
 
 if __name__ == "__main__":
 
-    test_system_operation()
+    # test_system_operation()
+    # test_cross_contract()
+    test_bugs_simple()

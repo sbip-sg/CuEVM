@@ -66,11 +66,11 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
             transaction_ptr->get_message_call(arith, call_state_ptr->touch_state_ptr, transaction_call_message_ptr);
 
         shared_message_call_ptr->copy_from(transaction_call_message_ptr);
-        printf("evm_message_call_t copy_from other after memcpy\n ");
+        // printf("evm_message_call_t copy_from other after memcpy\n ");
         // #ifdef __CUDA_ARCH__
         //         printf("message call copied %d\n", threadIdx.x);
         // #endif
-        shared_message_call_ptr->print();
+        // shared_message_call_ptr->print();
 
         CuEVM::evm_call_state_t *child_call_state_ptr = new CuEVM::evm_call_state_t(
             arith, call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr, shared_stack_ptr);
@@ -349,13 +349,13 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
 
 #endif
 
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-               THREADIDX);
-        __ONE_GPU_THREAD_WOSYNC_END__
+        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
+        //        THREADIDX);
+        // __ONE_GPU_THREAD_WOSYNC_END__
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
-        if ((opcode <= OP_EQ || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
+        if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
             simplified_trace_data_ptr->start_operation(cached_call_state.pc, opcode, *cached_call_state.stack_ptr);
         }
         if (opcode == OP_JUMPI) pc_src = cached_call_state.pc;
@@ -792,7 +792,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         }
 #endif
 #ifdef BUILD_LIBRARY
-        if ((opcode <= OP_EQ || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
+        if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
             simplified_trace_data_ptr->finish_operation(*cached_call_state.stack_ptr, error_code);
         }
 #endif
@@ -964,7 +964,7 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
 
     this->world_state.update(arith, call_state_ptr->touch_state_ptr->get_state());
     this->world_state.serialize_data(arith, serialized_worldstate_data_ptr);
-    printf("updated final world state\n");
+    // printf("updated final world state\n");
 
     return status;
 }
@@ -980,7 +980,7 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     // if the child call return from normal halting
     // no errors
     // #ifdef EIP_3155
-    printf(" finish_CALL error_code: %d %d\n", error_code, THREADIDX);
+    // printf(" finish_CALL error_code: %d %d\n", error_code, THREADIDX);
     // #endif
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {

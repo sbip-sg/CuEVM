@@ -31,7 +31,8 @@ __host__ __device__ void simplified_trace_data::record_branch(uint32_t pc_src, u
     branches[no_branches].pc_dst = pc_dst;
     branches[no_branches].pc_missed = pc_missed;
     branches[no_branches].distance = last_distance;
-    printf("record branch pc_src %u pc_dst %u distance %s\n", pc_src, pc_dst, branches[no_branches].distance.to_hex());
+    // printf("record branch pc_src %u pc_dst %u distance %s\n", pc_src, pc_dst,
+    // branches[no_branches].distance.to_hex());
     no_branches++;
 }
 
@@ -64,7 +65,7 @@ __host__ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_mess
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
-    printf("start call simplified trace data pc %d op %d\n", pc, message_call_ptr->call_type);
+    // printf("start call simplified trace data pc %d op %d\n", pc, message_call_ptr->call_type);
     calls[no_calls].sender = message_call_ptr->sender;
     calls[no_calls].receiver = message_call_ptr->recipient;
     calls[no_calls].pc = pc;
@@ -78,7 +79,7 @@ __host__ __device__ void simplified_trace_data::finish_call(uint8_t success) {
     if (no_calls > MAX_CALLS_TRACING) return;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
 
-    printf("no_calls %u \n", no_calls);
+    // printf("no_calls %u \n", no_calls);
     for (int i = no_calls - 1; i >= 0; i--) {
         if (calls[i].success == UINT8_MAX) {
             calls[i].success = success;

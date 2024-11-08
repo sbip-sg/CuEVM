@@ -77,9 +77,10 @@ class DetectedBug:
 class Fuzzer:
 
     def __init__(self, contract_source, num_instances=2, timeout=10, \
-                 config="configurations/default.json", contract_name=None, output=None, test_case_file = None, random_seed = 0) -> None:
+                 config="configurations/default.json", contract_name=None, output=None, test_case_file = None, random_seed = 0, branch_heuristic=False) -> None:
         random.seed(random_seed)
         self.library = CuEVMLib(contract_source, num_instances, config, contract_name=contract_name, detect_bug=True)
+        self.branch_heuristic = branch_heuristic
         self.num_instances = num_instances
         self.ast_parser = self.library.ast_parser
         self.contract_name = self.library.contract_name
@@ -103,7 +104,9 @@ class Fuzzer:
         self.population = {} # store the population for each branch
         self.detected_bugs = {}
         self.raw_inputs = []
+        self.branch_source_mapping = {}
         self.run_seed_round()
+
 
 
     def prepare_abi(self, abi):
@@ -125,34 +128,73 @@ class Fuzzer:
 
         print ("after processing")
         print (self.abi_list)
-
+    def get_branch_source_mapping(self, branch, branch_id):
+        if not self.branch_heuristic:
+            return
+        try:
+            frag = self.library.ast_parser.source_by_pc(self.contract_name, branch.pc_src, deploy=False)
+            print(f"find source code: {branch_id} { frag.get('fragment')}")
+            lines = frag.get("linenums",[0,0])
+            print(f"lines: {lines}")
+            if lines[1]<= lines[0]+1:
+                self.branch_source_mapping[branch_id] = frag.get('fragment')
+                return True
+            else:
+                self.branch_source_mapping[branch_id] = "NA"
+        except:
+            self.branch_source_mapping[branch_id] = "NA"
+        return False
+        
     def process_tx_trace(self, tx_trace):
         # print (self.raw_inputs)
-
+        # class EVMBranch:
+        #     pc_src: int
+        #     pc_dst: int
+        #     pc_missed: int
+        #     distance: int
         for idx,trace in enumerate(tx_trace):
-            for branch in trace.get("missed_branches", []):
-                # print ("missed branch ", branch)
-                if branch[0] not in self.covered_branches:
-                    self.missed_branches.add(branch[0])
-                if branch[0] in self.population:
-                    if self.population[branch[0]].distance > branch[1]:
-                        self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), branch[1])
+            for branch in trace.get("branches", []):
+                covered_branch = f"{branch.pc_src},{branch.pc_dst}"
+                if covered_branch not in self.covered_branches:
+                    self.covered_branches.add(covered_branch)
+                    if covered_branch not in self.population:
+                        self.population[covered_branch] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), 0)
+                missed_branch = f"{branch.pc_src},{branch.pc_missed}"
+                if missed_branch not in self.branch_source_mapping:
+                    self.get_branch_source_mapping(branch, missed_branch)
+                if self.branch_heuristic and self.branch_source_mapping[missed_branch] == "NA":
+                    continue
+                if missed_branch not in self.covered_branches:
+                    self.missed_branches.add(missed_branch)
+                if missed_branch in self.population:
+                    if self.population[missed_branch].distance > branch.distance:
+                        self.population[missed_branch] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), branch.distance)
                 else:
-                    self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), branch[1])
-            for branch in trace.get("covered_branches", []):
-                # print ("covered branch ", branch)
-                self.covered_branches.add(branch[0])
-                if branch[0] not in self.population:
-                    self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), 0)
-                elif self.population[branch[0]].distance != 0 :
-                    self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), 0)
-                if branch[0] in self.missed_branches:
-                    self.missed_branches.remove(branch[0])
+                    self.population[missed_branch] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), branch.distance)
+                
+            # for branch in trace.get("missed_branches", []):
+            #     # print ("missed branch ", branch)
+            #     if branch[0] not in self.covered_branches:
+            #         self.missed_branches.add(branch[0])
+            #     if branch[0] in self.population:
+            #         if self.population[branch[0]].distance > branch[1]:
+            #             self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), branch[1])
+            #     else:
+            #         self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), branch[1])
+            # for branch in trace.get("covered_branches", []):
+            #     # print ("covered branch ", branch)
+            #     self.covered_branches.add(branch[0])
+            #     if branch[0] not in self.population:
+            #         self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), 0)
+            #     elif self.population[branch[0]].distance != 0 :
+            #         self.population[branch[0]] = Seed(self.raw_inputs[idx].get("function"), self.raw_inputs[idx].get("inputs"), 0)
+            #     if branch[0] in self.missed_branches:
+            #         self.missed_branches.remove(branch[0])
 
             for bug in trace.get("bugs", []):
-                bug_id = str(bug[0]) + "_" + str(bug[1])
+                bug_id = str(bug.pc) + "_" + str(bug.bug_type)
                 if bug_id not in self.detected_bugs:
-                    self.detected_bugs[bug_id] = DetectedBug(bug[0], bug[1], self.raw_inputs[idx],[])
+                    self.detected_bugs[bug_id] = DetectedBug(bug.pc, bug.bug_type, self.raw_inputs[idx],[])
 
 
     def print_population(self):
@@ -161,7 +203,9 @@ class Fuzzer:
             print("\n\n ==========")
             print(f"Branch {k} : ")
             pprint(v)
-
+            if k in self.branch_source_mapping:
+                print(f"Source code: {self.branch_source_mapping[k]}")
+        print("Missed branches: ", self.missed_branches)
     def mutate(self, inputs, function, generate_random=False):
         if (generate_random):
             return [self.fuzzer.generate_random_input(input_) for input_ in self.abi_list[function].get("input_types")]
@@ -270,6 +314,8 @@ class Fuzzer:
 
         print ("\n\n Final Population \n\n")
         self.print_population()
+        
+
 
     def finalize_report(self):
         for k_, bug in self.detected_bugs.items():
@@ -323,8 +369,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--random_seed", default=0, help="random seed"
     )
+    parser.add_argument(
+        "--branch_heuristic", action="store_true", help="branch heuristic"
+    )
     args = parser.parse_args()
     fuzzer = Fuzzer(args.input, int(args.num_instances), args.timeout, args.config,  contract_name= args.contract_name
-                   , output=args.output, test_case_file=args.test_case, random_seed= int(args.random_seed))
+                   , output=args.output, test_case_file=args.test_case, random_seed= int(args.random_seed), branch_heuristic=args.branch_heuristic)
     fuzzer.run(num_iterations=int(args.num_iterations))
     fuzzer.finalize_report()

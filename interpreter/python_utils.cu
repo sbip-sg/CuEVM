@@ -360,8 +360,8 @@ void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyOb
         memcpy(evm_instances[index].simplified_trace_data_ptr, simplified_trace_data,
                sizeof(CuEVM::utils::simplified_trace_data));
         delete simplified_trace_data;
-        printf("size of serialized worldstate data %u\n", sizeof(CuEVM::serialized_worldstate_data));
-        printf("size of simplified trace data %u\n", sizeof(CuEVM::utils::simplified_trace_data));
+        // printf("size of serialized worldstate data %u\n", sizeof(CuEVM::serialized_worldstate_data));
+        // printf("size of simplified trace data %u\n", sizeof(CuEVM::utils::simplified_trace_data));
     }
 
     num_instances = num_transactions;
@@ -373,12 +373,14 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::utils::simplified_trace_d
     PyObject* branches = PyList_New(0);
     PyObject* events = PyList_New(0);
     PyObject* calls = PyList_New(0);
-
+    char hex_string[43];
     // process call
     for (size_t idx = 0; idx < trace_data.no_calls; idx++) {
         PyObject* call_item = PyDict_New();
-        PyDict_SetItemString(call_item, "sender", PyUnicode_FromString(trace_data.calls[idx].sender.to_hex()));
-        PyDict_SetItemString(call_item, "receiver", PyUnicode_FromString(trace_data.calls[idx].receiver.to_hex()));
+        PyDict_SetItemString(call_item, "sender",
+                             PyUnicode_FromString(trace_data.calls[idx].sender.address_to_hex(hex_string)));
+        PyDict_SetItemString(call_item, "receiver",
+                             PyUnicode_FromString(trace_data.calls[idx].receiver.address_to_hex(hex_string)));
 
         PyDict_SetItemString(call_item, "pc", PyLong_FromSize_t(trace_data.calls[idx].pc));
         PyDict_SetItemString(call_item, "op", PyLong_FromSize_t(trace_data.calls[idx].op));

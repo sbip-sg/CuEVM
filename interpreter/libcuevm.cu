@@ -57,32 +57,32 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
     // evm = nullptr;
 }
 
-PyObject* run_interpreter_pyobject(PyObject* read_roots) {
+PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_parsing) {
     CuEVM::evm_instance_t* instances_data;
     CuEVM::ArithEnv arith(cgbn_no_checks, 0);
-    printf("Running the interpreter\n");
+    // printf("Running the interpreter\n");
 #ifndef GPU
     printf("CPU libcuevm is not supported at the moment\n");
     return NULL;
 #endif
     CUDA_CHECK(cudaSetDevice(0));
     CUDA_CHECK(cudaDeviceReset());
-    printf("Running on GPU\n");
-    cgbn_error_report_t* report;
-    CUDA_CHECK(cgbn_error_report_alloc(&report));
+    // printf("Running on GPU\n");
+    cgbn_error_report_t* report = nullptr;
+    // CUDA_CHECK(cgbn_error_report_alloc(&report));
     cudaEvent_t start, stop;
     float milliseconds = 0;
 
     size_t size_value;
     cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    printf("current stack size %zu\n", size_value);
+    // printf("current stack size %zu\n", size_value);
     cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    printf("current heap size %zu\n", size_value);
+    // printf("current heap size %zu\n", size_value);
     size_t heap_size = (size_t(500) << 20);  // 500MB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 2 * 1024));
     cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    printf("current stack size %zu\n", size_value);
+    // printf("current stack size %zu\n", size_value);
     CUDA_CHECK(cudaDeviceSynchronize());
     // CUDA_CHECK(cudaEventCreate(&start));
     // CUDA_CHECK(cudaEventCreate(&stop));
@@ -106,13 +106,26 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots) {
     python_utils::get_evm_instances_from_PyObject(instances_data, read_roots, num_instances);
     // printf("print simplified trace data host\n");
     // instances_data[0].simplified_trace_data_ptr->print();
-    printf("Running on GPU %d %d\n", num_instances, CuEVM::cgbn_tpi);
+    printf("Running %d instances on GPU\n", num_instances);
     // run the evm
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
+
     kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
-    CUDA_CHECK(cudaDeviceSynchronize());
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Kernel execution time: %f milliseconds\n", milliseconds);
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    // CUDA_CHECK(cudaDeviceSynchronize());
+
     CUDA_CHECK(cudaGetLastError());
-    printf("GPU kernel finished\n");
-    CGBN_CHECK(report);
+    // printf("GPU kernel finished\n");
+    // CGBN_CHECK(report);
 
     // printf("\n\ntesting world state printing on host\n\n");
     // instances_data[0].serialized_worldstate_data_ptr->print();
@@ -121,25 +134,33 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots) {
     //     printf("\n\ninstance %d\n", i);
     //     instances_data[i].simplified_trace_data_ptr->print();
     // }
-    PyObject* write_root = python_utils::pyobject_from_evm_instances(instances_data, num_instances);
+    PyObject* write_root;
+    if (!skip_trace_parsing) {
+        write_root = python_utils::pyobject_from_evm_instances(instances_data, num_instances);
+    } else {
+        write_root = PyDict_New();
+    }
 
     CuEVM::free_evm_instances(instances_data, num_instances, managed);
 
     CUDA_CHECK(cgbn_error_report_free(report));
     CUDA_CHECK(cudaDeviceReset());
     return write_root;
-    // Py_RETURN_NONE;
 }
 
 static PyObject* run_dict(PyObject* self, PyObject* args) {
     PyObject* read_root;
-
+    uint32_t skip_trace_parsing = 0;
     // Parse the input PyObject* to get the Python object (dictionary)
-    if (!PyArg_ParseTuple(args, "O", &read_root)) {
+    // if (!PyArg_ParseTuple(args, "O", &read_root)) {
+    //     return NULL;  // If parsing fails, return NULL
+    // }
+    // Parse the input PyObject* to get the Python object (dictionary) and optionally the boolean flag
+    if (!PyArg_ParseTuple(args, "O|i", &read_root, &skip_trace_parsing)) {
         return NULL;  // If parsing fails, return NULL
     }
 
-    PyObject* write_root = run_interpreter_pyobject(read_root);
+    PyObject* write_root = run_interpreter_pyobject(read_root, skip_trace_parsing);
     // Return the resulting PyObject* (no need for manual memory management on Python side)
     return write_root;
 }
