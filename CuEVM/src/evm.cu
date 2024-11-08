@@ -29,15 +29,14 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
 #endif
 
                                  ,
-                                 CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr
-
-                                 )
+                                 CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr,
+                                 CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr)
     : world_state(world_state_data_ptr),
       block_info_ptr(block_info_ptr),
       transaction_ptr(transaction_ptr),
 
       serialized_worldstate_data_ptr(serialized_worldstate_data_ptr),
-
+      simplified_trace_data_ptr(simplified_trace_data_ptr),
       ecc_constants_ptr(ecc_constants_ptr) {
     // TODO: store in local/shared memory
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
@@ -67,11 +66,11 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
             transaction_ptr->get_message_call(arith, call_state_ptr->touch_state_ptr, transaction_call_message_ptr);
 
         shared_message_call_ptr->copy_from(transaction_call_message_ptr);
-        printf("evm_message_call_t copy_from other after memcpy\n ");
+        // printf("evm_message_call_t copy_from other after memcpy\n ");
         // #ifdef __CUDA_ARCH__
         //         printf("message call copied %d\n", threadIdx.x);
         // #endif
-        shared_message_call_ptr->print();
+        // shared_message_call_ptr->print();
 
         CuEVM::evm_call_state_t *child_call_state_ptr = new CuEVM::evm_call_state_t(
             arith, call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr, shared_stack_ptr);
@@ -106,9 +105,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_ins
             evm_instance.tracer_ptr
 #endif
             ,
-            evm_instance.serialized_worldstate_data_ptr
-
-      ) {
+            evm_instance.serialized_worldstate_data_ptr, evm_instance.simplified_trace_data_ptr) {
 }
 
 __host__ __device__ evm_t::~evm_t() {
@@ -305,11 +302,20 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
     if (status != ERROR_SUCCESS) {
         return;  // finish transaction
     }
+#ifdef BUILD_LIBRARY
+    simplified_trace_data_ptr->start_call(0, call_state_ptr->message_ptr);
+#endif
     int32_t error_code = start_CALL(arith, cached_call_state);
     if (error_code != ERROR_SUCCESS) {
+#ifdef BUILD_LIBRARY
+        simplified_trace_data_ptr->finish_call(0);
+#endif
         return;  // finish call
     }
     uint8_t opcode;
+#ifdef BUILD_LIBRARY
+    uint32_t pc_src;
+#endif
     CuEVM::evm_call_state_t *child_call_state_ptr = nullptr;
     while (true) {
         // uint32_t current_pc = call_state_ptr->pc;  // TODO: store in local/shared memory
@@ -342,10 +348,18 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         // __ONE_GPU_THREAD_WOSYNC_END__
 
 #endif
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-               THREADIDX);
-        __ONE_GPU_THREAD_WOSYNC_END__
+
+        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
+        //        THREADIDX);
+        // __ONE_GPU_THREAD_WOSYNC_END__
+#ifdef BUILD_LIBRARY
+        // comparison, arithmetic, revert/invalid
+        if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
+            simplified_trace_data_ptr->start_operation(cached_call_state.pc, opcode, *cached_call_state.stack_ptr);
+        }
+        if (opcode == OP_JUMPI) pc_src = cached_call_state.pc;
+#endif
         // DEBUG PRINT
 
         // __ONE_THREAD_PER_INSTANCE(printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
@@ -414,22 +428,37 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                         arith, cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr);
                     break;
                 case OP_LT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::LT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        *cached_call_state.stack_ptr);
                     break;
                 case OP_GT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::GT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        *cached_call_state.stack_ptr);
                     break;
                 case OP_SLT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::SLT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         *cached_call_state.stack_ptr);
                     break;
                 case OP_SGT:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::SGT(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         *cached_call_state.stack_ptr);
                     break;
                 case OP_EQ:
+#ifdef BUILD_LIBRARY
+                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+#endif
                     error_code = CuEVM::operations::EQ(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        *cached_call_state.stack_ptr);
                     break;
@@ -633,9 +662,16 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                                                          *call_state_ptr->message_ptr);
                     break;
                 case OP_JUMPI:
+
                     error_code = CuEVM::operations::JUMPI(arith, cached_call_state.gas_limit,
                                                           cached_call_state.gas_used, cached_call_state.pc,
-                                                          *cached_call_state.stack_ptr, *call_state_ptr->message_ptr);
+                                                          *cached_call_state.stack_ptr, *call_state_ptr->message_ptr
+#ifdef BUILD_LIBRARY
+                                                          ,
+                                                          simplified_trace_data_ptr
+#endif
+                    );
+
                     break;
 
                 case OP_PC:
@@ -755,6 +791,11 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
             );
         }
 #endif
+#ifdef BUILD_LIBRARY
+        if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
+            simplified_trace_data_ptr->finish_operation(*cached_call_state.stack_ptr, error_code);
+        }
+#endif
         // #ifdef __CUDA_ARCH__
         //         printf("after finish_operation idx %d opcode %d error code %d\n", threadIdx.x, opcode, error_code);
         // #endif
@@ -768,6 +809,9 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                 call_state_ptr = child_call_state_ptr;
                 cached_call_state = cached_evm_call_state(arith, call_state_ptr);
                 error_code = start_CALL(arith, cached_call_state);
+#ifdef BUILD_LIBRARY
+                simplified_trace_data_ptr->start_call(call_state_ptr->parent->pc, call_state_ptr->message_ptr);
+#endif
             } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                 // Logic: when op_create or create2 does not succeed,
                 // there is no start_CALL but do not revert parent contract:
@@ -920,7 +964,7 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
 
     this->world_state.update(arith, call_state_ptr->touch_state_ptr->get_state());
     this->world_state.serialize_data(arith, serialized_worldstate_data_ptr);
-    printf("updated final world state\n");
+    // printf("updated final world state\n");
 
     return status;
 }
@@ -935,9 +979,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     // #endif
     // if the child call return from normal halting
     // no errors
-#ifdef EIP_3155
-    printf(" finish_CALL error_code: %d\n", error_code);
-#endif
+    // #ifdef EIP_3155
+    // printf(" finish_CALL error_code: %d %d\n", error_code, THREADIDX);
+    // #endif
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
@@ -965,6 +1009,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
             }
         }
     }
+#ifdef BUILD_LIBRARY
+    simplified_trace_data_ptr->finish_call((error_code == ERROR_RETURN));
+#endif
     // printf("end finish_CALL before set warm account %d idx %d\n", error_code, THREADIDX);
     // #ifdef __CUDA_ARCH__
     //     printf("evm_t::finish_CALL %d before setting warm accounts error_code: %d\n", threadIdx.x, error_code);
@@ -1169,6 +1216,13 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
             memcpy(evm_instances[index].serialized_worldstate_data_ptr, serialized_worldstate_data,
                    sizeof(CuEVM::serialized_worldstate_data));
             delete serialized_worldstate_data;
+
+            CuEVM::utils::simplified_trace_data *simplified_trace_data = new CuEVM::utils::simplified_trace_data();
+            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].simplified_trace_data_ptr,
+                                         sizeof(CuEVM::utils::simplified_trace_data)));
+            memcpy(evm_instances[index].simplified_trace_data_ptr, simplified_trace_data,
+                   sizeof(CuEVM::utils::simplified_trace_data));
+            delete simplified_trace_data;
         }
     }
     num_instances = num_transactions;

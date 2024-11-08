@@ -32,9 +32,7 @@ CuEVM::evm_transaction_t* getTransactionDataFromListofPyObject(PyObject* read_ro
 CuEVM::state_t* getStateDataFromPyObject(PyObject* data);
 void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyObject* read_roots,
                                      uint32_t& num_instances);
-std::unordered_set<int> const interesting_opcodes = {
-    OP_ADD, OP_MUL, OP_SUB, OP_MOD,    OP_EXP,     OP_CALL,   OP_CALLCODE, OP_DELEGATECALL, OP_LT,    OP_GT,
-    OP_SLT, OP_SGT, OP_EQ,  OP_REVERT, OP_INVALID, OP_SSTORE, OP_JUMPI,    OP_SELFDESTRUCT, OP_ORIGIN};
+
 std::unordered_set<int> const bug_opcodes = {OP_ADD, OP_MUL, OP_SUB, OP_MOD, OP_EXP, OP_SELFDESTRUCT, OP_ORIGIN};
 std::unordered_set<int> const call_opcodes = {OP_CALL, OP_CALLCODE, OP_DELEGATECALL};  // ignore static call for now
 std::unordered_set<int> const comparison_opcodes = {OP_LT, OP_GT, OP_SLT, OP_SGT, OP_EQ};

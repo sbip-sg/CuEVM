@@ -94,7 +94,7 @@ struct EccConstants {
         for (int i = 0; i < 11; i++) {
             final_exp[i].from_hex(final_exp_const[i]);
         }
-        printf("EccConstants initialized\n");
+        // printf("EccConstants initialized\n");
     }
 };
 }  // namespace CuEVM

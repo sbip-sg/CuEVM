@@ -22,7 +22,9 @@ struct evm_instance_t {
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer*/
 #endif
+
     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
+    CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
 };
 struct evm_t {
     CuEVM::WorldState world_state;                   /**< The world state */
@@ -40,7 +42,7 @@ struct evm_t {
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer */
 #endif
     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
-
+    CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
     /**
      * @brief Construct a new evm_t object
      * Construct a new evm_t object
@@ -64,9 +66,8 @@ struct evm_t {
 #endif
 
                               ,
-                              CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr
-
-    );
+                              CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr,
+                              CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr);
 
     /**
      * @brief Construct a new evm_t object

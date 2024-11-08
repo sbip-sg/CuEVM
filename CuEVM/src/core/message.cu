@@ -63,7 +63,7 @@ __host__ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
     // this->params_data[7] = *return_data_size;
     cgbn_store(arith.env, &this->params_data[6], return_data_offset);
     cgbn_store(arith.env, &this->params_data[7], return_data_size);
-    this->params_data[2].print();
+    // this->params_data[2].print();
 
     this->depth = depth;
     this->call_type = call_type;
