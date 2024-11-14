@@ -84,8 +84,8 @@ The execution trace and output state will be printed to the stdout, you can use
 
 
 ## Demo of the functionality for testing transaction sequences
-Please refer to subfolder `samples/README.md` for testing and demo how to use this CuEVM.
 
+[Google Colab demo using free GPU](https://colab.research.google.com/drive/1W_3zKOJR2Jpv_6SoM0cmOFgVHP2b7rny?usp=sharing)
 
 ## Testing using ethtest
 
