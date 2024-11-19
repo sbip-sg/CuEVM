@@ -216,8 +216,8 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         // error_code |=
         //     current_state.touch_state.set_warm_account(arith,
         //     contract_address);
-        printf("generic_CREATE senderaddress ptr %p\n", sender_address_ptr);
-        sender_address_ptr->print();
+        // printf("generic_CREATE senderaddress ptr %p\n", sender_address_ptr);
+        // sender_address_ptr->print();
         CuEVM::account_t *sender_account = nullptr;
         current_state.touch_state_ptr->get_account(arith, sender_address_ptr, sender_account, ACCOUNT_NON_STORAGE_FLAG);
         // Do not get_account after this to reuse sender_account
@@ -287,7 +287,7 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
     } else
         cgbn_bitwise_mask_and(arith.env, cached_state.gas_used, cached_state.gas_used, 64);
 
-    printf("generic_CREATE error_code: %d\n", error_code);
+    // printf("generic_CREATE error_code: %d\n", error_code);
     return error_code;
 }
 

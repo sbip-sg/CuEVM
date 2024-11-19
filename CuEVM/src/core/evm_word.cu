@@ -71,7 +71,7 @@ __host__ __device__ int32_t evm_word_t::operator==(const uint32_t &value) const 
 
 __host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) {
 #ifdef __CUDA_ARCH__
-    // todo: make host function
+    // todo: make device function
 #else
     CuEVM::byte_array_t byte_array(hex_string, CuEVM::word_size, BIG_ENDIAN, CuEVM::PaddingDirection::LEFT_PADDING);
     return from_byte_array_t(byte_array);
@@ -190,6 +190,23 @@ __host__ __device__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty, u
     if (pretty) {
         CuEVM::utils::hex_string_without_leading_zeros(hex_string);
     }
+    return hex_string;
+}
+
+__host__ __device__ char *evm_word_t::address_to_hex(char *hex_string, uint32_t count) const {
+    if (hex_string == nullptr) {
+        hex_string = new char[count * 5 + 3];
+    }
+    hex_string[0] = '0';
+    hex_string[1] = 'x';
+    for (uint32_t idx = 3; idx < count; idx++) {
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8, (_limbs[count - 1 - idx] >> 24) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8 + 2, (_limbs[count - 1 - idx] >> 16) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8 + 4, (_limbs[count - 1 - idx] >> 8) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8 + 6, _limbs[count - 1 - idx] & 0xFF);
+    }
+    hex_string[43] = '\0';
+
     return hex_string;
 }
 

@@ -84,6 +84,8 @@ class TouchState {
         return *this;
     }
 
+    __host__ __device__ state_access_t *get_state() const { return _state; }
+
     /**
      * The getter for the account given by an address.
      * @param[in] arith The arithmetic environment.
@@ -292,6 +294,9 @@ class TouchState {
      * @return 0 if the touch state is updated, error otherwise.
      */
     __host__ __device__ int32_t update(ArithEnv &arith, TouchState *other);
+
+    // update the final state with the world state and combine storage
+    __host__ __device__ int32_t update_world_state(ArithEnv &arith);
 
     /**
      * Transfer the given value from one account to another.

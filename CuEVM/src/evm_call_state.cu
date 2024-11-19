@@ -42,8 +42,8 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     this->last_return_data_ptr = last_return_data_ptr;
 #ifdef EIP_3155
     this->trace_idx = 0;
-#endif
     printf("evm_call_state_t constructor no parent %d\n", THREADIDX);
+#endif
 }
 
 // /**
@@ -77,7 +77,7 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
                                                        evm_word_t* shared_stack_ptr)
 // : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
 {
-    printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
+    // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
     __SHARED_MEMORY__ CuEVM::TouchState* touch_state_ptr;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     touch_state_ptr = new CuEVM::TouchState(new CuEVM::state_access_t(), parent->touch_state_ptr);
@@ -118,7 +118,7 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     // printf("evm_call_state_t initialized memory pointer %p thread %d\n", memory_ptr, THREADIDX);
 
     this->memory_ptr = memory_ptr;
-    printf("memory size %d  idx %d\n", memory_ptr->size, THREADIDX);
+    // printf("memory size %d  idx %d\n", memory_ptr->size, THREADIDX);
     __SHARED_MEMORY__ log_state_data_t* log_state_ptr;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     log_state_ptr = new CuEVM::log_state_data_t();

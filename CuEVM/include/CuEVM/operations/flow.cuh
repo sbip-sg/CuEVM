@@ -10,6 +10,7 @@
 #include <CuEVM/core/jump_destinations.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/stack.cuh>
+#include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/arith.cuh>
 
 /**
@@ -49,7 +50,12 @@ __host__ __device__ int32_t JUMP(ArithEnv &arith, const bn_t &gas_limit, bn_t &g
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __host__ __device__ int32_t JUMPI(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used, uint32_t &pc,
-                                  CuEVM::evm_stack_t &stack, const CuEVM::evm_message_call_t &message);
+                                  CuEVM::evm_stack_t &stack, const CuEVM::evm_message_call_t &message
+#ifdef BUILD_LIBRARY
+                                  ,
+                                  CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
+#endif
+);
 
 /**
  * The PC operation implementation.
