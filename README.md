@@ -83,9 +83,9 @@ The execution trace and output state will be printed to the stdout, you can use
 ```
 
 
-## Demo of the functionality for testing transaction sequences
+## Demo of the GPU-accelerated fuzzer and CuEVM library mode
 
-[Google Colab demo using free GPU](https://colab.research.google.com/drive/1W_3zKOJR2Jpv_6SoM0cmOFgVHP2b7rny?usp=sharing)
+[Run Google Colab demo using free GPU](https://colab.research.google.com/drive/1W_3zKOJR2Jpv_6SoM0cmOFgVHP2b7rny?usp=sharing)
 
 ## Testing using ethtest
 
