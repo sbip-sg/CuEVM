@@ -208,7 +208,7 @@ __host__ __device__ tracer_t::~tracer_t() {
 }
 
 __host__ __device__ void tracer_t::grow() {
-    trace_data_t *new_data;
+    __SHARED_MEMORY__ trace_data_t *new_data;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     new_data = new trace_data_t[capacity + 128];
     if (data != nullptr) {

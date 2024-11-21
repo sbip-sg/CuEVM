@@ -46,15 +46,13 @@ __host__ __device__ int32_t generic_CALL(ArithEnv &arith, const bn_t &args_offse
 
     error_code |= CuEVM::gas_cost::memory_grow_cost(arith, *current_state.memory_ptr, args_offset, args_size,
                                                     memory_expansion_cost_args, temp_memory_gas_used);
-    // #ifdef __CUDA_ARCH__
-    //     printf("generic_CALL memory_expansion_cost_args idx %d error_code %d mempointer %p memsize %d\n",
-    //     threadIdx.x,
-    //            error_code, current_state.memory_ptr, current_state.memory_ptr->size);
-    //     __SYNC_THREADS__
-    //     print_bnt(arith, temp_memory_gas_used);
-    //     print_bnt(arith, args_offset);
-    //     print_bnt(arith, args_size);
-    // #endif
+
+    // printf("generic_CALL memory_expansion_cost_args idx %d error_code %d mempointer %p memsize %d\n", THREADIDX,
+    //        error_code, current_state.memory_ptr, current_state.memory_ptr->size);
+    // __SYNC_THREADS__
+    // print_bnt(arith, temp_memory_gas_used);
+    // print_bnt(arith, args_offset);
+    // print_bnt(arith, args_size);
 
     // memory return data
     bn_t ret_offset, ret_size;
@@ -391,9 +389,7 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
     if (error_code == ERROR_SUCCESS)  // break down scope to avoid stack problems
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr, cached_state);
 
-    // #ifdef __CUDA_ARCH__
-    //     printf("opcode CALL after cgeneric_CALL %d\n", threadIdx.x);
-    // #endif
+    printf("opcode CALL error_code %d thread %d\n", error_code, THREADIDX);
     return error_code;
 }
 

@@ -115,10 +115,10 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     memory_ptr = new CuEVM::evm_memory_t();
     __ONE_GPU_THREAD_END__
 
-    // printf("evm_call_state_t initialized memory pointer %p thread %d\n", memory_ptr, THREADIDX);
+    printf("evm_call_state_t initialized memory pointer %p thread %d\n", memory_ptr, THREADIDX);
 
     this->memory_ptr = memory_ptr;
-    // printf("memory size %d  idx %d\n", memory_ptr->size, THREADIDX);
+    printf("memory size %d  idx %d\n", memory_ptr->size, THREADIDX);
     __SHARED_MEMORY__ log_state_data_t* log_state_ptr;
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     log_state_ptr = new CuEVM::log_state_data_t();

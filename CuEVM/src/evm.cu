@@ -18,6 +18,64 @@
 #include <CuEVM/utils/opcodes.cuh>
 
 namespace CuEVM {
+
+// define the kernel function
+__global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM::evm_instance_t *instances,
+                                              uint32_t count) {
+    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
+    if (instance >= count) return;
+    CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
+    // CuEVM::bn_t test;
+    // printf("print simplified trace data device\n");
+    // instances[instance].simplified_trace_data_ptr->print();
+// printf("new instance %d\n", instance);
+#ifdef EIP_3155
+    if (instance == 0) {
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        printf("instance %d\n", instance);
+        printf("world state\n");
+        instances[instance].world_state_data_ptr->print();
+        printf("touch state\n");
+        instances[instance].touch_state_data_ptr->print();
+        printf("instance %d\n", instance);
+        printf("transaction\n");
+        instances[instance].transaction_ptr->print();
+        __ONE_GPU_THREAD_WOSYNC_END__
+    }
+#endif
+    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
+    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
+    CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
+    printf("evm allocated %p, threadid %d\n", evm, THREADIDX);
+    printf("evm->call_state_ptr %p, threadid %d\n", evm->call_state_ptr, THREADIDX);
+    CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
+    // printf("\nevm->run(arith) instance %d\n", instance);
+    // printf("print simplified trace data device inside evm\n");
+    // evm->simplified_trace_data_ptr->print();
+    printf("gas limit %d thread %d\n", THREADIDX);
+    print_bnt(arith, evm->call_state_ptr->gas_limit);
+    print_bnt(arith, cached_state.gas_limit);
+    __SYNC_THREADS__
+    evm->run(arith, cached_state);
+
+#ifdef EIP_3155
+    if (instance == 0) {
+        __ONE_GPU_THREAD_BEGIN__
+        // instances[0].tracer_ptr->print(arith);
+        instances[0].tracer_ptr->print_err();
+        __ONE_GPU_THREAD_WOSYNC_END__
+    }
+#endif
+    // print the final world state
+    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    // instances[instance].world_state_data_ptr->print();
+    // printf("simplified trace data\n");
+    // instances[instance].simplified_trace_data_ptr->print();
+    // __ONE_GPU_THREAD_WOSYNC_END__
+    // delete evm;
+    // evm = nullptr;
+}
+
 __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_data_ptr,
                                  CuEVM::block_info_t *block_info_ptr, CuEVM::evm_transaction_t *transaction_ptr,
                                  CuEVM::state_access_t *touch_state_data_ptr, CuEVM::log_state_data_t *log_state_ptr,
@@ -48,8 +106,8 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
 #ifdef EIP_3155
     // printing debug when enabling tracer.
     printf("call_state_ptr allocated %p, threadid %d\n", call_state_ptr, THREADIDX);
-    // transaction_ptr->print();
-    // call_state_ptr->print(arith);
+    transaction_ptr->print();
+    call_state_ptr->print(arith);
     // printf("call_state_local %d\n", THREADIDX);
     // call_state_local.print(arith);
 #endif
@@ -66,14 +124,14 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
             transaction_ptr->get_message_call(arith, call_state_ptr->touch_state_ptr, transaction_call_message_ptr);
 
         shared_message_call_ptr->copy_from(transaction_call_message_ptr);
-        // printf("evm_message_call_t copy_from other after memcpy\n ");
-        // #ifdef __CUDA_ARCH__
-        //         printf("message call copied %d\n", threadIdx.x);
-        // #endif
-        // shared_message_call_ptr->print();
+
+        printf("message call copied %d\n", THREADIDX);
+        shared_message_call_ptr->print();
 
         CuEVM::evm_call_state_t *child_call_state_ptr = new CuEVM::evm_call_state_t(
             arith, call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr, shared_stack_ptr);
+        printf("child_call_state_ptr allocated %p, threadid %d\n", child_call_state_ptr, THREADIDX);
+        // print_bnt(arith, child_call_state_ptr->gas_limit);
         // subtract the gas used by the transaction initialization from the gas
         // limit
         cgbn_sub(arith.env, child_call_state_ptr->gas_limit, child_call_state_ptr->gas_limit, call_state_ptr->gas_used);
@@ -1259,5 +1317,6 @@ __host__ void free_evm_instances(evm_instance_t *&evm_instances, uint32_t num_in
         CUDA_CHECK(cudaFree(evm_instances));
     }
 }
+
 }  // namespace CuEVM
 // todo|: make a vector o functions global constants so you can call them

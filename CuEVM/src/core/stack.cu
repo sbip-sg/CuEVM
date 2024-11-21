@@ -170,20 +170,13 @@ __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8
     //     return ERROR_STACK_INVALID_SIZE;
     // }
     // x valud must be validated by checking opcode ouside
-    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    // printf("pushx %d data size %d data to insert: \n", x, src_byte_size);
-    // for (uint8_t idx = 0; idx < src_byte_size; idx++) {
-    //     printf("%02x", src_byte_data[idx]);
-    // }
-    // printf("\n");
-    // __ONE_GPU_THREAD_WOSYNC_END__
-
-    // printf("pushx data size %d\n", src_byte_size);
-    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    // for (uint8_t idx = 0; idx < src_byte_size; idx++) {
-    //     printf("%02x", src_byte_data[idx]);
-    // }
-    // __ONE_GPU_THREAD_WOSYNC_END__
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    printf("pushx %d data size %d data to insert: \n", x, src_byte_size);
+    for (uint8_t idx = 0; idx < src_byte_size; idx++) {
+        printf("%02x", src_byte_data[idx]);
+    }
+    printf("\n");
+    __ONE_GPU_THREAD_WOSYNC_END__
 
     // int32_t error_code = (size() >= capacity) ? grow() : ERROR_SUCCESS;
     if (stack_offset < max_stack_size) {
@@ -218,9 +211,8 @@ __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8
         stack_offset++;
 
         // __SYNC_THREADS__  // do we need to sync here?
-        //     __ONE_THREAD_PER_INSTANCE(printf("pushx data inserted %d stack offset %d \n", threadIdx.x,
-        //     stack_offset););
-        // this->print();
+        __ONE_THREAD_PER_INSTANCE(printf("pushx data inserted %d stack offset %d \n", threadIdx.x, stack_offset););
+        this->print();
         return ERROR_SUCCESS;
     } else {
         printf("pushx overflow stack offset %d\n", stack_offset);

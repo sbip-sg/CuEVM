@@ -41,33 +41,6 @@ std::unordered_set<int> const revert_opcodes = {OP_REVERT, OP_INVALID};
 // OP_JUMPI
 // OP_SELFDESTRUCT
 
-// /**
-//  * Get the python dict object from the tracer data structure.
-//  * @param[in] arith The arithmetical environment.
-//  * @param[in] tracer_data The trace data structure.
-//  * @return The pythonobject.
-//  */
-// static PyObject* pyobject_from_tracer_data_t(tracer_data_t tracer_data);
-
-// /*
-//  * Get PyObject of the account
-//  * @param[in] arith The arithmetical environment
-//  * @param[in] account The account
-//  * @return The PyObject of the account
-//  */
-// static PyObject* pyobject_from_account_t(account_t account);
-// /**
-//  * Get pyobject of the state
-//  */
-// static PyObject* pyobject_from_state_data_t(state_data_t* state_data);
-// /*
-//  * Get PyObject of the transaction
-//  * @param[in] arith The arithmetical environment
-//  * @param[in] transaction The transaction
-//  * @return The PyObject of the transaction
-//  */
-// PyObject* pyobject_from_transaction_content(transaction_data_t* _content);
-
 PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* serialized_worldstate_instance);
 
 /**

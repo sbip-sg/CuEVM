@@ -13,46 +13,6 @@
 #include <chrono>
 #include <fstream>
 
-// define the kernel function
-__global__ void kernel_evm(cgbn_error_report_t *report, CuEVM::evm_instance_t *instances, uint32_t count) {
-    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
-    if (instance >= count) return;
-    CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
-    // CuEVM::bn_t test;
-
-// printf("new instance %d\n", instance);
-#ifdef EIP_3155
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    printf("instance %d\n", instance);
-    printf("world state\n");
-    instances[instance].world_state_data_ptr->print();
-    printf("touch state\n");
-    instances[instance].touch_state_data_ptr->print();
-    printf("instance %d\n", instance);
-    printf("transaction\n");
-    instances[instance].transaction_ptr->print();
-    __ONE_GPU_THREAD_WOSYNC_END__
-#endif
-    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
-    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
-    CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
-    CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
-    // printf("\nevm->run(arith) instance %d\n", instance);
-    __SYNC_THREADS__
-    evm->run(arith, cached_state);
-
-#ifdef EIP_3155
-    if (instance == 0) {
-        __ONE_GPU_THREAD_BEGIN__
-        // instances[0].tracer_ptr->print(arith);
-        instances[0].tracer_ptr->print_err();
-        __ONE_GPU_THREAD_WOSYNC_END__
-    }
-#endif
-    // delete evm;
-    // evm = nullptr;
-}
-
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose = false) {
     CuEVM::evm_instance_t *instances_data;
     CuEVM::ArithEnv arith(cgbn_no_checks, 0);
@@ -106,7 +66,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         // num_instances = 1;
         printf("Running on GPU %d %d\n", num_instances, CuEVM::cgbn_tpi);
         // run the evm
-        kernel_evm<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
+        CuEVM::kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaGetLastError());
         printf("GPU kernel finished\n");

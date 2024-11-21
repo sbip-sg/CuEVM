@@ -87,12 +87,11 @@ if(CPU)
 endif()
 
 if(GPU)
-    # Check if building as a library or an executable
+
     if(BUILD_LIBRARY)
-        # Find Python libraries only when building the library
+        # Find Python libraries
         find_package(PythonLibs REQUIRED)
         include_directories(${PYTHON_INCLUDE_DIRS})
-
         # Build as a shared library
         add_library(${PROJECT_NAME} SHARED
             "${PROJECT_SOURCE_DIR}/interpreter/libcuevm.cu"
@@ -134,10 +133,10 @@ if(GPU)
         target_compile_definitions(${PROJECT_NAME} PRIVATE EVM_VERSION=${EVM_VERSION})
 
         target_compile_definitions(${PROJECT_NAME} PRIVATE GPU)
+        
     else()
 
         set(GPU_INTERPRETER ${PROJECT_NAME}_GPU)
-
         # GPU
         add_executable(${GPU_INTERPRETER}
             "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
@@ -170,7 +169,9 @@ if(GPU)
         target_compile_definitions(${GPU_INTERPRETER} PRIVATE EVM_VERSION=${EVM_VERSION})
 
         target_compile_definitions(${GPU_INTERPRETER} PRIVATE GPU)
-    endif()
+
+    endif() 
+
 endif()
 
 if(TESTS)

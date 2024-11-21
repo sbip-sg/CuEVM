@@ -7,55 +7,6 @@
 #include <fstream>
 
 using namespace python_utils;
-// define the kernel function
-__global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM::evm_instance_t* instances,
-                                              uint32_t count) {
-    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
-    if (instance >= count) return;
-    CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
-    // CuEVM::bn_t test;
-    // printf("print simplified trace data device\n");
-    // instances[instance].simplified_trace_data_ptr->print();
-// printf("new instance %d\n", instance);
-#ifdef EIP_3155
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    printf("instance %d\n", instance);
-    printf("world state\n");
-    instances[instance].world_state_data_ptr->print();
-    printf("touch state\n");
-    instances[instance].touch_state_data_ptr->print();
-    printf("instance %d\n", instance);
-    printf("transaction\n");
-    instances[instance].transaction_ptr->print();
-    __ONE_GPU_THREAD_WOSYNC_END__
-#endif
-    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
-    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
-    CuEVM::evm_t* evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
-    CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
-    // printf("\nevm->run(arith) instance %d\n", instance);
-    // printf("print simplified trace data device inside evm\n");
-    // evm->simplified_trace_data_ptr->print();
-    __SYNC_THREADS__
-    evm->run(arith, cached_state);
-
-#ifdef EIP_3155
-    if (instance == 0) {
-        __ONE_GPU_THREAD_BEGIN__
-        // instances[0].tracer_ptr->print(arith);
-        instances[0].tracer_ptr->print_err();
-        __ONE_GPU_THREAD_WOSYNC_END__
-    }
-#endif
-    // print the final world state
-    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    // instances[instance].world_state_data_ptr->print();
-    // printf("simplified trace data\n");
-    // instances[instance].simplified_trace_data_ptr->print();
-    // __ONE_GPU_THREAD_WOSYNC_END__
-    // delete evm;
-    // evm = nullptr;
-}
 
 PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_parsing) {
     CuEVM::evm_instance_t* instances_data;
@@ -98,10 +49,6 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     }
 
     Py_ssize_t count = PyList_Size(read_roots);
-    // transaction_data_t* transactions = getTransactionDataFromPyObject(arith, PyDict_GetItemString(read_root,
-    // "transaction"));
-    // void get_evm_instances_from_PyObject(CuEVM::evm_instance_t * &evm_instances, const cJSON* test_json,
-    //                                      uint32_t& num_instances);
 
     python_utils::get_evm_instances_from_PyObject(instances_data, read_roots, num_instances);
     // printf("print simplified trace data host\n");
@@ -112,7 +59,7 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
+    CuEVM::kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -196,24 +143,3 @@ static PyModuleDef examplemodule = {PyModuleDef_HEAD_INIT,
 
 // Initialization function
 PyMODINIT_FUNC PyInit_libcuevm(void) { return PyModule_Create(&examplemodule); }
-
-// deprecated strings interfaces
-/*
-extern "C" char* run_json_string(const char* read_json_string) {
-    cJSON *read_root = cJSON_Parse(read_json_string);
-    if (read_root == NULL) {
-        // Handle parsing error (optional)
-        return NULL;
-    }
-
-    cJSON *write_root = cJSON_CreateObject();
-
-    // Assume run_interpreter modifies write_root based on read_root
-    run_interpreter(read_root, write_root);
-    cJSON_Delete(read_root);
-    char *json_str = cJSON_Print(write_root);
-    cJSON_Delete(write_root);
-
-    return json_str; // Caller needs to free this memory
-}
-*/

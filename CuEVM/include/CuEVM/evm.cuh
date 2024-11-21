@@ -159,6 +159,9 @@ __host__ int32_t get_evm_instances(ArithEnv& arith, evm_instance_t*& evm_instanc
  */
 __host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances, int32_t managed = 0);
 
+__global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM::evm_instance_t* instances,
+                                              uint32_t count);
+
 }  // namespace CuEVM
 
 #endif
