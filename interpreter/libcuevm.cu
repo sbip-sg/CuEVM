@@ -13,10 +13,7 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
     int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
     if (instance >= count) return;
     CuEVM::ArithEnv arith(cgbn_no_checks, report, instance);
-    // CuEVM::bn_t test;
-    // printf("print simplified trace data device\n");
-    // instances[instance].simplified_trace_data_ptr->print();
-// printf("new instance %d\n", instance);
+
 #ifdef EIP_3155
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     printf("instance %d\n", instance);
@@ -29,9 +26,10 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
     instances[instance].transaction_ptr->print();
     __ONE_GPU_THREAD_WOSYNC_END__
 #endif
-    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
-    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
-    CuEVM::evm_t* evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
+    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
+    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
+    CuEVM::evm_t* evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call[INSTANCE_IDX_PER_BLOCK],
+                                         shared_stack[INSTANCE_IDX_PER_BLOCK]);
     CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
     // printf("\nevm->run(arith) instance %d\n", instance);
     // printf("print simplified trace data device inside evm\n");
@@ -40,6 +38,15 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
     evm->run(arith, cached_state);
 
 #ifdef EIP_3155
+
+    __SYNC_THREADS__
+    __ONE_THREAD_PER_INSTANCE(printf("\n\ninstance %d\n", instance););
+    if (instance == 1) {
+        __ONE_GPU_THREAD_BEGIN__
+        instances[1].tracer_ptr->print_err();
+        __ONE_GPU_THREAD_WOSYNC_END__
+    }
+    __SYNC_THREADS__
     if (instance == 0) {
         __ONE_GPU_THREAD_BEGIN__
         // instances[0].tracer_ptr->print(arith);
@@ -49,9 +56,12 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM
 #endif
     // print the final world state
     // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    // instances[instance].world_state_data_ptr->print();
-    // printf("simplified trace data\n");
-    // instances[instance].simplified_trace_data_ptr->print();
+    // if (instance == 1) {
+    //     printf("world state\n");
+    //     instances[instance].world_state_data_ptr->print();
+    //     printf("simplified trace data\n");
+    //     instances[instance].simplified_trace_data_ptr->print();
+    // }
     // __ONE_GPU_THREAD_WOSYNC_END__
     // delete evm;
     // evm = nullptr;
@@ -106,13 +116,16 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     python_utils::get_evm_instances_from_PyObject(instances_data, read_roots, num_instances);
     // printf("print simplified trace data host\n");
     // instances_data[0].simplified_trace_data_ptr->print();
-    printf("Running %d instances on GPU\n", num_instances);
+
+    uint32_t num_blocks = (num_instances + CGBN_IBP - 1) / (CGBN_IBP);
+    // printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
+    //        CGBN_TPI * CGBN_IBP);
     // run the evm
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
+    kernel_evm_multiple_instances<<<num_blocks, CGBN_TPI * CGBN_IBP>>>(report, instances_data, num_instances);
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);

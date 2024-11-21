@@ -11,6 +11,7 @@
 
 namespace CuEVM {
 __host__ __device__ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t &byte_code) {
+    return;  // temporarily disabled
     size = 0;
     capacity = 0;
     uint8_t opcode;
@@ -57,6 +58,7 @@ __host__ __device__ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t
     // }
 }
 __host__ __device__ void jump_destinations_t::set_bytecode(CuEVM::byte_array_t &byte_code) {
+    return;  // temporarily disabled
     size = 0;
     uint8_t opcode;
     uint8_t push_size;
@@ -98,12 +100,12 @@ __host__ __device__ jump_destinations_t::~jump_destinations_t() {
 }
 
 __host__ __device__ uint32_t jump_destinations_t::has(uint32_t pc) {
-    // // return ERROR_SUCCESS;  // Temporarily disabled
+    return ERROR_SUCCESS;  // Temporarily disabled
     // return destinations.has_value(pc) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_INVALID_JUMP_DESTINATION;
 
-    __SHARED_MEMORY__ uint32_t error_code;
+    __SHARED_MEMORY__ uint32_t error_code[CGBN_IBP];
     uint32_t index;
-    error_code = ERROR_INVALID_JUMP_DESTINATION;
+    error_code[INSTANCE_IDX_PER_BLOCK] = ERROR_INVALID_JUMP_DESTINATION;
     __SYNC_THREADS__
 #ifdef __CUDA_ARCH__
     uint32_t slot_size = (size + CuEVM::cgbn_tpi) / CuEVM::cgbn_tpi;
@@ -115,7 +117,7 @@ __host__ __device__ uint32_t jump_destinations_t::has(uint32_t pc) {
             break;
         }
         if (destinations[slot_size * threadIdx.x + index] == pc) {
-            error_code = ERROR_SUCCESS;
+            error_code[INSTANCE_IDX_PER_BLOCK] = ERROR_SUCCESS;
             break;
         }
     }
@@ -123,30 +125,31 @@ __host__ __device__ uint32_t jump_destinations_t::has(uint32_t pc) {
 #else
     for (index = 0; index < size; index++) {
         if (destinations[index] == pc) {
-            return ERROR_SUCCESS;
+            error_code[INSTANCE_IDX_PER_BLOCK] = ERROR_SUCCESS;
+            break;
         }
     }
 #endif
-    return error_code;
+    return error_code[INSTANCE_IDX_PER_BLOCK];
 }
 
 __host__ __device__ int32_t jump_destinations_t::grow_capacity(uint32_t new_capacity) {
     if (new_capacity == capacity) return ERROR_SUCCESS;
-    __SHARED_MEMORY__ uint16_t *new_data;
+    __SHARED_MEMORY__ uint16_t *new_data[CGBN_IBP];
     __ONE_GPU_THREAD_BEGIN__
-    new_data = new uint16_t[new_capacity];
+    new_data[INSTANCE_IDX_PER_BLOCK] = new uint16_t[new_capacity];
     if (capacity > 0) {
         // printf("Copying destinations\n");
         // printf("New capacity: %d\n", new_capacity);
         // printf("Old capacity: %d\n", capacity);
         // printf("destination ptr: %p\n", destinations);
         // if (new_size > size) {
-        memcpy(new_data, destinations, min(new_capacity, capacity) * sizeof(uint16_t));
+        memcpy(new_data[INSTANCE_IDX_PER_BLOCK], destinations, min(new_capacity, capacity) * sizeof(uint16_t));
 
         delete[] destinations;
     }
     __ONE_GPU_THREAD_END__
-    destinations = new_data;
+    destinations = new_data[INSTANCE_IDX_PER_BLOCK];
     capacity = new_capacity;
     return ERROR_SUCCESS;
 }

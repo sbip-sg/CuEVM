@@ -267,9 +267,7 @@ __host__ __device__ int32_t TouchState::set_storage_value(ArithEnv &arith, const
         add_account(arith, address, account_ptr, ACCOUNT_STORAGE_FLAG);
     }
     __SYNC_THREADS__
-    // #ifdef __CUDA_ARCH__
-    //     printf("TouchState::set_storage_value after add account %d %p\n" ,threadIdx.x, account_ptr);
-    // #endif
+    // __ONE_THREAD_PER_INSTANCE(printf("Set storage value %p %d\n", account_ptr, THREADIDX););
     account_ptr->set_storage_value(arith, key, value);
     return ERROR_SUCCESS;
 }

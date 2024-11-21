@@ -78,11 +78,12 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
 // : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
 {
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
-    __SHARED_MEMORY__ CuEVM::TouchState* touch_state_ptr;
+    __SHARED_MEMORY__ CuEVM::TouchState* touch_state_ptr[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    touch_state_ptr = new CuEVM::TouchState(new CuEVM::state_access_t(), parent->touch_state_ptr);
+    touch_state_ptr[INSTANCE_IDX_PER_BLOCK] =
+        new CuEVM::TouchState(new CuEVM::state_access_t(), parent->touch_state_ptr);
     __ONE_GPU_THREAD_END__
-    this->touch_state_ptr = touch_state_ptr;
+    this->touch_state_ptr = touch_state_ptr[INSTANCE_IDX_PER_BLOCK];
     this->parent = parent;
     this->depth = parent->depth + 1;
     this->pc = 0;
@@ -91,14 +92,15 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     this->message_ptr = shared_message_ptr;
     this->message_ptr_copy = shadow_message_ptr;  // point to global memory, deallocate in destructor
     this->message_ptr->get_gas_limit(arith, this->gas_limit);
-    __SHARED_MEMORY__ evm_stack_t* stack_ptr;
+    __SHARED_MEMORY__ evm_stack_t* stack_ptr[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (parent->stack_ptr != nullptr) {
-        stack_ptr = new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base + parent->stack_ptr->stack_offset,
-                                           parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
+        stack_ptr[INSTANCE_IDX_PER_BLOCK] =
+            new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base + parent->stack_ptr->stack_offset,
+                                   parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
         // printf("parent stack found %p thread %d\n", parent->stack_ptr, THREADIDX);
     } else {
-        stack_ptr = new CuEVM::evm_stack_t(shared_stack_ptr);
+        stack_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::evm_stack_t(shared_stack_ptr);
         // printf("parent stack not found %p thread %d\n", parent->stack_ptr, THREADIDX);
     }
     // printf("Stack constructor done stack base %p stack base offset %d stack offset %d\n",
@@ -106,32 +108,32 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     //        stack_ptr->stack_base_offset, stack_ptr->stack_offset);
     // stack_ptr = new CuEVM::evm_stack_t(shared_stack_ptr);
     __ONE_GPU_THREAD_END__
-    this->stack_ptr = stack_ptr;
+    this->stack_ptr = stack_ptr[INSTANCE_IDX_PER_BLOCK];
 
     // printf("evm_call_state_t initialized stack pointer %p thread %d\n", stack_ptr, THREADIDX);
 
-    __SHARED_MEMORY__ evm_memory_t* memory_ptr;
+    __SHARED_MEMORY__ evm_memory_t* memory_ptr[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    memory_ptr = new CuEVM::evm_memory_t();
+    memory_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::evm_memory_t();
     __ONE_GPU_THREAD_END__
 
     // printf("evm_call_state_t initialized memory pointer %p thread %d\n", memory_ptr, THREADIDX);
 
-    this->memory_ptr = memory_ptr;
+    this->memory_ptr = memory_ptr[INSTANCE_IDX_PER_BLOCK];
     // printf("memory size %d  idx %d\n", memory_ptr->size, THREADIDX);
-    __SHARED_MEMORY__ log_state_data_t* log_state_ptr;
+    __SHARED_MEMORY__ log_state_data_t* log_state_ptr[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    log_state_ptr = new CuEVM::log_state_data_t();
+    log_state_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::log_state_data_t();
     __ONE_GPU_THREAD_END__
-    this->log_state_ptr = log_state_ptr;
+    this->log_state_ptr = log_state_ptr[INSTANCE_IDX_PER_BLOCK];
 
     // printf("evm_call_state_t initialized log state pointer %p thread %d\n", log_state_ptr, THREADIDX);
 
-    __SHARED_MEMORY__ evm_return_data_t* last_return_data_ptr;
+    __SHARED_MEMORY__ evm_return_data_t* last_return_data_ptr[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    last_return_data_ptr = new CuEVM::evm_return_data_t();
+    last_return_data_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::evm_return_data_t();
     __ONE_GPU_THREAD_END__
-    this->last_return_data_ptr = last_return_data_ptr;
+    this->last_return_data_ptr = last_return_data_ptr[INSTANCE_IDX_PER_BLOCK];
 
     // printf("evm_call_state_t initialized return data pointer %p thread %d\n", last_return_data_ptr, THREADIDX);
     // this->memory_ptr = new CuEVM::evm_memory_t();
@@ -167,11 +169,11 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::W
                                                        CuEVM::evm_return_data_t* last_return_data_ptr)
 // : touch_state(state_access_ptr, word_state_ptr) {
 {
-    __SHARED_MEMORY__ CuEVM::TouchState* touch_state_ptr;
+    __SHARED_MEMORY__ CuEVM::TouchState* touch_state_ptr[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    touch_state_ptr = new CuEVM::TouchState(state_access_ptr, word_state_ptr);
+    touch_state_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::TouchState(state_access_ptr, word_state_ptr);
     __ONE_GPU_THREAD_END__
-    this->touch_state_ptr = touch_state_ptr;
+    this->touch_state_ptr = touch_state_ptr[INSTANCE_IDX_PER_BLOCK];
     this->parent = nullptr;
     this->depth = 0;
     this->pc = 0;
@@ -195,6 +197,12 @@ __host__ __device__ evm_call_state_t::~evm_call_state_t() {
     if (parent != nullptr) {
         // delete message_ptr; TODO: fix this, currently using shared mem for message_ptr
         // printf("evm_call_state_t destructor thread %d\n", THREADIDX);
+        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        // printf(
+        //     "evm_call_state_t destructor thread %d message ptr %p stack ptr %p memory ptr %p log state ptr %p last "
+        //     "return data ptr %p\n",
+        //     THREADIDX, message_ptr, stack_ptr, memory_ptr, log_state_ptr, last_return_data_ptr);
+        // __ONE_GPU_THREAD_WOSYNC_END__
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
         delete message_ptr_copy;
         delete stack_ptr;

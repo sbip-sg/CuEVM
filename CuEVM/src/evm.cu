@@ -42,12 +42,12 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     call_state_ptr = new CuEVM::evm_call_state_t(arith, &world_state, nullptr, nullptr, log_state_ptr,
                                                  touch_state_data_ptr, return_data_ptr);
     // call_state_local = evm_call_steate_t(arith, call_state_ptr);
-// #ifndef __CUDA_ARCH__
-//     shared_message_call_ptr = new evm_message_call_t();
-// #endif
+    // #ifndef __CUDA_ARCH__
+    //     shared_message_call_ptr = new evm_message_call_t();
+    // #endif
 #ifdef EIP_3155
     // printing debug when enabling tracer.
-    printf("call_state_ptr allocated %p, threadid %d\n", call_state_ptr, THREADIDX);
+    // printf("call_state_ptr allocated %p, threadid %d\n", call_state_ptr, THREADIDX);
     // transaction_ptr->print();
     // call_state_ptr->print(arith);
     // printf("call_state_local %d\n", THREADIDX);
@@ -353,6 +353,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
         //        THREADIDX);
         // __ONE_GPU_THREAD_WOSYNC_END__
+
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
@@ -961,7 +962,7 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
     tracer_ptr->finish_transaction(arith, *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_used, status);
 #endif
     // update the final world state : TODO combine both
-
+    // __SYNC_THREADS__
     this->world_state.update(arith, call_state_ptr->touch_state_ptr->get_state());
     this->world_state.serialize_data(arith, serialized_worldstate_data_ptr);
     // printf("updated final world state\n");

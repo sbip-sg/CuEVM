@@ -33,7 +33,7 @@ __host__ __device__ void contract_storage_t::clear() {
 }
 
 __host__ __device__ contract_storage_t &contract_storage_t::operator=(const contract_storage_t &other) {
-    __SHARED_MEMORY__ storage_element_t *tmp_storage;
+    __SHARED_MEMORY__ storage_element_t *tmp_storage[CGBN_IBP];
     // __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (this == &other) {
         return *this;
@@ -47,10 +47,10 @@ __host__ __device__ contract_storage_t &contract_storage_t::operator=(const cont
         // #endif
         __ONE_GPU_THREAD_BEGIN__
         if (capacity > 0) {
-            tmp_storage = new storage_element_t[capacity];
+            tmp_storage[INSTANCE_IDX_PER_BLOCK] = new storage_element_t[capacity];
         }
         __ONE_GPU_THREAD_END__
-        storage = tmp_storage;
+        storage = tmp_storage[INSTANCE_IDX_PER_BLOCK];
     }
     __ONE_GPU_THREAD_BEGIN__
     if (other.size > 0) memcpy(storage, other.storage, other.size * sizeof(storage_element_t));
@@ -77,13 +77,15 @@ __host__ __device__ int32_t contract_storage_t::get_value(ArithEnv &arith, const
 __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const bn_t &key, const bn_t &value) {
     uint32_t idx;
     __SYNC_THREADS__  // ? why is this needed?
+                      // todo : remove the loop
         for (idx = 0; idx < size; idx++) {
         if (storage[idx].has_key(arith, key)) {
             storage[idx].set_value(arith, value);
             return ERROR_SUCCESS;
         }
     }
-    __SHARED_MEMORY__ storage_element_t *new_storage;
+
+    __SHARED_MEMORY__ storage_element_t *new_storage[CGBN_IBP];
     // #ifdef __CUDA_ARCH__
     //     printf("contract_storage_t::set_value before allocateidx %d size %d capacity %d  storage %p\n", threadIdx.x,
     //     size,
@@ -96,15 +98,14 @@ __host__ __device__ int32_t contract_storage_t::set_value(ArithEnv &arith, const
             capacity *= 2;
         }
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        new_storage = new storage_element_t[capacity];
+        new_storage[INSTANCE_IDX_PER_BLOCK] = new storage_element_t[capacity];
         // printf("allocate new storage %p, capacity %d\n", new_storage, capacity);
         if (size > 0) {
-            memcpy(new_storage, storage, size * sizeof(storage_element_t));
+            memcpy(new_storage[INSTANCE_IDX_PER_BLOCK], storage, size * sizeof(storage_element_t));
         }
         delete[] storage;
         __ONE_GPU_THREAD_END__
-
-        storage = new_storage;
+        storage = new_storage[INSTANCE_IDX_PER_BLOCK];
         // printf("set storage size %d capacity %d  storage %p, new_storage %p\n", size, capacity, storage,
         // new_storage);
     }

@@ -98,7 +98,7 @@ struct evm_stack_t {
      * @return 0 if the value is pushed, error code otherwise
      */
     __host__ __device__ int32_t push(ArithEnv &arith, const bn_t &value);
-
+    __host__ __device__ int32_t push_evm_word_t(ArithEnv &arith, const evm_word_t *value);
     /**
      * Pop a value from the stack
      * @param[in] arith The arithmetical environment

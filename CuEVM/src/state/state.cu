@@ -20,21 +20,21 @@ __host__ __device__ state_t &state_t::operator=(const state_t &other) {
     return *this;
 }
 __host__ __device__ void state_t::duplicate(const state_t &other) {
-    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts;
+    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts[CGBN_IBP];
     free();  // free the current state
     no_accounts = other.no_accounts;
     if (no_accounts > 0) {
         __ONE_GPU_THREAD_BEGIN__
-        tmp_accounts = (CuEVM::account_t *)malloc(no_accounts * sizeof(CuEVM::account_t));
+        tmp_accounts[INSTANCE_IDX_PER_BLOCK] = (CuEVM::account_t *)malloc(no_accounts * sizeof(CuEVM::account_t));
         __ONE_GPU_THREAD_END__
         for (uint32_t idx = 0; idx < no_accounts; idx++) {
-            tmp_accounts[idx].clear();
-            tmp_accounts[idx] = other.accounts[idx];
+            tmp_accounts[INSTANCE_IDX_PER_BLOCK][idx].clear();
+            tmp_accounts[INSTANCE_IDX_PER_BLOCK][idx] = other.accounts[idx];
         }
     } else {
-        tmp_accounts = nullptr;
+        tmp_accounts[INSTANCE_IDX_PER_BLOCK] = nullptr;
     }
-    accounts = tmp_accounts;
+    accounts = tmp_accounts[INSTANCE_IDX_PER_BLOCK];
 }
 
 __host__ __device__ state_t::~state_t() { free(); }
@@ -102,19 +102,24 @@ __host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const evm_word
 }
 
 __host__ __device__ int32_t state_t::add_account(const CuEVM::account_t &account) {
-    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts;
+    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts[CGBN_IBP];
     __ONE_GPU_THREAD_BEGIN__
-    tmp_accounts = (CuEVM::account_t *)malloc((no_accounts + 1) * sizeof(CuEVM::account_t));
-    memcpy(tmp_accounts, accounts, no_accounts * sizeof(CuEVM::account_t));
+
+    tmp_accounts[INSTANCE_IDX_PER_BLOCK] = (CuEVM::account_t *)malloc((no_accounts + 1) * sizeof(CuEVM::account_t));
+    // printf("state_t::add_account malloc, instance idx %d, no_accounts %d thread idx %d, account pointer %p\n",
+    //        INSTANCE_IDX_PER_BLOCK, no_accounts, THREADIDX, tmp_accounts[INSTANCE_IDX_PER_BLOCK]);
+    memcpy(tmp_accounts[INSTANCE_IDX_PER_BLOCK], accounts, no_accounts * sizeof(CuEVM::account_t));
     __ONE_GPU_THREAD_END__
-    tmp_accounts[no_accounts].clear();
-    tmp_accounts[no_accounts] = account;
+    tmp_accounts[INSTANCE_IDX_PER_BLOCK][no_accounts].clear();
+    tmp_accounts[INSTANCE_IDX_PER_BLOCK][no_accounts] = account;
     if (accounts != nullptr) {
+        // printf("state_t::add_account free accounts, instance idx %d, account pointer %p \n", INSTANCE_IDX_PER_BLOCK,
+        //        accounts);
         __ONE_GPU_THREAD_BEGIN__
         std::free(accounts);
         __ONE_GPU_THREAD_END__
     }
-    accounts = tmp_accounts;
+    accounts = tmp_accounts[INSTANCE_IDX_PER_BLOCK];
     no_accounts++;
     return ERROR_SUCCESS;
 }

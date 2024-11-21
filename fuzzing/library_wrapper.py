@@ -11,7 +11,8 @@ import time
 from utils import *
 
 # Add the directory containing your .so file to the Python path
-sys.path.append("../build/")
+# sys.path.append("../build/")
+sys.path.append("/home/minh/github/CuEVM-internal/build/")
 # sys.path.append("./binary/")
 
 import libcuevm  # Now you can import your module as usual
@@ -27,6 +28,7 @@ class CuEVMLib:
         detect_bug=False,
         sender="0x1111111111111111111111111111111111111111",
         contract_bin_runtime=None,
+        run_eth_tests=False,
     ):
         self.initiate_instance_data(
             source_file,
@@ -35,6 +37,7 @@ class CuEVMLib:
             contract_name,
             detect_bug,
             contract_bin_runtime,
+            run_eth_tests,
         )
         self.sender = sender
 
@@ -48,6 +51,9 @@ class CuEVMLib:
             return
         for i in range(len(trace_values.get("post"))):
             post_state = trace_values.get("post")[i].get("state")
+            if post_state is None:
+                # print(f"Skipping updating state for instance {i}")
+                continue
             # print("\n\n post_state %d \n\n" % i)
             # pprint(post_state)
             # self.instances[i]["pre"] = copy.deepcopy(post_state)
@@ -65,10 +71,13 @@ class CuEVMLib:
                 # self.instances[i]["pre"][key]["storage"] = value.get("storage")
 
             # sender = next_config["transaction"]["sender"]
+            
             self.instances[i]["transaction"]["nonce"] = hex(
-                post_state.get(self.sender).get("nonce")
+                post_state.get(self.sender, {}).get("nonce", 0)
             )
-
+    def run_eth_tests(self):
+        result_state = libcuevm.run_dict(self.instances)
+        return result_state
     ## 1. run transactions on the EVM instances
     ## 2. update the persistent state of the EVM instances
     ## 3. return the simplified trace during execution
@@ -187,12 +196,17 @@ class CuEVMLib:
         contract_name=None,
         detect_bug=False,
         contract_bin_runtime=None,
+        run_eth_tests=False
     ):
+        
         default_config = json.loads(open("configurations/default.json").read())
         # print(default_config)
         self.detect_bug = detect_bug
         # tx_sequence_list
         tx_sequence_config = json.loads(open(config).read())
+        if run_eth_tests:
+            self.instances = [copy.deepcopy(tx_sequence_config) for _ in range(num_instances)]
+            return
         if contract_name is None:
             self.contract_name = tx_sequence_config.get("contract_name")
         else:
@@ -258,9 +272,10 @@ class CuEVMLib:
 def test_state_change():
     my_lib = CuEVMLib(
         "contracts/state_change.sol",
-        2,
+        3,
         "configurations/state_change.json",
         # contract_bin_runtime="6011602201600460110260005560015561123460015561ffff60ff5500",
+        # contract_bin_runtime="6042611234621234567F123456789101112131415161718192021000"
     )
     test_case = {
         "function": "increase",
@@ -284,39 +299,41 @@ def test_state_change():
     }
 
     # for debugging, altering tx2 data
-    tx_2["data"] = ["0x12"]
-    tx_2["value"] = [hex(10)]
+    # tx_2["data"] = ["0x12"]
+    # tx_2["value"] = [hex(10)]
     # for debugging, altering the state 2
     my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
         "0x00"
-    ] = "0x22"
+    ] = "0x2001"
     # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"][
     #     "balance"
     # ] = "0x00"
-    # my_lib.instances[2]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
-    #     "0x00"
-    # ] = "0x33"
-    trace_res = my_lib.run_transactions([tx_1, tx_1])
-    # trace_res = my_lib.run_transactions([tx_1])
-    print("\n\n trace res \n\n")
-    pprint(trace_res)
-    print("\n\n Updated instance data \n\n")
-    my_lib.print_instance_data()
+    my_lib.instances[2]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
+        "0x00"
+    ] = "0x33"
 
-    trace_res = my_lib.run_transactions([tx_1, tx_1])
+    trace_res = my_lib.run_transactions([tx_1],)
+    # trace_res = my_lib.run_transactions([tx_1])
+    # print("\n\n trace res \n\n")
+    # pprint(trace_res)
+    # print("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
+
+    # trace_res = my_lib.run_transactions([tx_1, tx_1])
 
     # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
     # # trace_res = my_lib.run_transactions([tx_1, tx_1])
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
-    # print("\n\n Updated instance data \n\n")
+    print("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()
+
 
 
 def test_erc20():
     my_lib = CuEVMLib(
         "contracts/erc20.sol",
-        2,
+        5000,
         "configurations/erc20.json",
         contract_name="ERC20",
         detect_bug=False,
@@ -341,9 +358,9 @@ def test_erc20():
         ),  # must return an array
         "value": [hex(512)],
     }
-    trace_res = my_lib.run_transactions([tx_1, tx_2])
-    print("\n\n trace res \n\n")
-    pprint(trace_res)
+    trace_res = my_lib.run_transactions([tx_1, tx_2], skip_trace_parsing=True)
+    # print("\n\n trace res \n\n")
+    # pprint(trace_res)
 
 
 def test_branching():
@@ -384,7 +401,7 @@ def test_branching():
 def test_system_operation():
     my_lib = CuEVMLib(
         "contracts/system_operations.sol",
-        1,
+        2,
         "configurations/system_operation.json",
     )
     test_case = {
@@ -399,7 +416,10 @@ def test_system_operation():
         "data": get_transaction_data_from_config(test_case, my_lib.contract_instance),
         "value": [hex(1234)],
     }
-
+    print("instance data")
+    pprint(my_lib.instances)
+    print("tx_1")
+    pprint(tx_1)
     trace_res = my_lib.run_transactions([tx_1])
     print("\n\n trace res \n\n")
     pprint(trace_res)
@@ -407,7 +427,7 @@ def test_system_operation():
 def test_bugs_simple():
     my_lib = CuEVMLib(
         "contracts/test_bugs_simple.sol",
-        5000,
+        2,
         "configurations/default.json",
         contract_name="TestBug",
         detect_bug=True,
@@ -428,10 +448,62 @@ def test_bugs_simple():
         "value": [hex(0)],
     }
 
-    trace_res = my_lib.run_transactions([tx_1], measure_performance=True, skip_trace_parsing=True)
+    trace_res = my_lib.run_transactions([tx_1], measure_performance=True, skip_trace_parsing=False)
     print("\n\n trace res \n\n")
     if trace_res is not None and len(trace_res) > 0:
         pprint(trace_res[0])
+
+def test_run_eth_tests():
+    my_lib = CuEVMLib(
+        "contracts/test_bugs_simple.sol",
+        2,
+        "configurations/calldata_load.json",
+        run_eth_tests=True,
+    )
+    # print("\n\n instance data \n\n")
+    # pprint(my_lib.instances)
+
+    trace_res = my_lib.run_eth_tests()
+    print("\n\n trace res \n\n")
+    pprint(trace_res)
+# def test_erc20():
+#     my_lib = CuEVMLib(
+#         "contracts/erc20.sol",
+#         1,
+#         "configurations/erc20.json",
+#         contract_name="ERC20",
+#         detect_bug=False,
+#     )
+#     test_case = {
+#         "function": "mint",
+#         "type": "exec",
+#         "input_types": [],
+#         "input": [],
+#         "sender": 0,
+#     }
+#     test_case_2 = {
+#         "function": "transfer",
+#         "type": "exec",
+#         "input_types": ["address", "uint256"],
+#         "input": ["0x0000000000000000000000000000000000000001", 512],
+#         "sender": 0,
+#     }
+#     # print("instance data")
+#     # pprint(my_lib.instances)
+
+#     tx_1 = {
+#         "data": get_transaction_data_from_config(test_case, my_lib.contract_instance),
+#         "value": [hex(0)],
+#     }
+#     tx_2 = {
+#         "data": get_transaction_data_from_config(test_case_2, my_lib.contract_instance),
+#         "value": [hex(0)],
+#     }
+#     trace_res = my_lib.run_transactions([tx_1], measure_performance=True, skip_trace_parsing=True)
+#     # trace_res_2 = my_lib.run_transactions([tx_2], measure_performance=True, skip_trace_parsing=True)
+#     print("\n\n trace res \n\n")
+#     if trace_res is not None and len(trace_res) > 0:
+#         pprint(trace_res[0])
 
 def test_cross_contract():
     my_lib = CuEVMLib(
@@ -462,9 +534,32 @@ def test_cross_contract():
     print("\n\n trace res \n\n")
     pprint(trace_res)
 
-
 if __name__ == "__main__":
 
     # test_system_operation()
     # test_cross_contract()
-    test_bugs_simple()
+    # test_erc20()
+
+    def run_test_case(test_case_name):
+        if test_case_name == "system_operation":
+            test_system_operation()
+        elif test_case_name == "cross_contract":
+            test_cross_contract()
+        elif test_case_name == "erc20":
+            test_erc20()
+        elif test_case_name == "state_change":
+            test_state_change()
+        elif test_case_name == "bugs_simple":
+            test_bugs_simple()
+        elif test_case_name == "branching":
+            test_branching()
+        elif test_case_name == "run_eth_tests":
+            test_run_eth_tests()
+        else:
+            print(f"Unknown test case: {test_case_name}")
+
+    if len(sys.argv) > 1:
+        run_test_case(sys.argv[1])
+    else:
+        print("Please provide a test case name as a command line argument.")
+    # test_state_change()
