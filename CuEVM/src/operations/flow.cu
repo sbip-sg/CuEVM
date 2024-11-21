@@ -7,7 +7,7 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/operations/flow.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-
+#include <CuEVM/utils/opcodes.cuh>
 namespace CuEVM::operations {
 __host__ __device__ int32_t JUMP(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used, uint32_t &pc,
                                  CuEVM::evm_stack_t &stack, const CuEVM::evm_message_call_t &message) {
@@ -20,6 +20,10 @@ __host__ __device__ int32_t JUMP(ArithEnv &arith, const bn_t &gas_limit, bn_t &g
         error_code = cgbn_get_uint32_t(arith.env, destination_u32, destination) == ERROR_VALUE_OVERFLOW
                          ? ERROR_INVALID_JUMP_DESTINATION
                          : error_code;
+        if ((destination_u32 >= message.byte_code->size) || (message.byte_code->data[destination_u32] != OP_JUMPDEST)) {
+            return ERROR_INVALID_JUMP_DESTINATION;
+        }
+
         if (error_code == ERROR_SUCCESS) {
             pc = message.jump_destinations->has(destination_u32) == ERROR_SUCCESS
                      ? destination_u32 - 1
@@ -55,6 +59,10 @@ __host__ __device__ int32_t JUMPI(ArithEnv &arith, const bn_t &gas_limit, bn_t &
             simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
 #endif
 
+            if ((destination_u32 >= message.byte_code->size) ||
+                (message.byte_code->data[destination_u32] != OP_JUMPDEST)) {
+                return ERROR_INVALID_JUMP_DESTINATION;
+            }
             if (error_code == ERROR_SUCCESS) {
                 pc = message.jump_destinations->has(destination_u32) == ERROR_SUCCESS
                          ? destination_u32 - 1

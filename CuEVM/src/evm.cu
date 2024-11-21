@@ -30,18 +30,18 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM
     // instances[instance].simplified_trace_data_ptr->print();
 // printf("new instance %d\n", instance);
 #ifdef EIP_3155
-    if (instance == 0) {
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("instance %d\n", instance);
-        printf("world state\n");
-        instances[instance].world_state_data_ptr->print();
-        printf("touch state\n");
-        instances[instance].touch_state_data_ptr->print();
-        printf("instance %d\n", instance);
-        printf("transaction\n");
-        instances[instance].transaction_ptr->print();
-        __ONE_GPU_THREAD_WOSYNC_END__
-    }
+    // if (instance == 0) {
+    //     __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    //     printf("instance %d\n", instance);
+    //     printf("world state\n");
+    //     instances[instance].world_state_data_ptr->print();
+    //     printf("touch state\n");
+    //     instances[instance].touch_state_data_ptr->print();
+    //     printf("instance %d\n", instance);
+    //     printf("transaction\n");
+    //     instances[instance].transaction_ptr->print();
+    //     __ONE_GPU_THREAD_WOSYNC_END__
+    // }
 #endif
     // __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
     // __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
@@ -57,9 +57,9 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM
     // printf("\nevm->run(arith) instance %d\n", instance);
     // printf("print simplified trace data device inside evm\n");
     // evm->simplified_trace_data_ptr->print();
-    printf("gas limit %d thread %d\n", THREADIDX);
-    print_bnt(arith, evm->call_state_ptr->gas_limit);
-    print_bnt(arith, cached_state.gas_limit);
+    // printf("gas limit %d thread %d\n", THREADIDX);
+    // print_bnt(arith, evm->call_state_ptr->gas_limit);
+    // print_bnt(arith, cached_state.gas_limit);
     __SYNC_THREADS__
     evm->run(arith, cached_state);
 
@@ -108,17 +108,10 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
     // #ifndef __CUDA_ARCH__
     //     shared_message_call_ptr = new evm_message_call_t();
     // #endif
-#ifdef EIP_3155
-    // printing debug when enabling tracer.
-    // printf("call_state_ptr allocated %p, threadid %d\n", call_state_ptr, THREADIDX);
-    // transaction_ptr->print();
-    // call_state_ptr->print(arith);
-    // printf("call_state_local %d\n", THREADIDX);
-    // call_state_local.print(arith);
-#endif
+
     int32_t error_code = transaction_ptr->validate(arith, call_state_ptr->touch_state_ptr, *block_info_ptr,
                                                    call_state_ptr->gas_used, gas_price, gas_priority_fee);
-    // printf("transaction validated\n");
+    // printf("transaction validated error code %d\n", error_code);
     // #ifdef __CUDA_ARCH__
     //     printf("error  code %d idx %d \n", error_code, threadIdx.x);
     // #endif
@@ -130,12 +123,12 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
 
         shared_message_call_ptr->copy_from(transaction_call_message_ptr);
 
-        printf("message call copied %d\n", THREADIDX);
-        shared_message_call_ptr->print();
+        // printf("\n\n message call copied %d\n", THREADIDX);
+        // shared_message_call_ptr->print();
 
         CuEVM::evm_call_state_t *child_call_state_ptr = new CuEVM::evm_call_state_t(
             arith, call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr, shared_stack_ptr);
-        printf("child_call_state_ptr allocated %p, threadid %d\n", child_call_state_ptr, THREADIDX);
+        // printf("child_call_state_ptr allocated %p, threadid %d\n", child_call_state_ptr, THREADIDX);
         // print_bnt(arith, child_call_state_ptr->gas_limit);
         // subtract the gas used by the transaction initialization from the gas
         // limit
@@ -187,13 +180,13 @@ __host__ __device__ evm_t::~evm_t() {
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_state &cached_call_state) {
     // printf("start_CALL\n");
-// bn_t sender, recipient, value;
-// call_state_ptr->message_ptr->get_sender(arith, sender);
-// call_state_ptr->message_ptr->get_recipient(arith, recipient);
-#ifdef EIP_3155
-    printf("start_CALL %d\n", THREADIDX);
-    __SYNC_THREADS__
-#endif
+    // bn_t sender, recipient, value;
+    // call_state_ptr->message_ptr->get_sender(arith, sender);
+    // call_state_ptr->message_ptr->get_recipient(arith, recipient);
+    // #ifdef EIP_3155
+    // printf("start_CALL %d\n", THREADIDX);
+    // __SYNC_THREADS__
+    // #endif
 
     bn_t value;
     const evm_word_t *sender = &call_state_ptr->message_ptr->sender;
@@ -408,6 +401,8 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         // __ONE_GPU_THREAD_WOSYNC_BEGIN__
         // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
         //        THREADIDX);
+        // print_bnt(arith, cached_call_state.gas_limit);
+        // print_bnt(arith, cached_call_state.gas_used);
         // __ONE_GPU_THREAD_WOSYNC_END__
 
 #endif
@@ -934,9 +929,7 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
     const evm_word_t *beneficiary = &(block_info_ptr->coin_base);
     // block_info_ptr->get_coin_base(arith, beneficiary);
 #ifdef EIP_3155
-#ifdef __CUDA_ARCH__
-    printf("finish_TRANSACTION %d error_code: %d\n", threadIdx.x, error_code);
-#endif
+    __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
 #endif
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         bn_t gas_left;
@@ -991,13 +984,12 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
         // cgbn_mul(arith.env, gas_value, cached_call_state.gas_limit, gas_priority_fee);
         // set z to the given error or 1 TODO: 1 in YP
 #ifdef EIP_3155
-#ifdef __CUDA_ARCH__
-        printf("finish_TRANSACTION %d error_code: %d\n", threadIdx.x, error_code);
+        __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
         print_bnt(arith, gas_value);
         print_bnt(arith, call_state_ptr->gas_limit);
         print_bnt(arith, call_state_ptr->gas_used);
         print_bnt(arith, gas_priority_fee);
-#endif
+
 #endif
         status = error_code;
     }

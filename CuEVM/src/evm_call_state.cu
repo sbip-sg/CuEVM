@@ -10,6 +10,7 @@ __host__ __device__ cached_evm_call_state::cached_evm_call_state(ArithEnv& arith
     cgbn_set(arith.env, gas_used, state->gas_used);
     cgbn_set(arith.env, gas_limit, state->gas_limit);
     stack_ptr = state->stack_ptr;
+    // printf("message ptr %p\n", state->message_ptr);
     byte_code_size = state->message_ptr->byte_code->size;
     byte_code_data = state->message_ptr->byte_code->data;
 }
@@ -42,7 +43,7 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     this->last_return_data_ptr = last_return_data_ptr;
 #ifdef EIP_3155
     this->trace_idx = 0;
-    printf("evm_call_state_t constructor no parent %d\n", THREADIDX);
+    // printf("evm_call_state_t constructor no parent %d\n", THREADIDX);
 #endif
 }
 
@@ -117,7 +118,7 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::e
     memory_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::evm_memory_t();
     __ONE_GPU_THREAD_END__
 
-    printf("evm_call_state_t initialized memory pointer %p thread %d\n", memory_ptr, THREADIDX);
+    // printf("evm_call_state_t initialized memory pointer %p thread %d\n", memory_ptr, THREADIDX);
 
     this->memory_ptr = memory_ptr[INSTANCE_IDX_PER_BLOCK];
     // printf("memory size %d  idx %d\n", memory_ptr->size, THREADIDX);

@@ -56,8 +56,11 @@ __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &c
     // cgbn_set_byte_array_t(arith.env, contract_address, hash_address_bytes);
     // cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
     // todo check replacement
+    // __ONE_THREAD_PER_INSTANCE(printf("\n\nhash_address_bytes\n"););
+    // hash_address_bytes.print();
     sender_address_word[INSTANCE_IDX_PER_BLOCK].from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
-    if (THREAD_IDX_PER_INSTANCE < 3) sender_address_word[INSTANCE_IDX_PER_BLOCK]._limbs[THREAD_IDX_PER_INSTANCE] = 0;
+    if (THREAD_IDX_PER_INSTANCE >= CuEVM::cgbn_limbs - 3 && THREAD_IDX_PER_INSTANCE < CuEVM::cgbn_limbs)
+        sender_address_word[INSTANCE_IDX_PER_BLOCK]._limbs[THREAD_IDX_PER_INSTANCE] = 0;
     cgbn_load(arith.env, contract_address, &sender_address_word[INSTANCE_IDX_PER_BLOCK]);
     // #ifdef __CUDA_ARCH__
     //     printf("contract_address: thread id %d ", threadIdx.x);
@@ -98,7 +101,8 @@ __host__ __device__ int32_t get_contract_address_create2(ArithEnv &arith, bn_t &
     CuCrypto::keccak::sha3(input_data.data, total_bytes, hash_input_data.data, CuEVM::hash_size);
 
     sender_address_word[INSTANCE_IDX_PER_BLOCK].from_byte_array_t(hash_input_data, BIG_ENDIAN);
-    if (THREAD_IDX_PER_INSTANCE < 3) sender_address_word[INSTANCE_IDX_PER_BLOCK]._limbs[THREAD_IDX_PER_INSTANCE] = 0;
+    if (THREAD_IDX_PER_INSTANCE >= CuEVM::cgbn_limbs - 3 && THREAD_IDX_PER_INSTANCE < CuEVM::cgbn_limbs)
+        sender_address_word[INSTANCE_IDX_PER_BLOCK]._limbs[THREAD_IDX_PER_INSTANCE] = 0;
     cgbn_load(arith.env, contract_address, &sender_address_word[INSTANCE_IDX_PER_BLOCK]);
     // cgbn_set_byte_array_t(arith.env, contract_address, hash_input_data);
     // cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);

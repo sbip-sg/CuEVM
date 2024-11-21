@@ -212,11 +212,11 @@ __host__ void account_t::from_json(const cJSON *account_json, int32_t managed) {
 
     storage.from_json(cJSON_GetObjectItemCaseSensitive(account_json, "storage"), managed);
 #ifdef EIP_3155
-    printf("byte_code.size %d\n", byte_code.size);
-    printf("byte_code.data %p\n", byte_code.data);
-    printf("storage.size %d\n", storage.size);
-    printf("storage.capacity %d\n", storage.capacity);
-    printf("storage.storage %p\n", storage.storage);
+// printf("byte_code.size %d\n", byte_code.size);
+// printf("byte_code.data %p\n", byte_code.data);
+// printf("storage.size %d\n", storage.size);
+// printf("storage.capacity %d\n", storage.capacity);
+// printf("storage.storage %p\n", storage.storage);
 #endif
 }
 

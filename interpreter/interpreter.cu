@@ -118,6 +118,8 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         std::chrono::duration<double, std::milli> cpu_duration = cpu_end - cpu_start;
         printf("CPU EVM execution took %f ms\n", cpu_duration.count());
 #endif
+        break;
+        // run only one test
     }
 
     printf("Freeing the memory ...\n");

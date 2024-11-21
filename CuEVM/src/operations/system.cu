@@ -228,9 +228,13 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
             CuEVM::utils::get_contract_address_create(arith, contract_address, sender_address, sender_nonce);
         }
 
+        __ONE_THREAD_PER_INSTANCE(printf("\n\ncontract address\n"););
+        print_bnt(arith, contract_address);
         __SHARED_MEMORY__ evm_word_t contract_address_shared[CGBN_IBP], gas_shared[CGBN_IBP], value_shared[CGBN_IBP];
         cgbn_store(arith.env, &contract_address_shared[INSTANCE_IDX_PER_BLOCK], contract_address);
 
+        __ONE_THREAD_PER_INSTANCE(printf("\n\ncontract address shared\n"););
+        contract_address_shared[INSTANCE_IDX_PER_BLOCK].print();
         if (!current_state.touch_state_ptr->is_empty_account_create(arith,
                                                                     &contract_address_shared[INSTANCE_IDX_PER_BLOCK])) {
             // corner collision case: must set warm for the contract address
@@ -394,7 +398,7 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
     if (error_code == ERROR_SUCCESS)  // break down scope to avoid stack problems
         error_code |= generic_CALL(arith, args_offset, args_size, current_state, new_state_ptr, cached_state);
 
-    printf("opcode CALL error_code %d thread %d\n", error_code, THREADIDX);
+    // printf("opcode CALL error_code %d thread %d\n", error_code, THREADIDX);
     return error_code;
 }
 

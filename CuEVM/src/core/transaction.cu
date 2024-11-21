@@ -240,6 +240,9 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     // bn_t sender_address;
     // get_sender(arith, sender_address);
     // printf("after get_sender\n");
+    __ONE_THREAD_PER_INSTANCE(printf("sender address\n"););
+    this->sender.print();
+
     CuEVM::account_t *sender_account = nullptr;
     touch_state_ptr->get_account(arith, &this->sender, sender_account,
                                  ACCOUNT_BALANCE_FLAG | ACCOUNT_NONCE_FLAG | ACCOUNT_BYTE_CODE_FLAG);
@@ -581,7 +584,8 @@ __host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transacti
         data_idnex = index % data_counts;
         gas_limit_index = (index / data_counts) % gas_limit_counts;
         value_index = (index / (data_counts * gas_limit_counts)) % value_counts;
-        std::copy(template_transaction_ptr, template_transaction_ptr + 1, transactions_ptr + idx);
+        // std::copy(template_transaction_ptr, template_transaction_ptr + 1, transactions_ptr + idx);
+        memcpy(&transactions_ptr[idx], template_transaction_ptr, sizeof(evm_transaction_t));
         transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_idnex)->valuestring, LITTLE_ENDIAN,
                                                  CuEVM::PaddingDirection::NO_PADDING, managed);
         transactions_ptr[idx].gas_limit.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);

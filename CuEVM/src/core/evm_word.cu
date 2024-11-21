@@ -123,6 +123,21 @@ __host__ __device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_arr
     return ERROR_SUCCESS;
 }
 
+// __device__ __host__ __device__ int32_t evm_word_t::address_from_byte_array_t(byte_array_t &byte_array) {
+//     if (byte_array.size != CuEVM::word_size) {
+//         return ERROR_BYTE_ARRAY_INVALID_SIZE;
+//     }
+//     uint8_t *bytes = nullptr;
+
+//     uint8_t my_idx = THREAD_IDX_PER_INSTANCE;
+//     if (my_idx < CuEVM::cgbn_limbs) {
+//         bytes = byte_array.data + CuEVM::word_size - 1 - my_idx * 4;
+//         _limbs[my_idx] = (*(bytes--) | *(bytes--) << 8 | *(bytes--) << 16 | *(bytes--) << 24);
+//     }
+
+//     return ERROR_SUCCESS;
+// }
+
 __host__ __device__ int32_t evm_word_t::from_size_t(size_t value) {
     if (sizeof(size_t) == sizeof(uint64_t)) {
         return from_uint64_t(value);

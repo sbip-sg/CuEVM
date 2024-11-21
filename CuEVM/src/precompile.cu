@@ -129,23 +129,28 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
     byte_array_t bsize_array = byte_array_t(input_data.data, 32);
     byte_array_t esize_array = byte_array_t(input_data.data + 32, 32);
     byte_array_t msize_array = byte_array_t(input_data.data + 64, 32);
-
-    int32_t error = cgbn_set_byte_array_t(arith.env, base_size, bsize_array);
-    error |= cgbn_set_byte_array_t(arith.env, exponent_size, esize_array);
-    error |= cgbn_set_byte_array_t(arith.env, modulus_size, msize_array);
+    int32_t error = ERROR_SUCCESS;
+    // int32_t error = cgbn_set_byte_array_t(arith.env, base_size, bsize_array);
+    // error |= cgbn_set_byte_array_t(arith.env, exponent_size, esize_array);
+    // error |= cgbn_set_byte_array_t(arith.env, modulus_size, msize_array);
+    cgbn_set_memory(arith.env, base_size, bsize_array.data);
+    cgbn_set_memory(arith.env, exponent_size, esize_array.data);
+    cgbn_set_memory(arith.env, modulus_size, msize_array.data);
 
 #ifdef EIP_3155
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     printf("base size\n");
     print_bnt(arith, base_size);
     printf("exponent size\n");
     print_bnt(arith, exponent_size);
     printf("modulus size\n");
     print_bnt(arith, modulus_size);
+    __ONE_GPU_THREAD_WOSYNC_END__
 #endif
 
-    if (error) {
-        return error;
-    }
+    // if (error) {
+    //     return error;
+    // }
 
     uint32_t base_len, exp_len, mod_len, data_len;
     data_len = message->data->size;
@@ -182,7 +187,8 @@ __host__ __device__ int32_t operation_MODEXP(ArithEnv &arith, bn_t &gas_limit, b
 
     bool exp_is_zero = true;
 #ifdef __CUDA_ARCH__
-    printf("data len %d\n", data_len);
+
+    __ONE_THREAD_PER_INSTANCE(printf("data len %d\n", data_len););
     message->data->print();
 #endif
     // get a pointer to available bytes (call_exponent_size) of exponen
@@ -409,44 +415,52 @@ __host__ __device__ int32_t operation_ecRecover(ArithEnv &arith, CuEVM::EccConst
         // complete with zeroes the remaing bytes
         // input = arith.padded_malloc_byte_array(tmp_input, size, 128);
         CuEVM::byte_array_t input(message->get_data(), 0, 128);
-        __SHARED_MEMORY__ ecc::signature_t signature;
+        __SHARED_MEMORY__ ecc::signature_t *signature[CGBN_IBP];
+        __ONE_THREAD_PER_INSTANCE(signature[INSTANCE_IDX_PER_BLOCK] = new ecc::signature_t(););
         bn_t msg_hash, v, r, s, signer;
         cgbn_set_memory(arith.env, msg_hash, input.data, 32);
         cgbn_set_memory(arith.env, v, input.data + 32, 32);
         cgbn_set_memory(arith.env, r, input.data + 64, 32);
         cgbn_set_memory(arith.env, s, input.data + 96, 32);
 
-        cgbn_store(arith.env, &signature.msg_hash, msg_hash);
-        cgbn_store(arith.env, &signature.r, r);
-        cgbn_store(arith.env, &signature.s, s);
-        signature.v = cgbn_get_ui32(arith.env, v);
+        cgbn_store(arith.env, &signature[INSTANCE_IDX_PER_BLOCK]->msg_hash, msg_hash);
+        cgbn_store(arith.env, &signature[INSTANCE_IDX_PER_BLOCK]->r, r);
+        cgbn_store(arith.env, &signature[INSTANCE_IDX_PER_BLOCK]->s, s);
+        signature[INSTANCE_IDX_PER_BLOCK]->v = cgbn_get_ui32(arith.env, v);
 #ifdef EIP_3155
-        printf("\n v %d\n", signature.v);
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        printf("\n v %d\n", signature[INSTANCE_IDX_PER_BLOCK]->v);
         printf("r : \n");
         print_bnt(arith, r);
         printf("s : \n");
         print_bnt(arith, s);
         printf("msgh: \n");
         print_bnt(arith, msg_hash);
+        __ONE_GPU_THREAD_WOSYNC_END__
 #endif
         // TODO: is not 27 and 28, only?
         if (cgbn_compare_ui32(arith.env, v, 28) <= 0) {
-            __SHARED_MEMORY__ uint8_t output[32];
-            size_t res = ecc::ec_recover(arith, constants, signature, signer);
+            __SHARED_MEMORY__ uint8_t *output[CGBN_IBP];
+            __ONE_THREAD_PER_INSTANCE(output[INSTANCE_IDX_PER_BLOCK] = new uint8_t[32];);
+            size_t res = ecc::ec_recover(arith, constants, *signature[INSTANCE_IDX_PER_BLOCK], signer);
 #ifdef EIP_3155
+            __ONE_GPU_THREAD_WOSYNC_BEGIN__
             printf("ec recover %d\n", res);
             print_bnt(arith, signer);
+            __ONE_GPU_THREAD_WOSYNC_END__
 #endif
             if (res == ERROR_SUCCESS) {
-                memory_from_cgbn(arith, output, signer);
-                *return_data = byte_array_t(output, 32);
+                memory_from_cgbn(arith, output[INSTANCE_IDX_PER_BLOCK], signer);
+                *return_data = byte_array_t(output[INSTANCE_IDX_PER_BLOCK], 32);
                 error_code = ERROR_RETURN;
             } else {
                 // TODO: do we consume all gas?
                 // it happens by default because of the error code
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
             }
+            __ONE_THREAD_PER_INSTANCE(delete output[INSTANCE_IDX_PER_BLOCK];);
         }
+        __ONE_THREAD_PER_INSTANCE(delete signature[INSTANCE_IDX_PER_BLOCK];);
         return ERROR_RETURN;
     }
     return error_code;
@@ -474,18 +488,20 @@ __host__ __device__ int32_t operation_ecAdd(ArithEnv &arith, CuEVM::EccConstants
         // printf("y1: %s\n", ecc::bnt_to_string(arith._env, y1));
         // printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
         // printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
-        __SHARED_MEMORY__ uint8_t output[64];
+        __SHARED_MEMORY__ uint8_t *output[CGBN_IBP];
+        __ONE_THREAD_PER_INSTANCE(output[INSTANCE_IDX_PER_BLOCK] = new uint8_t[64];);
         int res = ecc::ec_add(arith, constants->alt_BN128, x1, y1, x1, y1, x2, y2);
         if (res == 0) {
-            memory_from_cgbn(arith, output, x1);
-            memory_from_cgbn(arith, output + 32, y1);
+            memory_from_cgbn(arith, output[INSTANCE_IDX_PER_BLOCK], x1);
+            memory_from_cgbn(arith, output[INSTANCE_IDX_PER_BLOCK] + 32, y1);
             // return_data.set(output, 64);
-            *return_data = byte_array_t(output, 64);
+            *return_data = byte_array_t(output[INSTANCE_IDX_PER_BLOCK], 64);
             error_code = ERROR_RETURN;
         } else {
             // consume all gas because it is an error
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         }
+        __ONE_THREAD_PER_INSTANCE(delete output[INSTANCE_IDX_PER_BLOCK];);
     }
     return error_code;
 }
@@ -508,21 +524,23 @@ __host__ __device__ int32_t operation_ecMul(ArithEnv &arith, CuEVM::EccConstants
         // printf("mul y: %s\n", ecc::bnt_to_string(arith._env, y));
         // printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
 
-        __SHARED_MEMORY__ uint8_t output[64];
+        __SHARED_MEMORY__ uint8_t *output[CGBN_IBP];
+        __ONE_THREAD_PER_INSTANCE(output[INSTANCE_IDX_PER_BLOCK] = new uint8_t[64];);
         int res = ecc::ec_mul(arith, constants->alt_BN128, x, y, x, y, k);
         // print result
         // printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
         // printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
         if (res == 0) {
-            memory_from_cgbn(arith, output, x);
-            memory_from_cgbn(arith, output + 32, y);
+            memory_from_cgbn(arith, output[INSTANCE_IDX_PER_BLOCK], x);
+            memory_from_cgbn(arith, output[INSTANCE_IDX_PER_BLOCK] + 32, y);
             // return_data.set(output, 64);
-            *return_data = byte_array_t(output, 64);
+            *return_data = byte_array_t(output[INSTANCE_IDX_PER_BLOCK], 64);
             error_code = ERROR_RETURN;
         } else {
             // consume all gas because it is an error
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         }
+        __ONE_THREAD_PER_INSTANCE(delete output[INSTANCE_IDX_PER_BLOCK];);
     }
     return error_code;
 }
