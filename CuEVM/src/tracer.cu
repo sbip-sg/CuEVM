@@ -208,15 +208,15 @@ __host__ __device__ tracer_t::~tracer_t() {
 }
 
 __host__ __device__ void tracer_t::grow() {
-    __SHARED_MEMORY__ trace_data_t *new_data;
+    __SHARED_MEMORY__ trace_data_t *new_data[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    new_data = new trace_data_t[capacity + 128];
+    new_data[INSTANCE_IDX_PER_BLOCK] = new trace_data_t[capacity + 128];
     if (data != nullptr) {
-        memcpy(new_data, data, sizeof(trace_data_t) * size);
+        memcpy(new_data[INSTANCE_IDX_PER_BLOCK], data, sizeof(trace_data_t) * size);
         delete[] data;
     }
     __ONE_GPU_THREAD_END__
-    data = new_data;
+    data = new_data[INSTANCE_IDX_PER_BLOCK];
     __SYNC_THREADS__
     capacity += 128;
 }
@@ -229,9 +229,9 @@ __host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const ui
     if (size == capacity) {
         grow();
     }
-    // #ifdef __CUDA_ARCH__
-    //     printf("tracer op %d idx %d after  grow\n", op, threadIdx.x);
-    // #endif
+
+    // printf("tracer op %d idx %d size %d after grow\n", op, THREADIDX, size);
+
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].pc = pc;
     data[size].op = op;

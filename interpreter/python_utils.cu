@@ -309,6 +309,8 @@ void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyOb
 
     evm_transaction_t* all_transactions = getTransactionDataFromListofPyObject(read_roots);
 
+    // share world state data
+    CuEVM::state_t* shared_world_state_data = nullptr;
     // generate the evm instances
 
     CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
@@ -320,6 +322,11 @@ void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyOb
         }
 
         evm_instances[index].world_state_data_ptr = getStateDataFromPyObject(PyDict_GetItemString(read_root, "pre"));
+        // if (shared_world_state_data == nullptr) {
+        //     shared_world_state_data = getStateDataFromPyObject(PyDict_GetItemString(read_root, "pre"));
+        // }
+        // evm_instances[index].world_state_data_ptr = shared_world_state_data;
+
         evm_instances[index].block_info_ptr = getBlockDataFromPyObject(PyDict_GetItemString(read_root, "env"));
         evm_instances[index].transaction_ptr = &all_transactions[index];
 

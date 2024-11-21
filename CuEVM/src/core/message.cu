@@ -7,42 +7,17 @@
 #include <CuEVM/core/message.cuh>
 
 namespace CuEVM {
-// __host__ __device__ evm_message_call_t::evm_message_call_t(
-//     ArithEnv &arith, const bn_t &sender, const bn_t &recipient, const bn_t &contract_address, const bn_t &gas_limit,
-//     const bn_t &value, const uint32_t depth, const uint32_t call_type, const bn_t &storage_address,
-//     const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code, const bn_t &return_data_offset,
-//     const bn_t &return_data_size, const uint32_t static_env) {
-//     cgbn_store(arith.env, &this->sender, sender);
-//     cgbn_store(arith.env, &this->recipient, recipient);
-//     // printf("evm_message_call_t constructor contract_address: ");
-//     // print_bnt(arith, contract_address);
-
-//     cgbn_store(arith.env, &this->contract_address, contract_address);
-//     this->contract_address.print();
-//     cgbn_store(arith.env, &this->gas_limit, gas_limit);
-//     cgbn_store(arith.env, &this->value, value);
-//     this->depth = depth;
-//     this->call_type = call_type;
-//     cgbn_store(arith.env, &this->storage_address, storage_address);
-//     this->data = new byte_array_t(data);
-//     this->byte_code = new byte_array_t(byte_code);
-//     cgbn_store(arith.env, &this->return_data_offset, return_data_offset);
-//     cgbn_store(arith.env, &this->return_data_size, return_data_size);
-//     this->static_env = static_env;
-//     // create the jump destinations
-//     this->jump_destinations = new CuEVM::jump_destinations_t(*this->byte_code);
-// }
 
 __host__ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
     ArithEnv &arith, const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *contract_address,
     const evm_word_t *gas_limit, const evm_word_t *value, const uint32_t depth, const uint32_t call_type,
     const evm_word_t *storage_address, const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code,
     const bn_t &return_data_offset, const bn_t &return_data_size, const uint32_t static_env) {
-    __SHARED_MEMORY__ evm_word_t *new_params_data;
+    __SHARED_MEMORY__ evm_word_t *new_params_data[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    new_params_data = new evm_word_t[8];
+    new_params_data[INSTANCE_IDX_PER_BLOCK] = new evm_word_t[8];
     __ONE_GPU_THREAD_END__
-    this->params_data = new_params_data;
+    this->params_data = new_params_data[INSTANCE_IDX_PER_BLOCK];
     /*
     evm_word_t *sender;
     evm_word_t *recipient;

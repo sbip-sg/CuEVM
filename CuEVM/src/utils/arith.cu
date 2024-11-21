@@ -62,6 +62,7 @@ __host__ __device__ int32_t cgbn_get_uint32_t(env_t env, uint32_t &dst, const bn
     return cgbn_compare(env, tmp, src) == 0 ? ERROR_SUCCESS : ERROR_VALUE_OVERFLOW;
 }
 
+// deprecated, todo fix this
 __host__ __device__ int32_t cgbn_set_byte_array_t(env_t env, bn_t &out, const byte_array_t &byte_array) {
     uint32_t word_size = env_t::BITS / 8;
     if (byte_array.size != word_size) return ERROR_INVALID_WORD_SIZE;
@@ -131,8 +132,8 @@ __host__ __device__ void evm_address_conversion(ArithEnv &arith, bn_t &address) 
     cgbn_bitwise_mask_and(arith.env, address, address, CuEVM::address_bits);
 }
 __host__ __device__ void print_bnt(ArithEnv &arith, const bn_t &bn) {
-    __SHARED_MEMORY__ evm_word_t tmp_word;
-    cgbn_store(arith.env, &tmp_word, bn);
-    tmp_word.print();
+    __SHARED_MEMORY__ evm_word_t tmp_word[CGBN_IBP];
+    cgbn_store(arith.env, &tmp_word[INSTANCE_IDX_PER_BLOCK], bn);
+    tmp_word[INSTANCE_IDX_PER_BLOCK].print();
 }
 }  // namespace CuEVM

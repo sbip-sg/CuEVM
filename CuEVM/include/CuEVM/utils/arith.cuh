@@ -36,8 +36,7 @@ class ArithEnv {
      * @param[in] report The error report for the CGBN library
      * @param[in] instance The instance number for the CGBN library
      */
-    __device__ ArithEnv(cgbn_monitor_t monitor, cgbn_error_report_t *report,
-                        uint32_t instance);
+    __device__ ArithEnv(cgbn_monitor_t monitor, cgbn_error_report_t *report, uint32_t instance);
 
     /**
      * The constructor.  This takes a monitor for the CGBN library.
@@ -70,36 +69,30 @@ class ArithEnv {
  * @param[in] src The memory byte array
  * @param[in] size The size of the memory byte array
  */
-__host__ __device__ void cgbn_set_memory(env_t env, bn_t &dst,
-                                         const uint8_t *src,
-                                         const uint32_t size = 32);
+__host__ __device__ void cgbn_set_memory(env_t env, bn_t &dst, const uint8_t *src, const uint32_t size = 32);
 
 /**
  * Get a CGBN type from a size_t.
  * @param[out] dst The destination CGBN
  * @param[in] src The size_t
  */
-__host__ __device__ void cgbn_set_size_t(env_t env, bn_t &dst,
-                                         const size_t src);
+__host__ __device__ void cgbn_set_size_t(env_t env, bn_t &dst, const size_t src);
 /**
  * Get a size_t from a CGBN type.
  * @param[out] dst The destination size_t
  * @param[in] src The source CGBN
  * @return 1 for overflow, 0 otherwiese
  */
-__host__ __device__ int32_t cgbn_get_size_t(env_t env, size_t &dst,
-                                            const bn_t &src);
+__host__ __device__ int32_t cgbn_get_size_t(env_t env, size_t &dst, const bn_t &src);
 /**
  * Get a uint64_t from a CGBN type.
  * @param[out] dst The destination uint64_t
  * @param[in] src The source CGBN
  * @return 1 for overflow, 0 otherwiese
  */
-__host__ __device__ int32_t cgbn_get_uint64_t(env_t env, uint64_t &dst,
-                                              const bn_t &src);
+__host__ __device__ int32_t cgbn_get_uint64_t(env_t env, uint64_t &dst, const bn_t &src);
 
-__host__ __device__ int32_t cgbn_get_uint32_t(env_t env, uint32_t &dst,
-                                              const bn_t &src);
+__host__ __device__ int32_t cgbn_get_uint32_t(env_t env, uint32_t &dst, const bn_t &src);
 
 /**
  * Get the cgbn number from the byte array.
@@ -107,8 +100,7 @@ __host__ __device__ int32_t cgbn_get_uint32_t(env_t env, uint32_t &dst,
  * @param[out] out The cgbn number.
  * @return The Error code. 0 for success, 1 for failure.
  */
-__host__ __device__ int32_t
-cgbn_set_byte_array_t(env_t env, bn_t &out, const byte_array_t &byte_array);
+__host__ __device__ int32_t cgbn_set_byte_array_t(env_t env, bn_t &out, const byte_array_t &byte_array);
 
 /**
  * Get the sub byte array from the byte array.
@@ -118,12 +110,8 @@ cgbn_set_byte_array_t(env_t env, bn_t &out, const byte_array_t &byte_array);
  * @param[out] out The sub byte array.
  * @return The Error code. 0 for success, 1 for failure.
  */
-__host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
-                                                 const byte_array_t &byte_array,
-                                                 const bn_t &index,
-                                                 const bn_t &length,
-                                                 byte_array_t &out);
-
+__host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith, const byte_array_t &byte_array, const bn_t &index,
+                                                 const bn_t &length, byte_array_t &out);
 
 /**
  * Get an array of maximum 256 bytes, each having value 1 or 0 indicating bit
@@ -133,9 +121,7 @@ __host__ __device__ int32_t get_sub_byte_array_t(ArithEnv &arith,
  * @param[in] src_cgbn_mem
  * @param limb_count
  */
-__host__ __device__ void get_bit_array(uint8_t *dst_array,
-                                       uint32_t &array_length,
-                                       evm_word_t &src_cgbn_mem,
+__host__ __device__ void get_bit_array(uint8_t *dst_array, uint32_t &array_length, evm_word_t &src_cgbn_mem,
                                        uint32_t limb_count = 8);
 
 /**
@@ -146,9 +132,7 @@ __host__ __device__ void get_bit_array(uint8_t *dst_array,
  * @param[in] src_cgbn_mem
  * @param limb_count
  */
-__host__ __device__ void byte_array_from_cgbn_memory(uint8_t *dst_array,
-                                                     size_t &array_length,
-                                                     evm_word_t &src_cgbn_mem,
+__host__ __device__ void byte_array_from_cgbn_memory(uint8_t *dst_array, size_t &array_length, evm_word_t &src_cgbn_mem,
                                                      size_t limb_count = 8);
 
 /**
@@ -158,8 +142,7 @@ __host__ __device__ void byte_array_from_cgbn_memory(uint8_t *dst_array,
  * @param[out] dst The memory byte array
  * @param[in] src The source CGBN
  */
-__host__ __device__ void memory_from_cgbn(ArithEnv &arith, uint8_t *dst,
-                                          bn_t &src);
+__host__ __device__ void memory_from_cgbn(ArithEnv &arith, uint8_t *dst, bn_t &src);
 
 /**
  * Convert and evm word to and address format

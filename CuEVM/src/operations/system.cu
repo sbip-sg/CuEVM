@@ -228,12 +228,13 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
             CuEVM::utils::get_contract_address_create(arith, contract_address, sender_address, sender_nonce);
         }
 
-        __SHARED_MEMORY__ evm_word_t contract_address_shared, gas_shared, value_shared;
-        cgbn_store(arith.env, &contract_address_shared, contract_address);
+        __SHARED_MEMORY__ evm_word_t contract_address_shared[CGBN_IBP], gas_shared[CGBN_IBP], value_shared[CGBN_IBP];
+        cgbn_store(arith.env, &contract_address_shared[INSTANCE_IDX_PER_BLOCK], contract_address);
 
-        if (!current_state.touch_state_ptr->is_empty_account_create(arith, &contract_address_shared)) {
+        if (!current_state.touch_state_ptr->is_empty_account_create(arith,
+                                                                    &contract_address_shared[INSTANCE_IDX_PER_BLOCK])) {
             // corner collision case: must set warm for the contract address
-            current_state.touch_state_ptr->set_warm_account(arith, &contract_address_shared);
+            current_state.touch_state_ptr->set_warm_account(arith, &contract_address_shared[INSTANCE_IDX_PER_BLOCK]);
             error_code |= ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
         }
 
@@ -248,13 +249,15 @@ __host__ __device__ int32_t generic_CREATE(ArithEnv &arith, CuEVM::evm_call_stat
         cgbn_set_ui32(arith.env, ret_size, 0);
         CuEVM::byte_array_t call_data;
 
-        cgbn_store(arith.env, &gas_shared, gas_capped);
-        cgbn_store(arith.env, &value_shared, value);
+        cgbn_store(arith.env, &gas_shared[INSTANCE_IDX_PER_BLOCK], gas_capped);
+        cgbn_store(arith.env, &value_shared[INSTANCE_IDX_PER_BLOCK], value);
 
         evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            arith, &current_state.message_ptr->recipient, &contract_address_shared, &contract_address_shared,
-            &gas_shared, &value_shared, current_state.message_ptr->get_depth() + 1, opcode, &contract_address_shared,
-            call_data, initialisation_code, ret_offset, ret_size, current_state.message_ptr->get_static_env());
+            arith, &current_state.message_ptr->recipient, &contract_address_shared[INSTANCE_IDX_PER_BLOCK],
+            &contract_address_shared[INSTANCE_IDX_PER_BLOCK], &gas_shared[INSTANCE_IDX_PER_BLOCK],
+            &value_shared[INSTANCE_IDX_PER_BLOCK], current_state.message_ptr->get_depth() + 1, opcode,
+            &contract_address_shared[INSTANCE_IDX_PER_BLOCK], call_data, initialisation_code, ret_offset, ret_size,
+            current_state.message_ptr->get_static_env());
 
         current_state.message_ptr->copy_from(message_call_ptr);
         // create the new evm call state
@@ -347,10 +350,10 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
-        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
-        cgbn_store(arith.env, &target_address, address);
-        cgbn_store(arith.env, &gas_shared, gas);
-        cgbn_store(arith.env, &value_shared, value);
+        __SHARED_MEMORY__ evm_word_t target_address[CGBN_IBP], gas_shared[CGBN_IBP], value_shared[CGBN_IBP];
+        cgbn_store(arith.env, &target_address[INSTANCE_IDX_PER_BLOCK], address);
+        cgbn_store(arith.env, &gas_shared[INSTANCE_IDX_PER_BLOCK], gas);
+        cgbn_store(arith.env, &value_shared[INSTANCE_IDX_PER_BLOCK], value);
         // bn_t sender;
         // current_state.message_ptr->get_recipient(arith, sender);  // I_{a}
         // bn_t recipient;
@@ -365,8 +368,10 @@ __host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &curre
         //         printf("opcode CALL before constructing message call t %d\n", threadIdx.x);
         // #endif
         evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            arith, &current_state.message_ptr->recipient, &target_address, &target_address, &gas_shared, &value_shared,
-            current_state.message_ptr->get_depth() + 1, OP_CALL, &target_address, call_data, code, ret_offset, ret_size,
+            arith, &current_state.message_ptr->recipient, &target_address[INSTANCE_IDX_PER_BLOCK],
+            &target_address[INSTANCE_IDX_PER_BLOCK], &gas_shared[INSTANCE_IDX_PER_BLOCK],
+            &value_shared[INSTANCE_IDX_PER_BLOCK], current_state.message_ptr->get_depth() + 1, OP_CALL,
+            &target_address[INSTANCE_IDX_PER_BLOCK], call_data, code, ret_offset, ret_size,
             current_state.message_ptr->get_static_env());
 
         current_state.message_ptr->copy_from(message_call_ptr);
@@ -415,10 +420,10 @@ __host__ __device__ int32_t CALLCODE(ArithEnv &arith, CuEVM::evm_call_state_t &c
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
-        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
-        cgbn_store(arith.env, &target_address, address);
-        cgbn_store(arith.env, &gas_shared, gas);
-        cgbn_store(arith.env, &value_shared, value);
+        __SHARED_MEMORY__ evm_word_t target_address[CGBN_IBP], gas_shared[CGBN_IBP], value_shared[CGBN_IBP];
+        cgbn_store(arith.env, &target_address[INSTANCE_IDX_PER_BLOCK], address);
+        cgbn_store(arith.env, &gas_shared[INSTANCE_IDX_PER_BLOCK], gas);
+        cgbn_store(arith.env, &value_shared[INSTANCE_IDX_PER_BLOCK], value);
 
         // bn_t sender;
         // current_state.message_ptr->get_recipient(arith, sender);  // I_{a}
@@ -432,8 +437,9 @@ __host__ __device__ int32_t CALLCODE(ArithEnv &arith, CuEVM::evm_call_state_t &c
         CuEVM::byte_array_t code;
 
         evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            arith, &current_state.message_ptr->recipient, &current_state.message_ptr->recipient, &target_address,
-            &gas_shared, &value_shared, current_state.message_ptr->get_depth() + 1, OP_CALLCODE,
+            arith, &current_state.message_ptr->recipient, &current_state.message_ptr->recipient,
+            &target_address[INSTANCE_IDX_PER_BLOCK], &gas_shared[INSTANCE_IDX_PER_BLOCK],
+            &value_shared[INSTANCE_IDX_PER_BLOCK], current_state.message_ptr->get_depth() + 1, OP_CALLCODE,
             &current_state.message_ptr->recipient, call_data, code, ret_offset, ret_size,
             current_state.message_ptr->get_static_env());
 
@@ -504,19 +510,20 @@ __host__ __device__ int32_t DELEGATECALL(ArithEnv &arith, CuEVM::evm_call_state_
         // current_state.message_ptr->get_recipient(arith, recipient);  // I_{a}
         // bn_t contract_address;
         // cgbn_set(arith.env, contract_address, address);  // t
-        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
+        __SHARED_MEMORY__ evm_word_t target_address[CGBN_IBP], gas_shared[CGBN_IBP], value_shared[CGBN_IBP];
 
-        cgbn_store(arith.env, &target_address, address);
-        cgbn_store(arith.env, &gas_shared, gas);
-        cgbn_store(arith.env, &value_shared, value);
+        cgbn_store(arith.env, &target_address[INSTANCE_IDX_PER_BLOCK], address);
+        cgbn_store(arith.env, &gas_shared[INSTANCE_IDX_PER_BLOCK], gas);
+        cgbn_store(arith.env, &value_shared[INSTANCE_IDX_PER_BLOCK], value);
         // bn_t storage_address;
         // cgbn_set(arith.env, storage_address, recipient);  // I_{a}
         CuEVM::byte_array_t call_data;
         CuEVM::byte_array_t code;
 
         evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            arith, &current_state.message_ptr->sender, &current_state.message_ptr->recipient, &target_address,
-            &gas_shared, &value_shared, current_state.message_ptr->get_depth() + 1, OP_DELEGATECALL,
+            arith, &current_state.message_ptr->sender, &current_state.message_ptr->recipient,
+            &target_address[INSTANCE_IDX_PER_BLOCK], &gas_shared[INSTANCE_IDX_PER_BLOCK],
+            &value_shared[INSTANCE_IDX_PER_BLOCK], current_state.message_ptr->get_depth() + 1, OP_DELEGATECALL,
             &current_state.message_ptr->recipient, call_data, code, ret_offset, ret_size,
             current_state.message_ptr->get_static_env());
         current_state.message_ptr->copy_from(message_call_ptr);
@@ -561,10 +568,10 @@ __host__ __device__ int32_t STATICCALL(ArithEnv &arith, CuEVM::evm_call_state_t 
     if (error_code == ERROR_SUCCESS) {
         // clean the address
         CuEVM::evm_address_conversion(arith, address);
-        __SHARED_MEMORY__ evm_word_t target_address, gas_shared, value_shared;
-        cgbn_store(arith.env, &target_address, address);
-        cgbn_store(arith.env, &gas_shared, gas);
-        cgbn_store(arith.env, &value_shared, value);
+        __SHARED_MEMORY__ evm_word_t target_address[CGBN_IBP], gas_shared[CGBN_IBP], value_shared[CGBN_IBP];
+        cgbn_store(arith.env, &target_address[INSTANCE_IDX_PER_BLOCK], address);
+        cgbn_store(arith.env, &gas_shared[INSTANCE_IDX_PER_BLOCK], gas);
+        cgbn_store(arith.env, &value_shared[INSTANCE_IDX_PER_BLOCK], value);
         // bn_t sender;
         // current_state.message_ptr->get_recipient(arith, sender);  //  I_{a}
         // bn_t recipient;
@@ -577,9 +584,10 @@ __host__ __device__ int32_t STATICCALL(ArithEnv &arith, CuEVM::evm_call_state_t 
         CuEVM::byte_array_t code;
 
         evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            arith, &current_state.message_ptr->recipient, &target_address, &target_address, &gas_shared, &value_shared,
-            current_state.message_ptr->get_depth() + 1, OP_STATICCALL, &target_address, call_data, code, ret_offset,
-            ret_size, 1);
+            arith, &current_state.message_ptr->recipient, &target_address[INSTANCE_IDX_PER_BLOCK],
+            &target_address[INSTANCE_IDX_PER_BLOCK], &gas_shared[INSTANCE_IDX_PER_BLOCK],
+            &value_shared[INSTANCE_IDX_PER_BLOCK], current_state.message_ptr->get_depth() + 1, OP_STATICCALL,
+            &target_address[INSTANCE_IDX_PER_BLOCK], call_data, code, ret_offset, ret_size, 1);
         current_state.message_ptr->copy_from(message_call_ptr);
 
         new_state_ptr = new CuEVM::evm_call_state_t(arith, &current_state, current_state.message_ptr, message_call_ptr);
@@ -646,31 +654,31 @@ __host__ __device__ int32_t SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit,
     } else {
         bn_t recipient;
         error_code |= stack.pop(arith, recipient);
-        __SHARED_MEMORY__ evm_word_t recipient_shared;
-        cgbn_store(arith.env, &recipient_shared, recipient);
+        __SHARED_MEMORY__ evm_word_t recipient_shared[CGBN_IBP];
+        cgbn_store(arith.env, &recipient_shared[INSTANCE_IDX_PER_BLOCK], recipient);
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SELFDESTRUCT);
         // bn_t contract_address;
         // message.get_contract_address(arith, contract_address);
 
         // custom logic, cannot use access_account_cost (no warm cost)
-        if (!touch_state.is_warm_account(arith, &recipient_shared))
+        if (!touch_state.is_warm_account(arith, &recipient_shared[INSTANCE_IDX_PER_BLOCK]))
             cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
 
         bn_t sender_balance;
         touch_state.get_balance(arith, &message.contract_address, sender_balance);
 
         if (cgbn_compare_ui32(arith.env, sender_balance, 0) > 0) {
-            if (touch_state.is_empty_account(arith, &recipient_shared)) {
+            if (touch_state.is_empty_account(arith, &recipient_shared[INSTANCE_IDX_PER_BLOCK])) {
                 cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_NEW_ACCOUNT);
             }
         }
         error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
             bn_t recipient_balance;
-            touch_state.get_balance(arith, &recipient_shared, recipient_balance);
+            touch_state.get_balance(arith, &recipient_shared[INSTANCE_IDX_PER_BLOCK], recipient_balance);
             cgbn_add(arith.env, recipient_balance, recipient_balance, sender_balance);
             cgbn_set_ui32(arith.env, sender_balance, 0);
-            touch_state.set_balance(arith, &recipient_shared, recipient_balance);
+            touch_state.set_balance(arith, &recipient_shared[INSTANCE_IDX_PER_BLOCK], recipient_balance);
             touch_state.set_balance(arith, &message.contract_address, sender_balance);
             // receiver = self => 0 balance
             return_data = CuEVM::evm_return_data_t();

@@ -226,8 +226,8 @@ constexpr CONSTANT uint32_t max_initcode_size = std::numeric_limits<uint32_t>::m
 
 constexpr CONSTANT uint32_t no_precompile_contracts = 10;
 
-// CGBN parameters
-constexpr CONSTANT uint32_t cgbn_tpi = 32;
+constexpr CONSTANT uint32_t cgbn_tpi = CGBN_TPI;
+constexpr CONSTANT uint32_t cgbn_IBP = CGBN_IBP;
 
 // CUEVM parameters
 constexpr CONSTANT uint32_t max_transactions_count = 10000;
@@ -237,7 +237,7 @@ constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
 // specific implementation constants
 constexpr CONSTANT uint32_t initial_storage_capacity = 4;
 
-constexpr CONSTANT uint32_t shared_stack_size = 1024;
+constexpr CONSTANT uint32_t shared_stack_size = SHARED_STACK_SIZE;
 
 /**
  * The CGBN context type.  This is a template type that takes

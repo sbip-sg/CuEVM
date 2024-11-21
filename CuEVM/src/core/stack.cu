@@ -108,13 +108,13 @@ __host__ __device__ evm_word_t *evm_stack_t::top() {
         return shared_stack_base + stack_offset;
     } else {
         if (global_stack_base == nullptr) {
-            __SHARED_MEMORY__ evm_word_t *new_stack_base;
+            __SHARED_MEMORY__ evm_word_t *new_stack_base[CGBN_IBP];
             // allocate one
             __ONE_GPU_THREAD_WOSYNC_BEGIN__
             printf("allocating new stack base on global memory \n");
-            new_stack_base = new evm_word_t[max_stack_size];
+            new_stack_base[INSTANCE_IDX_PER_BLOCK] = new evm_word_t[max_stack_size];
             __ONE_GPU_THREAD_END__
-            global_stack_base = new_stack_base;
+            global_stack_base = new_stack_base[INSTANCE_IDX_PER_BLOCK];
         }
         return global_stack_base + stack_base_offset + stack_offset - CuEVM::shared_stack_size;
     }
@@ -141,8 +141,20 @@ __host__ __device__ int32_t evm_stack_t::push(ArithEnv &arith, const bn_t &value
     }
 }
 
+__host__ __device__ int32_t evm_stack_t::push_evm_word_t(ArithEnv &arith, const evm_word_t *value) {
+    if (stack_offset < max_stack_size) {
+        *top() = *value;
+        stack_offset++;
+        // printf("Stack offset %d pointer %p  top %p\n", stack_offset, shared_stack_base, top());
+
+        return ERROR_SUCCESS;
+    } else {
+        return ERROR_STACK_OVERFLOW;
+    }
+}
+
 __host__ __device__ int32_t evm_stack_t::pop(ArithEnv &arith, bn_t &y) {
-    if (size() == 0) {
+    if (stack_offset == 0) {
         // TODO: delete maybe?
         cgbn_set_ui32(arith.env, y, 0);
         return ERROR_STACK_UNDERFLOW;
@@ -166,53 +178,61 @@ __host__ __device__ int32_t evm_stack_t::pop_evm_word(ArithEnv &arith, evm_word_
 #ifdef __CUDA_ARCH__
 __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8_t *src_byte_data,
                                                uint8_t src_byte_size) {
-    // if (x > 32) {
-    //     return ERROR_STACK_INVALID_SIZE;
+    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    // printf("pushx x %d data size %d thread_idx %d\n", x, src_byte_size, THREADIDX);
+    // for (uint8_t idx = 0; idx < src_byte_size; idx++) {
+    //     printf("%02x", src_byte_data[idx]);
     // }
-    // x valud must be validated by checking opcode ouside
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    printf("pushx %d data size %d data to insert: \n", x, src_byte_size);
-    for (uint8_t idx = 0; idx < src_byte_size; idx++) {
-        printf("%02x", src_byte_data[idx]);
-    }
-    printf("\n");
-    __ONE_GPU_THREAD_WOSYNC_END__
+    // __ONE_GPU_THREAD_WOSYNC_END__
 
     // int32_t error_code = (size() >= capacity) ? grow() : ERROR_SUCCESS;
     if (stack_offset < max_stack_size) {
         int last_idx_from_left = 31 - min(x, src_byte_size);
-        int my_idx = threadIdx.x % CuEVM::cgbn_tpi;
-        // printf("pushx data inserted %d myidx %d firstidxleft %d\n", threadIdx.x, my_idx, last_idx_from_left);
-        // if (my_idx < first_idx / 4) {
-        //     top_->_limbs[my_idx] = 0;
-        // } else {
-        // each thead will insert 4 bytes/ hardcoded big endian for now
-        int byte_start = (my_idx + 1) * 4 - 1;
-        uint32_t limb_value = 0;
-        if (byte_start > last_idx_from_left) {
-            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)];  //<< 24;
-        }
-        byte_start--;
-        if (byte_start > last_idx_from_left) {
-            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 8;  // << 16;
-        }
-        byte_start--;
-        if (byte_start > last_idx_from_left) {
-            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 16;  // << 8;
-        }
-        byte_start--;
-        if (byte_start > last_idx_from_left) {
-            // printf("bytestart %d src data idx %d thread idx %d, srcbyte %02x \n", byte_start, 31 - byte_start,
-            //        threadIdx.x, src_byte_data[31 - byte_start]);
-            limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 24;
-        }
+        int my_idx = THREAD_IDX_PER_INSTANCE;
+        if (my_idx < CuEVM::cgbn_limbs) {
+            // if (my_idx < first_idx / 4) {
+            //     top_->_limbs[my_idx] = 0;
+            // } else {
+            // each thead will insert 4 bytes/ hardcoded big endian for now
+            int byte_start = (my_idx + 1) * 4 - 1;
+            // printf("pushx data inserted %d myidx %d firstidxleft %d\n", THREADIDX, my_idx, last_idx_from_left);
+            // printf("%02x byte_start %d first idx %d\n", src_byte_data[src_byte_size - 1 - (31 - byte_start)],
+            //        byte_start, last_idx_from_left);
+            uint32_t limb_value = 0;
+            if (byte_start > last_idx_from_left) {
+                // printf("byte_start %d last_idx_from_left %d THREADIDX %d value %02x\n", byte_start,
+                // last_idx_from_left,
+                //        THREADIDX, src_byte_data[src_byte_size - 1 - (31 - byte_start)]);
 
-        top()->_limbs[CuEVM::cgbn_tpi - my_idx - 1] = limb_value;
+                limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)];  //<< 24;
+            }
+            byte_start--;
+            if (byte_start > last_idx_from_left) {
+                limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 8;  // << 16;
+            }
+            byte_start--;
+            if (byte_start > last_idx_from_left) {
+                limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 16;  // << 8;
+            }
+            byte_start--;
+            if (byte_start > last_idx_from_left) {
+                // printf("bytestart %d src data idx %d thread idx %d, srcbyte %02x \n", byte_start, 31 - byte_start,
+                //        threadIdx.x, src_byte_data[31 - byte_start]);
+                limb_value |= src_byte_data[src_byte_size - 1 - (31 - byte_start)] << 24;
+            }
+            // printf("limb value %08x THREADIDX %d store to top at %d\n", limb_value, THREADIDX,
+            //        CuEVM::cgbn_limbs - my_idx - 1);
+            top()->_limbs[CuEVM::cgbn_limbs - my_idx - 1] = limb_value;
+        }
         stack_offset++;
 
         // __SYNC_THREADS__  // do we need to sync here?
-        __ONE_THREAD_PER_INSTANCE(printf("pushx data inserted %d stack offset %d \n", threadIdx.x, stack_offset););
-        this->print();
+        //     __ONE_THREAD_PER_INSTANCE(printf("after pushx\n"););
+        // __SYNC_THREADS__
+        // if (INSTANCE_IDX_PER_BLOCK == 1) {
+        //     // printf("THREADIDX %d\n", THREADIDX);
+        //     this->print();
+        // }
         return ERROR_SUCCESS;
     } else {
         printf("pushx overflow stack offset %d\n", stack_offset);
@@ -253,10 +273,11 @@ __host__ __device__ int32_t evm_stack_t::dupx(ArithEnv &arith, uint32_t x) {
 
     if ((stack_offset < max_stack_size) && (x <= stack_offset)) {
         // cgbn_store(arith.env, top(), value);
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        // TODO: optimize memcpy
-        memcpy(top(), get_address_at_index(x), sizeof(evm_word_t));
-        __ONE_GPU_THREAD_WOSYNC_END__
+        *top() = *get_address_at_index(x);
+        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        // // TODO: optimize memcpy
+        // memcpy(top(), get_address_at_index(x), sizeof(evm_word_t));
+        // __ONE_GPU_THREAD_WOSYNC_END__
         stack_offset++;
         return ERROR_SUCCESS;
     } else {
@@ -271,16 +292,16 @@ __host__ __device__ int32_t evm_stack_t::swapx(ArithEnv &arith, uint32_t x) {
 
     // cgbn_store(arith.env, global_stack_base + size() - x - 1, a);
     // cgbn_store(arith.env, global_stack_base + size() - 1, b);
+    // __ONE_THREAD_PER_INSTANCE(printf("swapx %d x %d\n", THREADIDX, x););
     x++;
     if (x > stack_offset) {
         return ERROR_STACK_UNDERFLOW;
     }
-    __SHARED_MEMORY__ evm_word_t tmp;
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    memcpy(&tmp, get_address_at_index(x), sizeof(evm_word_t));
-    memcpy(get_address_at_index(x), get_address_at_index(1), sizeof(evm_word_t));
-    memcpy(get_address_at_index(1), &tmp, sizeof(evm_word_t));
-    __ONE_GPU_THREAD_WOSYNC_END__
+    __SHARED_MEMORY__ evm_word_t tmp[CGBN_IBP];
+    tmp[INSTANCE_IDX_PER_BLOCK] = *get_address_at_index(x);
+    *get_address_at_index(x) = *get_address_at_index(1);
+    *get_address_at_index(1) = tmp[INSTANCE_IDX_PER_BLOCK];
+
     return ERROR_SUCCESS;
 }
 
@@ -374,64 +395,5 @@ __host__ void evm_stack_t::gpu_free(evm_stack_t *gpu_instances, uint32_t count) 
     delete[] tmp_gpu_instances;
     CUDA_CHECK(cudaFree(gpu_instances));
 }
-/*
-__host__ evm_stack_t *evm_stack_t::cpu_from_gpu(evm_stack_t *gpu_instances, uint32_t count) {
-    evm_stack_t *cpu_instances = new evm_stack_t[count];
-    evm_stack_t *tmp_gpu_instances = new evm_stack_t[count];
-    evm_stack_t *tmp_cpu_instances = new evm_stack_t[count];
-    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, count * sizeof(evm_stack_t), cudaMemcpyDeviceToHost));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (cpu_instances[idx].stack_offset > 0) {
-            CUDA_CHECK(cudaMalloc(&tmp_cpu_instances[idx].global_stack_base,
-                                  cpu_instances[idx].stack_offset * sizeof(evm_word_t)));
-        } else {
-            tmp_cpu_instances[idx].global_stack_base = nullptr;
-        }
-        tmp_cpu_instances[idx].stack_offset = cpu_instances[idx].stack_offset;
-        tmp_cpu_instances[idx].capacity = cpu_instances[idx].stack_offset;
-    }
-    CUDA_CHECK(cudaMalloc(&tmp_gpu_instances, count * sizeof(evm_stack_t)));
-    CUDA_CHECK(cudaMemcpy(tmp_gpu_instances, tmp_cpu_instances, count * sizeof(evm_stack_t), cudaMemcpyHostToDevice));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        tmp_cpu_instances[idx].clear();
-        cpu_instances[idx].clear();
-    }
-    transfer_kernel_evm_stack_t<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
-    CUDA_CHECK(cudaDeviceSynchronize());
-    CUDA_CHECK(cudaFree(gpu_instances));
-
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, tmp_gpu_instances, sizeof(evm_stack_t) * count, cudaMemcpyDeviceToHost));
-
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (tmp_cpu_instances[idx].stack_offset > 0) {
-            cpu_instances[idx].global_stack_base = new evm_word_t[tmp_cpu_instances[idx].stack_offset];
-            CUDA_CHECK(cudaMemcpy(cpu_instances[idx].global_stack_base, tmp_cpu_instances[idx].global_stack_base,
-                                  sizeof(evm_word_t) * tmp_cpu_instances[idx].stack_offset, cudaMemcpyDeviceToHost));
-        } else {
-            cpu_instances[idx].global_stack_base = NULL;
-        }
-        cpu_instances[idx].stack_offset = tmp_cpu_instances[idx].stack_offset;
-        cpu_instances[idx].capacity = tmp_cpu_instances[idx].stack_offset;
-    }
-    for (uint32_t idx = 0; idx < count; idx++) {
-        tmp_cpu_instances[idx].clear();
-    }
-    delete[] tmp_cpu_instances;
-    evm_stack_t::gpu_free(tmp_gpu_instances, count);
-    return cpu_instances;
-}
-
-__global__ void transfer_kernel_evm_stack_t(evm_stack_t *dst, evm_stack_t *src, uint32_t count) {
-    uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-    if (instance >= count) {
-        return;
-    }
-    dst[instance].stack_offset = src[instance].stack_offset;
-    dst[instance].capacity = src[instance].stack_offset;
-    memcpy(dst[instance].global_stack_base, src[instance].global_stack_base,
-           src[instance].stack_offset * sizeof(evm_word_t));
-    delete[] src[instance].global_stack_base;
-    src[instance].clear();
-}*/
 
 }  // namespace CuEVM::stack

@@ -46,15 +46,10 @@ __host__ __device__ int32_t SSTORE(ArithEnv &arith, const bn_t &gas_limit, bn_t 
     error_code |= stack.pop(arith, value);
     // bn_t storage_address;
     // message.get_storage_address(arith, storage_address);
-    // #ifdef __CUDA_ARCH__
-    //     printf("SSTORE %d\n", threadIdx.x);
-    //     print_bnt(arith, key);
-    //     print_bnt(arith, value);
-    //     print_bnt(arith, storage_address);
-    // #endif
     error_code |=
         CuEVM::gas_cost::sstore_cost(arith, gas_used, gas_refund, touch_state, &message.storage_address, key, value);
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
+
     return (error_code ? error_code : touch_state.set_storage_value(arith, &message.storage_address, key, value));
 }
 }  // namespace CuEVM::operations

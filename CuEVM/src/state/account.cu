@@ -107,9 +107,6 @@ __host__ __device__ int32_t account_t::get_storage_value(ArithEnv &arith, const 
 }
 
 __host__ __device__ int32_t account_t::set_storage_value(ArithEnv &arith, const bn_t &key, const bn_t &value) {
-    // #ifdef __CUDA_ARCH__
-    //     printf("account_t::set_storage_value %d account ptr %p storage ptr %p\n", threadIdx.x, this, &storage);
-    // #endif
     return storage.set_value(arith, key, value);
 }
 
