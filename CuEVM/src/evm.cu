@@ -134,16 +134,6 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
         // limit
         cgbn_sub(arith.env, child_call_state_ptr->gas_limit, child_call_state_ptr->gas_limit, call_state_ptr->gas_used);
         call_state_ptr = child_call_state_ptr;
-        // cached_call_state = cached_evm_call_state(arith, call_state_ptr);
-        // call_state_local = evm_call_state_t(arith, call_state_ptr);
-        // #ifdef EIP_3155
-        //         // printing debug when enabling tracer.
-        //         printf("call_state_ptr allocated %p, threadid %d\n", call_state_ptr, THREADIDX);
-        //         // transaction_ptr->print();
-        //         call_state_ptr->print(arith);
-        //         printf("call_state_local %d\n", THREADIDX);
-        //         call_state_local.print(arith);
-        // #endif
     }
 #ifdef EIP_3155
     this->tracer_ptr = tracer_ptr;
@@ -179,15 +169,10 @@ __host__ __device__ evm_t::~evm_t() {
 }
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_state &cached_call_state) {
-    // printf("start_CALL\n");
-    // bn_t sender, recipient, value;
-    // call_state_ptr->message_ptr->get_sender(arith, sender);
-    // call_state_ptr->message_ptr->get_recipient(arith, recipient);
-    // #ifdef EIP_3155
-    // printf("start_CALL %d\n", THREADIDX);
-    // __SYNC_THREADS__
-    // #endif
-
+    // printf("Start call sender receipient contract address %d\n", THREADIDX);
+    // call_state_ptr->message_ptr->sender.print();
+    // call_state_ptr->message_ptr->recipient.print();
+    // call_state_ptr->message_ptr->contract_address.print();
     bn_t value;
     const evm_word_t *sender = &call_state_ptr->message_ptr->sender;
     const evm_word_t *recipient = &call_state_ptr->message_ptr->recipient;
@@ -203,13 +188,6 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_s
         // call failed = account never warmed up
         return error_code;
     }
-#ifdef EIP_3155
-// #ifdef __CUDA_ARCH__
-//     printf("start_CALL transfer error code %d idx %d \n", error_code, threadIdx.x);
-//     __ONE_THREAD_PER_INSTANCE(printf("value ");)
-//     print_bnt(arith, value);
-// #endif
-#endif
 
     if (call_state_ptr->message_ptr->call_type == OP_CALL || call_state_ptr->message_ptr->call_type == OP_CALLCODE ||
         call_state_ptr->message_ptr->call_type == OP_DELEGATECALL ||
@@ -250,14 +228,6 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_s
     // error_code |=
     call_state_ptr->touch_state_ptr->get_account(arith, recipient, account_ptr, ACCOUNT_NONE_FLAG);
 
-    // #ifdef EIP_3155
-    // #ifdef __CUDA_ARCH__
-    //     printf("call_state_ptr->touch_state.get_account error code %d,  idx %d  pointer %p, balance\n", error_code,
-    //            threadIdx.x, account_ptr);
-    //     account_ptr->balance.print();
-    // #endif
-    // #endif
-
     cached_call_state.set_byte_code(call_state_ptr->message_ptr->byte_code);
 
     if ((call_state_ptr->message_ptr->call_type == OP_CREATE) ||
@@ -275,7 +245,7 @@ __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_s
                           ? ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED
                           : ERROR_SUCCESS;
         cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
-
+        error_code |= call_state_ptr->touch_state_ptr->set_nonce(arith, sender, sender_nonce);
     } else {
         // Go-ethereum: check depth > 1024 before increase
         // -> depth > 1025 after increase
@@ -398,12 +368,12 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                                                          cached_call_state.gas_limit, cached_call_state.gas_used);
         call_state_ptr->trace_idx = trace_idx;
 
-        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
         //        THREADIDX);
         // print_bnt(arith, cached_call_state.gas_limit);
         // print_bnt(arith, cached_call_state.gas_used);
-        // __ONE_GPU_THREAD_WOSYNC_END__
+        __ONE_GPU_THREAD_WOSYNC_END__
 
 #endif
 
@@ -830,15 +800,7 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         // TODO: to see after calls
         // increase program counter
         cached_call_state.pc++;
-        // call_state_ptr->pc = ++current_pc;  // current pc may be changed by pushx
-        // call_state_ptr->pc++;
-        // __SYNC_THREADS__
 
-// #ifdef __CUDA_ARCH__
-//         __SYNC_THREADS__
-//         printf("idx %d after increase pc %d , call_state_ptr %p, call_state_ptr->trace_idx %d , depth %d\n",
-//                threadIdx.x, call_state_ptr->pc, call_state_ptr, call_state_ptr->trace_idx, call_state_ptr->depth);
-// #endif
 #ifdef EIP_3155
         if (call_state_ptr->trace_idx > 0 || (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1)) {
             tracer_ptr->finish_operation(arith, call_state_ptr->trace_idx, cached_call_state.gas_used,
@@ -855,14 +817,9 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
             simplified_trace_data_ptr->finish_operation(*cached_call_state.stack_ptr, error_code);
         }
 #endif
-        // #ifdef __CUDA_ARCH__
-        //         printf("after finish_operation idx %d opcode %d error code %d\n", threadIdx.x, opcode, error_code);
-        // #endif
+
         // all calls  + create
         if (opcode >= OP_CREATE && opcode <= OP_STATICCALL && opcode != OP_RETURN) {
-            // #ifdef __CUDA_ARCH__
-            //             printf("opcode %d error code %d\n", opcode, error_code);
-            // #endif
             if (error_code == ERROR_SUCCESS) {
                 cached_call_state.write_cache_to_state(arith, call_state_ptr);
                 call_state_ptr = child_call_state_ptr;
@@ -1030,9 +987,7 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
     // set the child call to failure
     cgbn_set_ui32(arith.env, child_success, 0);
 
-    // #ifdef __CUDA_ARCH__
-    //     printf("evm_t::finish_CALL %d error_code: %d\n", threadIdx.x, error_code);
-    // #endif
+    // printf("evm_t::finish_CALL %d error_code: %d\n", THREADIDX, error_code);
     // if the child call return from normal halting
     // no errors
     // #ifdef EIP_3155
@@ -1079,9 +1034,6 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
 
     // call_state_ptr->message_ptr->get_recipient(arith, receiver);
     call_state_ptr->parent->touch_state_ptr->set_warm_account(arith, &call_state_ptr->message_ptr->recipient);
-    // #ifdef __CUDA_ARCH__
-    //     printf("evm_t::finish_CALL %d after setting warm accounts error_code: %d\n", threadIdx.x, error_code);
-    // #endif
     if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
         // abnormal halting where return data ptr is not handled, need to reset
         // it
@@ -1090,7 +1042,6 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
         // call_state_ptr->parent->last_return_data_ptr = new CuEVM::evm_return_data_t();
         CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
     }
-    // printf("end finish_CALL after checking and allocating return data: %d idx %d\n", error_code, THREADIDX);
     // get the memory offset and size of the return data
     // in the parent memory
     bn_t ret_offset, ret_size;
@@ -1116,22 +1067,11 @@ __host__ __device__ int32_t evm_t::finish_CALL(ArithEnv &arith, int32_t error_co
         delete call_state_ptr;
 
         call_state_ptr = parent_call_state_ptr;
-        //         call_state_local = evm_call_state_t(arith, call_state_ptr);
-        // #ifdef EIP_3155
-        //         // printing debug when enabling tracer.
-        //         printf("call_state_ptr allocated %p, threadid %d\n", call_state_ptr, THREADIDX);
-        //         // transaction_ptr->print();
-        //         call_state_ptr->print(arith);
-        //         printf("call_state_local %d\n", THREADIDX);
-        //         call_state_local.print(arith);
-        // #endif
+
         // copy back the shadow message_call t to shared memory
         call_state_ptr->message_ptr->copy_from(call_state_ptr->message_ptr_copy);
         // cached_call_state = cached_evm_call_state(arith, call_state_ptr);
     }
-    // #ifdef __CUDA_ARCH__
-    //     printf("evm_t::finish_CALL %d before return error_code: %d\n", threadIdx.x, error_code);
-    // #endif
     // printf("end finish_CALL error_code: %d idx %d\n", error_code, THREADIDX);
     return error_code;
 }
@@ -1144,21 +1084,6 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith, cached_evm_cal
     CuEVM::account_t *sender_account = nullptr;
     call_state_ptr->parent->touch_state_ptr->get_account(arith, &call_state_ptr->message_ptr->sender, sender_account,
                                                          ACCOUNT_BYTE_CODE_FLAG);
-    // if (sender_account->is_contract()) {
-    //     printf("\naccount is contract\n");
-    //     bn_t sender_nonce;
-    //     call_state_ptr->parent->touch_state.get_nonce(arith, sender_address,
-    //                                                   sender_nonce);
-    //     cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
-    //     call_state_ptr->parent->touch_state.set_nonce(arith, sender_address,
-    //                                                   sender_nonce);
-    // }
-
-    // bn_t sender_nonce;
-    // call_state_ptr->parent->touch_state.get_nonce(arith, sender_address,
-    // sender_nonce); cgbn_add_ui32(arith.env, sender_nonce, sender_nonce, 1);
-    // call_state_ptr->parent->touch_state.set_nonce(arith, sender_address,
-    // sender_nonce); compute the gas to deposit the contract
 
     bn_t code_size;
     cgbn_set_ui32(arith.env, code_size, call_state_ptr->parent->last_return_data_ptr->size);

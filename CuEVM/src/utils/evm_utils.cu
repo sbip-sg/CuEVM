@@ -5,6 +5,63 @@
 #include <CuEVM/utils/evm_utils.cuh>
 
 namespace CuEVM::utils {
+__host__ __device__ int32_t get_contract_address_create_word(ArithEnv &arith, evm_word_t *contract_address,
+                                                             evm_word_t *sender_address, evm_word_t *sender_nonce) {
+    CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
+    sender_address->to_byte_array_t(sender_address_bytes);
+    sender_nonce->to_byte_array_t(sender_nonce_bytes);
+
+    uint32_t nonce_bytes;
+    for (nonce_bytes = CuEVM::word_size; nonce_bytes > 0; nonce_bytes--) {
+        if (sender_nonce_bytes.data[CuEVM::word_size - nonce_bytes] != 0) {
+            break;
+        }
+    }
+
+    uint8_t rlp_list[1 + 1 + CuEVM::address_size + 1 + CuEVM::word_size];
+    rlp_list[1] = 0x80 + CuEVM::address_size;
+    for (uint32_t idx = 0; idx < CuEVM::address_size; idx++) {
+        rlp_list[2 + idx] = sender_address_bytes.data[CuEVM::word_size - CuEVM::address_size + idx];
+    }
+
+    uint32_t rlp_list_length;
+    // 21 is from the address the 20 bytes is the length of the address
+    // and the 1 byte is the 0x80 + length of the address (20)
+    // if (cgbn_compare_ui32(arith.env, sender_nonce, 128) < 0) {
+    if (sender_nonce->_limbs[0] < 128) {
+        rlp_list_length = 1 + CuEVM::address_size + 1;
+        if (sender_nonce->_limbs[0] == 0) {
+            rlp_list[2 + CuEVM::address_size] = 0x80;  // special case for nonce 0
+        } else {
+            rlp_list[2 + CuEVM::address_size] = sender_nonce_bytes.data[CuEVM::word_size - 1];
+        }
+    } else {
+        // 1 byte for the length of the nonce
+        // 0x80 + length of the nonce
+        rlp_list_length = 21 + 1 + nonce_bytes;
+        rlp_list[2 + CuEVM::address_size] = 0x80 + nonce_bytes;
+        for (uint8_t idx = 0; idx < nonce_bytes; idx++) {
+            rlp_list[2 + CuEVM::address_size + 1 + idx] = sender_nonce_bytes.data[CuEVM::word_size - nonce_bytes + idx];
+        }
+    }
+    rlp_list[0] = 0xc0 + rlp_list_length;
+
+    CuEVM::byte_array_t hash_address_bytes(CuEVM::hash_size);
+    CuCrypto::keccak::sha3(&(rlp_list[0]), rlp_list_length + 1, hash_address_bytes.data, CuEVM::hash_size);
+
+    // cgbn_set_byte_array_t(arith.env, contract_address, hash_address_bytes);
+    // cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
+    // todo check replacement
+    // __ONE_THREAD_PER_INSTANCE(printf("\n\nhash_address_bytes\n"););
+    hash_address_bytes.print();
+    contract_address->from_byte_array_t_loop(hash_address_bytes, BIG_ENDIAN);
+    for (uint32_t idx = CuEVM::cgbn_limbs - 3; idx < CuEVM::cgbn_limbs; idx++) {
+        contract_address->_limbs[idx] = 0;
+    }
+
+    return ERROR_SUCCESS;
+}
+
 __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &contract_address,
                                                         const bn_t &sender_address, const bn_t &sender_nonce) {
     __SHARED_MEMORY__ evm_word_t sender_address_word[CGBN_IBP];
@@ -22,6 +79,11 @@ __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &c
         }
     }
     // TODO: this might work only for CuEVM::word_size == 32
+
+    // printf("get contract address create\n");
+    // sender_address_word[INSTANCE_IDX_PER_BLOCK].print();
+    // printf("sender nonce\n");
+    // sender_nonce_word[INSTANCE_IDX_PER_BLOCK].print();
 
     uint8_t rlp_list[1 + 1 + CuEVM::address_size + 1 + CuEVM::word_size];
     rlp_list[1] = 0x80 + CuEVM::address_size;
@@ -62,10 +124,7 @@ __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &c
     if (THREAD_IDX_PER_INSTANCE >= CuEVM::cgbn_limbs - 3 && THREAD_IDX_PER_INSTANCE < CuEVM::cgbn_limbs)
         sender_address_word[INSTANCE_IDX_PER_BLOCK]._limbs[THREAD_IDX_PER_INSTANCE] = 0;
     cgbn_load(arith.env, contract_address, &sender_address_word[INSTANCE_IDX_PER_BLOCK]);
-    // #ifdef __CUDA_ARCH__
-    //     printf("contract_address: thread id %d ", threadIdx.x);
-    //     print_bnt(arith, contract_address);
-    // #endif
+
     return ERROR_SUCCESS;
 }
 

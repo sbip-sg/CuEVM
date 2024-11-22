@@ -5,6 +5,7 @@
 
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
+#include <CuEVM/utils/cuda_utils.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/opcodes.cuh>
@@ -323,15 +324,7 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     touch_state_ptr->set_warm_account(arith, &block_info.coin_base);
 
 #endif
-    // printf("after warm up coinbase\n");
-    // TODO: Setwarm account for precompile contracts directly in is_warm function
-    //     bn_t precompile_contract_address;
-    // #pragma unroll
-    //     for (uint32_t idx = 1; idx < CuEVM::no_precompile_contracts; idx++) {
-    //         cgbn_set_ui32(arith.env, precompile_contract_address, idx);
-    //         touch_state.set_warm_account(arith, precompile_contract_address);
-    //     }
-    // printf("end validating transaction\n");
+
     return ERROR_SUCCESS;
 }
 
@@ -368,15 +361,20 @@ evm_transaction_t::get_message_call(ArithEnv &arith, CuEVM::TouchState *touch_st
     if (is_create) {
         call_type = OP_CREATE;
         byte_code = data_init;
+        // bn_t sender_nonce, sender_address, contract_address;
+        // touch_state_ptr->get_nonce(arith, &this->sender, sender_nonce);
+        // cgbn_load(arith.env, sender_address, (cgbn_evm_word_t_ptr) & (this->sender));
+        // CuEVM::utils::get_contract_address_create(arith, contract_address, sender_address, sender_nonce);
+        // cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (this->to), contract_address);
         // blank call data in create
         evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
             arith, &this->sender, &this->to, &this->to, &this->gas_limit, &this->value, depth, call_type, &this->to,
             CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
-#ifdef __CUDA_ARCH__
-        printf("CREATE to_account %p init code size %d account code size %d idx %d \n", to_account,
-               to_account->byte_code.size, byte_code.size, threadIdx.x);
+
+        __ONE_THREAD_PER_INSTANCE(printf("CREATE to_account %p init code size %d account code size %d idx %d \n",
+                                         to_account, to_account->byte_code.size, byte_code.size, THREADIDX););
         to_account->address.print();
-#endif
+
     } else {
         // CuEVM::account_t *to_account = nullptr;
         // touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
@@ -525,18 +523,22 @@ __host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transacti
     const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
     // verify what is happening from strlen 0
     if (strlen(to_json->valuestring) == 0) {
+        printf(" CREATE when loading json\n");
         CuEVM::account_t *sender_account = nullptr;
-        bn_t sender, contract_address;
-        cgbn_load(arith.env, sender, &template_transaction_ptr->sender);
+
         world_state_ptr->get_account(arith, &template_transaction_ptr->sender, sender_account);
-        bn_t sender_nonce;
-        cgbn_load(arith.env, sender_nonce, &sender_account->nonce);
-        CuEVM::utils::get_contract_address_create(arith, contract_address, sender, sender_nonce);
-        cgbn_store(arith.env, &template_transaction_ptr->to, contract_address);
+
+        CuEVM::utils::get_contract_address_create_word(arith, &template_transaction_ptr->to,
+                                                       &template_transaction_ptr->sender, &sender_account->nonce);
+        printf("contract address\n");
+        template_transaction_ptr->to.print();
         template_transaction_ptr->is_create = true;
     } else {
         template_transaction_ptr->to.from_hex(to_json->valuestring);
     }
+
+    printf("tx to \n");
+    template_transaction_ptr->to.print();
 
     const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
     uint32_t value_counts = cJSON_GetArraySize(value_json);

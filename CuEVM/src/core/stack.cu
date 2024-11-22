@@ -67,7 +67,7 @@ __host__ __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
         int32_t left_over = CuEVM::shared_stack_size - stack_base_offset;
         if (left_over > 0) {
             memcpy(other, shared_stack_base, left_over * sizeof(evm_word_t));
-            memcpy(other, global_stack_base, (stack_offset - left_over) * sizeof(evm_word_t));
+            memcpy(other + left_over, global_stack_base, (stack_offset - left_over) * sizeof(evm_word_t));
         } else
             memcpy(other, global_stack_base, stack_offset * sizeof(evm_word_t));
     }
@@ -107,12 +107,15 @@ __host__ __device__ evm_word_t *evm_stack_t::top() {
         // printf("shared stack base %p stack offset %d\n", shared_stack_base, stack_offset);
         return shared_stack_base + stack_offset;
     } else {
-        if (global_stack_base == nullptr) {
+        // page size is max stack size
+        if ((stack_base_offset + stack_offset - CuEVM::shared_stack_size) % max_stack_size == 0) {
             __SHARED_MEMORY__ evm_word_t *new_stack_base[CGBN_IBP];
             // allocate one
             __ONE_GPU_THREAD_WOSYNC_BEGIN__
-            printf("allocating new stack base on global memory \n");
             new_stack_base[INSTANCE_IDX_PER_BLOCK] = new evm_word_t[max_stack_size];
+            if (global_stack_base != nullptr) {
+                delete[] global_stack_base;
+            }
             __ONE_GPU_THREAD_END__
             global_stack_base = new_stack_base[INSTANCE_IDX_PER_BLOCK];
         }
@@ -189,10 +192,9 @@ __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8
     if (stack_offset < max_stack_size) {
         int last_idx_from_left = 31 - min(x, src_byte_size);
         int my_idx = THREAD_IDX_PER_INSTANCE;
+        evm_word_t *top_ = top();
+
         if (my_idx < CuEVM::cgbn_limbs) {
-            // if (my_idx < first_idx / 4) {
-            //     top_->_limbs[my_idx] = 0;
-            // } else {
             // each thead will insert 4 bytes/ hardcoded big endian for now
             int byte_start = (my_idx + 1) * 4 - 1;
             // printf("pushx data inserted %d myidx %d firstidxleft %d\n", THREADIDX, my_idx, last_idx_from_left);
@@ -222,7 +224,7 @@ __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8
             }
             // printf("limb value %08x THREADIDX %d store to top at %d\n", limb_value, THREADIDX,
             //        CuEVM::cgbn_limbs - my_idx - 1);
-            top()->_limbs[CuEVM::cgbn_limbs - my_idx - 1] = limb_value;
+            top_->_limbs[CuEVM::cgbn_limbs - my_idx - 1] = limb_value;
         }
         stack_offset++;
 
@@ -260,11 +262,11 @@ __host__ __device__ int32_t evm_stack_t::pushx(ArithEnv &arith, uint8_t x, uint8
 #ifdef __CUDA_ARCH__
 // The caller must check underflow
 __host__ __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) const {
-    if (stack_base_offset + stack_offset - index < CuEVM::shared_stack_size)
+    // printf("global stack base %p shared stack base %p\n", global_stack_base, shared_stack_base);
+    if (stack_base_offset + stack_offset - index < CuEVM::shared_stack_size)  // stack_offset is after added
         return shared_stack_base + stack_offset - index;
-    else {
+    else
         return global_stack_base + stack_base_offset + stack_offset - index - CuEVM::shared_stack_size;
-    }
 }
 
 __host__ __device__ int32_t evm_stack_t::dupx(ArithEnv &arith, uint32_t x) {
@@ -336,8 +338,10 @@ __host__ __device__ int32_t evm_stack_t::swapx(ArithEnv &arith, uint32_t x) {
 __host__ __device__ void evm_stack_t::print() {
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     printf("Stack size: %d, data:\n", size());
-    for (uint32_t idx = 0; idx < size(); idx++) {
-        shared_stack_base[idx].print();
+    for (uint32_t idx = 1; idx <= size(); idx++) {
+        evm_word_t *elem = get_address_at_index(idx);
+        printf("idx %d, elem %p\n", idx, elem);
+        elem->print();
     }
     __ONE_GPU_THREAD_WOSYNC_END__
 }

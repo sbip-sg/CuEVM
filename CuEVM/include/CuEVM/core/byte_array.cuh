@@ -201,10 +201,13 @@ struct byte_array_t {
      */
 
     __host__ __device__ static void reset_return_data(byte_array_t *&return_data_ptr) {
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        if (return_data_ptr->data != nullptr) delete return_data_ptr->data;
-        __ONE_GPU_THREAD_WOSYNC_END__
-        return_data_ptr->size = 0;
+        return_data_ptr->free();
+        // printf("reset return data thread %d", THREADIDX);
+        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        // if (return_data_ptr->data != nullptr) delete[] return_data_ptr->data;
+        // return_data_ptr->data = nullptr;
+        // __ONE_GPU_THREAD_WOSYNC_END__
+        // return_data_ptr->size = 0;
     }
 
    private:

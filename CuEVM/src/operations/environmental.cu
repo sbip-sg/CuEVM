@@ -382,23 +382,28 @@ __host__ __device__ int32_t EXTCODEHASH(ArithEnv &arith, const bn_t &gas_limit, 
     bn_t address;
     int32_t error_code = stack.pop(arith, address);
     CuEVM::evm_address_conversion(arith, address);
+    printf("ext code hash Thread %d\n", THREADIDX);
+    print_bnt(arith, address);
     __SHARED_MEMORY__ evm_word_t address_shared[CGBN_IBP];
     cgbn_store(arith.env, &address_shared[INSTANCE_IDX_PER_BLOCK], address);
-
+    address_shared[INSTANCE_IDX_PER_BLOCK].print();
     CuEVM::gas_cost::access_account_cost(arith, gas_used, touch_state, &address_shared[INSTANCE_IDX_PER_BLOCK]);
     error_code |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
-    bn_t hash_bn;
+    // bn_t hash_bn;
     if ((touch_state.is_empty_account(arith, &address_shared[INSTANCE_IDX_PER_BLOCK])) ||
         touch_state.is_deleted_account(arith, &address_shared[INSTANCE_IDX_PER_BLOCK])) {
-        cgbn_set_ui32(arith.env, hash_bn, 0);
+        // cgbn_set_ui32(arith.env, hash_bn, 0);
+        address_shared[INSTANCE_IDX_PER_BLOCK].set_zero();
     } else {
         CuEVM::byte_array_t byte_code;
         error_code |= touch_state.get_code(arith, &address_shared[INSTANCE_IDX_PER_BLOCK], byte_code);
         CuEVM::byte_array_t hash(CuEVM::hash_size);
         CuCrypto::keccak::sha3(byte_code.data, byte_code.size, hash.data, hash.size);
-        error_code |= cgbn_set_byte_array_t(arith.env, hash_bn, hash);
+        // error_code |= cgbn_set_byte_array_t(arith.env, hash_bn, hash);
+        address_shared[INSTANCE_IDX_PER_BLOCK].from_byte_array_t(hash, BIG_ENDIAN);
     }
-    error_code |= stack.push(arith, hash_bn);
+    // result is in address_shared[INSTANCE_IDX_PER_BLOCK]
+    error_code |= stack.push_evm_word_t(arith, &address_shared[INSTANCE_IDX_PER_BLOCK]);
     return error_code;
 }
 

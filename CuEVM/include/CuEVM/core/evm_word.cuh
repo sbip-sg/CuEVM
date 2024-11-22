@@ -30,6 +30,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      */
     __host__ __device__ evm_word_t(uint32_t value);
 
+    __host__ __device__ void set_zero();
     /**
      * The assignment operator.
      * @param[in] src The source evm_word_t
@@ -63,13 +64,21 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      */
     __host__ int32_t from_hex(const char *hex_string);
     /**
-     * Set the evm_word_t from a byte array.
+     * Set the evm_word_t from a byte array, optimized for parallel threads.
      * The byte array is in Big Endian format.
      * @param[in] byte_array The source byte array
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
     __host__ __device__ int32_t from_byte_array_t(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
+    /**
+     * Set the evm_word_t from a byte array. Compatible with CPU version.
+     * The byte array is in Big Endian format.
+     * @param[in] byte_array The source byte array
+     * @param[in] endian The endian format
+     * @return 0 for success, 1 otherwise
+     */
+    __host__ int32_t from_byte_array_t_loop(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
     /**
      * Set the evm_word_t from a size_t.
      * @param[in] value The source size_t
