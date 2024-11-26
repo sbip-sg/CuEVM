@@ -241,8 +241,8 @@ __host__ __device__ int32_t evm_transaction_t::validate(ArithEnv &arith, CuEVM::
     // bn_t sender_address;
     // get_sender(arith, sender_address);
     // printf("after get_sender\n");
-    __ONE_THREAD_PER_INSTANCE(printf("sender address\n"););
-    this->sender.print();
+    // __ONE_THREAD_PER_INSTANCE(printf("sender address\n"););
+    // this->sender.print();
 
     CuEVM::account_t *sender_account = nullptr;
     touch_state_ptr->get_account(arith, &this->sender, sender_account,

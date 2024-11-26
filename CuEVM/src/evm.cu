@@ -43,23 +43,13 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM
     //     __ONE_GPU_THREAD_WOSYNC_END__
     // }
 #endif
-    // __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call;
-    // __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CuEVM::shared_stack_size];
-    // CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call, shared_stack);
-    // printf("evm allocated %p, threadid %d\n", evm, THREADIDX);
-    // printf("evm->call_state_ptr %p, threadid %d\n", evm->call_state_ptr, THREADIDX);
-    // CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
+
     __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
     __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
     CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call[INSTANCE_IDX_PER_BLOCK],
                                          shared_stack[INSTANCE_IDX_PER_BLOCK]);
     CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
-    // printf("\nevm->run(arith) instance %d\n", instance);
-    // printf("print simplified trace data device inside evm\n");
-    // evm->simplified_trace_data_ptr->print();
-    // printf("gas limit %d thread %d\n", THREADIDX);
-    // print_bnt(arith, evm->call_state_ptr->gas_limit);
-    // print_bnt(arith, cached_state.gas_limit);
+
     __SYNC_THREADS__
     evm->run(arith, cached_state);
 
@@ -71,14 +61,6 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM
         __ONE_GPU_THREAD_WOSYNC_END__
     }
 #endif
-    // print the final world state
-    // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    // instances[instance].world_state_data_ptr->print();
-    // printf("simplified trace data\n");
-    // instances[instance].simplified_trace_data_ptr->print();
-    // __ONE_GPU_THREAD_WOSYNC_END__
-    // delete evm;
-    // evm = nullptr;
 }
 
 __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_data_ptr,
@@ -369,8 +351,8 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         call_state_ptr->trace_idx = trace_idx;
 
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-        //        THREADIDX);
+        printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
+               THREADIDX);
         // print_bnt(arith, cached_call_state.gas_limit);
         // print_bnt(arith, cached_call_state.gas_used);
         __ONE_GPU_THREAD_WOSYNC_END__
