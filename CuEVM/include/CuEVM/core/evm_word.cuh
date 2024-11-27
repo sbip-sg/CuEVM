@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <CGBN/cgbn.h>
 #include <cuda.h>
 #include <stdint.h>
 

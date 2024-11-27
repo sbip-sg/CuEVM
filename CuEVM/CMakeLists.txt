@@ -29,7 +29,7 @@ if (NOT CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-
+set(CGBN_TPI "32" CACHE STRING "Thread per instance for CGBN")
 
 find_package(GMP REQUIRED)
 find_package(cJSON REQUIRED) # Assuming cJSON is available as a find package
@@ -74,5 +74,5 @@ target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${CUDA_LIBRARIES})
 
 # Add specific NVCC flags using target_compile_options (if necessary)
 target_compile_options(${PROJECT_NAME}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
-
+target_compile_definitions(${PROJECT_NAME} PRIVATE CGBN_TPI=${CGBN_TPI})
 

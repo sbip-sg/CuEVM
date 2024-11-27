@@ -5,13 +5,18 @@
 
 #pragma once
 
+
+// CGBN parameters
+#ifndef CGBN_TPI
+#define CGBN_TPI 32
+#endif
+
+#define CGBN_IBP 2
+#define SHARED_STACK_SIZE 128
+
 #include <CGBN/cgbn.h>
 #include <cuda.h>
 
-// CGBN parameters
-#define CGBN_TPI 32
-#define CGBN_IBP 2
-#define SHARED_STACK_SIZE 128
 #ifdef __CUDA_ARCH__
 #ifndef MULTIPLE_THREADS_PER_INSTANCE
 #define MULTIPLE_THREADS_PER_INSTANCE

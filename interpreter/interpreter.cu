@@ -1,4 +1,4 @@
-#include <CGBN/cgbn.h>
+
 #include <cjson/cJSON.h>
 #include <getopt.h>
 

@@ -15,7 +15,7 @@ option(TESTS "Enable tests" ON)
 option(TESTS_GPU "Enable GPU tests" OFF)
 option(BUILD_LIBRARY "Build Python library" OFF)
 set(EVM_VERSION "SHANGHAI" CACHE STRING "EVM version to use")
-
+set(CGBN_TPI "32" CACHE STRING "Thread per instance for CGBN")
 project("cuevm"
         VERSION 0.1.0
         DESCRIPTION "A CUDA EVM Interpreter"
@@ -84,6 +84,8 @@ if(CPU)
         target_compile_definitions(${CPU_INTERPRETER} PRIVATE EIP_3155_OPTIONAL)
     endif()
     target_compile_definitions(${CPU_INTERPRETER} PRIVATE EVM_VERSION=${EVM_VERSION})
+    
+    target_compile_definitions(${CPU_INTERPRETER} PRIVATE CGBN_TPI=${CGBN_TPI})
 endif()
 
 if(GPU)
@@ -133,6 +135,8 @@ if(GPU)
         target_compile_definitions(${PROJECT_NAME} PRIVATE EVM_VERSION=${EVM_VERSION})
 
         target_compile_definitions(${PROJECT_NAME} PRIVATE GPU)
+
+        target_compile_definitions(${PROJECT_NAME} PRIVATE CGBN_TPI=${CGBN_TPI})
         
     else()
 
@@ -170,6 +174,7 @@ if(GPU)
 
         target_compile_definitions(${GPU_INTERPRETER} PRIVATE GPU)
 
+        target_compile_definitions(${GPU_INTERPRETER} PRIVATE CGBN_TPI=${CGBN_TPI})
     endif() 
 
 endif()

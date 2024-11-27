@@ -1,4 +1,3 @@
-#include <CGBN/cgbn.h>
 
 #include <CuCrypto/keccak.cuh>
 #include <CuEVM/utils/error_codes.cuh>
