@@ -281,15 +281,13 @@ __host__ __device__ int32_t transaction_intrinsic_gas(ArithEnv &arith, const CuE
         }
     }
 
-    // if transaction type is 1 it might have access list
-    if (transaction.type == 1) {
-        // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for
-        // each address in transaction.access_list
-        for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
-            cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_ACCESS_LIST_ADDRESS);
-            cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic,
-                          GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count);
-        }
+    // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for
+    // each address in transaction.access_list
+
+    for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
+        cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_ACCESS_LIST_ADDRESS);
+        cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic,
+                      GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count);
     }
 
 #ifdef EIP_3860

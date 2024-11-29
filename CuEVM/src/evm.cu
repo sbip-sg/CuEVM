@@ -48,19 +48,22 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM
     __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
     CuEVM::evm_t *evm = new CuEVM::evm_t(arith, instances[instance], &shared_message_call[INSTANCE_IDX_PER_BLOCK],
                                          shared_stack[INSTANCE_IDX_PER_BLOCK]);
-    CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
 
-    __SYNC_THREADS__
-    evm->run(arith, cached_state);
+    if (evm->status == ERROR_SUCCESS) {
+        CuEVM::cached_evm_call_state cached_state(arith, evm->call_state_ptr);
+
+        __SYNC_THREADS__
+        evm->run(arith, cached_state);
 
 #ifdef EIP_3155
-    if (instance == 0) {
-        __ONE_GPU_THREAD_BEGIN__
-        // instances[0].tracer_ptr->print(arith);
-        instances[0].tracer_ptr->print_err();
-        __ONE_GPU_THREAD_WOSYNC_END__
-    }
+        if (instance == 0) {
+            __ONE_GPU_THREAD_BEGIN__
+            // instances[0].tracer_ptr->print(arith);
+            instances[0].tracer_ptr->print_err();
+            __ONE_GPU_THREAD_WOSYNC_END__
+        }
 #endif
+    }
 }
 
 __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_data_ptr,
@@ -350,12 +353,12 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                                                          cached_call_state.gas_limit, cached_call_state.gas_used);
         call_state_ptr->trace_idx = trace_idx;
 
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-               THREADIDX);
-        // print_bnt(arith, cached_call_state.gas_limit);
-        // print_bnt(arith, cached_call_state.gas_used);
-        __ONE_GPU_THREAD_WOSYNC_END__
+        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
+        //        THREADIDX);
+        // // print_bnt(arith, cached_call_state.gas_limit);
+        // // print_bnt(arith, cached_call_state.gas_used);
+        // __ONE_GPU_THREAD_WOSYNC_END__
 
 #endif
 
@@ -923,11 +926,11 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
         // cgbn_mul(arith.env, gas_value, cached_call_state.gas_limit, gas_priority_fee);
         // set z to the given error or 1 TODO: 1 in YP
 #ifdef EIP_3155
-        __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
-        print_bnt(arith, gas_value);
-        print_bnt(arith, call_state_ptr->gas_limit);
-        print_bnt(arith, call_state_ptr->gas_used);
-        print_bnt(arith, gas_priority_fee);
+        // __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
+        // print_bnt(arith, gas_value);
+        // print_bnt(arith, call_state_ptr->gas_limit);
+        // print_bnt(arith, call_state_ptr->gas_used);
+        // print_bnt(arith, gas_priority_fee);
 
 #endif
         status = error_code;

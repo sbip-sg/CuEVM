@@ -30,9 +30,7 @@ __host__ int32_t access_list_account_t::from_json(const cJSON *json, int32_t man
     if (address_json == NULL) {
         return ERROR_FAILED;
     }
-    if (!address.from_hex(address_json->valuestring)) {
-        return ERROR_FAILED;
-    }
+    address.from_hex(address_json->valuestring);
     cJSON *storage_keys_json = cJSON_GetObjectItemCaseSensitive(json, "storageKeys");
     if (storage_keys_json == NULL) {
         storage_keys_count = 0;
@@ -210,6 +208,7 @@ __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(ArithEnv &ari
             bn_t key;
             cgbn_load(arith.env, key, (cgbn_evm_word_t_ptr) & (access_list.accounts[i].storage_keys[j]));
             bn_t value;
+            cgbn_set_ui32(arith.env, value, 0);
             touch_state_ptr->set_warm_key(arith, &(access_list.accounts[i].address), key, value);
         }
     }
@@ -507,7 +506,7 @@ __host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transacti
     }
 
     evm_transaction_t *template_transaction_ptr = new evm_transaction_t();
-    uint32_t data_idnex, gas_limit_index, value_index, idx;
+    uint32_t data_index, gas_limit_index, value_index, access_list_index, idx;
 
     uint32_t type = 0;
 
@@ -523,30 +522,26 @@ __host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transacti
     const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
     // verify what is happening from strlen 0
     if (strlen(to_json->valuestring) == 0) {
-        printf(" CREATE when loading json\n");
+        // printf(" CREATE when loading json\n");
         CuEVM::account_t *sender_account = nullptr;
 
         world_state_ptr->get_account(arith, &template_transaction_ptr->sender, sender_account);
 
         CuEVM::utils::get_contract_address_create_word(arith, &template_transaction_ptr->to,
                                                        &template_transaction_ptr->sender, &sender_account->nonce);
-        printf("contract address\n");
-        template_transaction_ptr->to.print();
+        // printf("contract address\n");
+        // template_transaction_ptr->to.print();
         template_transaction_ptr->is_create = true;
     } else {
         template_transaction_ptr->to.from_hex(to_json->valuestring);
     }
 
-    printf("tx to \n");
-    template_transaction_ptr->to.print();
-
     const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
     uint32_t value_counts = cJSON_GetArraySize(value_json);
 
-    const cJSON *access_list_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "accessList");
-    if (access_list_json != nullptr) {
-        template_transaction_ptr->access_list.from_json(access_list_json, managed);
-    }
+    uint32_t access_list_counts = 0;
+    const cJSON *access_list_json = cJSON_GetObjectItem(transaction_json, "accessLists");
+    if (access_list_json != nullptr) access_list_counts = cJSON_GetArraySize(access_list_json);
 
     const cJSON *max_fee_per_gas_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "maxFeePerGas");
 
@@ -583,12 +578,17 @@ __host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transacti
     uint32_t index;
     for (idx = 0; idx < transactions_count; idx++) {
         index = (start_index + idx) % original_count;
-        data_idnex = index % data_counts;
+        data_index = index % data_counts;
+        if (access_list_counts > 0) {
+            access_list_index = data_index % access_list_counts;  // TODO: check if this is correct
+            template_transaction_ptr->access_list.from_json(cJSON_GetArrayItem(access_list_json, access_list_index),
+                                                            managed);
+        }
         gas_limit_index = (index / data_counts) % gas_limit_counts;
         value_index = (index / (data_counts * gas_limit_counts)) % value_counts;
         // std::copy(template_transaction_ptr, template_transaction_ptr + 1, transactions_ptr + idx);
         memcpy(&transactions_ptr[idx], template_transaction_ptr, sizeof(evm_transaction_t));
-        transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_idnex)->valuestring, LITTLE_ENDIAN,
+        transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_index)->valuestring, LITTLE_ENDIAN,
                                                  CuEVM::PaddingDirection::NO_PADDING, managed);
         transactions_ptr[idx].gas_limit.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
         // better refactorign the boundary checks
