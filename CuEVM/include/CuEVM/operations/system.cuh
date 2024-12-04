@@ -35,38 +35,33 @@ __host__ __device__ int32_t STOP(CuEVM::evm_return_data_t &return_data);
 
 /**
  * The CREATE operation. gives the new evm call state
- * @param[in] arith The arithmetical environment.
  * @param[in] current_state The current state.
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CREATE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
-                                   CuEVM::evm_call_state_t *&new_state_ptr, CuEVM::cached_evm_call_state &cached_state);
+__host__ __device__ int32_t CREATE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                                   CuEVM::cached_evm_call_state &cached_state);
 
 /**
  * The CALL operation. gives the new evm call state
- * @param[in] arith The arithmetical environment.
  * @param[in] current_state The current state.
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CALL(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
-                                 CuEVM::evm_call_state_t *&new_state_ptr, CuEVM::cached_evm_call_state &cached_state);
+__host__ __device__ int32_t CALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                                 CuEVM::cached_evm_call_state &cached_state);
 
 /**
  * The CALLCODE operation. gives the new evm call state
- * @param[in] arith The arithmetical environment.
  * @param[in] current_state The current state.
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CALLCODE(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
-                                     CuEVM::evm_call_state_t *&new_state_ptr,
+__host__ __device__ int32_t CALLCODE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
                                      CuEVM::cached_evm_call_state &cached_state);
 
 /**
  * The RETURN operation.
- * @param[in] arith The arithmetical environment.
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[in] stack The stack.
@@ -74,51 +69,45 @@ __host__ __device__ int32_t CALLCODE(ArithEnv &arith, CuEVM::evm_call_state_t &c
  * @param[out] return_data The return data.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t RETURN(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t RETURN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                    CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data);
 /**
  * The DELEGATECALL operation. gives the new evm call state
- * @param[in] arith The arithmetical environment.
  * @param[in] current_state The current state.
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t DELEGATECALL(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
+__host__ __device__ int32_t DELEGATECALL(CuEVM::evm_call_state_t &current_state,
                                          CuEVM::evm_call_state_t *&new_state_ptr,
                                          CuEVM::cached_evm_call_state &cached_state);
 
 /**
  * The CREATE2 operation. gives the new evm call state
- * @param[in] arith The arithmetical environment.
  * @param[in] current_state The current state.
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CREATE2(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
-                                    CuEVM::evm_call_state_t *&new_state_ptr,
+__host__ __device__ int32_t CREATE2(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
                                     CuEVM::cached_evm_call_state &cached_state);
 
 /**
  * The STATICCALL operation. gives the new evm call state
- * @param[in] arith The arithmetical environment.
  * @param[in] current_state The current state.
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t STATICCALL(ArithEnv &arith, CuEVM::evm_call_state_t &current_state,
-                                       CuEVM::evm_call_state_t *&new_state_ptr,
+__host__ __device__ int32_t STATICCALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
                                        CuEVM::cached_evm_call_state &cached_state);
 
 /**
  * The REVERT operation.
- * @param[in] arith The arithmetical environment.
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[in] stack The stack.
  * @param[in] memory The memory.
  * @param[out] return_data The return data.
  */
-__host__ __device__ int32_t REVERT(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t REVERT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                    CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data);
 
 /**
@@ -129,7 +118,6 @@ __host__ __device__ int32_t INVALID();
 
 /**
  * The SELFDESTRUCT operation.
- * @param[in] arith The arithmetical environment.
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
@@ -138,9 +126,9 @@ __host__ __device__ int32_t INVALID();
  * @param[out] return_data The return data.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t SELFDESTRUCT(ArithEnv &arith, const bn_t &gas_limit, bn_t &gas_used,
-                                         CuEVM::evm_stack_t &stack, CuEVM::evm_message_call_t &message,
-                                         CuEVM::TouchState &touch_state, CuEVM::evm_return_data_t &return_data);
+__host__ __device__ int32_t SELFDESTRUCT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                                         CuEVM::evm_message_call_t &message, CuEVM::TouchState &touch_state,
+                                         CuEVM::evm_return_data_t &return_data);
 }  // namespace CuEVM::operations
 
 #endif

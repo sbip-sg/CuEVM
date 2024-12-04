@@ -24,7 +24,6 @@ namespace CuEVM::operations {
      * Takes the memory offset from the stack and push the evm word from
      * the memory at the given memory offset.
      * Adittional gas cost is added for the memory expansion.
-     * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
      * @param[inout] stack The stack.
@@ -32,9 +31,8 @@ namespace CuEVM::operations {
      * @return 0 if the operation was successful, an error code otherwise.
      */
     __host__ __device__ int32_t MLOAD(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
+        const gas_t &gas_limit,
+        gas_t &gas_used,
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_memory_t &memory);
 
@@ -43,7 +41,6 @@ namespace CuEVM::operations {
      * Takes the memory offset and the value from the stack and stores the
      * value in the memory at the given memory offset.
      * Adittional gas cost is added for the memory expansion.
-     * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
      * @param[in] stack The stack.
@@ -51,9 +48,8 @@ namespace CuEVM::operations {
      * @return 0 if the operation was successful, an error code otherwise.
      */
     __host__ __device__ int32_t MSTORE(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
+        const gas_t &gas_limit,
+        gas_t &gas_used,
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_memory_t &memory);
 
@@ -62,7 +58,6 @@ namespace CuEVM::operations {
      * Takes the memory offset and the value from the stack and stores the
      * least significant byte of the value in the memory at the given memory offset.
      * Adittional gas cost is added for the memory expansion.
-     * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
      * @param[in] stack The stack.
@@ -70,16 +65,14 @@ namespace CuEVM::operations {
      * @return 0 if the operation was successful, an error code otherwise.
      */
     __host__ __device__ int32_t MSTORE8(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
+        const gas_t &gas_limit,
+        gas_t &gas_used,
         CuEVM::evm_stack_t &stack,
         CuEVM::evm_memory_t &memory);
 
     /**
      * The MSIZE operation implementation.
      * Pushes the memory size to the stack.
-     * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit.
      * @param[inout] gas_used The gas used.
      * @param[out] stack The stack.
@@ -87,9 +80,8 @@ namespace CuEVM::operations {
      * @return 0 if the operation was successful, an error code otherwise.
      */
     __host__ __device__ int32_t MSIZE(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
+        const gas_t &gas_limit,
+        gas_t &gas_used,
         CuEVM::evm_stack_t &stack,
         const CuEVM::evm_memory_t &memory);
 }

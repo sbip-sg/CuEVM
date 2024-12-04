@@ -7,8 +7,8 @@
 #ifndef _CUEVM_COMPARE_OP_H_
 #define _CUEVM_COMPARE_OP_H_
 
-#include <CuEVM/utils/arith.cuh>
 #include <CuEVM/core/stack.cuh>
+#include <CuEVM/utils/arith.cuh>
 
 /**
  * The comparison operations.
@@ -21,111 +21,81 @@
  * - ISZERO
  */
 namespace CuEVM::operations {
-    /**
-     * The LT operation implementation.
-     * Takes two values from the stack, compares them and pushes the result
-     * back to the stack.
-     * The two values are considered unsigned.
-     * The result is 1 if the first value is less than the second value,
-     * 0 otherwise.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[inout] stack The stack.
-    */
-    __host__ __device__ int32_t LT(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
-        CuEVM::evm_stack_t &stack);
+/**
+ * The LT operation implementation.
+ * Takes two values from the stack, compares them and pushes the result
+ * back to the stack.
+ * The two values are considered unsigned.
+ * The result is 1 if the first value is less than the second value,
+ * 0 otherwise.
+ * @param[in] gas_limit The gas limit.
+ * @param[inout] gas_used The gas used.
+ * @param[inout] stack The stack.
+ */
+__host__ __device__ int32_t LT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
-    /**
-     * The GT operation implementation.
-     * Takes two values from the stack, compares them and pushes the result
-     * back to the stack.
-     * The two values are considered unsigned.
-     * The result is 1 if the first value is greater than the second value,
-     * 0 otherwise.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[inout] stack The stack.
-    */
-    __host__ __device__ int32_t GT(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
-        CuEVM::evm_stack_t &stack);
+/**
+ * The GT operation implementation.
+ * Takes two values from the stack, compares them and pushes the result
+ * back to the stack.
+ * The two values are considered unsigned.
+ * The result is 1 if the first value is greater than the second value,
+ * 0 otherwise.
+ * @param[in] gas_limit The gas limit.
+ * @param[inout] gas_used The gas used.
+ * @param[inout] stack The stack.
+ */
+__host__ __device__ int32_t GT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
-    /**
-     * The SLT operation implementation.
-     * Takes two values from the stack, compares them and pushes the result
-     * back to the stack.
-     * The two values are considered signed.
-     * The result is 1 if the first value is less than the second value,
-     * 0 otherwise.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[inout] stack The stack.
-    */
-    __host__ __device__ int32_t SLT(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
-        CuEVM::evm_stack_t &stack);
+/**
+ * The SLT operation implementation.
+ * Takes two values from the stack, compares them and pushes the result
+ * back to the stack.
+ * The two values are considered signed.
+ * The result is 1 if the first value is less than the second value,
+ * 0 otherwise.
+ * @param[in] gas_limit The gas limit.
+ * @param[inout] gas_used The gas used.
+ * @param[inout] stack The stack.
+ */
+__host__ __device__ int32_t SLT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
-    /**
-     * The SGT operation implementation.
-     * Takes two values from the stack, compares them and pushes the result
-     * back to the stack.
-     * The two values are considered signed.
-     * The result is 1 if the first value is greater than the second value,
-     * 0 otherwise.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[inout] stack The stack.
-    */
-    __host__ __device__ int32_t SGT(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
-        CuEVM::evm_stack_t &stack);
+/**
+ * The SGT operation implementation.
+ * Takes two values from the stack, compares them and pushes the result
+ * back to the stack.
+ * The two values are considered signed.
+ * The result is 1 if the first value is greater than the second value,
+ * 0 otherwise.
+ * @param[in] gas_limit The gas limit.
+ * @param[inout] gas_used The gas used.
+ * @param[inout] stack The stack.
+ */
+__host__ __device__ int32_t SGT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
-    /**
-     * The EQ operation implementation.
-     * Takes two values from the stack, compares them and pushes the result
-     * back to the stack.
-     * The result is 1 if the first value is equal to the second value,
-     * 0 otherwise.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[inout] stack The stack.
-    */
-    __host__ __device__ int32_t EQ(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
-        CuEVM::evm_stack_t &stack);
+/**
+ * The EQ operation implementation.
+ * Takes two values from the stack, compares them and pushes the result
+ * back to the stack.
+ * The result is 1 if the first value is equal to the second value,
+ * 0 otherwise.
+ * @param[in] gas_limit The gas limit.
+ * @param[inout] gas_used The gas used.
+ * @param[inout] stack The stack.
+ */
+__host__ __device__ int32_t EQ(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
-    /**
-     * The ISZERO operation implementation.
-     * Takes a value from the stack, compares it with zero and pushes the result
-     * back to the stack.
-     * The result is 1 if the value is equal to zero,
-     * 0 otherwise.
-     * @param[in] arith The arithmetical environment.
-     * @param[in] gas_limit The gas limit.
-     * @param[inout] gas_used The gas used.
-     * @param[inout] stack The stack.
-    */
-    __host__ __device__ int32_t ISZERO(
-        ArithEnv &arith,
-        const bn_t &gas_limit,
-        bn_t &gas_used,
-        CuEVM::evm_stack_t &stack);
-}
+/**
+ * The ISZERO operation implementation.
+ * Takes a value from the stack, compares it with zero and pushes the result
+ * back to the stack.
+ * The result is 1 if the value is equal to zero,
+ * 0 otherwise.
+ * @param[in] gas_limit The gas limit.
+ * @param[inout] gas_used The gas used.
+ * @param[inout] stack The stack.
+ */
+__host__ __device__ int32_t ISZERO(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+}  // namespace CuEVM::operations
 
 #endif

@@ -67,30 +67,27 @@ struct state_t {
 
     /**
      * The get account index function.
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address.
      * @param[out] index The index.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account_index(ArithEnv &arith, const evm_word_t *address, uint32_t &index);
+    __host__ __device__ int32_t get_account_index(const evm_word_t *address, uint32_t &index);
 
     /**
      * The get account function.
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address.
      * @param[out] account The account.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t &account);
+    __host__ __device__ int32_t get_account(const evm_word_t *address, CuEVM::account_t &account);
 
     /**
      * The get account function.
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address.
      * @param[out] account_ptr The account pointer.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t *&account_ptr);
+    __host__ __device__ int32_t get_account(const evm_word_t *address, CuEVM::account_t *&account_ptr);
 
     /**
      * The add account function.
@@ -101,23 +98,21 @@ struct state_t {
 
     /**
      * The set account function.
-     * @param[in] arith The arithmetic environment.
      * @param[in] account The account.
      * @return If set 0. otherwise error.
      */
-    __host__ __device__ int32_t set_account(ArithEnv &arith, const CuEVM::account_t &account);
+    __host__ __device__ int32_t set_account(const CuEVM::account_t &account);
 
     /**
      * The update account function.
-     * @param[in] arith The arithmetic environment.
      * @param[in] account The account.
      * @return If updated 0. otherwise error.
      */
-    __host__ __device__ int32_t update_account(ArithEnv &arith, const CuEVM::account_t &account,
+    __host__ __device__ int32_t update_account(const CuEVM::account_t &account,
                                                const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_ALL_FLAG);
 
-    __host__ __device__ int32_t update(ArithEnv &arith, const CuEVM::account_t *accounts,
-                                       const CuEVM::account_flags_t *flags, uint32_t account_count);
+    __host__ __device__ int32_t update(const CuEVM::account_t *accounts, const CuEVM::account_flags_t *flags,
+                                       uint32_t account_count);
     // /**
     //  * If an account is empty.
     //  * @param[in] arith The arithmetic environment.

@@ -117,48 +117,48 @@ struct evm_transaction_t {
      * @param[in] arith the arithmetic environment.
      * @param[out] nonce the nonce of the transaction YP: \f$T_{n}\f$.
      */
-    __host__ __device__ void get_nonce(ArithEnv &arith, bn_t &nonce) const;
+    __host__ __device__ void get_nonce(evm_word_t &nonce) const;
 
     /**
      * get the gas limit of the transaction
      * @param[in] arith the arithmetic environment.
      * @param[out] gas_limit the gas limit of the transaction YP: \f$T_{g}\f$.
      */
-    __host__ __device__ void get_gas_limit(ArithEnv &arith, bn_t &gas_limit) const;
+    __host__ __device__ void get_gas_limit(evm_word_t &gas_limit) const;
     /**
      * get the to address of the transaction
      * @param[in] arith the arithmetic environment.
      * @param[out] to the to address of the transaction YP: \f$T_{t}\f$.
      */
-    __host__ __device__ void get_to(ArithEnv &arith, bn_t &to) const;
+    __host__ __device__ void get_to(evm_word_t &to) const;
 
     /**
      * get the value of the transaction
      * @param[in] arith the arithmetic environment.
      * @param[out] value the value of the transaction YP: \f$T_{v}\f$.
      */
-    __host__ __device__ void get_value(ArithEnv &arith, bn_t &value) const;
+    __host__ __device__ void get_value(evm_word_t &value) const;
 
     /**
      * get the sender address of the transaction
      * @param[in] arith the arithmetic environment.
      * @param[out] sender the sender address of the transaction YP: \f$T_{s}\f$ or \f$T_{r}\f$.
      */
-    __host__ __device__ void get_sender(ArithEnv &arith, bn_t &sender) const;
+    __host__ __device__ void get_sender(evm_word_t &sender) const;
 
     /**
      * get the max fee per gas of the transaction
      * @param[in] arith the arithmetic environment.
      * @param[out] max_fee_per_gas the max fee per gas of the transaction YP: \f$T_{m}\f$.
      */
-    __host__ __device__ void get_max_fee_per_gas(ArithEnv &arith, bn_t &max_fee_per_gas) const;
+    __host__ __device__ void get_max_fee_per_gas(evm_word_t &max_fee_per_gas) const;
 
     /**
      * get the max priority fee per gas of the transaction
      * @param[in] arith the arithmetic environment.
      * @param[out] max_priority_fee_per_gas the max priority fee per gas of the transaction YP: \f$T_{f}\f$.
      */
-    __host__ __device__ void get_max_priority_fee_per_gas(ArithEnv &arith, bn_t &max_priority_fee_per_gas) const;
+    __host__ __device__ void get_max_priority_fee_per_gas(evm_word_t &max_priority_fee_per_gas) const;
 
     /**
      * get the gas price of the transaction
@@ -166,22 +166,21 @@ struct evm_transaction_t {
      * @param[out] gas_price the gas price of the transaction YP: \f$T_{p}\f$.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t get_gas_price(ArithEnv &arith, const CuEVM::block_info_t &block_info,
-                                              bn_t &gas_price) const;
+    __host__ __device__ int32_t get_gas_price(const CuEVM::block_info_t &block_info, evm_word_t &gas_price) const;
 
     /**
      * get the data of the transaction
      * @param[in] arith the arithmetic environment.
      * @param[out] data_init the data of the transaction YP: \f$T_{i}\f$ or \f$T_{d}\f$.
      */
-    __host__ __device__ void get_data(ArithEnv &arith, byte_array_t &data_init) const;
+    __host__ __device__ void get_data(byte_array_t &data_init) const;
 
     /**
      * Get if the is a contract creation transaction
      * @param[in] arith the arithmetic environment.
      * @return 1 if the transaction is a contract creation transaction, 0 otherwise.
      */
-    __host__ __device__ int32_t is_contract_creation(ArithEnv &arith) const;
+    __host__ __device__ int32_t is_contract_creation() const;
 
     /**
      * Get the transaction fees
@@ -195,9 +194,10 @@ struct evm_transaction_t {
      * @param[out] m the max fee per gas YP: \f$m\f$.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t get_transaction_fees(ArithEnv &arith, CuEVM::block_info_t &block_info, bn_t &gas_value,
-                                                     bn_t &gas_limit, bn_t &gas_price, bn_t &gas_priority_fee,
-                                                     bn_t &up_front_cost, bn_t &m) const;
+    __host__ __device__ int32_t get_transaction_fees(CuEVM::block_info_t &block_info, evm_word_t &gas_value,
+                                                     evm_word_t &gas_limit, evm_word_t &gas_price,
+                                                     evm_word_t &gas_priority_fee, evm_word_t &up_front_cost,
+                                                     evm_word_t &m) const;
 
     /**
      * warm up the access list
@@ -205,7 +205,7 @@ struct evm_transaction_t {
      * @param[in] touch_state the touch state.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t access_list_warm_up(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr) const;
+    __host__ __device__ int32_t access_list_warm_up(CuEVM::TouchState *touch_state_ptr) const;
 
     /**
      * validate the transaction
@@ -217,9 +217,9 @@ struct evm_transaction_t {
      * @param[out] gas_priority_fee the gas priority fee YP: \f$f\f$.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t validate(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr,
-                                         CuEVM::block_info_t &block_info, bn_t &gas_used, bn_t &gas_price,
-                                         bn_t &gas_priority_fee) const;
+    __host__ __device__ int32_t validate(CuEVM::TouchState *touch_state_ptr, CuEVM::block_info_t &block_info,
+                                         evm_word_t &gas_used, evm_word_t &gas_price,
+                                         evm_word_t &gas_priority_fee) const;
 
     /**
      * get the message call from the transaction
@@ -228,7 +228,7 @@ struct evm_transaction_t {
      * @param[out] evm_message_call_ptr the message call.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t get_message_call(ArithEnv &arith, CuEVM::TouchState *touch_state_ptr,
+    __host__ __device__ int32_t get_message_call(CuEVM::TouchState *touch_state_ptr,
                                                  CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const;
 
     __host__ __device__ void print();
@@ -255,9 +255,9 @@ __host__ uint32_t no_transactions(const cJSON *json);
  * @param[in] clones the number of clones.
  * @return 0 for success, error code for failure.
  */
-__host__ int32_t get_transactions(ArithEnv &arith, evm_transaction_t *&transactions_ptr, const cJSON *json,
-                                  uint32_t &transactions_count, int32_t managed = 0, state_t *world_state = nullptr,
-                                  uint32_t start_index = 0, uint32_t clones = 1);
+__host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJSON *json, uint32_t &transactions_count,
+                                  int32_t managed = 0, state_t *world_state = nullptr, uint32_t start_index = 0,
+                                  uint32_t clones = 1);
 
 /**
  * free the transactions

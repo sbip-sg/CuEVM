@@ -51,8 +51,8 @@ struct account_t {
      * @param[in] arith The arithmetical environment
      * @param[in] address The address of the account
      */
-    __host__ __device__ account_t(ArithEnv &arith, const bn_t &address);
-    __host__ __device__ account_t(ArithEnv &arith, evm_word_t *address);
+    __host__ __device__ account_t(const evm_word_t &address);
+    __host__ __device__ account_t(evm_word_t *address);
 
     /**
      * The destructor for the account data structure.
@@ -88,7 +88,7 @@ struct account_t {
      * @param[out] value The value
      * @return If found 0, otherwise error code
      */
-    __host__ __device__ int32_t get_storage_value(ArithEnv &arith, const bn_t &key, bn_t &value);
+    __host__ __device__ int32_t get_storage_value(const evm_word_t &key, evm_word_t &value);
     /**
      * Set the storage value for the given key.
      * @param[in] arith The arithmetical environment
@@ -96,28 +96,28 @@ struct account_t {
      * @param[in] value The value of the storage
      * @return If set succesfull 0, otherwise error code
      */
-    __host__ __device__ int32_t set_storage_value(ArithEnv &arith, const bn_t &key, const bn_t &value);
+    __host__ __device__ int32_t set_storage_value(const evm_word_t &key, const evm_word_t &value);
 
     /**
      * Get the address of the account.
      * @param[in] arith The arithmetical environment
      * @param[out] address The address of the account
      */
-    __host__ __device__ void get_address(ArithEnv &arith, bn_t &address);
+    __host__ __device__ void get_address(evm_word_t &address);
 
     /**
      * Get the balance of the account.
      * @param[in] arith The arithmetical environment
      * @param[out] balance The balance of the account
      */
-    __host__ __device__ void get_balance(ArithEnv &arith, bn_t &balance);
+    __host__ __device__ void get_balance(evm_word_t &balance);
 
     /**
      * Get the nonce of the account.
      * @param[in] arith The arithmetical environment
      * @param[out] nonce The nonce of the account
      */
-    __host__ __device__ void get_nonce(ArithEnv &arith, bn_t &nonce);
+    __host__ __device__ void get_nonce(evm_word_t &nonce);
 
     /**
      * Get the byte code of the account.
@@ -130,21 +130,21 @@ struct account_t {
      * @param[in] arith The arithmetical environment
      * @param[in] address The address of the account
      */
-    __host__ __device__ void set_address(ArithEnv &arith, const evm_word_t *address);
+    __host__ __device__ void set_address(const evm_word_t *address);
 
     /**
      * Set the balance of the account.
      * @param[in] arith The arithmetical environment
      * @param[in] balance The balance of the account
      */
-    __host__ __device__ void set_balance(ArithEnv &arith, const bn_t &balance);
+    __host__ __device__ void set_balance(const evm_word_t &balance);
 
     /**
      * Set the nonce of the account.
      * @param[in] arith The arithmetical environment
      * @param[in] nonce The nonce of the account
      */
-    __host__ __device__ void set_nonce(ArithEnv &arith, const bn_t &nonce);
+    __host__ __device__ void set_nonce(const evm_word_t &nonce);
 
     /**
      * set the byte code of the account.
@@ -158,7 +158,7 @@ struct account_t {
      * @param[in] address The address
      * @return If found 1, otherwise 0
      */
-    __host__ __device__ int32_t has_address(ArithEnv &arith, const evm_word_t *address);
+    __host__ __device__ int32_t has_address(const evm_word_t *address);
 
     /**
      * Verify if the account has the the given address.
@@ -175,8 +175,7 @@ struct account_t {
      * @param[in] other The given account
      * @param[in] flags The flags to indicate which fields should be updated
      */
-    __host__ __device__ void update(ArithEnv &arith, const account_t &other,
-                                    const account_flags_t &flags = ACCOUNT_ALL_FLAG);
+    __host__ __device__ void update(const account_t &other, const account_flags_t &flags = ACCOUNT_ALL_FLAG);
     /**
      * Verify if the account is empty.
      * @return If empty 1, otherwise 0

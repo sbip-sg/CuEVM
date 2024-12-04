@@ -1,8 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Data: 2024-06-20
-// SPDX-License-Identifier: MIT
-
 #include <CuCrypto/keccak.cuh>
 #include <CuEVM/state/account.cuh>
 #include <CuEVM/utils/error_codes.cuh>
@@ -48,20 +43,20 @@ __host__ __device__ account_t::account_t(const account_t *account_ptr, const acc
     }
 }
 
-__host__ __device__ account_t::account_t(ArithEnv &arith, const bn_t &address) : storage(), byte_code(0U) {
-    cgbn_store(arith.env, &this->address, address);
-    bn_t tmp;
-    cgbn_set_ui32(arith.env, tmp, 0);
-    cgbn_store(arith.env, &this->balance, tmp);
-    cgbn_store(arith.env, &this->nonce, tmp);
+__host__ __device__ account_t::account_t(const evm_word_t &address) : storage(), byte_code(0U) {
+    this->address = address;
+    evm_word_t tmp;
+    tmp.set_zero();
+    this->balance = tmp;
+    this->nonce = tmp;
 }
 
-__host__ __device__ account_t::account_t(ArithEnv &arith, evm_word_t *address) : storage(), byte_code(0U) {
+__host__ __device__ account_t::account_t(evm_word_t *address) : storage(), byte_code(0U) {
     this->address = *address;
-    bn_t tmp;
-    cgbn_set_ui32(arith.env, tmp, 0);
-    cgbn_store(arith.env, &this->balance, tmp);
-    cgbn_store(arith.env, &this->nonce, tmp);
+    evm_word_t tmp;
+    tmp.set_zero();
+    this->balance = tmp;
+    this->nonce = tmp;
 }
 
 __host__ __device__ account_t::~account_t() { free(); }
@@ -102,48 +97,36 @@ __host__ __device__ account_t &account_t::operator=(const account_t &other) {
     return *this;
 }
 
-__host__ __device__ int32_t account_t::get_storage_value(ArithEnv &arith, const bn_t &key, bn_t &value) {
-    return storage.get_value(arith, key, value);
+__host__ __device__ int32_t account_t::get_storage_value(const evm_word_t &key, evm_word_t &value) {
+    return storage.get_value(key, value);
 }
 
-__host__ __device__ int32_t account_t::set_storage_value(ArithEnv &arith, const bn_t &key, const bn_t &value) {
-    return storage.set_value(arith, key, value);
+__host__ __device__ int32_t account_t::set_storage_value(const evm_word_t &key, const evm_word_t &value) {
+    return storage.set_value(key, value);
 }
 
-__host__ __device__ void account_t::get_address(ArithEnv &arith, bn_t &address) {
-    cgbn_load(arith.env, address, &this->address);
-}
+__host__ __device__ void account_t::get_address(evm_word_t &address) { this->address = address; }
 
-__host__ __device__ void account_t::get_balance(ArithEnv &arith, bn_t &balance) {
-    cgbn_load(arith.env, balance, &this->balance);
-}
+__host__ __device__ void account_t::get_balance(evm_word_t &balance) { this->balance = balance; }
 
-__host__ __device__ void account_t::get_nonce(ArithEnv &arith, bn_t &nonce) {
-    cgbn_load(arith.env, nonce, &this->nonce);
-}
+__host__ __device__ void account_t::get_nonce(evm_word_t &nonce) { this->nonce = nonce; }
 
 __host__ __device__ byte_array_t account_t::get_byte_code() const { return byte_code; }
 
-__host__ __device__ void account_t::set_nonce(ArithEnv &arith, const bn_t &nonce) {
-    cgbn_store(arith.env, &this->nonce, nonce);
-}
+__host__ __device__ void account_t::set_nonce(const evm_word_t &nonce) { this->nonce = nonce; }
 
-__host__ __device__ void account_t::set_balance(ArithEnv &arith, const bn_t &balance) {
-    cgbn_store(arith.env, &this->balance, balance);
-}
+__host__ __device__ void account_t::set_balance(const evm_word_t &balance) { this->balance = balance; }
 
-__host__ __device__ void account_t::set_address(ArithEnv &arith, const evm_word_t *address) {
+__host__ __device__ void account_t::set_address(const evm_word_t *address) {
     // cgbn_store(arith.env, &this->address, address);
     this->address = *address;
 }
 
 __host__ __device__ void account_t::set_byte_code(const byte_array_t &byte_code) { this->byte_code = byte_code; }
 
-__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const evm_word_t *address) {
-    return this->address == *address;
-}
+__host__ __device__ int32_t account_t::has_address(const evm_word_t *address) { return this->address == *address; }
 
-__host__ __device__ void account_t::update(ArithEnv &arith, const account_t &other, const account_flags_t &flags) {
+__host__ __device__ void account_t::update(const account_t &other, const account_flags_t &flags) {
     if (flags.has_address()) {
         address = other.address;
     }
@@ -157,20 +140,9 @@ __host__ __device__ void account_t::update(ArithEnv &arith, const account_t &oth
         byte_code = other.byte_code;
     }
     if (flags.has_storage()) {
-        storage.update(arith, other.storage);
+        storage.update(other.storage);
     }
 }
-
-// __host__ __device__ bool account_t::is_empty(ArithEnv &arith) {
-//     bn_t balance, nonce;
-//     cgbn_load(arith.env, balance, &this->balance);
-//     cgbn_load(arith.env, nonce, &this->nonce);
-//     return ((cgbn_compare_ui32(arith.env, balance, 0) == 0) &&
-//             (cgbn_compare_ui32(arith.env, nonce, 0) == 0) &&
-//             (this->byte_code.size == 0))
-//                ? true
-//                : false;
-// }
 
 __host__ __device__ bool account_t::is_empty() {
     return ((balance == 0) && (nonce == 0) && (byte_code.size == 0)) ? true : false;
@@ -185,11 +157,10 @@ __host__ __device__ bool account_t::is_empty_create() {
 __host__ __device__ int32_t account_t::is_contract() { return (byte_code.size > 0); }
 
 __host__ __device__ void account_t::empty() {
-    // __ONE_GPU_THREAD_BEGIN__
     memset(&address, 0, sizeof(evm_word_t));
-    memset(&balance, 0, sizeof(evm_word_t));
-    memset(&nonce, 0, sizeof(evm_word_t));
-    // __ONE_GPU_THREAD_END__
+    this->balance.set_zero();
+    this->nonce.set_zero();
+
     byte_code.clear();
     storage.clear();
 }
@@ -326,115 +297,5 @@ __host__ account_t *account_t::get_cpu(uint32_t count) {
 }
 
 __host__ void account_t::free_cpu(account_t *cpu_instances, uint32_t count) { delete[] cpu_instances; }
-
-__host__ account_t *account_t::get_gpu_from_cpu(account_t *cpu_instances, uint32_t count) {
-    account_t *gpu_instances, *tmp_cpu_instances;
-    tmp_cpu_instances = new account_t[count];
-    memcpy(tmp_cpu_instances, cpu_instances, count * sizeof(account_t));
-
-    for (uint32_t index = 0; index < count; index++) {
-        if ((cpu_instances[index].byte_code.data != nullptr) && (cpu_instances[index].byte_code.size > 0)) {
-            CUDA_CHECK(cudaMalloc(&tmp_cpu_instances[index].byte_code.data,
-                                  cpu_instances[index].byte_code.size * sizeof(uint8_t)));
-            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[index].byte_code.data, cpu_instances[index].byte_code.data,
-                                  cpu_instances[index].byte_code.size * sizeof(uint8_t), cudaMemcpyHostToDevice));
-            tmp_cpu_instances[index].byte_code.size = cpu_instances[index].byte_code.size;
-        }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
-            CUDA_CHECK(cudaMalloc(&tmp_cpu_instances[index].storage.storage,
-                                  tmp_cpu_instances[index].storage.size * sizeof(CuEVM::storage_element_t)));
-            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[index].storage.storage, cpu_instances[index].storage.storage,
-                                  cpu_instances[index].storage.size * sizeof(CuEVM::storage_element_t),
-                                  cudaMemcpyHostToDevice));
-            tmp_cpu_instances[index].storage.size = cpu_instances[index].storage.size;
-            tmp_cpu_instances[index].storage.capacity = cpu_instances[index].storage.capacity;
-        }
-    }
-    CUDA_CHECK(cudaMalloc(&gpu_instances, count * sizeof(account_t)));
-    CUDA_CHECK(cudaMemcpy(gpu_instances, tmp_cpu_instances, count * sizeof(account_t), cudaMemcpyHostToDevice));
-    for (uint32_t index = 0; index < count; index++) {
-        tmp_cpu_instances[index].clear();
-    }
-    delete[] tmp_cpu_instances;
-    return gpu_instances;
-}
-
-__host__ void account_t::free_gpu(account_t *gpu_instances, uint32_t count) {
-    account_t *tmp_cpu_instances = new account_t[count];
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances, count * sizeof(account_t), cudaMemcpyDeviceToHost));
-    for (uint32_t index = 0; index < count; index++) {
-        if ((tmp_cpu_instances[index].byte_code.data != nullptr) && (tmp_cpu_instances[index].byte_code.size > 0)) {
-            CUDA_CHECK(cudaFree(tmp_cpu_instances[index].byte_code.data));
-        }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
-            CUDA_CHECK(cudaFree(tmp_cpu_instances[index].storage.storage));
-        }
-        tmp_cpu_instances[index].clear();
-    }
-    delete[] tmp_cpu_instances;
-    CUDA_CHECK(cudaFree(gpu_instances));
-}
-
-__host__ account_t *account_t::get_cpu_from_gpu(account_t *gpu_instances, uint32_t count) {
-    // we consider that the byte code and storage were not allocated
-    // from the cpu side
-    account_t *cpu_instances = new account_t[count];
-    account_t *tmp_cpu_instances = new account_t[count];
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, gpu_instances, count * sizeof(account_t), cudaMemcpyDeviceToHost));
-    memcpy(cpu_instances, tmp_cpu_instances, count * sizeof(account_t));
-    for (uint32_t index = 0; index < count; index++) {
-        if ((tmp_cpu_instances[index].byte_code.data != nullptr) && (tmp_cpu_instances[index].byte_code.size > 0)) {
-            cpu_instances[index].byte_code.data = new uint8_t[tmp_cpu_instances[index].byte_code.size];
-            cpu_instances[index].byte_code.size = tmp_cpu_instances[index].byte_code.size;
-        } else {
-            cpu_instances[index].byte_code.data = nullptr;
-            cpu_instances[index].byte_code.size = 0;
-        }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
-            cpu_instances[index].storage.storage = new CuEVM::storage_element_t[tmp_cpu_instances[index].storage.size];
-            cpu_instances[index].storage.size = tmp_cpu_instances[index].storage.size;
-            cpu_instances[index].storage.capacity = tmp_cpu_instances[index].storage.capacity;
-        } else {
-            cpu_instances[index].storage.storage = nullptr;
-            cpu_instances[index].storage.size = 0;
-            cpu_instances[index].storage.capacity = 0;
-        }
-        tmp_cpu_instances[index].clear();
-    }
-    account_t *tmp_gpu_instaces;
-    tmp_gpu_instaces = account_t::get_gpu_from_cpu(cpu_instances, count);
-
-    // call the transfer kernel
-    account_t_transfer_kernel<<<count, 1>>>(tmp_gpu_instaces, gpu_instances, count);
-    CUDA_CHECK(cudaDeviceSynchronize());
-    CUDA_CHECK(cudaFree(gpu_instances));
-
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_instances, tmp_gpu_instaces, count * sizeof(account_t), cudaMemcpyDeviceToHost));
-
-    for (uint32_t index = 0; index < count; index++) {
-        if ((tmp_cpu_instances[index].byte_code.data != nullptr) && (tmp_cpu_instances[index].byte_code.size > 0)) {
-            CUDA_CHECK(cudaMemcpy(cpu_instances[index].byte_code.data, tmp_cpu_instances[index].byte_code.data,
-                                  tmp_cpu_instances[index].byte_code.size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
-            cpu_instances[index].byte_code.size = tmp_cpu_instances[index].byte_code.size;
-        } else {
-            cpu_instances[index].byte_code.data = nullptr;
-            cpu_instances[index].byte_code.size = 0;
-        }
-        if ((tmp_cpu_instances[index].storage.storage != nullptr) && (tmp_cpu_instances[index].storage.size > 0)) {
-            CUDA_CHECK(cudaMemcpy(cpu_instances[index].storage.storage, tmp_cpu_instances[index].storage.storage,
-                                  tmp_cpu_instances[index].storage.size * sizeof(CuEVM::storage_element_t),
-                                  cudaMemcpyDeviceToHost));
-            cpu_instances[index].storage.size = tmp_cpu_instances[index].storage.size;
-        } else {
-            cpu_instances[index].storage.storage = nullptr;
-            cpu_instances[index].storage.size = 0;
-        }
-        tmp_cpu_instances[index].clear();
-    }
-    delete[] tmp_cpu_instances;
-
-    account_t::free_gpu(tmp_gpu_instaces, count);
-    return cpu_instances;
-}
 
 }  // namespace CuEVM

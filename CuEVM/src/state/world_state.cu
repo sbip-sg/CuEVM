@@ -1,7 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Data: 2024-06-20
-// SPDX-License-Identifier: MIT
 
 #include <CuEVM/state/world_state.cuh>
 #include <CuEVM/utils/error_codes.cuh>
@@ -24,23 +20,24 @@ __host__ __device__ int32_t WorldState::update(ArithEnv &arith, const CuEVM::sta
 }
 
 __host__ __device__ void WorldState::serialize_data(ArithEnv &arith, serialized_worldstate_data *data) {
-    data->no_accounts = _state->no_accounts;
-    for (uint32_t idx = 0; idx < _state->no_accounts; idx++) {
-        account_t *account_ptr = &_state->accounts[idx];
-        account_ptr->address.address_to_hex(data->addresses[idx]);
-        account_ptr->balance.to_hex(data->balance[idx]);
-        data->nonce[idx] = account_ptr->nonce._limbs[0];  // check if limbs 0
-        if (account_ptr->storage.size > 0) {
-            for (uint32_t idx_storage = 0; idx_storage < account_ptr->storage.size; idx_storage++) {
-                account_ptr->storage.storage[idx_storage].key.to_hex(
-                    data->storage_keys[data->no_storage_elements + idx_storage]);
-                account_ptr->storage.storage[idx_storage].value.to_hex(
-                    data->storage_values[data->no_storage_elements + idx_storage]);
-                data->storage_indexes[data->no_storage_elements + idx_storage] = idx;
-            }
-        }
-        data->no_storage_elements += account_ptr->storage.size;
-    }
+    // TODO: reenable
+    // data->no_accounts = _state->no_accounts;
+    // for (uint32_t idx = 0; idx < _state->no_accounts; idx++) {
+    //     account_t *account_ptr = &_state->accounts[idx];
+    //     account_ptr->address.address_to_hex(data->addresses[idx]);
+    //     account_ptr->balance.to_hex(data->balance[idx]);
+    //     data->nonce[idx] = account_ptr->nonce._limbs[0];  // check if limbs 0
+    //     if (account_ptr->storage.size > 0) {
+    //         for (uint32_t idx_storage = 0; idx_storage < account_ptr->storage.size; idx_storage++) {
+    //             account_ptr->storage.storage[idx_storage].key.to_hex(
+    //                 data->storage_keys[data->no_storage_elements + idx_storage]);
+    //             account_ptr->storage.storage[idx_storage].value.to_hex(
+    //                 data->storage_values[data->no_storage_elements + idx_storage]);
+    //             data->storage_indexes[data->no_storage_elements + idx_storage] = idx;
+    //         }
+    //     }
+    //     data->no_storage_elements += account_ptr->storage.size;
+    // }
 }
 __host__ void serialized_worldstate_data::print() {
     printf("\nPrinting serialized worldstate data\n");

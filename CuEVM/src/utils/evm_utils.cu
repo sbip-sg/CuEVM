@@ -4,6 +4,7 @@
 #include <CuEVM/utils/evm_utils.cuh>
 
 namespace CuEVM::utils {
+
 __host__ __device__ int32_t get_contract_address_create_word(ArithEnv &arith, evm_word_t *contract_address,
                                                              evm_word_t *sender_address, evm_word_t *sender_nonce) {
     CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;

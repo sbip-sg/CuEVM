@@ -22,31 +22,26 @@ class AccessState {
 
     /**
      * Add an account to the state.
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[out] account_ptr The pointer to the account.
      * @param[in] flag The account access flags.
      * @return 0 if the account is added successfully, error otherwise.
      */
-    __host__ __device__ int32_t add_account(ArithEnv &arith,
-                                            const bn_t &address,
-                                            CuEVM::account_t *&account_ptr,
+    __host__ __device__ int32_t add_account(const evm_word_t &address, CuEVM::account_t *&account_ptr,
                                             const CuEVM::account_flags_t flag);
 
    public:
     /**
      * The default constructor.
      */
-    __host__ __device__ AccessState()
-        : _state(nullptr), _world_state(nullptr) {}
+    __host__ __device__ AccessState() : _state(nullptr), _world_state(nullptr) {}
 
     /**
      * The constructor with the state and the world state.
      * @param[in] state The state access.
      * @param[in] world_state The world state.
      */
-    __host__ __device__ AccessState(state_access_t *state,
-                                    WorldState *world_state)
+    __host__ __device__ AccessState(state_access_t *state, WorldState *world_state)
         : _state(state), _world_state(world_state) {}
 
     /**
@@ -59,37 +54,31 @@ class AccessState {
 
     /**
      * Get an account from the state.
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[out] account_ptr The pointer to the account.
      * @param[in] flag The account access flags.
      * @return 0 if the account is found, error otherwise.
      */
-    __host__ __device__ int32_t get_account(
-        ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
-        const CuEVM::account_flags_t flag = ACCOUNT_NONE_FLAG);
+    __host__ __device__ int32_t get_account(const evm_word_t &address, CuEVM::account_t *&account_ptr,
+                                            const CuEVM::account_flags_t flag = ACCOUNT_NONE_FLAG);
 
     /**
      * Get the value from the state.
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[in] key The key of the storage.
      * @param[out] value The value of the storage.
      * @return 0 if found, error otherwiese.
      */
-    __host__ __device__ int32_t get_value(ArithEnv &arith, const bn_t &address,
-                                          const bn_t &key, bn_t &value);
+    __host__ __device__ int32_t get_value(const evm_word_t &address, const evm_word_t &key, evm_word_t &value);
 
     /**
      * Get the value without modifing the state
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[in] key The key of the storage.
      * @param[out] value The value of the storage.
      * @return 0 if the value is found, error otherwise.
      */
-    __host__ __device__ int32_t poke_value(ArithEnv &arith, const bn_t &address,
-                                           const bn_t &key, bn_t &value) const;
+    __host__ __device__ int32_t poke_value(const evm_word_t &address, const evm_word_t &key, evm_word_t &value) const;
 
     /**
      * Get the balance without modifing the state
@@ -97,9 +86,7 @@ class AccessState {
      * @param[in] address The address of the account.
      * @return 0 if the value is found, error otherwise.
      */
-    __host__ __device__ int32_t poke_balance(ArithEnv &arith,
-                                             const bn_t &address,
-                                             bn_t &balance) const;
+    __host__ __device__ int32_t poke_balance(const evm_word_t &address, evm_word_t &balance) const;
 
     /**
      * If an account has beeen accessed, it will be marked as warm.
@@ -112,7 +99,6 @@ class AccessState {
 
     /**
      * If a key has been accessed, it will be marked as warm.
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[in] key The key of the storage.
      * @return 1 if the key is warm, 0 otherwise
@@ -123,12 +109,10 @@ class AccessState {
 
     /**
      * If an account does not exist in the world state/deleted
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @return 1 if the account is deleted, 0 otherwise.
      */
-    __host__ __device__ int32_t is_deleted_account(ArithEnv &arith,
-                                                   const bn_t &address) const;
+    __host__ __device__ int32_t is_deleted_account(const evm_word_t &address) const;
     // /**
     //  * IF an account is empty
     //  * @param[in] arith The arithmetic environment.
@@ -140,13 +124,10 @@ class AccessState {
     //                                              const bn_t &address) const;
     /**
      * Get the full storage from access state and world state
-     * @param[in] arith The arithmetic environment.
      * @param[in] address The address of the account.
      * @param[out] storage The storage of the account.
      * @return 0 if the storage is found, error otherwise.
      */
-    __host__ __device__ int32_t
-    get_storage(ArithEnv &arith, const bn_t &address,
-                CuEVM::contract_storage_t &storage) const;
+    __host__ __device__ int32_t get_storage(const evm_word_t &address, CuEVM::contract_storage_t &storage) const;
 };
 }  // namespace CuEVM

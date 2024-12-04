@@ -1,8 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
-// SPDX-License-Identifier: MIT
-
 #include <CuEVM/state/state_access.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
@@ -15,11 +10,10 @@ __host__ __device__ state_access_t::state_access_t(const state_access_t &other) 
 __host__ __device__ state_access_t::~state_access_t() { free(); }
 
 __host__ __device__ void state_access_t::free() {
-    __ONE_GPU_THREAD_BEGIN__
     if (flags != nullptr && no_accounts > 0) {
         std::free(flags);
     }
-    __ONE_GPU_THREAD_END__
+
     state_t::free();
     clear();
 }
@@ -46,24 +40,21 @@ __host__ __device__ state_access_t &state_access_t::operator=(const state_access
 }
 
 __host__ __device__ void state_access_t::duplicate(const state_access_t &other) {
-    __SHARED_MEMORY__ CuEVM::account_flags_t *tmp_flags[CGBN_IBP];
+    CuEVM::account_flags_t *tmp_flags;
     state_t::duplicate(other);
     if (no_accounts > 0) {
-        __ONE_GPU_THREAD_BEGIN__
-        tmp_flags[INSTANCE_IDX_PER_BLOCK] =
-            (CuEVM::account_flags_t *)malloc(sizeof(CuEVM::account_flags_t) * no_accounts);
-        memcpy(tmp_flags[INSTANCE_IDX_PER_BLOCK], other.flags, no_accounts * sizeof(CuEVM::account_flags_t));
-        __ONE_GPU_THREAD_END__
+        tmp_flags = (CuEVM::account_flags_t *)malloc(sizeof(CuEVM::account_flags_t) * no_accounts);
+        memcpy(tmp_flags, other.flags, no_accounts * sizeof(CuEVM::account_flags_t));
     } else {
-        tmp_flags[INSTANCE_IDX_PER_BLOCK] = nullptr;
+        tmp_flags = nullptr;
     }
-    flags = tmp_flags[INSTANCE_IDX_PER_BLOCK];
+    flags = tmp_flags;
 }
 
-__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const evm_word_t *address,
-                                                        CuEVM::account_t &account, const CuEVM::account_flags_t flag) {
+__host__ __device__ int32_t state_access_t::get_account(const evm_word_t *address, CuEVM::account_t &account,
+                                                        const CuEVM::account_flags_t flag) {
     uint32_t index = 0;
-    if (state_t::get_account_index(arith, address, index) == ERROR_SUCCESS) {
+    if (state_t::get_account_index(address, index) == ERROR_SUCCESS) {
         flags[index].update(flag);
         account = accounts[index];
         return ERROR_SUCCESS;
@@ -71,11 +62,10 @@ __host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const e
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_access_t::get_account(ArithEnv &arith, const evm_word_t *address,
-                                                        CuEVM::account_t *&account_ptr,
+__host__ __device__ int32_t state_access_t::get_account(const evm_word_t *address, CuEVM::account_t *&account_ptr,
                                                         const CuEVM::account_flags_t flag) {
     uint32_t index = 0;
-    if (state_t::get_account_index(arith, address, index) == ERROR_SUCCESS) {
+    if (state_t::get_account_index(address, index) == ERROR_SUCCESS) {
         flags[index].update(flag);
         account_ptr = &accounts[index];
         return ERROR_SUCCESS;
@@ -90,18 +80,15 @@ __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &
     //     printf("after state_t::add_account(account); before malloc(account_flags_t; %d\n", threadIdx.x);
     // #endif
     uint32_t index = no_accounts - 1;
-    __SHARED_MEMORY__ CuEVM::account_flags_t *tmp_flags[CGBN_IBP];
-    __ONE_GPU_THREAD_BEGIN__
-    // printf(" state_access_t::add_account no_accounts: %u\n", no_accounts);
-    tmp_flags[INSTANCE_IDX_PER_BLOCK] = (CuEVM::account_flags_t *)malloc(sizeof(CuEVM::account_flags_t) * no_accounts);
-    memcpy(tmp_flags[INSTANCE_IDX_PER_BLOCK], flags, (no_accounts - 1) * sizeof(CuEVM::account_flags_t));
+    CuEVM::account_flags_t *tmp_flags;
+    tmp_flags = (CuEVM::account_flags_t *)malloc(sizeof(CuEVM::account_flags_t) * no_accounts);
+    memcpy(tmp_flags, flags, (no_accounts - 1) * sizeof(CuEVM::account_flags_t));
 
     if (flags != nullptr) {
         delete[] flags;
     }
-    __ONE_GPU_THREAD_END__
 
-    flags = tmp_flags[INSTANCE_IDX_PER_BLOCK];
+    flags = tmp_flags;
     flags[index] = flag;
 
     // #ifdef __CUDA_ARCH__
@@ -111,95 +98,70 @@ __host__ __device__ int32_t state_access_t::add_account(const CuEVM::account_t &
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t state_access_t::add_duplicate_account(ArithEnv &arith, CuEVM::account_t *&account_ptr,
+__host__ __device__ int32_t state_access_t::add_duplicate_account(CuEVM::account_t *&account_ptr,
                                                                   CuEVM::account_t *&src_account_ptr,
                                                                   const CuEVM::account_flags_t flag) {
     CuEVM::account_flags_t no_storage_copy(ACCOUNT_NON_STORAGE_FLAG);
 
-    __SHARED_MEMORY__ CuEVM::account_t *tmp_account_ptr[CGBN_IBP];
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    tmp_account_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::account_t();
-    // tmp_account_ptr = new CuEVM::account_t(src_account_ptr, no_storage_copy);
-    __ONE_GPU_THREAD_END__
-    tmp_account_ptr[INSTANCE_IDX_PER_BLOCK]->update(arith, *src_account_ptr, no_storage_copy);
-    // #ifdef __CUDA_ARCH__
-    //     printf("TouchState::add_duplicate_account before add_account %d tmp_account_ptr %p storage %p\n",
-    //     threadIdx.x,
-    //            tmp_account_ptr, &tmp_account_ptr->storage);
-    // #endif
-    int32_t error_code = add_account(*tmp_account_ptr[INSTANCE_IDX_PER_BLOCK], flag);
-    // #ifdef __CUDA_ARCH__
-    //     printf("TouchState::add_duplicate_account after add_account %d\n" ,threadIdx.x);
-    // #endif
-    // printf("after add_account\n");
+    CuEVM::account_t *tmp_account_ptr;
+    tmp_account_ptr = new CuEVM::account_t();
+    tmp_account_ptr->update(*src_account_ptr, no_storage_copy);
+
+    int32_t error_code = add_account(*tmp_account_ptr, flag);
+
     account_ptr = &accounts[no_accounts - 1];
-    //  #ifdef __CUDA_ARCH__
-    //     printf("TouchState::add_duplicate_account after assigning account_ptr %d, account_ptr %p\n" ,threadIdx.x,
-    //     account_ptr);
-    // #endif
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    delete tmp_account_ptr[INSTANCE_IDX_PER_BLOCK];
-    __ONE_GPU_THREAD_WOSYNC_END__
-    //  #ifdef __CUDA_ARCH__
-    //     printf("TouchState::add_duplicate_account delete tmp_account_ptr %d, account_ptr %p\n" ,threadIdx.x,
-    //     account_ptr);
-    // #endif
-    // printf("after delete tmp_account_ptr\n");
+
+    delete tmp_account_ptr;
+
     return error_code;
 }
 
-__host__ __device__ int32_t state_access_t::add_new_account(ArithEnv &arith, const evm_word_t *address,
-                                                            CuEVM::account_t *&account_ptr,
+__host__ __device__ int32_t state_access_t::add_new_account(const evm_word_t *address, CuEVM::account_t *&account_ptr,
                                                             const CuEVM::account_flags_t flag) {
-    __SHARED_MEMORY__ CuEVM::account_t *tmp_account_ptr[CGBN_IBP];
-    bn_t zero;
-    cgbn_set_ui32(arith.env, zero, 0);
+    CuEVM::account_t *tmp_account_ptr;
+
     // printf("before new CuEVM::account_t();\n");
 
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    tmp_account_ptr[INSTANCE_IDX_PER_BLOCK] = new CuEVM::account_t();
-    __ONE_GPU_THREAD_END__
+    tmp_account_ptr = new CuEVM::account_t();
 
-    tmp_account_ptr[INSTANCE_IDX_PER_BLOCK]->set_address(arith, address);
+    tmp_account_ptr->address = *address;
     // default constructor did not set balance + nonce
-    tmp_account_ptr[INSTANCE_IDX_PER_BLOCK]->set_balance(arith, zero);
-    tmp_account_ptr[INSTANCE_IDX_PER_BLOCK]->set_nonce(arith, zero);
+    tmp_account_ptr->balance = 0;
+    tmp_account_ptr->nonce = 0;
 
-    int32_t error_code = add_account(*tmp_account_ptr[INSTANCE_IDX_PER_BLOCK], flag);
+    int32_t error_code = add_account(*tmp_account_ptr, flag);
 
     account_ptr = &accounts[no_accounts - 1];
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    delete tmp_account_ptr[INSTANCE_IDX_PER_BLOCK];
-    __ONE_GPU_THREAD_WOSYNC_END__
+    delete tmp_account_ptr;
 
     return error_code;
 }
 
-__host__ __device__ int32_t state_access_t::set_account(ArithEnv &arith, const CuEVM::account_t &account,
+__host__ __device__ int32_t state_access_t::set_account(const CuEVM::account_t &account,
                                                         const CuEVM::account_flags_t flag) {
-    if (update_account(arith, account, flag) != ERROR_SUCCESS) {
+    if (update_account(account, flag) != ERROR_SUCCESS) {
         return add_account(account, flag);
     } else {
         return ERROR_SUCCESS;
     }
 }
 
-__host__ __device__ int32_t state_access_t::update_account(ArithEnv &arith, const CuEVM::account_t &account,
+__host__ __device__ int32_t state_access_t::update_account(const CuEVM::account_t &account,
                                                            const CuEVM::account_flags_t flag) {
     uint32_t index = 0;
-    if (state_t::get_account_index(arith, &(account.address), index) == ERROR_SUCCESS) {
-        accounts[index].update(arith, account, flag);
+    if (state_t::get_account_index(&(account.address), index) == ERROR_SUCCESS) {
+        accounts[index].update(account, flag);
         flags[index].update(flag);
         return ERROR_SUCCESS;
     }
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_access_t::update(ArithEnv &arith, const state_access_t &other) {
+__host__ __device__ int32_t state_access_t::update(const state_access_t &other) {
     int32_t error_code = ERROR_SUCCESS;
     for (uint32_t i = 0; i < other.no_accounts; i++) {
         // if update failed (not exist), add the account
-        if (update_account(arith, other.accounts[i], other.flags[i]) != ERROR_SUCCESS) {
+        if (update_account(other.accounts[i], other.flags[i]) != ERROR_SUCCESS) {
             error_code |= add_account(other.accounts[i], other.flags[i]);
         }
     }
@@ -282,132 +244,5 @@ __host__ cJSON *state_access_t::merge_json(const state_t &state1, const state_ac
     delete[] writen_accounts;
     return state_json;
 }
-__host__ state_access_t *state_access_t::get_cpu(uint32_t count) { return new state_access_t[count]; }
 
-__host__ void state_access_t::cpu_free(state_access_t *cpu_states, uint32_t count) {
-    if (cpu_states != nullptr) {
-        for (uint32_t idx = 0; idx < count; idx++) {
-            if (cpu_states[idx].no_accounts > 0) {
-                delete[] cpu_states[idx].accounts;
-                std::free(cpu_states[idx].flags);
-            }
-            cpu_states[idx].clear();
-        }
-        delete[] cpu_states;
-    }
-}
-
-__host__ state_access_t *state_access_t::get_gpu_from_cpu(const state_access_t *cpu_states, uint32_t count) {
-    state_access_t *gpu_states, *tmp_gpu_states;
-    tmp_gpu_states = new state_access_t[count];
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (cpu_states[idx].no_accounts > 0) {
-            tmp_gpu_states[idx].accounts =
-                CuEVM::account_t::get_gpu_from_cpu(cpu_states[idx].accounts, cpu_states[idx].no_accounts);
-            CUDA_CHECK(cudaMalloc((void **)&(tmp_gpu_states[idx].flags),
-                                  cpu_states[idx].no_accounts * sizeof(CuEVM::account_flags_t)));
-            CUDA_CHECK(cudaMemcpy(tmp_gpu_states[idx].flags, cpu_states[idx].flags,
-                                  cpu_states[idx].no_accounts * sizeof(CuEVM::account_flags_t),
-                                  cudaMemcpyHostToDevice));
-            tmp_gpu_states[idx].no_accounts = cpu_states[idx].no_accounts;
-        } else {
-            tmp_gpu_states[idx].accounts = nullptr;
-            tmp_gpu_states[idx].no_accounts = 0;
-            tmp_gpu_states[idx].flags = nullptr;
-        }
-    }
-    CUDA_CHECK(cudaMalloc((void **)&gpu_states, count * sizeof(state_access_t)));
-    CUDA_CHECK(cudaMemcpy(gpu_states, tmp_gpu_states, count * sizeof(state_access_t), cudaMemcpyHostToDevice));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        tmp_gpu_states[idx].clear();
-    }
-    delete[] tmp_gpu_states;
-    return gpu_states;
-}
-
-__host__ void state_access_t::gpu_free(state_access_t *gpu_states, uint32_t count) {
-    state_access_t *tmp_gpu_states = new state_access_t[count];
-    CUDA_CHECK(cudaMemcpy(tmp_gpu_states, gpu_states, count * sizeof(state_access_t), cudaMemcpyDeviceToHost));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (tmp_gpu_states[idx].no_accounts > 0) {
-            CuEVM::account_t::free_gpu(tmp_gpu_states[idx].accounts, tmp_gpu_states[idx].no_accounts);
-            CUDA_CHECK(cudaFree(tmp_gpu_states[idx].flags));
-        }
-        tmp_gpu_states[idx].clear();
-    }
-    delete[] tmp_gpu_states;
-    CUDA_CHECK(cudaFree(gpu_states));
-}
-
-__host__ state_access_t *state_access_t::get_cpu_from_gpu(state_access_t *gpu_states, uint32_t count) {
-    state_access_t *cpu_states, *tmp_cpu_states, *tmp_gpu_states;
-    tmp_cpu_states = new state_access_t[count];
-    cpu_states = new state_access_t[count];
-    CUDA_CHECK(cudaMemcpy(cpu_states, gpu_states, count * sizeof(state_access_t), cudaMemcpyDeviceToHost));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (cpu_states[idx].no_accounts > 0) {
-            CUDA_CHECK(cudaMalloc((void **)&(tmp_cpu_states[idx].accounts),
-                                  cpu_states[idx].no_accounts * sizeof(CuEVM::account_t)));
-            tmp_cpu_states[idx].no_accounts = cpu_states[idx].no_accounts;
-            CUDA_CHECK(cudaMalloc((void **)&(tmp_cpu_states[idx].flags),
-                                  cpu_states[idx].no_accounts * sizeof(CuEVM::account_flags_t)));
-        } else {
-            tmp_cpu_states[idx].accounts = nullptr;
-            tmp_cpu_states[idx].no_accounts = 0;
-            tmp_cpu_states[idx].flags = nullptr;
-        }
-    }
-    CUDA_CHECK(cudaMalloc((void **)&tmp_gpu_states, count * sizeof(state_access_t)));
-    CUDA_CHECK(cudaMemcpy(tmp_gpu_states, tmp_cpu_states, count * sizeof(state_access_t), cudaMemcpyHostToDevice));
-
-    state_access_t_transfer_kernel<<<count, 1>>>(tmp_gpu_states, gpu_states, count);
-    CUDA_CHECK(cudaDeviceSynchronize());
-    CUDA_CHECK(cudaMemcpy(tmp_cpu_states, tmp_gpu_states, count * sizeof(state_access_t), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaFree(gpu_states));
-    CUDA_CHECK(cudaFree(tmp_gpu_states));
-
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (tmp_cpu_states[idx].no_accounts > 0) {
-            cpu_states[idx].flags =
-                (CuEVM::account_flags_t *)malloc(tmp_cpu_states[idx].no_accounts * sizeof(CuEVM::account_flags_t));
-            CUDA_CHECK(cudaMemcpy(cpu_states[idx].flags, tmp_cpu_states[idx].flags,
-                                  tmp_cpu_states[idx].no_accounts * sizeof(CuEVM::account_flags_t),
-                                  cudaMemcpyDeviceToHost));
-            CUDA_CHECK(cudaFree(tmp_cpu_states[idx].flags));
-            cpu_states[idx].accounts =
-                CuEVM::account_t::get_cpu_from_gpu(tmp_cpu_states[idx].accounts, tmp_cpu_states[idx].no_accounts);
-            cpu_states[idx].no_accounts = tmp_cpu_states[idx].no_accounts;
-        } else {
-            cpu_states[idx].accounts = nullptr;
-            cpu_states[idx].no_accounts = 0;
-            cpu_states[idx].flags = nullptr;
-        }
-        tmp_cpu_states[idx].clear();
-    }
-    delete[] tmp_cpu_states;
-    return cpu_states;
-}
-
-__global__ void state_access_t_transfer_kernel(state_access_t *dst_instances, state_access_t *src_instances,
-                                               uint32_t count) {
-    uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < count) {
-        if (src_instances[idx].no_accounts > 0) {
-            memcpy(dst_instances[idx].accounts, src_instances[idx].accounts,
-                   src_instances[idx].no_accounts * sizeof(CuEVM::account_t));
-            dst_instances[idx].no_accounts = src_instances[idx].no_accounts;
-            for (uint32_t idx2 = 0; idx2 < src_instances[idx].no_accounts; idx2++) {
-                src_instances[idx].accounts[idx2].byte_code.clear();
-                src_instances[idx].accounts[idx2].storage.clear();
-            }
-            memcpy(dst_instances[idx].flags, src_instances[idx].flags,
-                   src_instances[idx].no_accounts * sizeof(CuEVM::account_flags_t));
-            src_instances[idx].free();
-        } else {
-            dst_instances[idx].accounts = nullptr;
-            dst_instances[idx].no_accounts = 0;
-            dst_instances[idx].flags = nullptr;
-        }
-    }
-}
 }  // namespace CuEVM

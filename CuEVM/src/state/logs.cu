@@ -1,36 +1,28 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Data: 2023-11-30
-// SPDX-License-Identifier: MIT
 
 #include <CuEVM/state/logs.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
 __host__ __device__ int32_t log_state_data_t::grow() {
-    __SHARED_MEMORY__ log_data_t *new_logs[CGBN_IBP];
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    new_logs[INSTANCE_IDX_PER_BLOCK] = new log_data_t[capacity + log_page_size];
+    log_data_t *new_logs;
+    new_logs = new log_data_t[capacity + log_page_size];
     // printf("allocate capacity  %d for logpointer %p new_logs %p\n", capacity + log_page_size, this, new_logs);
-    __ONE_GPU_THREAD_END__
-    if (new_logs[INSTANCE_IDX_PER_BLOCK] == nullptr) {
+
+    if (new_logs == nullptr) {
         return ERROR_MEMORY_ALLOCATION_FAILED;
     }
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (logs != nullptr && no_logs > 0) {
-        memcpy(new_logs[INSTANCE_IDX_PER_BLOCK], logs, no_logs * sizeof(log_data_t));
+        memcpy(new_logs, logs, no_logs * sizeof(log_data_t));
         delete[] logs;
     }
-    __ONE_GPU_THREAD_END__
-    logs = new_logs[INSTANCE_IDX_PER_BLOCK];
+    logs = new_logs;
     capacity = capacity + log_page_size;
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t log_state_data_t::push(ArithEnv &arith, const bn_t &address,
-                                                   const CuEVM::byte_array_t &record, const bn_t &topic_1,
-                                                   const bn_t &topic_2, const bn_t &topic_3, const bn_t &topic_4,
+__host__ __device__ int32_t log_state_data_t::push(const evm_word_t &address, const byte_array_t &record,
+                                                   const evm_word_t &topic_1, const evm_word_t &topic_2,
+                                                   const evm_word_t &topic_3, const evm_word_t &topic_4,
                                                    const uint32_t &no_topics) {
     int32_t error_code = ERROR_SUCCESS;
 
@@ -38,32 +30,30 @@ __host__ __device__ int32_t log_state_data_t::push(ArithEnv &arith, const bn_t &
         error_code |= grow();
     }
 
-    __SYNC_THREADS__
-
     logs[no_logs].record = record;
-    cgbn_store(arith.env, &(logs[no_logs].address), address);
-    cgbn_store(arith.env, &(logs[no_logs].topics[0]), topic_1);
-    cgbn_store(arith.env, &(logs[no_logs].topics[1]), topic_2);
-    cgbn_store(arith.env, &(logs[no_logs].topics[2]), topic_3);
-    cgbn_store(arith.env, &(logs[no_logs].topics[3]), topic_4);
+    logs[no_logs].address = address;
+    logs[no_logs].topics[0] = topic_1;
+    logs[no_logs].topics[1] = topic_2;
+    logs[no_logs].topics[2] = topic_3;
+    logs[no_logs].topics[3] = topic_4;
     logs[no_logs].no_topics = no_topics;
     no_logs++;
 
     return error_code;
 }
 
-__host__ __device__ int32_t log_state_data_t::update(ArithEnv &arith, const log_state_data_t &other) {
+__host__ __device__ int32_t log_state_data_t::update(const log_state_data_t &other) {
     int32_t error_code = ERROR_SUCCESS;
-    bn_t address, topic_1, topic_2, topic_3, topic_4;
+    evm_word_t address, topic_1, topic_2, topic_3, topic_4;
 
     for (uint32_t idx = 0; idx < other.no_logs; idx++) {
-        cgbn_load(arith.env, address, &(other.logs[idx].address));
-        cgbn_load(arith.env, topic_1, &(other.logs[idx].topics[0]));
-        cgbn_load(arith.env, topic_2, &(other.logs[idx].topics[1]));
-        cgbn_load(arith.env, topic_3, &(other.logs[idx].topics[2]));
-        cgbn_load(arith.env, topic_4, &(other.logs[idx].topics[3]));
+        address = other.logs[idx].address;
+        topic_1 = other.logs[idx].topics[0];
+        topic_2 = other.logs[idx].topics[1];
+        topic_3 = other.logs[idx].topics[2];
+        topic_4 = other.logs[idx].topics[3];
         error_code |=
-            push(arith, address, other.logs[idx].record, topic_1, topic_2, topic_3, topic_4, other.logs[idx].no_topics);
+            push(address, other.logs[idx].record, topic_1, topic_2, topic_3, topic_4, other.logs[idx].no_topics);
     }
     return error_code;
 }

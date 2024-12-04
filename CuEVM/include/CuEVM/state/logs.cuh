@@ -70,9 +70,9 @@ struct log_state_data_t {
      * @param[in] no_topics The number of topics of the log
      * @return 0 if success, error otherwise
      */
-    __host__ __device__ int32_t push(ArithEnv &arith, const bn_t &address, const CuEVM::byte_array_t &record,
-                                     const bn_t &topic_1, const bn_t &topic_2, const bn_t &topic_3, const bn_t &topic_4,
-                                     const uint32_t &no_topics);
+    __host__ __device__ int32_t push(const evm_word_t &address, const CuEVM::byte_array_t &record,
+                                     const evm_word_t &topic_1, const evm_word_t &topic_2, const evm_word_t &topic_3,
+                                     const evm_word_t &topic_4, const uint32_t &no_topics);
 
     /**
      * Update the log state with the logs from another log state
@@ -80,7 +80,7 @@ struct log_state_data_t {
      * @param[in] other The other log state
      * @return 0 if success, error otherwise
      */
-    __host__ __device__ int32_t update(ArithEnv &arith, const log_state_data_t &other);
+    __host__ __device__ int32_t update(const log_state_data_t &other);
 
     /**
      * Print the log state

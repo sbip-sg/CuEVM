@@ -14,7 +14,7 @@ namespace CuEVM {
 /**
  * The EVM word type. also use for store CGBN base type.
  */
-struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
+struct evm_word_t : uint256 {
     /**
      * The default constructor.
      */
@@ -49,13 +49,6 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
     __host__ __device__ int32_t operator==(const evm_word_t &other) const;
 
     /**
-     * The equality operator for uint32_t
-     * @param[in] value the uint32_t value
-     * @return 1 for equal, 0 otherwise
-     */
-    __host__ __device__ int32_t operator==(const uint32_t &value) const;
-    __host__ __device__ int32_t operator<(const uint32_t &value) const;
-    /**
      * Set the evm_word_t from a hex string.
      * The hex string is in Big Endian format.
      * @param[in] hex_string The source hex string
@@ -70,14 +63,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * @return 0 for success, 1 otherwise
      */
     __host__ __device__ int32_t from_byte_array_t(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
-    /**
-     * Set the evm_word_t from a byte array. Compatible with CPU version.
-     * The byte array is in Big Endian format.
-     * @param[in] byte_array The source byte array
-     * @param[in] endian The endian format
-     * @return 0 for success, 1 otherwise
-     */
-    __host__ int32_t from_byte_array_t_loop(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
+
     /**
      * Set the evm_word_t from a size_t.
      * @param[in] value The source size_t
@@ -97,6 +83,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      */
     __host__ __device__ int32_t from_uint32_t(uint32_t value);
 
+    __host__ __device__ uint32_t get_uint32_t() const;
     /**
      * Print the evm_word_t.
      */
@@ -146,8 +133,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ int32_t to_bit_array_t(byte_array_t &bit_array, int32_t endian = LITTLE_ENDIAN) const;
+    __host__ __device__ int32_t to_bit_array_t(byte_array_t &bit_array, int32_t endian = BIG_ENDIAN) const;
 };
 
-typedef cgbn_mem_t<CuEVM::word_bits> *cgbn_evm_word_t_ptr;
 }  // namespace CuEVM

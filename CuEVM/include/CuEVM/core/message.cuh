@@ -37,13 +37,11 @@ struct evm_message_call_t_shadow {
     uint32_t call_type;  /**< The call type internal has the opcode */
 
     CuEVM::jump_destinations_t *jump_destinations; /**< The jump destinations */
-    __host__ __device__ evm_message_call_t_shadow(ArithEnv &arith, const evm_word_t *sender,
-                                                  const evm_word_t *recipient, const evm_word_t *contract_address,
-                                                  const evm_word_t *gas_limit, const evm_word_t *value,
-                                                  const uint32_t depth, const uint32_t call_type,
-                                                  const evm_word_t *storage_address, const CuEVM::byte_array_t &data,
-                                                  const CuEVM::byte_array_t &byte_code, const bn_t &return_data_offset,
-                                                  const bn_t &return_data_size, const uint32_t static_env);
+    __host__ __device__ evm_message_call_t_shadow(
+        ArithEnv &arith, const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *contract_address,
+        const evm_word_t *gas_limit, const evm_word_t *value, const uint32_t depth, const uint32_t call_type,
+        const evm_word_t *storage_address, const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code,
+        const evm_word_t &return_data_offset, const evm_word_t &return_data_size, const uint32_t static_env);
 };
 
 /**
@@ -111,34 +109,34 @@ struct evm_message_call_t {
      * @param[in] arith The arithmetical environment.
      * @param[out] sender The sender address YP: \f$s\f$.
      */
-    __host__ __device__ void get_sender(ArithEnv &arith, bn_t &sender) const;
+    __host__ __device__ void get_sender(evm_word_t &sender) const;
 
     /**
      * Get the recipient address.
      * @param[in] arith The arithmetical environment.
      * @param[out] recipient The recipient address YP: \f$r\f$.
      */
-    __host__ __device__ void get_recipient(ArithEnv &arith, bn_t &recipient) const;
+    __host__ __device__ void get_recipient(evm_word_t &recipient) const;
 
     /**
      * Get the contract address.
      * @param[in] arith The arithmetical environment.
      * @param[out] contract_address The contract address YP: \f$c\f$.
      */
-    __host__ __device__ void get_contract_address(ArithEnv &arith, bn_t &contract_address) const;
+    __host__ __device__ void get_contract_address(evm_word_t &contract_address) const;
 
     /**
      * Get the gas limit.
      * @param[in] arith The arithmetical environment.
      * @param[out] gas_limit The gas limit YP: \f$g\f$.
      */
-    __host__ __device__ void get_gas_limit(ArithEnv &arith, bn_t &gas_limit) const;
+    __host__ __device__ void get_gas_limit(evm_word_t &gas_limit) const;
     /**
      * Get the value.
      * @param[in] arith The arithmetical environment.
      * @param[out] value The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL.
      */
-    __host__ __device__ void get_value(ArithEnv &arith, bn_t &value) const;
+    __host__ __device__ void get_value(evm_word_t &value) const;
 
     /**
      * Get the depth.
@@ -157,7 +155,7 @@ struct evm_message_call_t {
      * @param[in] arith The arithmetical environment.
      * @param[out] storage_address The storage address YP: \f$a\f$.
      */
-    __host__ __device__ void get_storage_address(ArithEnv &arith, bn_t &storage_address) const;
+    __host__ __device__ void get_storage_address(evm_word_t &storage_address) const;
 
     /**
      * Get the call/init data.
@@ -176,13 +174,13 @@ struct evm_message_call_t {
      * @param[in] arith The arithmetical environment.
      * @param[out] return_data_offset The return data offset in memory.
      */
-    __host__ __device__ void get_return_data_offset(ArithEnv &arith, bn_t &return_data_offset) const;
+    __host__ __device__ void get_return_data_offset(evm_word_t &return_data_offset) const;
     /**
      * Get the return data size.
      * @param[in] arith The arithmetical environment.
      * @param[out] return_data_size The return data size in memory.
      */
-    __host__ __device__ void get_return_data_size(ArithEnv &arith, bn_t &return_data_size) const;
+    __host__ __device__ void get_return_data_size(evm_word_t &return_data_size) const;
     /**
      * Get the static flag.
      * @return The static flag (STATICCALL) YP: \f$w\f$.
@@ -193,7 +191,7 @@ struct evm_message_call_t {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit YP: \f$g\f$.
      */
-    __host__ __device__ void set_gas_limit(ArithEnv &arith, bn_t &gas_limit);
+    __host__ __device__ void set_gas_limit(evm_word_t &gas_limit);
 
     /**
      * Set the call data.
@@ -212,13 +210,13 @@ struct evm_message_call_t {
      * @param[in] arith The arithmetical environment.
      * @param[in] return_data_offset The return data offset in memory.
      */
-    __host__ __device__ void set_return_data_offset(ArithEnv &arith, bn_t &return_data_offset);
+    __host__ __device__ void set_return_data_offset(evm_word_t &return_data_offset);
     /**
      * Set the return data size.
      * @param[in] arith The arithmetical environment.
      * @param[in] return_data_size The return data size in memory.
      */
-    __host__ __device__ void set_return_data_size(ArithEnv &arith, bn_t &return_data_size);
+    __host__ __device__ void set_return_data_size(evm_word_t &return_data_size);
     /**
      * Get the jump destinations.
      * @return The jump destinations.

@@ -9,71 +9,38 @@
 
 namespace CuEVM {
 __host__ __device__ byte_array_t::byte_array_t(const uint32_t size) : size(size) {
-    __SHARED_MEMORY__ uint8_t *tmp_data[CGBN_IBP];
-    // printf("byte_array_t::byte_array_t construction %d %d instance id %d\n", THREADIDX, THREAD_IDX_PER_INSTANCE,
-    //        INSTANCE_IDX_PER_BLOCK);
+    uint8_t *local_data = nullptr;
     if (size > 0) {
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = new uint8_t[size];
-        __ONE_GPU_THREAD_END__
-        // memset(tmp_data, 0, size * sizeof(uint8_t));
-        // parallel_copy
-        // printf("instance id %d , instance data %p\n", INSTANCE_IDX_PER_BLOCK, tmp_data[INSTANCE_IDX_PER_BLOCK]);
-        uint32_t my_idx = THREAD_IDX_PER_INSTANCE;
-        for (; my_idx < size; my_idx += CuEVM::cgbn_tpi) {
-            tmp_data[INSTANCE_IDX_PER_BLOCK][my_idx] = 0;
-        }
-    } else
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = nullptr;
-    __SYNC_THREADS__
-    data = tmp_data[INSTANCE_IDX_PER_BLOCK];
+        local_data = new uint8_t[size];
+        memset(local_data, 0, size * sizeof(uint8_t));
+    }
+    data = local_data;
 }
 
 __device__ byte_array_t::byte_array_t(uint8_t *data, uint32_t size) : size(size) {
-    __SHARED_MEMORY__ uint8_t *tmp_data[CGBN_IBP];
+    uint8_t *local_data = nullptr;
 
     if (size > 0) {
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = new uint8_t[size];
-        __ONE_GPU_THREAD_END__
-        // memcpy(tmp_data, data, size * sizeof(uint8_t));
-        // parallel_copy
-        uint32_t my_idx = THREAD_IDX_PER_INSTANCE;
-        for (; my_idx < size; my_idx += CuEVM::cgbn_tpi) {
-            tmp_data[INSTANCE_IDX_PER_BLOCK][my_idx] = data[my_idx];
-        }
-    } else
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = nullptr;
+        local_data = new uint8_t[size];
+        memcpy(local_data, data, size * sizeof(uint8_t));
+    }
 
-    this->data = tmp_data[INSTANCE_IDX_PER_BLOCK];
+    this->data = local_data;
 }
 
 __host__ __device__ byte_array_t::byte_array_t(const byte_array_t &src_byte_array, uint32_t offset, uint32_t size)
     : size(size) {
-    __SHARED_MEMORY__ uint8_t *tmp_data[CGBN_IBP];
+    uint8_t *local_data = nullptr;
     // printf("byte_array_t::byte_array_t %d %d %d %d\n", THREADIDX, THREAD_IDX_PER_INSTANCE, offset, size);
     if (size > 0) {
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = new uint8_t[size];
-        __ONE_GPU_THREAD_END__
-        // memset(tmp_data, 0, size * sizeof(uint8_t));
-        // parallel_copy
-        uint32_t my_idx = THREAD_IDX_PER_INSTANCE;
-        for (uint32_t idx = my_idx; idx < size; idx += CuEVM::cgbn_tpi) {
-            tmp_data[INSTANCE_IDX_PER_BLOCK][idx] = 0;
-        }
-        // parallel_copy
+        local_data = new uint8_t[size];
+
         if (offset < src_byte_array.size)
-            for (uint32_t idx = my_idx; idx < min(size, src_byte_array.size - offset); idx += CuEVM::cgbn_tpi) {
-                tmp_data[INSTANCE_IDX_PER_BLOCK][idx] = src_byte_array.data[offset + idx];
+            for (uint32_t idx = 0; idx < min(size, src_byte_array.size - offset); idx++) {
+                local_data[idx] = src_byte_array.data[offset + idx];
             }
-        // if (offset < src_byte_array.size)
-        //     memcpy(tmp_data, src_byte_array.data + offset, min(size, src_byte_array.size - offset) *
-        //     sizeof(uint8_t));
-    } else
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = nullptr;
-    // __ONE_GPU_THREAD_END__
-    this->data = tmp_data[INSTANCE_IDX_PER_BLOCK];
+    }
+    this->data = local_data;
 }
 
 __host__ byte_array_t::byte_array_t(const char *hex_string, int32_t endian, PaddingDirection padding)
@@ -90,9 +57,7 @@ __host__ __device__ byte_array_t::~byte_array_t() { free(); }
 
 __host__ __device__ void byte_array_t::free() {
     if ((size > 0) && (data != nullptr)) {
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         delete[] data;
-        __ONE_GPU_THREAD_WOSYNC_END__
         clear();
     }
 }
@@ -108,59 +73,34 @@ __host__ __device__ void byte_array_t::clear() {
 }
 
 __host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other) : size(other.size) {
-    __SHARED_MEMORY__ uint8_t *tmp_data[CGBN_IBP];
-    __ONE_GPU_THREAD_BEGIN__
+    uint8_t *local_data = nullptr;
     if (size > 0) {
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = new uint8_t[size];
-        memcpy(tmp_data[INSTANCE_IDX_PER_BLOCK], other.data, size * sizeof(uint8_t));
-    } else
-        tmp_data[INSTANCE_IDX_PER_BLOCK] = nullptr;
-    __ONE_GPU_THREAD_END__
-    data = tmp_data[INSTANCE_IDX_PER_BLOCK];
+        local_data = new uint8_t[size];
+        memcpy(local_data, other.data, size * sizeof(uint8_t));
+    }
+    data = local_data;
 }
 
 __host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &other) {
-    __SHARED_MEMORY__ uint8_t *tmp_data[CGBN_IBP];
-    // #ifdef __CUDA_ARCH__
-    //     printf("byte_array_t::operator= %d this %p other %p\n", threadIdx.x, this, &other);
-    //     printf("byte_array_t::operator= %d this size %d other size %d\n", threadIdx.x, size, other.size);
-    //     printf("byte_array_t::operator= %d this data %p other data %p tmp_data before allocated %p\n", threadIdx.x,
-    //     data,
-    //            other.data, tmp_data);
-    // #endif
+    uint8_t *local_data = nullptr;
+
     if (this != &other) {
-        // if (size != other.size) {
-        // __ONE_GPU_THREAD_BEGIN__
-        // free();
-        // tmp_data = (other.size > 0) ? new uint8_t[other.size] : nullptr;
-        // __ONE_GPU_THREAD_END__
-        // } else {
-        // tmp_data = data; // cannot assign like this as data will be freed by others
-        // }
+
         free();  // can do outside, all thread set to null
 
         if (other.size > 0) {
             // printf("other size !=0 %p \n", tmp_data);
-            __ONE_GPU_THREAD_WOSYNC_BEGIN__
-            tmp_data[INSTANCE_IDX_PER_BLOCK] = new uint8_t[other.size];
-            __ONE_GPU_THREAD_END__
+            local_data = new uint8_t[other.size];
 
-            // memcpy(tmp_data, other.data, other.size * sizeof(uint8_t));
-            // parallel_copy
-            uint32_t my_idx = THREAD_IDX_PER_INSTANCE;
-            for (; my_idx < other.size; my_idx += CuEVM::cgbn_tpi) {
-                tmp_data[INSTANCE_IDX_PER_BLOCK][my_idx] = other.data[my_idx];
+            for (uint32_t idx = 0; idx < other.size; idx++) {
+                local_data[idx] = other.data[idx];
             }
-        } else
-            tmp_data[INSTANCE_IDX_PER_BLOCK] = nullptr;
+        }
 
-        data = tmp_data[INSTANCE_IDX_PER_BLOCK];
+        data = local_data;
         size = other.size;
     }
-    // __SYNC_THREADS__
-    // #ifdef __CUDA_ARCH__
-    //     printf("byte_array_t::operator= After %d this data %p other data %p\n", threadIdx.x, data, other.data);
-    // #endif
+  
     return *this;
 }
 
@@ -168,69 +108,39 @@ __host__ __device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_p
     // printf("byte_array_t::grow %d %d size %d zero_padding %d, new_size %d, data %p\n", THREADIDX,
     //        THREAD_IDX_PER_INSTANCE, size, zero_padding, new_size, data);
     if (new_size == size) return ERROR_SUCCESS;
-    __SHARED_MEMORY__ uint8_t *new_data[CGBN_IBP];
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    new_data[INSTANCE_IDX_PER_BLOCK] = new uint8_t[new_size];
-    __ONE_GPU_THREAD_END__
-    // printf("byte_array_t::grow %d %d %d %d new_data_pointer %p\n", THREADIDX, THREAD_IDX_PER_INSTANCE, new_size,
-    //        zero_padding, new_data[INSTANCE_IDX_PER_BLOCK]);
+    uint8_t *new_data;
+    
+    new_data = new uint8_t[new_size];
+
     if (zero_padding) {
-        // parallel_copy
-        uint32_t my_idx = THREAD_IDX_PER_INSTANCE;
-        for (; my_idx < new_size; my_idx += CuEVM::cgbn_tpi) {
-            new_data[INSTANCE_IDX_PER_BLOCK][my_idx] = 0;
+
+        for (uint32_t idx = 0; idx < new_size; idx++) {
+            new_data[idx] = 0;
         }
     }
     //  memset(new_data, 0, new_size * sizeof(uint8_t));
     if (size > 0) {
-        // if (new_size > size) {
-        // memcpy(new_data, data, min(new_size, size) * sizeof(uint8_t));
-        // parallel_copy
-        uint32_t my_idx = THREAD_IDX_PER_INSTANCE;
-        for (; my_idx < min(new_size, size); my_idx += CuEVM::cgbn_tpi) {
-            new_data[INSTANCE_IDX_PER_BLOCK][my_idx] = data[my_idx];
+
+        for (uint32_t idx = 0; idx < min(new_size, size); idx++) {
+            new_data[idx] = data[idx];
         }
-        // if (zero_padding)
-        //   memset(new_data + size, 0, new_size - size);
-        // } else {
-        //     memcpy(new_data, data, new_size * sizeof(uint8_t));
-        // }
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
         delete[] data;
-        __ONE_GPU_THREAD_WOSYNC_END__
     }
 
-    data = new_data[INSTANCE_IDX_PER_BLOCK];
+    data = new_data;
     size = new_size;
     return ERROR_SUCCESS;
 }
 
 __host__ __device__ uint32_t byte_array_t::has_value(uint8_t value) const {
-    __SHARED_MEMORY__ uint32_t error_code[CGBN_IBP];
+    uint32_t error_code = ERROR_VALUE_NOT_FOUND;
     uint32_t index;
-    error_code[INSTANCE_IDX_PER_BLOCK] = ERROR_VALUE_NOT_FOUND;
-    __SYNC_THREADS__
-#ifdef __CUDA_ARCH__
-    uint32_t slot_size = size / CuEVM::cgbn_tpi;
-    for (index = 0; index < slot_size; index++) {
-        if (data[slot_size * threadIdx.x + index] == value) {
-            error_code[INSTANCE_IDX_PER_BLOCK] = ERROR_SUCCESS;
-        }
-    }
-    for (index = slot_size * CuEVM::cgbn_tpi; index < size; index++) {
-        if (data[index] == value) {
-            error_code[INSTANCE_IDX_PER_BLOCK] = ERROR_SUCCESS;
-        }
-    }
-    __SYNC_THREADS__
-#else
     for (index = 0; index < size; index++) {
         if (data[index] == value) {
             return ERROR_SUCCESS;
         }
     }
-#endif
-    return error_code[INSTANCE_IDX_PER_BLOCK];
+    return error_code;
 }
 
 __host__ __device__ void byte_array_t::print() const {
@@ -383,10 +293,8 @@ __host__ __device__ int32_t byte_array_t::padded_copy_BE(const byte_array_t src)
         size_diff = -1;
         copy_size = size;
     }
-    __ONE_GPU_THREAD_BEGIN__
     memcpy(data, src.data, copy_size);
     memset(data + copy_size, 0, size - src.size);
-    __ONE_GPU_THREAD_END__
     return size_diff;
 }
 
@@ -400,27 +308,6 @@ __host__ byte_array_t *byte_array_t::get_cpu(uint32_t count) {
 }
 
 __host__ void byte_array_t::cpu_free(byte_array_t *cpu_instances, uint32_t count) { delete[] cpu_instances; }
-
-__host__ byte_array_t *byte_array_t::gpu_from_cpu(byte_array_t *cpu_instances, uint32_t count) {
-    byte_array_t *gpu_instances, *tmp_cpu_instances;
-    tmp_cpu_instances = new byte_array_t[count];
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (cpu_instances[idx].size > 0) {
-            CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[idx].data, sizeof(uint8_t) * cpu_instances[idx].size));
-            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[idx].data, cpu_instances[idx].data,
-                                  sizeof(uint8_t) * cpu_instances[idx].size, cudaMemcpyHostToDevice));
-            tmp_cpu_instances[idx].size = cpu_instances[idx].size;
-        }
-    }
-    CUDA_CHECK(cudaMalloc((void **)&gpu_instances, sizeof(byte_array_t) * count));
-    CUDA_CHECK(cudaMemcpy(gpu_instances, tmp_cpu_instances, sizeof(byte_array_t) * count, cudaMemcpyHostToDevice));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        tmp_cpu_instances[idx].size = 0;
-        tmp_cpu_instances[idx].data = nullptr;
-    }
-    delete[] tmp_cpu_instances;
-    return gpu_instances;
-}
 
 __host__ void byte_array_t::gpu_free(byte_array_t *gpu_instances, uint32_t count) {
     byte_array_t *cpu_instances = new byte_array_t[count];
@@ -436,73 +323,4 @@ __host__ void byte_array_t::gpu_free(byte_array_t *gpu_instances, uint32_t count
     CUDA_CHECK(cudaFree(gpu_instances));
 }
 
-__host__ byte_array_t *byte_array_t::cpu_from_gpu(byte_array_t *gpu_instances, uint32_t count) {
-    byte_array_t *cpu_instances;
-    cpu_instances = new byte_array_t[count];
-    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, sizeof(byte_array_t) * count, cudaMemcpyDeviceToHost));
-
-    // 1. alocate the memory for gpu memory as memory which can be addressed by
-    // the cpu
-    byte_array_t *tmp_cpu_instances, *tmp_gpu_instances;
-    tmp_cpu_instances = new byte_array_t[count];
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (cpu_instances[idx].size > 0) {
-            CUDA_CHECK(cudaMalloc((void **)&tmp_cpu_instances[idx].data, sizeof(uint8_t) * cpu_instances[idx].size));
-            tmp_cpu_instances[idx].size = cpu_instances[idx].size;
-        }
-    }
-    CUDA_CHECK(cudaMalloc((void **)&tmp_gpu_instances, sizeof(byte_array_t) * count));
-    CUDA_CHECK(cudaMemcpy(tmp_gpu_instances, tmp_cpu_instances, sizeof(byte_array_t) * count, cudaMemcpyHostToDevice));
-
-    // 2. call the kernel to copy the memory between the gpu memories
-    CUDA_CHECK(cudaDeviceSynchronize());
-    CuEVM::byte_array_t_transfer_kernel<<<count, 1>>>(tmp_gpu_instances, gpu_instances, count);
-    CUDA_CHECK(cudaDeviceSynchronize());
-    cudaFree(gpu_instances);
-    gpu_instances = tmp_gpu_instances;
-    tmp_gpu_instances = nullptr;
-
-    // 3. copy the gpu memories back in the cpu memories
-    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, sizeof(byte_array_t) * count, cudaMemcpyDeviceToHost));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (cpu_instances[idx].size > 0) {
-            tmp_cpu_instances[idx].data = new uint8_t[cpu_instances[idx].size];
-            CUDA_CHECK(cudaMemcpy(tmp_cpu_instances[idx].data, cpu_instances[idx].data,
-                                  sizeof(uint8_t) * cpu_instances[idx].size, cudaMemcpyDeviceToHost));
-            tmp_cpu_instances[idx].size = cpu_instances[idx].size;
-        } else {
-            tmp_cpu_instances[idx].data = nullptr;
-            tmp_cpu_instances[idx].size = 0;
-        }
-    }
-    // 4. free the temporary allocated memory
-    byte_array_t::gpu_free(gpu_instances, count);
-    for (uint32_t idx = 0; idx < count; idx++) {
-        cpu_instances[idx].data = tmp_cpu_instances[idx].data;
-        tmp_cpu_instances[idx].data = nullptr;
-        tmp_cpu_instances[idx].size = 0;
-    }
-    delete[] tmp_cpu_instances;
-    tmp_cpu_instances = nullptr;
-    return cpu_instances;
-}
-
-__host__ __device__ void byte_array_t::transfer_memory(byte_array_t &dst, byte_array_t &src) {
-    dst.size = src.size;
-    if (src.size > 0) {
-        memcpy(dst.data, src.data, src.size * sizeof(uint8_t));
-    } else {
-        dst.data = nullptr;
-    }
-    src.free();
-}
-
-// CPU-GPU
-__global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances, byte_array_t *src_instances, uint32_t count) {
-    uint32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (instance >= count) return;
-
-    CuEVM::byte_array_t::transfer_memory(dst_instances[instance], src_instances[instance]);
-}
 }  // namespace CuEVM

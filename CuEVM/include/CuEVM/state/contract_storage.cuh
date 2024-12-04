@@ -63,7 +63,7 @@ struct contract_storage_t {
      * @param[out] value The value for the given key
      * @return The error code for the operation (0 means success)
      */
-    __host__ __device__ int32_t get_value(ArithEnv &arith, const bn_t &key, bn_t &value) const;
+    __host__ __device__ int32_t get_value(const evm_word_t &key, evm_word_t &value) const;
 
     /**
      * Set the value for the given key
@@ -72,14 +72,14 @@ struct contract_storage_t {
      * @param[in] value The value for the given key
      * @return The error code for the operation (0 means success)
      */
-    __host__ __device__ int32_t set_value(ArithEnv &arith, const bn_t &key, const bn_t &value);
+    __host__ __device__ int32_t set_value(const evm_word_t &key, const evm_word_t &value);
 
     /**
      * Update the the current storage with the given storage
      * @param[in] arith The arithmetic environment
      * @param[in] other The contract storage with the updates
      */
-    __host__ __device__ void update(ArithEnv &arith, const contract_storage_t &other);
+    __host__ __device__ void update(const contract_storage_t &other);
 
     /**
      * Get the storage element index for the given key

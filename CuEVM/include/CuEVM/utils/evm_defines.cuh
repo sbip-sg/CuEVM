@@ -239,29 +239,5 @@ constexpr CONSTANT uint32_t initial_storage_capacity = 4;
 
 constexpr CONSTANT uint32_t shared_stack_size = SHARED_STACK_SIZE;
 
-/**
- * The CGBN context type.  This is a template type that takes
- * the number of threads per instance and the
- * parameters class as template parameters.
- */
-#if defined(__CUDA_ARCH__)
-using context_t = cgbn_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
-#else
-using context_t = cgbn_host_context_t<CuEVM::cgbn_tpi, cgbn_default_parameters_t>;
-#endif
-
-/**
- * The CGBN environment type. This is a template type that takes the
- * context type as a template parameter. It provides the CGBN functions.
- */
-using env_t = cgbn_env_t<context_t, CuEVM::word_bits>;
-
-/**
- * The CGBN base type for the given number of bit in environment.
- */
-using bn_t = env_t::cgbn_t;
-/**
- * The CGBN wide type with double the given number of bits in environment.
- */
-using bn_wide_t = env_t::cgbn_wide_t;
+typedef uint64_t gas_t;
 }  // namespace CuEVM

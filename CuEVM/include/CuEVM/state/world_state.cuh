@@ -54,17 +54,15 @@ class WorldState {
 
     /**
      * Get the account pointer given the address
-     * @param[in] arith The arithmetic value to be processed.
      * @param[in] address The address for the account
      * @param[out] account_ptr  The pointer to the account
      * @return if found 0, otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t *&account_ptr);
-    __host__ __device__ int32_t update(ArithEnv &arith, const CuEVM::state_access_t *state_access_ptr);
+    __host__ __device__ int32_t get_account(const evm_word_t *address, CuEVM::account_t *&account_ptr);
+    __host__ __device__ int32_t update(const CuEVM::state_access_t *state_access_ptr);
 
     /**
      * Get the value of a storage element
-     * @param[in] arith The arithemtic environment.
      * @param[in] address The blockchain address of the account whose storage
      * value is being queried. This parameter specifies the account uniquely.
      * @param[in] key The key corresponding to the storage value within the
@@ -75,8 +73,8 @@ class WorldState {
      * if the account or the key within the account's storage could not be found
      * and the value is set to 0.
      */
-    __host__ __device__ int32_t get_value(ArithEnv &arith, const evm_word_t *address, const bn_t &key, bn_t &value);
-    __host__ __device__ void serialize_data(ArithEnv &arith, serialized_worldstate_data *data);
+    __host__ __device__ int32_t get_value(const evm_word_t *address, const evm_word_t &key, evm_word_t &value);
+    __host__ __device__ void serialize_data(serialized_worldstate_data *data);
 };
 
 }  // namespace CuEVM

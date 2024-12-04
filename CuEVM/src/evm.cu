@@ -1106,7 +1106,7 @@ __host__ __device__ int32_t evm_t::finish_CREATE(ArithEnv &arith, cached_evm_cal
 }
 
 __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instances, const cJSON *test_json,
-                                   uint32_t &num_instances, int32_t managed) {
+                                   uint32_t &num_instances, uint32_t clones, int32_t managed) {
     // get the world state
     CuEVM::state_t *world_state_data_ptr = nullptr;
     const cJSON *world_state_json = NULL;  // the json for the world state
@@ -1117,12 +1117,6 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
         world_state_json = test_json;
     else
         return 1;
-    if (managed)
-        CUDA_CHECK(cudaMallocManaged(&world_state_data_ptr, sizeof(CuEVM::state_t)));
-    else
-        world_state_data_ptr = new CuEVM::state_t();
-
-    world_state_data_ptr->from_json(world_state_json, managed);
 
     // get the block info
     CuEVM::block_info_t *block_info_ptr = nullptr;
@@ -1131,9 +1125,11 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
     // get the transaction
     CuEVM::evm_transaction_t *transactions_ptr = nullptr;
     uint32_t num_transactions = 0;
+    uint32_t num_original_transactions = 0;
     CuEVM::transaction::get_transactions(arith, transactions_ptr, test_json, num_transactions, managed,
                                          world_state_data_ptr);
-
+    num_original_transactions = num_transactions;
+    num_transactions *= clones;
     // generate the evm instances
 
     if (managed)
@@ -1141,9 +1137,15 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
     else
         evm_instances = new evm_instance_t[num_transactions];
     for (uint32_t index = 0; index < num_transactions; index++) {
+        if (managed)
+            CUDA_CHECK(cudaMallocManaged(&world_state_data_ptr, sizeof(CuEVM::state_t)));
+        else
+            world_state_data_ptr = new CuEVM::state_t();
+        world_state_data_ptr->from_json(world_state_json, managed);
+
         evm_instances[index].world_state_data_ptr = world_state_data_ptr;
         evm_instances[index].block_info_ptr = block_info_ptr;
-        evm_instances[index].transaction_ptr = &transactions_ptr[index];
+        evm_instances[index].transaction_ptr = &transactions_ptr[index % num_original_transactions];
         if (managed == 0) {
             evm_instances[index].touch_state_data_ptr = new CuEVM::state_access_t();
             evm_instances[index].log_state_ptr = new CuEVM::log_state_data_t();

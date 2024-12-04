@@ -118,19 +118,12 @@ struct tracer_t {
     __host__ __device__ uint32_t start_operation(ArithEnv &arith, const uint32_t pc, const uint8_t op,
                                                  const CuEVM::evm_memory_t &memory, const CuEVM::evm_stack_t &stack,
                                                  const uint32_t depth, const CuEVM::evm_return_data_t &return_data,
-                                                 const bn_t &gas_limit, const bn_t &gas_used);
+                                                 const gas_t &gas_limit, const gas_t &gas_used);
 
-    __host__ __device__ void finish_operation(ArithEnv &arith, const uint32_t idx, const bn_t &gas_used,
-                                              const bn_t &gas_refund
-#ifdef EIP_3155_OPTIONAL
-                                              ,
-                                              const uint32_t error_code
-// , const CuEVM::contract_storage_t &storage
-#endif
-    );
+    __host__ __device__ void finish_operation(const uint32_t idx, const gas_t &gas_used, const gas_t &gas_refund);
 
-    __host__ __device__ void finish_transaction(ArithEnv &arith, const CuEVM::byte_array_t &return_data,
-                                                const bn_t &gas_used, uint32_t error_code);
+    __host__ __device__ void finish_transaction(const CuEVM::byte_array_t &return_data, const gas_t &gas_used,
+                                                uint32_t error_code);
 
     __host__ __device__ void print(ArithEnv &arith);
 

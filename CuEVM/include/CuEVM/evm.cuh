@@ -35,8 +35,8 @@ struct evm_t {
     //     cached_call_state; /**< The state pointer store in local mem (constant register usage)*/
     // CuEVM::evm_call_state_t call_state_local; /**< The state pointer store in local mem (constant register usage)*/
     CuEVM::EccConstants* ecc_constants_ptr; /**< The ecc constants pointer*/
-    bn_t gas_price;                         /**< The gas price */
-    bn_t gas_priority_fee;                  /**< The gas priority fee */
+    gas_t gas_price;                        /**< The gas price */
+    gas_t gas_priority_fee;                 /**< The gas priority fee */
     uint32_t status;                        /**< The status */
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer */
@@ -55,10 +55,10 @@ struct evm_t {
      * @param[in] return_data_ptr The return data pointer
      * @param[in] tracer_ptr The tracer pointer
      */
-    __host__ __device__ evm_t(ArithEnv& arith, CuEVM::state_t* world_state_data_ptr,
-                              CuEVM::block_info_t* block_info_ptr, CuEVM::evm_transaction_t* transaction_ptr,
-                              CuEVM::state_access_t* touch_state_data_ptr, CuEVM::log_state_data_t* log_state_ptr,
-                              CuEVM::evm_return_data_t* return_data_ptr, CuEVM::EccConstants* ecc_constants_ptr,
+    __host__ __device__ evm_t(CuEVM::state_t* world_state_data_ptr, CuEVM::block_info_t* block_info_ptr,
+                              CuEVM::evm_transaction_t* transaction_ptr, CuEVM::state_access_t* touch_state_data_ptr,
+                              CuEVM::log_state_data_t* log_state_ptr, CuEVM::evm_return_data_t* return_data_ptr,
+                              CuEVM::EccConstants* ecc_constants_ptr,
                               CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
                               ,
@@ -75,7 +75,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @param[in] evm_instance The evm instance
      */
-    __host__ __device__ evm_t(ArithEnv& arith, CuEVM::evm_instance_t& evm_instance,
+    __host__ __device__ evm_t(CuEVM::evm_instance_t& evm_instance,
                               CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
                               CuEVM::evm_word_t* shared_stack_ptr = nullptr);
 
@@ -92,7 +92,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t start_CALL(ArithEnv& arith, cached_evm_call_state& cache_call_state);
+    __host__ __device__ int32_t start_CALL(cached_evm_call_state& cache_call_state);
 
     /**
      * @brief Finish a call operation
@@ -103,7 +103,7 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_CALL(ArithEnv& arith, int32_t error_code);
+    __host__ __device__ int32_t finish_CALL(int32_t error_code);
 
     /**
      * @brief Finish a CREATEX operation.
@@ -112,7 +112,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_CREATE(ArithEnv& arith, cached_evm_call_state& cache_call_state);
+    __host__ __device__ int32_t finish_CREATE(cached_evm_call_state& cache_call_state);
 
     /**
      * @brief Finish a transaction operation.
@@ -124,15 +124,15 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_TRANSACTION(ArithEnv& arith, int32_t error_code);
+    __host__ __device__ int32_t finish_TRANSACTION(int32_t error_code);
 
     /**
      * @brief run the EVM for the given transaction
      * Run the EVM for the given transaction
      * @param[in] arith The arithmetic environment
      */
-    __host__ __device__ void run(ArithEnv& arith, cached_evm_call_state& cache_call_state);
-    __host__ __device__ void run(ArithEnv& arith);
+    __host__ __device__ void run(cached_evm_call_state& cache_call_state);
+    __host__ __device__ void run();
 };
 
 typedef int32_t (*evm_operation_f)(CuEVM::evm_call_state_t* call_state);
@@ -147,8 +147,8 @@ typedef int32_t (*evm_operation_f)(CuEVM::evm_call_state_t* call_state);
  * @param[in] managed Whether the memory is managed
  * @return int32_t The error code, 0 if successful
  */
-__host__ int32_t get_evm_instances(ArithEnv& arith, evm_instance_t*& evm_instances, const cJSON* test_json,
-                                   uint32_t& num_instances, int32_t managed = 0);
+__host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* test_json, uint32_t& num_instances,
+                                   uint32_t clones = 1, int32_t managed = 0);
 
 /**
  * @brief Free the EVM instances object
@@ -159,8 +159,7 @@ __host__ int32_t get_evm_instances(ArithEnv& arith, evm_instance_t*& evm_instanc
  */
 __host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances, int32_t managed = 0);
 
-__global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM::evm_instance_t* instances,
-                                              uint32_t count);
+__global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t* instances, uint32_t count);
 
 }  // namespace CuEVM
 

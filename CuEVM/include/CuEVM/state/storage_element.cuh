@@ -25,15 +25,13 @@ struct storage_element_t {
      * @param[in] key The key of the storage
      * @param[in] value The value of the storage for the given key
      */
-    __host__ __device__ storage_element_t(evm_word_t key, evm_word_t value)
-        : key(key), value(value) {}
+    __host__ __device__ storage_element_t(evm_word_t key, evm_word_t value) : key(key), value(value) {}
 
     /**
      * The copy constructor for the storage element
      * @param[in] storage_element The storage element to copy
      */
-    __host__ __device__
-    storage_element_t(const storage_element_t &storage_element)
+    __host__ __device__ storage_element_t(const storage_element_t &storage_element)
         : key(storage_element.key), value(storage_element.value) {}
 
     /**
@@ -46,17 +44,7 @@ struct storage_element_t {
      * Set the value of the storage element
      * @param[in] value The value of the storage element (evm_word_t)
      */
-    __host__ __device__ void set_value(evm_word_t value) {
-        this->value = value;
-    }
-
-    /**
-     * Set the value of the storage element through bn_t
-     * @param[in] arith The arithmetic environment
-     * @param[in] value The value of the storage element (bn_t)
-     */
-    __host__ __device__ void set_value(ArithEnv &arith, const bn_t &value);
-
+    __host__ __device__ void set_value(const evm_word_t value);
     /**
      * Get the value of the storage element
      * @return The value of the storage element (evm_word_t)
@@ -65,23 +53,16 @@ struct storage_element_t {
 
     /**
      * Get the value of the storage element through bn_t
-     * @param[in] arith The arithmetic environment
-     * @param[out] value The value of the storage element (bn_t)
+     * @param[out] value The value of the storage element (evm_word_t)
      */
-    __host__ __device__ void get_value(ArithEnv &arith, bn_t &value) const;
-
-    /**
-     * Set the key of the storage element
-     * @param[in] key The key of the storage element (evm_word_t)
-     */
-    __host__ __device__ void set_key(evm_word_t key) { this->key = key; }
+    __host__ __device__ void get_value(evm_word_t value) const;
 
     /**
      * Set the key of the storage element through bn_t
      * @param[in] arith The arithmetic environment
      * @param[in] key The key of the storage element (bn_t)
      */
-    __host__ __device__ void set_key(ArithEnv &arith, const bn_t &key);
+    __host__ __device__ void set_key(const evm_word_t key);
 
     /**
      * Get the key of the storage element
@@ -94,15 +75,14 @@ struct storage_element_t {
      * @param[in] arith The arithmetic environment
      * @param[out] key The key of the storage element (bn_t)
      */
-    __host__ __device__ void get_key(ArithEnv &arith, bn_t &key) const;
+    __host__ __device__ void get_key(evm_word_t key) const;
 
     /**
      * The assignment operator for the storage element
      * @param[in] storage_element The storage element to assign
      * @return The storage element assigned
      */
-    __host__ __device__ storage_element_t &operator=(
-        const storage_element_t &storage_element) {
+    __host__ __device__ storage_element_t &operator=(const storage_element_t &storage_element) {
         this->key = storage_element.key;
         this->value = storage_element.value;
         return *this;
@@ -115,14 +95,6 @@ struct storage_element_t {
      * @return If the key is equal to the key of the storage element
      */
     __host__ __device__ int32_t has_key(const evm_word_t key) const;
-
-    /**
-     * Get if the key given (bn_t) is equal to the key of the storage element
-     * @param[in] arith The arithmetic environment
-     * @param[in] key The key to compare (bn_t)
-     * @return If the key is equal to the key of the storage element
-     */
-    __host__ __device__ int32_t has_key(ArithEnv &arith, const bn_t &key) const;
 
     /**
      * Get if the value of the storage element is equal to 0
@@ -138,7 +110,7 @@ struct storage_element_t {
      * @return If the value of the storage element is equal to 0, 1 if true, 0
      * if false
      */
-    __host__ __device__ int32_t is_zero_value(ArithEnv &arith) const;
+    __host__ __device__ int32_t is_zero_value() const;
 
     /**
      * Get the storage element from a JSON object
@@ -159,9 +131,7 @@ struct storage_element_t {
      * @param[in] pretty If the hex string should be left trimmed of zeros
      * @return The error code for the operation (0 means success)
      */
-    __host__ int32_t add_to_json(cJSON *storage_json,
-                                 char *key_string_ptr = nullptr,
-                                 char *value_string_ptr = nullptr,
+    __host__ int32_t add_to_json(cJSON *storage_json, char *key_string_ptr = nullptr, char *value_string_ptr = nullptr,
                                  int32_t pretty = 0) const;
 
     /**

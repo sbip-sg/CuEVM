@@ -1,7 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Data: 2023-11-30
-// SPDX-License-Identifier: MIT
 
 #include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/error_codes.cuh>
@@ -128,8 +124,10 @@ __host__ __device__ void memory_from_cgbn(ArithEnv &arith, uint8_t *dst, bn_t &s
     }
 }
 
-__host__ __device__ void evm_address_conversion(ArithEnv &arith, bn_t &address) {
-    cgbn_bitwise_mask_and(arith.env, address, address, CuEVM::address_bits);
+__host__ __device__ void evm_address_conversion(evm_word_t &address) {
+    for (uint32_t idx = 0; idx < 32; idx++) {
+        address.words[idx] = 0;
+    }
 }
 __host__ __device__ void print_bnt(ArithEnv &arith, const bn_t &bn) {
     __SHARED_MEMORY__ evm_word_t tmp_word[CGBN_IBP];
