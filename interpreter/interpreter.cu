@@ -6,7 +6,6 @@
 #include <CuEVM/evm.cuh>
 #include <CuEVM/evm_call_state.cuh>
 #include <CuEVM/tracer.cuh>
-#include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
@@ -15,14 +14,12 @@
 
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose = false) {
     CuEVM::evm_instance_t *instances_data;
-    CuEVM::ArithEnv arith(cgbn_no_checks, 0);
+
     printf("Running the interpreter\n");
-#ifdef GPU
+
     CUDA_CHECK(cudaSetDevice(0));
     CUDA_CHECK(cudaDeviceReset());
     printf("Running on GPU\n");
-    cgbn_error_report_t *report;
-    CUDA_CHECK(cgbn_error_report_alloc(&report));
     cudaEvent_t start, stop;
     float milliseconds = 0;
 
@@ -39,7 +36,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     CUDA_CHECK(cudaDeviceSynchronize());
     // CUDA_CHECK(cudaEventCreate(&start));
     // CUDA_CHECK(cudaEventCreate(&stop));
-#endif
 
     // read the json file with the global state
     cJSON *read_root = CuEVM::utils::get_json_from_file(read_json_filename);
@@ -52,72 +48,39 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         write_root = cJSON_CreateObject();
     }
     uint32_t num_instances = 0;
-    int32_t managed = 0;
-#ifdef GPU
-    managed = 1;
-#endif
+    int32_t managed = 1;
 
     const cJSON *test_json = nullptr;
     cJSON_ArrayForEach(test_json, read_root) {
-        CuEVM::get_evm_instances(arith, instances_data, test_json, num_instances, managed);
+        CuEVM::get_evm_instances(instances_data, test_json, num_instances, clones, managed);
 
-#ifdef GPU
         // TODO remove DEBUG num instances
         // num_instances = 1;
-        printf("Running on GPU %d %d\n", num_instances, CuEVM::cgbn_tpi);
+        uint32_t num_blocks = (num_instances + CGBN_IBP - 1) / (CGBN_IBP);
+        printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
+               CGBN_TPI * CGBN_IBP);
         // run the evm
-        CuEVM::kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
-        CUDA_CHECK(cudaDeviceSynchronize());
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start);
+
+        CuEVM::kernel_evm_multiple_instances<<<num_blocks, CGBN_TPI * CGBN_IBP>>>(instances_data, num_instances);
+        cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+
+        cudaEventElapsedTime(&milliseconds, start, stop);
+        printf("Kernel execution time: %f milliseconds\n", milliseconds);
+
         CUDA_CHECK(cudaGetLastError());
         printf("GPU kernel finished\n");
-        CGBN_CHECK(report);
-#ifdef EIP_3155
-        // print only the first instance
 
-        // CuEVM::utils::print_err_device_data(instances_data[0].tracer_ptr);
-#endif
         // CUDA_CHECK(cudaEventRecord(stop));
         // CUDA_CHECK(cudaEventSynchronize(stop));
         // CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
-#else
-        printf("Running CPU EVM\n");
-        // run the evm
-        CuEVM::evm_t *evm = nullptr;
-        cJSON *final_state = nullptr;
-        auto cpu_start = std::chrono::high_resolution_clock::now();
-        for (uint32_t instance = 0; instance < num_instances; instance++) {
-            evm = new CuEVM::evm_t(arith, instances_data[instance]);
-            evm->run(arith);
-#ifdef EIP_3155
-            evm->tracer_ptr->print_err();
-#endif
-            // printf("DEBUG: CPU EVM instance %d finished - START\n", instance);
-            // printf("DEBUG: CPU EVM instance %d world state\n", instance);
-            // instances_data[instance].world_state_data_ptr->print();
-            // printf("DEBUG: CPU EVM instance %d touch state\n", instance);
-            // instances_data[instance].touch_state_data_ptr->print();
-            // printf("DEBUG: CPU EVM instance %d access state\n", instance);
-            // instances_data[instance].access_state_data_ptr->print();
-            // printf("DEBUG: CPU EVM instance %d finished - END\n", instance);
-            final_state = CuEVM::state_access_t::merge_json(*instances_data[instance].world_state_data_ptr,
-                                                            *instances_data[instance].touch_state_data_ptr);
-            char *final_state_root_json_str = cJSON_PrintUnformatted(final_state);
-            fprintf(stderr, "%s\n", final_state_root_json_str);
-            cJSON_Delete(final_state);
-            free(final_state_root_json_str);
-            delete evm;
-            evm = nullptr;
-        }
-#endif
-#ifdef GPU
+
         printf("GPU EVM finished\n");
         printf("Main GPU kernel execution took %f ms\n", milliseconds);
-#else
-        printf("CPU EVM finished\n");
-        auto cpu_end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> cpu_duration = cpu_end - cpu_start;
-        printf("CPU EVM execution took %f ms\n", cpu_duration.count());
-#endif
+
         break;
         // run only one test
     }
@@ -125,10 +88,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("Freeing the memory ...\n");
     CuEVM::free_evm_instances(instances_data, num_instances, managed);
 
-#ifdef GPU
-    CUDA_CHECK(cgbn_error_report_free(report));
     CUDA_CHECK(cudaDeviceReset());
-#endif
 
     cJSON_Delete(read_root);
     if (write_json_filename != nullptr) {

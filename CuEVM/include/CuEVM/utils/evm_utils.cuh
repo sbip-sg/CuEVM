@@ -1,15 +1,10 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
-// SPDX-License-Identifier: MIT
-
 #pragma once
 
 #include <cuda.h>
 #include <stdint.h>
 
 #include <CuEVM/core/byte_array.cuh>
-#include <CuEVM/utils/arith.cuh>
+#include <CuEVM/core/evm_word.cuh>
 
 namespace CuEVM::utils {
 
@@ -21,8 +16,8 @@ namespace CuEVM::utils {
  * @param[in] sender_address The sender address
  * @param[in] sender_nonce The sender nonce
  */
-__host__ __device__ int32_t get_contract_address_create(evm_word_t &contract_address, const evm_word_t &sender_address,
-                                                        const evm_word_t &sender_nonce);
+__host__ __device__ int32_t get_contract_address_create(evm_word_t *contract_address, evm_word_t *sender_address,
+                                                        evm_word_t *sender_nonce);
 
 /**
  * Get the contract address from the sender address and the sender nonce.
@@ -43,8 +38,8 @@ __host__ __device__ int32_t get_contract_address_create_word(evm_word_t *contrac
  * @param[in] salt The salt
  * @param[in] init_code The init code
  */
-__host__ __device__ int32_t get_contract_address_create2(evm_word_t &contract_address, const evm_word_t &sender_address,
-                                                         const evm_word_t &salt, const CuEVM::byte_array_t &init_code);
+__host__ __device__ int32_t get_contract_address_create2(evm_word_t *contract_address, evm_word_t *sender_address,
+                                                         evm_word_t *salt, const CuEVM::byte_array_t &init_code);
 
 /**
  * If it is a hex character.
@@ -109,6 +104,8 @@ __host__ __device__ int32_t clean_hex_string(char **hex_string);
 __host__ __device__ int32_t hex_string_without_leading_zeros(char *hex_string);
 
 __host__ __device__ char *uint64_to_hex(uint64_t value);
+
+__host__ __device__ void evm_address_conversion(evm_word_t &address);
 
 /**
  * Get the json object from a file.

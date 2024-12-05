@@ -1,15 +1,10 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
-// SPDX-License-Identifier: MIT
-
 #pragma once
 
 #include <CuEVM/state/account.cuh>
 #include <CuEVM/state/account_flags.cuh>
 #include <CuEVM/state/state.cuh>
 #include <CuEVM/state/state_access.cuh>
-#include <CuEVM/utils/arith.cuh>
+
 namespace CuEVM {
 // for convenient data transfer between host and device. set a fixed maximum size for the number of addresses to be
 // transferred

@@ -4,48 +4,7 @@
 
 namespace ecc {
 
-// typedef struct {
-//     evm_word_t FP;
-//     evm_word_t Order;
-//     evm_word_t GX;
-//     evm_word_t GY;
-//     // A!=0 is not supported for simplicity
-//     uint32_t B;
-//     // y^2 = x^3 + 7 // y^2 = x^3 + 3
-//     // y^2 = x^3 + Ax + B
-//     // Constructor that accepts a curve name
-// } Curve;
-
-// __host__ __device__ static const int32_t FQ2_mod_coeffs[] = {1, 0};
-// __host__ __device__ static const int32_t FQ1_mod_coeffs[] = {1};
-// __host__ __device__ static const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
-
-// template <size_t Degree>
-// struct FQ {
-//     bn_t coeffs[Degree];
-// };
-
-// Constexpr function to return the appropriate modulus coefficients array based
-// on the template parameter Degree
-// template <size_t Degree>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs();
-
-// template <>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs<2>() {
-//     return FQ2_mod_coeffs;
-// }
-// template <>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs<1>() {
-//     return FQ1_mod_coeffs;
-// }
-// template <>
-// __host__ __device__  constexpr const int32_t *get_modulus_coeffs<12>() {
-//     return FQ12_mod_coeffs;
-// }
-// __host__ __device__ static const int32_t FQ2_mod_coeffs[] = {1, 0};
-// __host__ __device__ static const int32_t FQ1_mod_coeffs[] = {1};
-// __host__ __device__ static const int32_t FQ12_mod_coeffs[] = {82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0};
-
+#ifdef ENABLE_ECC
 __host__ __device__ void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
     env_t::cgbn_wide_t temp;
     cgbn_mul_wide(env, temp, a, b);
@@ -356,6 +315,8 @@ __host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_con
         return 0;
     }
 }
+///
+#endif
 
 #ifdef ENABLE_PAIRING_CODE
 template <size_t Degree>
@@ -1287,7 +1248,6 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     return FQP_equals(arith, final_res, one_fq12) ? 1 : 0;
 }
 #else  // dummy delc to avoid compilation error
-__host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_constants_ptr, uint8_t *points_data,
-                                         size_t data_len) {}
+__host__ __device__ int pairing_multiple(EccConstants *ecc_constants_ptr, uint8_t *points_data, size_t data_len) {}
 #endif
 }  // namespace ecc

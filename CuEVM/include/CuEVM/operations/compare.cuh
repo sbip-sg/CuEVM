@@ -1,14 +1,5 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Date: 2023-07-15
-// SPDX-License-Identifier: MIT
-
-#ifndef _CUEVM_COMPARE_OP_H_
-#define _CUEVM_COMPARE_OP_H_
-
+#pragma once
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/utils/arith.cuh>
 
 /**
  * The comparison operations.
@@ -32,7 +23,7 @@ namespace CuEVM::operations {
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t LT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t LT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The GT operation implementation.
@@ -45,7 +36,7 @@ __host__ __device__ int32_t LT(const evm_word_t &gas_limit, gas_t &gas_used, CuE
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t GT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t GT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SLT operation implementation.
@@ -58,7 +49,7 @@ __host__ __device__ int32_t GT(const evm_word_t &gas_limit, gas_t &gas_used, CuE
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t SLT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SLT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SGT operation implementation.
@@ -71,7 +62,7 @@ __host__ __device__ int32_t SLT(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t SGT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SGT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The EQ operation implementation.
@@ -83,7 +74,7 @@ __host__ __device__ int32_t SGT(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t EQ(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t EQ(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The ISZERO operation implementation.
@@ -95,7 +86,5 @@ __host__ __device__ int32_t EQ(const evm_word_t &gas_limit, gas_t &gas_used, CuE
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t ISZERO(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t ISZERO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 }  // namespace CuEVM::operations
-
-#endif

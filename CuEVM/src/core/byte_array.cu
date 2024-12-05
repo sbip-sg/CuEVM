@@ -1,8 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Data: 2024-06-20
-// SPDX-License-Identifier: MIT
-
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
@@ -85,7 +80,6 @@ __host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &ot
     uint8_t *local_data = nullptr;
 
     if (this != &other) {
-
         free();  // can do outside, all thread set to null
 
         if (other.size > 0) {
@@ -100,7 +94,7 @@ __host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &ot
         data = local_data;
         size = other.size;
     }
-  
+
     return *this;
 }
 
@@ -109,18 +103,16 @@ __host__ __device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_p
     //        THREAD_IDX_PER_INSTANCE, size, zero_padding, new_size, data);
     if (new_size == size) return ERROR_SUCCESS;
     uint8_t *new_data;
-    
+
     new_data = new uint8_t[new_size];
 
     if (zero_padding) {
-
         for (uint32_t idx = 0; idx < new_size; idx++) {
             new_data[idx] = 0;
         }
     }
     //  memset(new_data, 0, new_size * sizeof(uint8_t));
     if (size > 0) {
-
         for (uint32_t idx = 0; idx < min(new_size, size); idx++) {
             new_data[idx] = data[idx];
         }

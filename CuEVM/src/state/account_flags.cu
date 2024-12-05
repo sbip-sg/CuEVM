@@ -1,4 +1,3 @@
-
 #include <CuEVM/state/account_flags.cuh>
 
 namespace CuEVM {

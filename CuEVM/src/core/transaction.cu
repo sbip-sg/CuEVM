@@ -1,8 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Data: 2024-07-12
-// SPDX-License-Identifier: MIT
-
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>
@@ -141,9 +136,9 @@ __host__ __device__ void evm_transaction_t::get_data(byte_array_t &data_init) co
 __host__ __device__ int32_t evm_transaction_t::is_contract_creation() const { return to == 0; }
 
 __host__ __device__ int32_t evm_transaction_t::get_transaction_fees(CuEVM::block_info_t &block_info, gas_t &gas_value,
-                                                                    gas_t &gas_limit, evm_word_t &gas_price,
-                                                                    evm_word_t &gas_priority_fee,
-                                                                    evm_word_t &up_front_cost, evm_word_t &m) const {
+                                                                    gas_t &gas_limit, gas_t &gas_price,
+                                                                    gas_t &gas_priority_fee, gas_t &up_front_cost,
+                                                                    gas_t &m) const {
     // simplify, temporarily remove
     /*
         evm_word_t max_fee_per_gas;  // YP: \f$T_{m}\f$
@@ -199,7 +194,7 @@ __host__ __device__ int32_t evm_transaction_t::access_list_warm_up(CuEVM::TouchS
 
 __host__ __device__ int32_t evm_transaction_t::validate(CuEVM::TouchState *touch_state_ptr,
                                                         CuEVM::block_info_t &block_info, gas_t &gas_used,
-                                                        evm_word_t &gas_price, evm_word_t &gas_priority_fee) const {
+                                                        gas_t &gas_price, gas_t &gas_priority_fee) const {
     // printf("begin validating transaction\n");
     /*
     gas_t gas_intrinsic;
@@ -339,7 +334,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         // cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (this->to), contract_address);
         // blank call data in create
         evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            &this->sender, &this->to, &this->to, &this->gas_limit, &this->value, depth, call_type, &this->to,
+            &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to,
             CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
 
         printf("CREATE to_account %p init code size %d account code size %d idx %d \n", to_account,
@@ -354,7 +349,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         // #endif
         byte_code = to_account->byte_code;
         evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            &this->sender, &this->to, &this->to, &this->gas_limit, &this->value, depth, call_type, &this->to, data_init,
+            &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to, data_init,
             byte_code, return_data_offset, return_data_size, static_env);
     }
 
@@ -370,8 +365,7 @@ __host__ __device__ void evm_transaction_t::print() {
     printf("Type: %d\n", type);
     printf("Nonce: ");
     nonce.print();
-    printf("Gas Limit: ");
-    gas_limit.print();
+    printf("Gas Limit: %lu\n", gas_limit);
     printf("To: ");
     to.print();
     printf("Value: ");
@@ -408,8 +402,7 @@ __host__ cJSON *evm_transaction_t::to_json() {
     cJSON_AddNumberToObject(json, "type", type);
     nonce.to_hex(hex_string_ptr);
     cJSON_AddStringToObject(json, "nonce", hex_string_ptr);
-    gas_limit.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(json, "gas_limit", hex_string_ptr);
+    cJSON_AddNumberToObject(json, "gas_limit", gas_limit);
     to.to_hex(hex_string_ptr, 0, 5);
     cJSON_AddStringToObject(json, "to", hex_string_ptr);
     value.to_hex(hex_string_ptr);
@@ -562,7 +555,9 @@ __host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJ
         memcpy(&transactions_ptr[idx], template_transaction_ptr, sizeof(evm_transaction_t));
         transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_index)->valuestring, LITTLE_ENDIAN,
                                                  CuEVM::PaddingDirection::NO_PADDING, managed);
-        transactions_ptr[idx].gas_limit.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
+        evm_word_t tmp;
+        tmp.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
+        transactions_ptr[idx].gas_limit = uint256_get_uint32_t(&tmp);
         // better refactorign the boundary checks
         if (strlen(cJSON_GetArrayItem(value_json, value_index)->valuestring) > 66) {
             return ERROR_FAILED;

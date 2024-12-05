@@ -1,17 +1,10 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Data: 2023-11-30
-// SPDX-License-Identifier: MIT
-
-#ifndef _CUEVM_MESSAGE_H_
-#define _CUEVM_MESSAGE_H_
+#pragma once
 
 #include <CuCrypto/keccak.cuh>
 #include <CuEVM/core/byte_array.cuh>
+#include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/core/jump_destinations.cuh>
 #include <CuEVM/state/state.cuh>
-#include <CuEVM/utils/arith.cuh>
 
 namespace CuEVM {
 
@@ -37,11 +30,13 @@ struct evm_message_call_t_shadow {
     uint32_t call_type;  /**< The call type internal has the opcode */
 
     CuEVM::jump_destinations_t *jump_destinations; /**< The jump destinations */
-    __host__ __device__ evm_message_call_t_shadow(
-        ArithEnv &arith, const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *contract_address,
-        const evm_word_t *gas_limit, const evm_word_t *value, const uint32_t depth, const uint32_t call_type,
-        const evm_word_t *storage_address, const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code,
-        const evm_word_t &return_data_offset, const evm_word_t &return_data_size, const uint32_t static_env);
+    __host__ __device__ evm_message_call_t_shadow(const evm_word_t *sender, const evm_word_t *recipient,
+                                                  const evm_word_t *contract_address, const gas_t gas_limit,
+                                                  const evm_word_t *value, const uint32_t depth,
+                                                  const uint32_t call_type, const evm_word_t *storage_address,
+                                                  const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code,
+                                                  const evm_word_t &return_data_offset,
+                                                  const evm_word_t &return_data_size, const uint32_t static_env);
 };
 
 /**
@@ -52,7 +47,7 @@ struct evm_message_call_t {
     evm_word_t sender;             /**< The sender address YP: \f$s\f$ */
     evm_word_t recipient;          /**< The recipient address YP: \f$r\f$ also \f$I_{a}\f$ */
     evm_word_t contract_address;   /**< The contract address YP: \f$c\f$ */
-    evm_word_t gas_limit;          /**< The gas limit YP: \f$g\f$ */
+    gas_t gas_limit;               /**< The gas limit YP: \f$g\f$ */
     evm_word_t value;              /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
     evm_word_t storage_address;    /**< The storage address YP: \f$a\f$ */
     evm_word_t return_data_offset; /**< The return data offset in memory */
@@ -130,7 +125,7 @@ struct evm_message_call_t {
      * @param[in] arith The arithmetical environment.
      * @param[out] gas_limit The gas limit YP: \f$g\f$.
      */
-    __host__ __device__ void get_gas_limit(evm_word_t &gas_limit) const;
+    __host__ __device__ void get_gas_limit(gas_t &gas_limit) const;
     /**
      * Get the value.
      * @param[in] arith The arithmetical environment.
@@ -191,7 +186,7 @@ struct evm_message_call_t {
      * @param[in] arith The arithmetical environment.
      * @param[in] gas_limit The gas limit YP: \f$g\f$.
      */
-    __host__ __device__ void set_gas_limit(evm_word_t &gas_limit);
+    __host__ __device__ void set_gas_limit(gas_t &gas_limit);
 
     /**
      * Set the call data.
@@ -230,5 +225,3 @@ struct evm_message_call_t {
 };
 
 }  // namespace CuEVM
-
-#endif

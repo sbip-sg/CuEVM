@@ -3,23 +3,21 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
-__host__ __device__ int32_t WorldState::get_account(ArithEnv &arith, const evm_word_t *address,
-                                                    CuEVM::account_t *&account_ptr) {
-    return _state->get_account(arith, address, account_ptr);
+__host__ __device__ int32_t WorldState::get_account(const evm_word_t *address, CuEVM::account_t *&account_ptr) {
+    return _state->get_account(address, account_ptr);
 }
 
-__host__ __device__ int32_t WorldState::get_value(ArithEnv &arith, const evm_word_t *address, const bn_t &key,
-                                                  bn_t &value) {
+__host__ __device__ int32_t WorldState::get_value(const evm_word_t *address, const evm_word_t &key, evm_word_t &value) {
     account_t *account_ptr = nullptr;
-    cgbn_set_ui32(arith.env, value, 0);
-    return (_state->get_account(arith, address, account_ptr) || account_ptr->get_storage_value(arith, key, value));
+    uint256_from_uint32(&value, 0);
+    return (_state->get_account(address, account_ptr) || account_ptr->get_storage_value(key, value));
 }
 
-__host__ __device__ int32_t WorldState::update(ArithEnv &arith, const CuEVM::state_access_t *other) {
-    return _state->update(arith, other->accounts, other->flags, other->no_accounts);
+__host__ __device__ int32_t WorldState::update(const CuEVM::state_access_t *other) {
+    return _state->update(other->accounts, other->flags, other->no_accounts);
 }
 
-__host__ __device__ void WorldState::serialize_data(ArithEnv &arith, serialized_worldstate_data *data) {
+__host__ __device__ void WorldState::serialize_data(serialized_worldstate_data *data) {
     // TODO: reenable
     // data->no_accounts = _state->no_accounts;
     // for (uint32_t idx = 0; idx < _state->no_accounts; idx++) {

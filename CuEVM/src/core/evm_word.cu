@@ -1,20 +1,17 @@
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-#include <CuEVM/utils/evm_utils.cuh>
 
 namespace CuEVM {
-__host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) { 
-  #pragma unroll
-  for (int32_t index = 0; index < CuEVM::cgbn_limbs; index++) {
-    words[index] = src.words[index];
-  }
+__host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) {
+#pragma unroll
+    for (int32_t index = 0; index < CuEVM::cgbn_limbs; index++) {
+        words[index] = src.words[index];
+    }
 }
 
 __host__ __device__ evm_word_t::evm_word_t(uint32_t value) : evm_word_t() { this->from_uint32_t(value); }
 
-__host__ __device__ evm_word_t &evm_word_t::operator=(const evm_word_t &src) {
-   uint256_cpy(this,&src);
-}
+__host__ __device__ evm_word_t &evm_word_t::operator=(const evm_word_t &src) { uint256_cpy(this, &src); }
 
 __host__ __device__ evm_word_t &evm_word_t::operator=(uint32_t value) {
     this->from_uint32_t(value);
@@ -22,19 +19,14 @@ __host__ __device__ evm_word_t &evm_word_t::operator=(uint32_t value) {
 }
 
 __host__ __device__ int32_t evm_word_t::operator==(const evm_word_t &other) const {
-    return uint256_cmp(this,&other)==0;
-
+    return uint256_cmp(this, &other) == 0;
 }
 
-
-__host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) {
-    uint256_from_hex(this,hex_string);
-}
+__host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) { uint256_from_hex(this, hex_string); }
 
 __device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {
     uint256_from_bytes(this, byte_array.data, byte_array.size);
 }
-
 
 __host__ __device__ int32_t evm_word_t::from_size_t(size_t value) {
     if (sizeof(size_t) == sizeof(uint64_t)) {
@@ -46,13 +38,9 @@ __host__ __device__ int32_t evm_word_t::from_size_t(size_t value) {
     }
 }
 
-__host__ __device__ void evm_word_t::set_zero() {
-    uint256_set_zero(this);
-}
+__host__ __device__ void evm_word_t::set_zero() { uint256_set_zero(this); }
 
-__host__ __device__ uint32_t evm_word_t::get_uint32_t() const {
-    return uint256_get_uint32_t(this);
-}
+__host__ __device__ uint32_t evm_word_t::get_uint32_t() const { return uint256_get_uint32_t(this); }
 
 __host__ __device__ int32_t evm_word_t::from_uint64_t(uint64_t value) {
 #pragma unroll
@@ -64,12 +52,10 @@ __host__ __device__ int32_t evm_word_t::from_uint64_t(uint64_t value) {
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_word_t::from_uint32_t(uint32_t value) {
-    uint256_from_uint32(this,value);
-}
+__host__ __device__ int32_t evm_word_t::from_uint32_t(uint32_t value) { uint256_from_uint32(this, value); }
 
 __host__ __device__ int32_t evm_word_t_compare(const evm_word_t *a, const evm_word_t *b, uint16_t num_limbs = 8) {
-    return uint256_cmp(a,b);
+    return uint256_cmp(a, b);
 }
 
 __host__ __device__ void evm_word_t::print() const {
@@ -80,7 +66,6 @@ __host__ __device__ void evm_word_t::print() const {
     printf("\n");
     __ONE_GPU_THREAD_WOSYNC_END__
 }
-
 
 __host__ __device__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty, uint32_t count) const {
     if (hex_string == nullptr) {
@@ -110,7 +95,7 @@ __host__ __device__ char *evm_word_t::address_to_hex(char *hex_string, uint32_t 
 
 __host__ __device__ int32_t evm_word_t::to_byte_array_t(byte_array_t &byte_array, int32_t endian) const {
     byte_array.grow(CuEVM::word_size, 1);
-    uint256_to_bytes(byte_array.data,this, byte_array.size);
+    uint256_to_bytes(byte_array.data, this, byte_array.size);
 }
 
 __host__ __device__ int32_t evm_word_t::to_bit_array_t(byte_array_t &bit_array, int32_t endian) const {

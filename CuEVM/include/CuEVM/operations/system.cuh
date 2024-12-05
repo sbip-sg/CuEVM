@@ -6,7 +6,6 @@
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/evm_call_state.cuh>
 #include <CuEVM/state/touch_state.cuh>
-#include <CuEVM/utils/arith.cuh>
 
 /**
  * The system operations class.

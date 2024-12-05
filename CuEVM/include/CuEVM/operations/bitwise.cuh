@@ -1,14 +1,5 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Date: 2023-07-15
-// SPDX-License-Identifier: MIT
-
-#ifndef _CUEVM_BITWISE_OP_H_
-#define _CUEVM_BITWISE_OP_H_
-
+#pragma once
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/utils/arith.cuh>
 
 /**
  * The bitwise operations class.
@@ -31,7 +22,7 @@ namespace CuEVM::operations {
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t AND(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t AND(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The OR operation implementation.
@@ -41,7 +32,7 @@ __host__ __device__ int32_t AND(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t OR(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t OR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The XOR operation implementation.
@@ -52,7 +43,7 @@ __host__ __device__ int32_t OR(const evm_word_t &gas_limit, gas_t &gas_used, CuE
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t XOR(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t XOR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The NOT operation implementation.
@@ -63,7 +54,7 @@ __host__ __device__ int32_t XOR(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t NOT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t NOT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The BYTE operation implementation.
@@ -77,7 +68,7 @@ __host__ __device__ int32_t NOT(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t BYTE(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t BYTE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SHL operation implementation.
@@ -89,7 +80,7 @@ __host__ __device__ int32_t BYTE(const evm_word_t &gas_limit, gas_t &gas_used, C
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t SHL(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SHL(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SHR operation implementation.
@@ -101,7 +92,7 @@ __host__ __device__ int32_t SHL(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t SHR(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SHR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SAR operation implementation.
@@ -116,7 +107,5 @@ __host__ __device__ int32_t SHR(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t SAR(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SAR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 }  // namespace CuEVM::operations
-
-#endif

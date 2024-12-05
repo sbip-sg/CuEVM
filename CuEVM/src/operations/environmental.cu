@@ -4,7 +4,7 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/operations/environmental.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-
+#include <CuEVM/utils/evm_utils.cuh>
 namespace CuEVM::operations {
 __host__ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                  CuEVM::evm_memory_t &memory) {
@@ -63,7 +63,7 @@ __host__ __device__ int32_t BALANCE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t 
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
     evm_word_t address;
     int32_t error_code = stack.pop(address);
-    evm_address_conversion(address);
+    CuEVM::utils::evm_address_conversion(address);
 
     error_code |= CuEVM::gas_cost::access_account_cost(gas_used, touch_state, &address);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -247,7 +247,7 @@ __host__ __device__ int32_t EXTCODESIZE(const CuEVM::gas_t &gas_limit, CuEVM::ga
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
     evm_word_t address;
     int32_t error_code = stack.pop(address);
-    CuEVM::evm_address_conversion(address);
+    CuEVM::utils::evm_address_conversion(address);
 
     CuEVM::gas_cost::access_account_cost(gas_used, touch_state, &address);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -268,7 +268,7 @@ __host__ __device__ int32_t EXTCODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::ga
     evm_word_t address, memory_offset, code_offset, length;
     int32_t error_code = stack.pop(address);
     // TODO implement stack.pop_address;
-    CuEVM::evm_address_conversion(address);
+    CuEVM::utils::evm_address_conversion(address);
     error_code |= stack.pop(memory_offset);
     error_code |= stack.pop(code_offset);
     error_code |= stack.pop(length);
@@ -368,7 +368,7 @@ __host__ __device__ int32_t EXTCODEHASH(const CuEVM::gas_t &gas_limit, CuEVM::ga
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
     evm_word_t address;
     int32_t error_code = stack.pop(address);
-    CuEVM::evm_address_conversion(address);
+    CuEVM::utils::evm_address_conversion(address);
 
     CuEVM::gas_cost::access_account_cost(gas_used, touch_state, &address);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);

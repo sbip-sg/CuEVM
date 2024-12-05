@@ -1,8 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Data: 2023-11-30
-// SPDX-License-Identifier: MIT
-
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
@@ -36,22 +31,21 @@ __host__ __device__ void simplified_trace_data::record_branch(uint32_t pc_src, u
     no_branches++;
 }
 
-__host__ __device__ void simplified_trace_data::record_distance(ArithEnv &arith, uint8_t op,
-                                                                const CuEVM::evm_stack_t &stack_ptr) {
-    bn_t distance, op1, op2;
+__host__ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::evm_stack_t &stack_ptr) {
+    evm_word_t distance, op1, op2;
     uint32_t stack_size = stack_ptr.size();
 
-    cgbn_load(arith.env, op1, stack_ptr.get_address_at_index(1));
-    cgbn_load(arith.env, op2, stack_ptr.get_address_at_index(2));
+    op1 = *stack_ptr.get_address_at_index(1);
+    op2 = *stack_ptr.get_address_at_index(2);
 
-    if (cgbn_compare(arith.env, op1, op2) >= 1)
-        cgbn_sub(arith.env, distance, op1, op2);
+    if (uint256_cmp(&op1, &op2) >= 1)
+        uint256_sub(&distance, &op1, &op2);
     else
-        cgbn_sub(arith.env, distance, op2, op1);
+        uint256_sub(&distance, &op2, &op1);
 
-    if (op != OP_EQ) cgbn_add_ui32(arith.env, distance, distance, 1);
+    if (op != OP_EQ) uint256_add_word(&distance, &distance, 1);
 
-    cgbn_store(arith.env, &last_distance, distance);
+    last_distance = distance;
 }
 
 __host__ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t &stack_ptr,
@@ -113,9 +107,9 @@ __host__ cJSON *trace_data_t::to_json() {
     cJSON *json = cJSON_CreateObject();
     cJSON_AddNumberToObject(json, "pc", pc);
     cJSON_AddNumberToObject(json, "op", op);
-    cJSON_AddStringToObject(json, "gas", gas.to_hex(hex_string_ptr));
+    cJSON_AddNumberToObject(json, "gas", gas);
 
-    cJSON_AddStringToObject(json, "gasCost", gas_cost.to_hex(hex_string_ptr));
+    cJSON_AddNumberToObject(json, "gasCost", gas_cost);
     cJSON_AddNumberToObject(json, "memSize", mem_size);
     cJSON *stack_json = cJSON_CreateArray();
     for (uint32_t i = 0; i < stack_size; i++) {
@@ -124,7 +118,7 @@ __host__ cJSON *trace_data_t::to_json() {
     cJSON_AddItemToObject(json, "stack", stack_json);
     cJSON_AddNumberToObject(json, "depth", depth);
     cJSON_AddItemToObject(json, "returnData", return_data->to_json());
-    cJSON_AddStringToObject(json, "refund", refund.to_hex(hex_string_ptr));
+    cJSON_AddNumberToObject(json, "refund", refund);
 #ifdef EIP_3155_OPTIONAL
     cJSON_AddNumberToObject(json, "errorCode", error_code);
     CuEVM::byte_array_t memory_array(memory, mem_size);
@@ -152,9 +146,9 @@ __host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
 
     printf("{\"pc\":%d,\"op\":%d,", pc, op);
 
-    printf("\"gas\":\"%s\",", gas.to_hex(hex_string_ptr, 1));
+    printf("\"gas\":\"%x\",", gas);
 
-    printf("\"gasCost\":\"%s\",", gas_cost.to_hex(hex_string_ptr, 1));
+    printf("\"gasCost\":\"%x\",", gas_cost);
 
     printf("\"memSize\":%u,", mem_size);
 
@@ -163,7 +157,7 @@ __host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
     // print uint256 stack values
     printf("[");
     for (uint32_t i = 0; i < stack_size; i++) {
-        stack[i].print_as_compact_hex();
+        stack[i].to_hex(hex_string_ptr, true);
         if (i != stack_size - 1) {
             printf(",");
         }
@@ -176,7 +170,7 @@ __host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
     // correct way is to show the whole 256 bits
     // fprintf(stderr, "\"refund\":\"%s\"}\n", refund.to_hex(hex_string_ptr,
     // 1));
-    printf("\"refund\":%u", refund._limbs[0]);
+    printf("\"refund\":%u", refund);
 #ifdef EIP_3155_OPTIONAL
     printf(",\"error\":%u", error_code);
     printf(",\"memory\":\"0x");
@@ -221,67 +215,56 @@ __host__ __device__ void tracer_t::grow() {
     capacity += 128;
 }
 
-__host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const uint32_t pc, const uint8_t op,
+__host__ __device__ uint32_t tracer_t::start_operation(const uint32_t pc, const uint8_t op,
                                                        const CuEVM::evm_memory_t &memory,
                                                        const CuEVM::evm_stack_t &stack, const uint32_t depth,
                                                        const CuEVM::evm_return_data_t &return_data,
-                                                       const bn_t &gas_limit, const bn_t &gas_used) {
+                                                       const CuEVM::gas_t &gas_limit, const CuEVM::gas_t &gas_used) {
     if (size == capacity) {
         grow();
     }
 
     // printf("tracer op %d idx %d size %d after grow\n", op, THREADIDX, size);
 
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[size].pc = pc;
     data[size].op = op;
     data[size].mem_size = memory.size;
-    __ONE_GPU_THREAD_END__
-    bn_t gas;
-    cgbn_sub(arith.env, gas, gas_limit, gas_used);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas), gas);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[size].gas_cost), gas_used);
-    // #ifdef __CUDA_ARCH__
-    //     printf("tracer op %d idx %d after storing gas cost\n", op, threadIdx.x);
-    // #endif
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+
+    gas_t gas = gas_limit - gas_used;
+    data[size].gas = gas;
+    data[size].gas_cost = gas_used;
+
     data[size].stack_size = stack.size();
     if (data[size].stack_size > 0) {
         data[size].stack = new evm_word_t[data[size].stack_size];
         stack.extract_data(data[size].stack);
-        // // std::copy(stack.stack_base, stack.stack_base + stack.size(), data[size].stack);
-        // memcpy(data[size].stack, stack.stack_base, sizeof(evm_word_t) * data[size].stack_size);
     }
 
     data[size].depth = depth;
-    __ONE_GPU_THREAD_END__  // sync here
-#ifndef GPU                 // reduce complication in gpu code
-        data[size]
-            .return_data = new byte_array_t(return_data);
+
+#ifndef GPU  // reduce complication in gpu code
+    data[size].return_data = new byte_array_t(return_data);
 #endif
 
 #ifdef EIP_3155_OPTIONAL
     data[size].memory = new uint8_t[data[size].mem_size];
-    // std::copy(memory.data.data, memory.data.data + data[size].mem_size, data[size].memory);
     memcpy(data[size].memory, memory.data.data, data[size].mem_size);
 #endif
 
     return size++;
 }
 
-__host__ __device__ void tracer_t::finish_operation(ArithEnv &arith, const uint32_t idx, const bn_t &gas_used,
-                                                    const bn_t &gas_refund
+__host__ __device__ void tracer_t::finish_operation(const uint32_t idx, const CuEVM::gas_t &gas_used,
+                                                    const CuEVM::gas_t &gas_refund
 #ifdef EIP_3155_OPTIONAL
                                                     ,
                                                     const uint32_t error_code
 // , const CuEVM::contract_storage_t &storage
 #endif
 ) {
-    bn_t gas_cost;
-    cgbn_load(arith.env, gas_cost, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost));
-    cgbn_sub(arith.env, gas_cost, gas_used, gas_cost);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].gas_cost), gas_cost);
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (data[idx].refund), gas_refund);
+    gas_t gas_cost = data[idx].gas - gas_used;
+    data[idx].gas_cost = gas_cost;
+    data[idx].refund = gas_refund;
 #ifdef EIP_3155_OPTIONAL
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     data[idx].error_code = error_code;
@@ -290,21 +273,19 @@ __host__ __device__ void tracer_t::finish_operation(ArithEnv &arith, const uint3
 #endif
 }
 
-__host__ __device__ void tracer_t::finish_transaction(ArithEnv &arith, const CuEVM::evm_return_data_t &return_data,
-                                                      const bn_t &gas_used, uint32_t error_code) {
+__host__ __device__ void tracer_t::finish_transaction(const CuEVM::evm_return_data_t &return_data,
+                                                      const CuEVM::gas_t &gas_used, uint32_t error_code) {
     this->return_data = return_data;
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (this->gas_used), gas_used);
+    this->gas_used = gas_used;
     this->status = error_code;
 }
 
-__host__ __device__ void tracer_t::print(ArithEnv &arith) {
+__host__ __device__ void tracer_t::print() {
     for (uint32_t i = 0; i < size; i++) {
         printf("PC: %d\n", data[i].pc);
         printf("Opcode: %d\n", data[i].op);
-        printf("Gas: ");
-        data[i].gas.print();
-        printf("Gas cost: ");
-        data[i].gas_cost.print();
+        printf("Gas: %d\n", data[i].gas);
+        printf("Gas cost: %d\n", data[i].gas_cost);
         printf("Stack: ");
         for (uint32_t j = 0; j < data[i].stack_size; j++) {
             data[i].stack[j].print();
@@ -313,8 +294,7 @@ __host__ __device__ void tracer_t::print(ArithEnv &arith) {
         printf("Memory size: %d\n", data[i].mem_size);
         printf("Return data: ");
         data[i].return_data->print();
-        printf("Refund: ");
-        data[i].refund.print();
+        printf("Refund: %d\n", data[i].refund);
 #ifdef EIP_3155_OPTIONAL
         printf("Error code: %d\n", data[i].error_code);
         printf("Memory: ");
@@ -348,7 +328,7 @@ __host__ __device__ void tracer_t::print_err() {
         printf("\"output\":\"\",");
     }
 
-    printf("\"gasUsed\":\"%s\",", gas_used.to_hex(hex_string_ptr, 1));
+    printf("\"gasUsed\":\"%x\",", gas_used);
 
     printf("\"pass\":\"%s\",", (status == ERROR_RETURN) || (status == ERROR_REVERT) ? "true" : "false");
 

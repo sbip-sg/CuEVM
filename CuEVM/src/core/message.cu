@@ -1,23 +1,15 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Data: 2024-07-12
-// SPDX-License-Identifier: MIT
-
 #include <CuEVM/core/message.cuh>
 
 namespace CuEVM {
 
 __host__ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
-    ArithEnv &arith, const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *contract_address,
-    const gas_t gas_limit, const evm_word_t *value, const uint32_t depth, const uint32_t call_type,
-    const evm_word_t *storage_address, const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code,
-    const evm_word_t &return_data_offset, const evm_word_t &return_data_size, const uint32_t static_env) {
-    __SHARED_MEMORY__ evm_word_t *new_params_data[CGBN_IBP];
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    new_params_data[INSTANCE_IDX_PER_BLOCK] = new evm_word_t[8];
-    __ONE_GPU_THREAD_END__
-    this->params_data = new_params_data[INSTANCE_IDX_PER_BLOCK];
+    const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *contract_address, const gas_t gas_limit,
+    const evm_word_t *value, const uint32_t depth, const uint32_t call_type, const evm_word_t *storage_address,
+    const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code, const evm_word_t &return_data_offset,
+    const evm_word_t &return_data_size, const uint32_t static_env) {
+    evm_word_t *new_params_data;
+    new_params_data = new evm_word_t[8];
+    this->params_data = new_params_data;
     /*
     evm_word_t *sender;
     evm_word_t *recipient;
@@ -119,7 +111,7 @@ __host__ __device__ void evm_message_call_t::get_contract_address(evm_word_t &co
  * @param[in] arith The arithmetical environment.
  * @param[out] gas_limit The gas limit YP: \f$g\f$.
  */
-__host__ __device__ void evm_message_call_t::get_gas_limit(evm_word_t &gas_limit) const { gas_limit = this->gas_limit; }
+__host__ __device__ void evm_message_call_t::get_gas_limit(gas_t &gas_limit) const { gas_limit = this->gas_limit; }
 
 /**
  * Get the value.
@@ -190,7 +182,7 @@ __host__ __device__ uint32_t evm_message_call_t::get_static_env() const { return
  * @param[in] arith The arithmetical environment.
  * @param[in] gas_limit The gas limit YP: \f$g\f$.
  */
-__host__ __device__ void evm_message_call_t::set_gas_limit(evm_word_t &gas_limit) { this->gas_limit = gas_limit; }
+__host__ __device__ void evm_message_call_t::set_gas_limit(gas_t &gas_limit) { this->gas_limit = gas_limit; }
 
 /**
  * Set the call data.
@@ -257,8 +249,7 @@ __host__ __device__ void evm_message_call_t::print() const {
     recipient.print();
     printf("\ncontract_address: ");
     contract_address.print();
-    printf("\ngas_limit: ");
-    gas_limit.print();
+    printf("\ngas_limit: %lu", gas_limit);
     printf("\nvalue: ");
     value.print();
     printf("\ndepth: %d", depth);

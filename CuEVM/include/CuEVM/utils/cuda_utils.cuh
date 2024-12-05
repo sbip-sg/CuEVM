@@ -1,8 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
-// SPDX-License-Identifier: MIT
-
 #pragma once
 
 // CGBN parameters
@@ -13,9 +8,9 @@
 #define CGBN_IBP 8
 #define SHARED_STACK_SIZE 128
 
-// #include <CGBN/cgbn.h>
-#include <CuBigInt/uint256.cuh>
 #include <cuda.h>
+
+#include <CuBigInt/uint256.cuh>
 
 #ifdef __CUDA_ARCH__
 #ifndef MULTIPLE_THREADS_PER_INSTANCE
@@ -78,4 +73,3 @@
 #endif
 
 void cuda_check(cudaError_t status, const char *action = NULL, const char *file = NULL, int32_t line = 0);
-void cgbn_check(cgbn_error_report_t *report, const char *file = NULL, int32_t line = 0);

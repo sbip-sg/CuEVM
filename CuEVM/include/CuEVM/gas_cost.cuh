@@ -1,10 +1,8 @@
-#ifndef __GAS_COST_H__
-#define __GAS_COST_H__
+#pragma once
 
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/state/touch_state.cuh>
-#include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 
 #define GAS_ZERO 0
@@ -180,7 +178,7 @@ __host__ __device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length);
  * @param[inout] gas_used The gas used
  * @param[in] rounds Number of rounds (big-endian unsigned integer)
  */
-__host__ __device__ void blake2_cost(gas_t &gas_used, const uint32_t rounds);
+__host__ __device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds);
 
 __host__ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
                                         const evm_word_t &exponent_bit_length_bn,
@@ -192,7 +190,7 @@ __host__ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &expon
  * @param[inout] gas_used The gas used
  * @param[in] data_size The size of the data in bytes
  */
-__host__ __device__ void ecpairing_cost(gas_t &gas_used, const uint32_t data_size);
+__host__ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size);
 
 /**
  * Add the cost for accessing account information
@@ -202,7 +200,7 @@ __host__ __device__ void ecpairing_cost(gas_t &gas_used, const uint32_t data_siz
  * @param[in] address The address of the account
  * @return 0 for success, 1 for failure
  */
-__host__ __device__ int32_t access_account_cost(gas_t &gas_used, const CuEVM::TouchState &touch_state,
+__host__ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::TouchState &touch_state,
                                                 const evm_word_t *address);
 
 /**
@@ -255,5 +253,3 @@ __host__ __device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, 
 
 }  // namespace gas_cost
 }  // namespace CuEVM
-
-#endif  // __GAS_COST_H__

@@ -1,13 +1,8 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-09-15
-// SPDX-License-Identifier: MIT
-
 #pragma once
 
 #include <cjson/cJSON.h>
 
-#include <CuEVM/utils/arith.cuh>
+#include <CuEVM/core/evm_word.cuh>
 
 namespace CuEVM {
 struct storage_element_t {
@@ -98,15 +93,6 @@ struct storage_element_t {
 
     /**
      * Get if the value of the storage element is equal to 0
-     * @return If the value of the storage element is equal to 0, 1 if true, 0
-     * if false
-     */
-    __host__ __device__ int32_t is_zero_value() const;
-
-    /**
-     * Get if the value of the storage element is equal to 0with the help of the
-     * arithmetic environment
-     * @param[in] arith The arithmetic environment
      * @return If the value of the storage element is equal to 0, 1 if true, 0
      * if false
      */

@@ -1,5 +1,4 @@
-#ifndef _CUEVM_EVM_STATE_H_
-#define _CUEVM_EVM_STATE_H_
+#pragma once
 
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/message.cuh>
@@ -7,7 +6,6 @@
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/state/logs.cuh>
 #include <CuEVM/state/touch_state.cuh>
-#include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 
 namespace CuEVM {
@@ -61,9 +59,9 @@ struct evm_call_state_t {
      */
     __host__ __device__ ~evm_call_state_t();
 
-    __host__ __device__ void print(ArithEnv& arith) const;
+    __host__ __device__ void print() const;
 
-    __host__ __device__ int32_t update(ArithEnv& arith, evm_call_state_t& other);
+    __host__ __device__ int32_t update(evm_call_state_t& other);
 };
 // pc, gas_used, gas_limit, stack_ptr, bytecode should be in local or shared memory
 struct cached_evm_call_state {
@@ -80,5 +78,3 @@ struct cached_evm_call_state {
     __host__ __device__ void write_cache_to_state(evm_call_state_t* state);  // copy from cache to state
 };
 }  // namespace CuEVM
-
-#endif

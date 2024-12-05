@@ -3,106 +3,99 @@
 
 namespace CuEVM {
 namespace gas_cost {
-__host__ __device__ int32_t has_gas(ArithEnv &arith, const bn_t &gas_limit, const bn_t &gas_used) {
-    return (cgbn_compare(arith.env, gas_limit, gas_used) < 0) ? ERROR_GAS_LIMIT_EXCEEDED : ERROR_SUCCESS;
+__host__ __device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used) {
+    return (gas_limit < gas_used) ? ERROR_GAS_LIMIT_EXCEEDED : ERROR_SUCCESS;
 }
 
-__host__ __device__ void max_gas_call(ArithEnv &arith, bn_t &gas_capped, const bn_t &gas_limit, const bn_t &gas_used) {
+__host__ __device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const gas_t &gas_used) {
     // compute the remaining gas
-    bn_t gas_left;
-    cgbn_sub(arith.env, gas_left, gas_limit, gas_used);
+    gas_t gas_left;
+    gas_left = gas_limit - gas_used;
     // cap to uint64_t in case overflow following go-ethereum
-    cgbn_bitwise_mask_and(arith.env, gas_left, gas_left, 64);
+    // gas_left = gas_left & 0xFFFFFFFFFFFFFFFF;
     // gas capped = (63/64) * gas_left
-    cgbn_div_ui32(arith.env, gas_capped, gas_left, 64);
-    cgbn_sub(arith.env, gas_capped, gas_left, gas_capped);
+    gas_capped = gas_left / 64;
+    gas_capped = gas_left - gas_capped;
 }
 
-__host__ __device__ void evm_words_gas_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &length,
-                                            const uint32_t gas_per_word) {
+__host__ __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word) {
     // gas_used += gas_per_word * emv word count of length
     // length = (length + 31) / 32
-    bn_t evm_words_gas;
-    cgbn_add_ui32(arith.env, evm_words_gas, length, CuEVM::word_size - 1);
-    cgbn_div_ui32(arith.env, evm_words_gas, evm_words_gas, CuEVM::word_size);
-    cgbn_mul_ui32(arith.env, evm_words_gas, evm_words_gas, gas_per_word);
-    cgbn_add(arith.env, gas_used, gas_used, evm_words_gas);
+    gas_t evm_words_gas;
+    evm_words_gas = (length + 31) / 32;
+    evm_words_gas = evm_words_gas * gas_per_word;
+    gas_used += evm_words_gas;
 }
 
-__host__ __device__ void evm_bytes_gas_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &length,
-                                            const uint32_t gas_per_byte) {
+__host__ __device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_byte) {
     // gas_used += gas_per_byte * bytes count of length
-    bn_t evm_bytes_gas;
-    cgbn_mul_ui32(arith.env, evm_bytes_gas, length, gas_per_byte);
-    cgbn_add(arith.env, gas_used, gas_used, evm_bytes_gas);
+    gas_t evm_bytes_gas;
+    evm_bytes_gas = length * gas_per_byte;
+    gas_used += evm_bytes_gas;
 }
 
-__host__ __device__ int32_t exp_bytes_gas_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &exponent) {
+__host__ __device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const evm_word_t &exponent) {
     // dynamic gas calculation (G_expbyte * bytes_in_exponent)
-    int32_t last_bit;
-    last_bit = CuEVM::word_bits - 1 - cgbn_clz(arith.env, exponent);
-    uint32_t exponent_byte_size = (last_bit == -1) ? 0 : (last_bit) / 8 + 1;
-    bn_t dynamic_gas;
-    cgbn_set_ui32(arith.env, dynamic_gas, exponent_byte_size);
-    cgbn_mul_ui32(arith.env, dynamic_gas, dynamic_gas, GAS_EXP_BYTE);
-    cgbn_add(arith.env, gas_used, gas_used, dynamic_gas);
-    return last_bit;
+    // int32_t last_bit;
+    // last_bit = CuEVM::word_bits - 1 - cgbn_clz(exponent);
+    // uint32_t exponent_byte_size = (last_bit == -1) ? 0 : (last_bit) / 8 + 1;
+    uint32_t exponent_byte_size = 0;  // todo fix this
+    gas_t dynamic_gas;
+    dynamic_gas = exponent_byte_size * GAS_EXP_BYTE;
+    gas_used += dynamic_gas;
+    return ERROR_SUCCESS;
 }
 
-__host__ __device__ void initcode_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &initcode_length) {
+__host__ __device__ void initcode_cost(gas_t &gas_used, const gas_t &initcode_length) {
     // gas_used += GAS_INITCODE_WORD_COST * emv word count of initcode
     // length = (initcode_length + 31) / 32
-    evm_words_gas_cost(arith, gas_used, initcode_length, GAS_INITCODE_WORD_COST);
+    evm_words_gas_cost(gas_used, initcode_length, GAS_INITCODE_WORD_COST);
 }
 
-__host__ __device__ void code_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &code_length) {
+__host__ __device__ void code_cost(gas_t &gas_used, const gas_t &code_length) {
     // gas_used += GAS_CODE_DEPOSIT * length
-    evm_bytes_gas_cost(arith, gas_used, code_length, GAS_CODE_DEPOSIT);
+    evm_bytes_gas_cost(gas_used, code_length, GAS_CODE_DEPOSIT);
 }
 
-__host__ __device__ void keccak_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &length) {
-    evm_words_gas_cost(arith, gas_used, length, GAS_KECCAK256_WORD);
+__host__ __device__ void keccak_cost(gas_t &gas_used, const gas_t &length) {
+    evm_words_gas_cost(gas_used, length, GAS_KECCAK256_WORD);
 }
 
-__host__ __device__ void memory_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &length) {
-    evm_words_gas_cost(arith, gas_used, length, GAS_MEMORY);
+__host__ __device__ void memory_cost(gas_t &gas_used, const gas_t &length) {
+    evm_words_gas_cost(gas_used, length, GAS_MEMORY);
 }
 
-__host__ __device__ void log_record_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &length) {
-    evm_bytes_gas_cost(arith, gas_used, length, GAS_LOG_DATA);
+__host__ __device__ void log_record_cost(gas_t &gas_used, const gas_t &length) {
+    evm_bytes_gas_cost(gas_used, length, GAS_LOG_DATA);
 }
 
-__host__ __device__ void log_topics_cost(ArithEnv &arith, bn_t &gas_used, const uint32_t &no_topics) {
-    bn_t topic_gas;
-    cgbn_set_ui32(arith.env, topic_gas, GAS_LOG_TOPIC);
-    cgbn_mul_ui32(arith.env, topic_gas, topic_gas, no_topics);
-    cgbn_add(arith.env, gas_used, gas_used, topic_gas);
+__host__ __device__ void log_topics_cost(gas_t &gas_used, const uint32_t &no_topics) {
+    gas_used += GAS_LOG_TOPIC * no_topics;
 }
 
-__host__ __device__ void sha256_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &length) {
-    evm_words_gas_cost(arith, gas_used, length, GAS_PRECOMPILE_SHA256_WORD);
+__host__ __device__ void sha256_cost(gas_t &gas_used, const gas_t &length) {
+    evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_SHA256_WORD);
 }
 
-__host__ __device__ void ripemd160_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &length) {
-    evm_words_gas_cost(arith, gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
+__host__ __device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length) {
+    evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
 }
 
-__host__ __device__ void blake2_cost(ArithEnv &arith, bn_t &gas_used, const uint32_t rounds) {
+__host__ __device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds) {
     // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
-    bn_t temp;
-    cgbn_set_ui32(arith.env, temp, rounds);
-    cgbn_mul_ui32(arith.env, temp, temp, GAS_PRECOMPILE_BLAKE2_ROUND);
-    cgbn_add(arith.env, gas_used, gas_used, temp);
+    gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds;
 }
 
-__host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used, const bn_t &exponent_size,
-                                        const bn_t &exponent_bit_length_bn, const bn_t &multiplication_complexity) {
+__host__ __device__ int32_t modexp_cost(gas_t &gas_used, const uint32_t &exponent_size,
+                                        const uint32_t &exponent_bit_length_bn,
+                                        const uint32_t &multiplication_complexity) {
     // compute the iteration count depending on the size
     // of the exponent and its most significant non-zero
     // bit of the least siginifcant 256 bits
-    bn_t iteration_count, adjusted_exponent_bit_length;
+    /*
+    gas_t iteration_count, adjusted_exponent_bit_length;
     // cgbn_set_ui32(arith.env, iteration_count, 0);
-    cgbn_set_ui32(arith.env, adjusted_exponent_bit_length, 0);
+    cgbn_set_ui32(adjusted_exponent_bit_length, 0);
     uint32_t iteration_count_overflow;
     iteration_count_overflow = 0;
     // if the size is less than 32 bytes (256 bits) we
@@ -170,57 +163,49 @@ __host__ __device__ int32_t modexp_cost(ArithEnv &arith, bn_t &gas_used, const b
     //     printf("dynamic_gas: %d\n", cgbn_get_ui32(arith.env, dynamic_gas));
     // #endif
     cgbn_add(arith.env, gas_used, gas_used, dynamic_gas);
+    */ // TODO: reimplement this
     return ERROR_SUCCESS;
 }
-__host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used, uint32_t data_size) {
+__host__ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
     // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 *
     // GAS_PRECOMPILE_ECPAIRING_PAIR
-    cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_ECPAIRING);
-    bn_t temp;
-    cgbn_set_ui32(arith.env, temp, data_size);
-    cgbn_div_ui32(arith.env, temp, temp, 192);
-    cgbn_mul_ui32(arith.env, temp, temp, GAS_PRECOMPILE_ECPAIRING_PAIR);
-    cgbn_add(arith.env, gas_used, gas_used, temp);
+    gas_used += GAS_PRECOMPILE_ECPAIRING + data_size / 192 * GAS_PRECOMPILE_ECPAIRING_PAIR;
 }
 
-__host__ __device__ int32_t access_account_cost(ArithEnv &arith, bn_t &gas_used, CuEVM::TouchState &touch_state,
+__host__ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::TouchState &touch_state,
                                                 const evm_word_t *address) {
-    if (touch_state.is_warm_account(arith, address)) {
-        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
+    if (touch_state.is_warm_account(address)) {
+        gas_used += GAS_WARM_ACCESS;
     } else {
-        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_ACCOUNT_ACCESS);
+        gas_used += GAS_COLD_ACCOUNT_ACCESS;
         // set the account warm in case it's cold
         // assuming this function is called only when the account is accessed
         // TODO: remove redundant logic
-        touch_state.set_warm_account(arith, address);
+        touch_state.set_warm_account(address);
     }
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t sload_cost(ArithEnv &arith, bn_t &gas_used, const CuEVM::TouchState &touch_state,
-                                       const evm_word_t *address, const bn_t &key) {
+__host__ __device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::TouchState &touch_state, const evm_word_t *address,
+                                       const evm_word_t &key) {
     // get the key warm
-    if (touch_state.is_warm_key(arith, address, key)) {
-        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
+    if (touch_state.is_warm_key(address, key)) {
+        gas_used += GAS_WARM_ACCESS;
     } else {
-        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_SLOAD);
+        gas_used += GAS_COLD_SLOAD;
     }
 
     return ERROR_SUCCESS;
 }
-__host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used, bn_t &gas_refund,
-                                        const CuEVM::TouchState &touch_state, const evm_word_t *address,
-                                        const bn_t &key, const bn_t &new_value) {
+__host__ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::TouchState &touch_state,
+                                        const evm_word_t *address, const evm_word_t &key, const evm_word_t &new_value) {
     // get the key warm
-    if (touch_state.is_warm_key(arith, address, key) == false) {
-        // #ifdef __CUDA_ARCH__
-        //         printf("SSTORE cold %d\n", threadIdx.x);
-        // #endif
-        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_COLD_SLOAD);
+    if (touch_state.is_warm_key(address, key) == false) {
+        gas_used += GAS_COLD_SLOAD;
     }
-    bn_t original_value, current_value;
-    touch_state.poke_original_value(arith, address, key, original_value);
-    touch_state.poke_value(arith, address, key, current_value);
+    evm_word_t original_value, current_value;
+    touch_state.poke_original_value(address, key, original_value);
+    touch_state.poke_value(address, key, current_value);
     // #ifdef __CUDA_ARCH__
     //     printf("SSTORE COST %d\n", threadIdx.x);
     //     print_bnt(arith, original_value);
@@ -228,32 +213,32 @@ __host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used, bn_t &g
     //     print_bnt(arith, new_value);
     // #endif
     // EIP-2200
-    if (cgbn_compare(arith.env, new_value, current_value) == 0) {
-        cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SLOAD);
+    if (new_value == current_value) {
+        gas_used += GAS_SLOAD;
     } else {
-        if (cgbn_compare(arith.env, current_value, original_value) == 0) {
-            if (cgbn_compare_ui32(arith.env, original_value, 0) == 0) {
-                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_STORAGE_SET);
+        if (current_value == original_value) {
+            if (uint256_is_zero(&original_value)) {
+                gas_used += GAS_STORAGE_SET;
             } else {
-                cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SSTORE_RESET);
-                if (cgbn_compare_ui32(arith.env, new_value, 0) == 0) {
-                    cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_SSTORE_CLEARS_SCHEDULE);
+                gas_used += GAS_SSTORE_RESET;
+                if (uint256_is_zero(&new_value)) {
+                    gas_refund += GAS_SSTORE_CLEARS_SCHEDULE;
                 }
             }
         } else {
-            cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_SLOAD);
-            if (cgbn_compare_ui32(arith.env, original_value, 0) != 0) {
-                if (cgbn_compare_ui32(arith.env, current_value, 0) == 0) {
-                    cgbn_sub_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
-                } else if (cgbn_compare_ui32(arith.env, new_value, 0) == 0) {
-                    cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_CLEAR_REFUND);
+            gas_used += GAS_SLOAD;
+            if (uint256_is_zero(&original_value)) {
+                if (uint256_is_zero(&current_value)) {
+                    gas_refund -= GAS_STORAGE_CLEAR_REFUND;
+                } else if (uint256_is_zero(&new_value)) {
+                    gas_refund += GAS_STORAGE_CLEAR_REFUND;
                 }
             }
-            if (cgbn_compare(arith.env, original_value, new_value) == 0) {
-                if (cgbn_compare_ui32(arith.env, original_value, 0) == 0) {
-                    cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_SET - GAS_SLOAD);
+            if (original_value == new_value) {
+                if (uint256_is_zero(&original_value)) {
+                    gas_refund += GAS_STORAGE_SET - GAS_SLOAD;
                 } else {
-                    cgbn_add_ui32(arith.env, gas_refund, gas_refund, GAS_STORAGE_RESET - GAS_SLOAD);
+                    gas_refund += GAS_STORAGE_RESET - GAS_SLOAD;
                 }
             }
         }
@@ -261,23 +246,23 @@ __host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used, bn_t &g
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t transaction_intrinsic_gas(ArithEnv &arith, const CuEVM::evm_transaction_t &transaction,
-                                                      bn_t &gas_intrinsic) {
+__host__ __device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &transaction,
+                                                      gas_t &gas_intrinsic) {
     // gas_intrinsic = GAS_TRANSACTION
-    cgbn_set_ui32(arith.env, gas_intrinsic, GAS_TRANSACTION);
+    gas_intrinsic = GAS_TRANSACTION;
 
     // gas_intrinsic += GAS_TRANSACTION_CREATE if transaction.create
     if (transaction.is_create) {
-        cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_TX_CREATE);
+        gas_intrinsic += GAS_TX_CREATE;
     }
 
     // gas_intrinsic += GAS_TX_DATA_ZERO/GAS_TX_DATA_NONZERO for each byte in
     // transaction.data
     for (uint32_t idx = 0; idx < transaction.data_init.size; idx++) {
         if (transaction.data_init.data[idx] == 0) {
-            cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_TX_DATA_ZERO);
+            gas_intrinsic += GAS_TX_DATA_ZERO;
         } else {
-            cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_TX_DATA_NONZERO);
+            gas_intrinsic += GAS_TX_DATA_NONZERO;
         }
     }
 
@@ -285,37 +270,35 @@ __host__ __device__ int32_t transaction_intrinsic_gas(ArithEnv &arith, const CuE
     // each address in transaction.access_list
 
     for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
-        cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_ACCESS_LIST_ADDRESS);
-        cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic,
-                      GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count);
+        gas_intrinsic += GAS_ACCESS_LIST_ADDRESS;
+        gas_intrinsic += GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count;
     }
 
 #ifdef EIP_3860
     // gas_intrinsic += GAS_INITCODE_COST if create transaction
     if (transaction.is_create) {
         if (transaction.data_init.size > max_initcode_size > 0) return ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
-        bn_t initcode_length;
-        cgbn_set_ui32(arith.env, initcode_length, transaction.data_init.size);
-        initcode_cost(arith, gas_intrinsic, initcode_length);
+        initcode_cost(gas_intrinsic, transaction.data_init.size);
     }
 #endif
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t memory_grow_cost(ArithEnv &arith, const CuEVM::evm_memory_t &memory, const bn_t &index,
-                                             const bn_t &length, bn_t &memory_expansion_cost, bn_t &gas_used) {
+__host__ __device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, const evm_word_t &index,
+                                             const evm_word_t &length, gas_t &memory_expansion_cost, gas_t &gas_used) {
     // reset to 0;
-    cgbn_set_ui32(arith.env, memory_expansion_cost, 0);
+    memory_expansion_cost = 0;
+    /*
     do {
-        if (cgbn_compare_ui32(arith.env, length, 0) <= 0) {
+        if (uint256_is_zero(&length)) {
             return ERROR_SUCCESS;
         }
-        bn_t offset;
-        uint32_t offset_ui32;
-        if (cgbn_add(arith.env, offset, index, length) != 0) {
+        evm_word_t offset;
+        evm_word_t offset_ui32;
+        if (uint256_add(index, length, offset)) {
             break;
         }
-        if (cgbn_get_uint32_t(arith.env, offset_ui32, offset) == ERROR_VALUE_OVERFLOW) {
+        if (uint256_get_uint32_t(offset, offset_ui32) == ERROR_VALUE_OVERFLOW) {
             break;
         }
         bn_t old_memory_cost;
@@ -358,7 +341,10 @@ __host__ __device__ int32_t memory_grow_cost(ArithEnv &arith, const CuEVM::evm_m
         }
         return ERROR_SUCCESS;
     } while (0);
-    return ERR_MEMORY_INVALID_OFFSET;
+    */ // TODO: reimplement this
+
+    // return ERR_MEMORY_INVALID_OFFSET;
+    return ERROR_SUCCESS;
 }
 }  // namespace gas_cost
 }  // namespace CuEVM

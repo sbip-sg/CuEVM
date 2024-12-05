@@ -1,14 +1,5 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Date: 2024-07-15
-// SPDX-License-Identifier: MIT
-
-#ifndef _CUEVM_ARITHMETIC_OP_H_
-#define _CUEVM_ARITHMETIC_OP_H_
-
+#pragma once
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/utils/arith.cuh>
 
 /**
  * The arithmetic operations.
@@ -36,7 +27,7 @@ namespace operations {
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t ADD(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t ADD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The MUL operation implementation.
@@ -47,7 +38,7 @@ __host__ __device__ int32_t ADD(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t MUL(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t MUL(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SUB operation implementation.
@@ -58,7 +49,7 @@ __host__ __device__ int32_t MUL(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t SUB(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SUB(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The DIV operation implementation.
@@ -71,7 +62,7 @@ __host__ __device__ int32_t SUB(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t DIV(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t DIV(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SDIV operation implementation.
@@ -85,7 +76,7 @@ __host__ __device__ int32_t DIV(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t SDIV(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SDIV(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 /**
  * The MOD operation implementation.
  * Takes two values from the stack, calculates the remainder
@@ -98,7 +89,7 @@ __host__ __device__ int32_t SDIV(const evm_word_t &gas_limit, gas_t &gas_used, C
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t MOD(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t MOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SMOD operation implementation.
@@ -112,7 +103,7 @@ __host__ __device__ int32_t MOD(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t SMOD(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The ADDMOD operation implementation.
@@ -126,7 +117,7 @@ __host__ __device__ int32_t SMOD(const evm_word_t &gas_limit, gas_t &gas_used, C
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t ADDMOD(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t ADDMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The MULMOD operation implementation.
@@ -142,7 +133,7 @@ __host__ __device__ int32_t ADDMOD(const evm_word_t &gas_limit, gas_t &gas_used,
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t MULMOD(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t MULMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 /**
  * The EXP operation implementation.
  * Takes two values from the stack, calculates the first value
@@ -155,7 +146,7 @@ __host__ __device__ int32_t MULMOD(const evm_word_t &gas_limit, gas_t &gas_used,
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t EXP(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t EXP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The SIGNEXTEND operation implementation.
@@ -173,8 +164,6 @@ __host__ __device__ int32_t EXP(const evm_word_t &gas_limit, gas_t &gas_used, Cu
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t SIGNEXTEND(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__host__ __device__ int32_t SIGNEXTEND(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 }  // namespace operations
 }  // namespace CuEVM
-
-#endif

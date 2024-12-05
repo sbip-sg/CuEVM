@@ -2,7 +2,6 @@
 #pragma once
 #include <CuCrypto/keccak.cuh>
 #include <CuEVM/core/evm_word.cuh>
-#include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/ecc_constants.cuh>
 
 namespace ecc {
@@ -22,9 +21,9 @@ using Curve = CuEVM::Curve;
 
 template <size_t Degree>
 struct FQ {
-    bn_t coeffs[Degree];
+    evm_word_t coeffs[Degree];
 };
-
+/*
 template <size_t Degree>
 void print_fqp(env_t env, FQ<Degree> &P, const char *name);
 
@@ -127,7 +126,7 @@ __host__ __device__ void pairing(ArithEnv &arith, FQ<12> &Res, FQ<2> &Qx, FQ<2> 
 
 __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_constants_ptr, uint8_t *points_data,
                                          size_t data_len);
-
+*/
 }  // namespace ecc
 
 // #include "ecc_impl.cuh"

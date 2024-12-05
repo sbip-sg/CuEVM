@@ -1,4 +1,3 @@
-
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/operations/storage.cuh>
 #include <CuEVM/utils/error_codes.cuh>

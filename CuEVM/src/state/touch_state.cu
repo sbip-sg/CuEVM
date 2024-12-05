@@ -15,21 +15,8 @@ __host__ __device__ int32_t TouchState::add_account(const evm_word_t *address, C
     // __ONE_THREAD_PER_INSTANCE(printf("TouchState::add_account - acces_state_flag: %d\n", acces_state_flag););
     int32_t error_code = get_account(address, tmp_account_ptr, acces_state_flag);
     if (error_code == ERROR_SUCCESS) {
-        // #ifdef __CUDA_ARCH__
-        //         printf("TouchState::add_account after get_account %d tmp_account_ptr %p\n", threadIdx.x,
-        //         tmp_account_ptr);
-        // #endif
-        // check if tmp_account_ptr is not in the current _state
         uint32_t index;
         if (_state->get_account_index(address, index) == ERROR_SUCCESS) {
-            // account found in the current state
-            // #ifdef __CUDA_ARCH__
-            //             printf("TouchState::add_account account found in the current state %d  acc index %d\n",
-            //             threadIdx.x, index);
-            // #endif
-            // print_bnt(arith, address);
-            // address->print();
-            // _state->print();
             _state->flags[index].update(acces_state_flag);
         } else
             return _state->add_duplicate_account(account_ptr, tmp_account_ptr, acces_state_flag);

@@ -1,15 +1,7 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2023 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Data: 2023-11-30
-// SPDX-License-Identifier: MIT
-
-#ifndef _CUEVM_BLOCK_OP_H_
-#define _CUEVM_BLOCK_OP_H_
+#pragma once
 
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/utils/arith.cuh>
 
 // 40s: Block Information
 
@@ -40,7 +32,7 @@ namespace CuEVM::operations {
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t BLOCKHASH(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                       const CuEVM::block_info_t &block);
 
 /**
@@ -52,7 +44,7 @@ __host__ __device__ int32_t BLOCKHASH(const evm_word_t &gas_limit, gas_t &gas_us
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t COINBASE(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                      const CuEVM::block_info_t &block);
 
 /**
@@ -64,7 +56,7 @@ __host__ __device__ int32_t COINBASE(const evm_word_t &gas_limit, gas_t &gas_use
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t TIMESTAMP(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                       const CuEVM::block_info_t &block);
 
 /**
@@ -76,7 +68,7 @@ __host__ __device__ int32_t TIMESTAMP(const evm_word_t &gas_limit, gas_t &gas_us
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t NUMBER(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                    const CuEVM::block_info_t &block);
 
 /**
@@ -88,7 +80,7 @@ __host__ __device__ int32_t NUMBER(const evm_word_t &gas_limit, gas_t &gas_used,
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t PREVRANDAO(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t PREVRANDAO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                        const CuEVM::block_info_t &block);
 
 /**
@@ -100,7 +92,7 @@ __host__ __device__ int32_t PREVRANDAO(const evm_word_t &gas_limit, gas_t &gas_u
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t GASLIMIT(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t GASLIMIT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                      const CuEVM::block_info_t &block);
 
 /**
@@ -112,7 +104,7 @@ __host__ __device__ int32_t GASLIMIT(const evm_word_t &gas_limit, gas_t &gas_use
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t CHAINID(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t CHAINID(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                     const CuEVM::block_info_t &block);
 
 /**
@@ -124,8 +116,6 @@ __host__ __device__ int32_t CHAINID(const evm_word_t &gas_limit, gas_t &gas_used
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t BASEFEE(const evm_word_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__host__ __device__ int32_t BASEFEE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                     const CuEVM::block_info_t &block);
 }  // namespace CuEVM::operations
-
-#endif

@@ -4,9 +4,46 @@
 #include <CuEVM/utils/evm_utils.cuh>
 
 namespace CuEVM::utils {
+__host__ __device__ void get_bit_array(uint8_t *dst_array, uint32_t &array_length, evm_word_t &src_cgbn_mem,
+                                       uint32_t limb_count) {
+    uint32_t current_limb;
+    uint32_t bitIndex = 0;  // Index for each bit in dst_array
+    array_length = 0;
+    for (uint32_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem.words[limb_count - 1 - idx];
+        for (int bit = 31; bit >= 0; --bit) {  // hardcoded 32 bits per limb
+            // Extract each bit from the current limb and store '0' or '1' in
+            // dst_array
+            dst_array[bitIndex++] = (current_limb & (1U << bit)) ? 1 : 0;
+            if (dst_array[bitIndex - 1] == 1 && array_length == 0) {
+                array_length = 256 - (bitIndex - 1);
+            }
+        }
+    }
+}
 
-__host__ __device__ int32_t get_contract_address_create_word(ArithEnv &arith, evm_word_t *contract_address,
-                                                             evm_word_t *sender_address, evm_word_t *sender_nonce) {
+__host__ __device__ void byte_array_from_cgbn_memory(uint8_t *dst_array, size_t &array_length, evm_word_t &src_cgbn_mem,
+                                                     size_t limb_count) {
+    size_t current_limb;
+    array_length = limb_count * 4;  // Each limb has 4 bytes
+
+    for (size_t idx = 0; idx < limb_count; idx++) {
+        current_limb = src_cgbn_mem.words[limb_count - 1 - idx];
+        dst_array[idx * 4] = (current_limb >> 24) & 0xFF;  // Extract the most significant byte
+        dst_array[idx * 4 + 1] = (current_limb >> 16) & 0xFF;
+        dst_array[idx * 4 + 2] = (current_limb >> 8) & 0xFF;
+        dst_array[idx * 4 + 3] = current_limb & 0xFF;  // Extract the least significant byte
+    }
+}
+
+__host__ __device__ void evm_address_conversion(evm_word_t &address) {
+    for (uint32_t idx = 0; idx < 3; idx++) {
+        address.words[idx] = 0;
+    }
+}
+
+__host__ __device__ int32_t get_contract_address_create_word(evm_word_t *contract_address, evm_word_t *sender_address,
+                                                             evm_word_t *sender_nonce) {
     CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
     sender_address->to_byte_array_t(sender_address_bytes);
     sender_nonce->to_byte_array_t(sender_nonce_bytes);
@@ -28,9 +65,9 @@ __host__ __device__ int32_t get_contract_address_create_word(ArithEnv &arith, ev
     // 21 is from the address the 20 bytes is the length of the address
     // and the 1 byte is the 0x80 + length of the address (20)
     // if (cgbn_compare_ui32(arith.env, sender_nonce, 128) < 0) {
-    if (sender_nonce->_limbs[0] < 128) {
+    if (uint256_get_uint32_t(sender_nonce) < 128) {
         rlp_list_length = 1 + CuEVM::address_size + 1;
-        if (sender_nonce->_limbs[0] == 0) {
+        if (uint256_get_uint32_t(sender_nonce) == 0) {
             rlp_list[2 + CuEVM::address_size] = 0x80;  // special case for nonce 0
         } else {
             rlp_list[2 + CuEVM::address_size] = sender_nonce_bytes.data[CuEVM::word_size - 1];
@@ -54,23 +91,19 @@ __host__ __device__ int32_t get_contract_address_create_word(ArithEnv &arith, ev
     // todo check replacement
     // __ONE_THREAD_PER_INSTANCE(printf("\n\nhash_address_bytes\n"););
     hash_address_bytes.print();
-    contract_address->from_byte_array_t_loop(hash_address_bytes, BIG_ENDIAN);
+    contract_address->from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
     for (uint32_t idx = CuEVM::cgbn_limbs - 3; idx < CuEVM::cgbn_limbs; idx++) {
-        contract_address->_limbs[idx] = 0;
+        contract_address->words[idx] = 0;
     }
 
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &contract_address,
-                                                        const bn_t &sender_address, const bn_t &sender_nonce) {
-    __SHARED_MEMORY__ evm_word_t sender_address_word[CGBN_IBP];
-    cgbn_store(arith.env, (cgbn_evm_word_t_ptr)(&sender_address_word[INSTANCE_IDX_PER_BLOCK]), sender_address);
-    __SHARED_MEMORY__ evm_word_t sender_nonce_word[CGBN_IBP];
-    cgbn_store(arith.env, &sender_nonce_word[INSTANCE_IDX_PER_BLOCK], sender_nonce);
+__host__ __device__ int32_t get_contract_address_create(evm_word_t *contract_address, evm_word_t *sender_address,
+                                                        evm_word_t *sender_nonce) {
     CuEVM::byte_array_t sender_address_bytes, sender_nonce_bytes;
-    sender_address_word[INSTANCE_IDX_PER_BLOCK].to_byte_array_t(sender_address_bytes);
-    sender_nonce_word[INSTANCE_IDX_PER_BLOCK].to_byte_array_t(sender_nonce_bytes);
+    sender_address->to_byte_array_t(sender_address_bytes);
+    sender_nonce->to_byte_array_t(sender_nonce_bytes);
 
     uint32_t nonce_bytes;
     for (nonce_bytes = CuEVM::word_size; nonce_bytes > 0; nonce_bytes--) {
@@ -94,9 +127,9 @@ __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &c
     uint32_t rlp_list_length;
     // 21 is from the address the 20 bytes is the length of the address
     // and the 1 byte is the 0x80 + length of the address (20)
-    if (cgbn_compare_ui32(arith.env, sender_nonce, 128) < 0) {
+    if (uint256_get_uint32_t(sender_nonce) < 128) {
         rlp_list_length = 1 + CuEVM::address_size + 1;
-        if (cgbn_compare_ui32(arith.env, sender_nonce, 0) == 0) {
+        if (uint256_get_uint32_t(sender_nonce) == 0) {
             rlp_list[2 + CuEVM::address_size] = 0x80;  // special case for nonce 0
         } else {
             rlp_list[2 + CuEVM::address_size] = sender_nonce_bytes.data[CuEVM::word_size - 1];
@@ -120,25 +153,18 @@ __host__ __device__ int32_t get_contract_address_create(ArithEnv &arith, bn_t &c
     // todo check replacement
     // __ONE_THREAD_PER_INSTANCE(printf("\n\nhash_address_bytes\n"););
     // hash_address_bytes.print();
-    sender_address_word[INSTANCE_IDX_PER_BLOCK].from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
-    if (THREAD_IDX_PER_INSTANCE >= CuEVM::cgbn_limbs - 3 && THREAD_IDX_PER_INSTANCE < CuEVM::cgbn_limbs)
-        sender_address_word[INSTANCE_IDX_PER_BLOCK]._limbs[THREAD_IDX_PER_INSTANCE] = 0;
-    cgbn_load(arith.env, contract_address, &sender_address_word[INSTANCE_IDX_PER_BLOCK]);
+    contract_address->from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
+    evm_address_conversion(*contract_address);
 
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t get_contract_address_create2(ArithEnv &arith, bn_t &contract_address,
-                                                         const bn_t &sender_address, const bn_t &salt,
-                                                         const CuEVM::byte_array_t &init_code) {
-    __SHARED_MEMORY__ evm_word_t sender_address_word[CGBN_IBP];
-    cgbn_store(arith.env, &sender_address_word[INSTANCE_IDX_PER_BLOCK], sender_address);
-    __SHARED_MEMORY__ evm_word_t salt_word[CGBN_IBP];
-    cgbn_store(arith.env, &salt_word[INSTANCE_IDX_PER_BLOCK], salt);
+__host__ __device__ int32_t get_contract_address_create2(evm_word_t *contract_address, evm_word_t *sender_address,
+                                                         evm_word_t *salt, const CuEVM::byte_array_t &init_code) {
     CuEVM::byte_array_t sender_address_bytes, salt_bytes;
-    sender_address_word[INSTANCE_IDX_PER_BLOCK].to_byte_array_t(sender_address_bytes);
-    salt_word[INSTANCE_IDX_PER_BLOCK].to_byte_array_t(salt_bytes);
 
+    uint256_to_bytes(sender_address_bytes.data, sender_address, sender_address_bytes.size);
+    uint256_to_bytes(salt_bytes.data, salt, salt_bytes.size);
     uint32_t total_bytes = 1 + CuEVM::address_size + CuEVM::word_size + CuEVM::hash_size;
 
     CuEVM::byte_array_t hash_code(CuEVM::hash_size);
@@ -159,12 +185,8 @@ __host__ __device__ int32_t get_contract_address_create2(ArithEnv &arith, bn_t &
     CuEVM::byte_array_t hash_input_data(CuEVM::hash_size);
     CuCrypto::keccak::sha3(input_data.data, total_bytes, hash_input_data.data, CuEVM::hash_size);
 
-    sender_address_word[INSTANCE_IDX_PER_BLOCK].from_byte_array_t(hash_input_data, BIG_ENDIAN);
-    if (THREAD_IDX_PER_INSTANCE >= CuEVM::cgbn_limbs - 3 && THREAD_IDX_PER_INSTANCE < CuEVM::cgbn_limbs)
-        sender_address_word[INSTANCE_IDX_PER_BLOCK]._limbs[THREAD_IDX_PER_INSTANCE] = 0;
-    cgbn_load(arith.env, contract_address, &sender_address_word[INSTANCE_IDX_PER_BLOCK]);
-    // cgbn_set_byte_array_t(arith.env, contract_address, hash_input_data);
-    // cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
+    contract_address->from_byte_array_t(hash_input_data, BIG_ENDIAN);
+    evm_address_conversion(*contract_address);
     return ERROR_SUCCESS;
 }
 

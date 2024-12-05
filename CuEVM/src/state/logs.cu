@@ -1,4 +1,3 @@
-
 #include <CuEVM/state/logs.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 

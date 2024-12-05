@@ -1,8 +1,3 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation Programme)
-// Author: Stefan-Dan Ciocirlan
-// Data: 2024-07-12
-// SPDX-License-Identifier: MIT
 #pragma once
 #include <cjson/cJSON.h>
 
@@ -10,7 +5,6 @@
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/state/touch_state.cuh>
-#include <CuEVM/utils/arith.cuh>
 
 namespace CuEVM {
 namespace transaction {
@@ -82,7 +76,7 @@ struct access_list_t {
 struct evm_transaction_t {
     uint32_t type;                       /**< The transaction type EIP-2718 (YP: YP: \f$\T_{x}\f$) */
     evm_word_t nonce;                    /**< The nonce YP: \f$T_{n}\f$ */
-    evm_word_t gas_limit;                /**< The gas limit YP: \f$T_{g}\f$ */
+    gas_t gas_limit;                     /**< The gas limit YP: \f$T_{g}\f$ */
     evm_word_t to;                       /**< The recipient address YP: \f$T_{t}\f$ */
     evm_word_t value;                    /**< The value YP: \f$T_{v}\f$ */
     evm_word_t sender;                   /**< The sender address YP: \f$T_{s}\f$ or \f$T_{r}\f$*/
@@ -194,14 +188,12 @@ struct evm_transaction_t {
      * @param[out] m the max fee per gas YP: \f$m\f$.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t get_transaction_fees(CuEVM::block_info_t &block_info, evm_word_t &gas_value,
-                                                     evm_word_t &gas_limit, evm_word_t &gas_price,
-                                                     evm_word_t &gas_priority_fee, evm_word_t &up_front_cost,
-                                                     evm_word_t &m) const;
+    __host__ __device__ int32_t get_transaction_fees(CuEVM::block_info_t &block_info, gas_t &gas_value,
+                                                     gas_t &gas_limit, gas_t &gas_price, gas_t &gas_priority_fee,
+                                                     gas_t &up_front_cost, gas_t &m) const;
 
     /**
      * warm up the access list
-     * @param[in] arith the arithmetic environment.
      * @param[in] touch_state the touch state.
      * @return 0 for success, error code for failure.
      */
@@ -218,8 +210,7 @@ struct evm_transaction_t {
      * @return 0 for success, error code for failure.
      */
     __host__ __device__ int32_t validate(CuEVM::TouchState *touch_state_ptr, CuEVM::block_info_t &block_info,
-                                         evm_word_t &gas_used, evm_word_t &gas_price,
-                                         evm_word_t &gas_priority_fee) const;
+                                         gas_t &gas_used, gas_t &gas_price, gas_t &gas_priority_fee) const;
 
     /**
      * get the message call from the transaction

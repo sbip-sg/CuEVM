@@ -1,7 +1,4 @@
-// CuEVM: CUDA Ethereum Virtual Machine implementation
-// Copyright 2024 Stefan-Dan Ciocirlan (SBIP - Singapore Blockchain Innovation
-// Programme) Author: Stefan-Dan Ciocirlan Date: 2024-10-09
-// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include <cuda.h>
@@ -112,8 +109,6 @@ struct evm_word_t : uint256 {
                                      uint32_t count = CuEVM::cgbn_limbs) const;
 
     __host__ __device__ char *address_to_hex(char *hex_string = nullptr, uint32_t count = CuEVM::cgbn_limbs) const;
-    __host__ __device__ void print_as_compact_hex() const;
-
     /**
      * Get the byte array from the evm_word_t.
      * The byte array is in Big Endian format.

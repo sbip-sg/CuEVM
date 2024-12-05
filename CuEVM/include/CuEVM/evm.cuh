@@ -1,5 +1,4 @@
-#ifndef _CUEVM_EVM_H_
-#define _CUEVM_EVM_H_
+#pragma once
 
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/core/message.cuh>
@@ -8,7 +7,6 @@
 #include <CuEVM/state/state.cuh>
 #include <CuEVM/state/world_state.cuh>
 #include <CuEVM/tracer.cuh>
-#include <CuEVM/utils/arith.cuh>
 #include <CuEVM/utils/ecc_constants.cuh>
 namespace CuEVM {
 struct evm_instance_t {
@@ -162,5 +160,3 @@ __host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_in
 __global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t* instances, uint32_t count);
 
 }  // namespace CuEVM
-
-#endif
