@@ -1,0 +1,29 @@
+{
+  "contract_name": "TestCrossContract",
+  "storage": {},
+  "pre": {
+    "0x1000000000000000000000000000000000000000": {
+      "balance": "0x0ba1a9ce0ba1a9ce",
+      "code": "0x6011602201600460110260005560015561123460015561ffff60ff5500",
+      "nonce": "0x00",
+      "storage": {}
+    }
+  },
+  "test_cases": [
+    {
+      "function": "underflow",
+      "type": "exec",
+      "input_types": [
+        "address",
+        "uint256"
+      ],
+      "input": [
+        "0x1000000000000000000000000000000000000000",
+        "0x1234"
+      ],
+      "value": 300,
+      "sender": 0,
+      "receiver": "0x1000000000000000000000000000000000000000"
+    }
+  ]
+}

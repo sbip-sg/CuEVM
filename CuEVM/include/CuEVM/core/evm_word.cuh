@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <CGBN/cgbn.h>
 #include <cuda.h>
 #include <stdint.h>
 
@@ -30,6 +29,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      */
     __host__ __device__ evm_word_t(uint32_t value);
 
+    __host__ __device__ void set_zero();
     /**
      * The assignment operator.
      * @param[in] src The source evm_word_t
@@ -54,6 +54,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      * @return 1 for equal, 0 otherwise
      */
     __host__ __device__ int32_t operator==(const uint32_t &value) const;
+    __host__ __device__ int32_t operator<(const uint32_t &value) const;
     /**
      * Set the evm_word_t from a hex string.
      * The hex string is in Big Endian format.
@@ -62,13 +63,21 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
      */
     __host__ int32_t from_hex(const char *hex_string);
     /**
-     * Set the evm_word_t from a byte array.
+     * Set the evm_word_t from a byte array, optimized for parallel threads.
      * The byte array is in Big Endian format.
      * @param[in] byte_array The source byte array
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
     __host__ __device__ int32_t from_byte_array_t(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
+    /**
+     * Set the evm_word_t from a byte array. Compatible with CPU version.
+     * The byte array is in Big Endian format.
+     * @param[in] byte_array The source byte array
+     * @param[in] endian The endian format
+     * @return 0 for success, 1 otherwise
+     */
+    __host__ int32_t from_byte_array_t_loop(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
     /**
      * Set the evm_word_t from a size_t.
      * @param[in] value The source size_t
@@ -115,6 +124,7 @@ struct evm_word_t : cgbn_mem_t<CuEVM::word_bits> {
     __host__ __device__ char *to_hex(char *hex_string = nullptr, int32_t pretty = 0,
                                      uint32_t count = CuEVM::cgbn_limbs) const;
 
+    __host__ __device__ char *address_to_hex(char *hex_string = nullptr, uint32_t count = CuEVM::cgbn_limbs) const;
     __host__ __device__ void print_as_compact_hex() const;
 
     /**

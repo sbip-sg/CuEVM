@@ -184,7 +184,7 @@ __host__ __device__ void ecpairing_cost(ArithEnv &arith, bn_t &gas_used, uint32_
 }
 
 __host__ __device__ int32_t access_account_cost(ArithEnv &arith, bn_t &gas_used, CuEVM::TouchState &touch_state,
-                                                const bn_t &address) {
+                                                const evm_word_t *address) {
     if (touch_state.is_warm_account(arith, address)) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
     } else {
@@ -198,7 +198,7 @@ __host__ __device__ int32_t access_account_cost(ArithEnv &arith, bn_t &gas_used,
 }
 
 __host__ __device__ int32_t sload_cost(ArithEnv &arith, bn_t &gas_used, const CuEVM::TouchState &touch_state,
-                                       const bn_t &address, const bn_t &key) {
+                                       const evm_word_t *address, const bn_t &key) {
     // get the key warm
     if (touch_state.is_warm_key(arith, address, key)) {
         cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_WARM_ACCESS);
@@ -209,8 +209,8 @@ __host__ __device__ int32_t sload_cost(ArithEnv &arith, bn_t &gas_used, const Cu
     return ERROR_SUCCESS;
 }
 __host__ __device__ int32_t sstore_cost(ArithEnv &arith, bn_t &gas_used, bn_t &gas_refund,
-                                        const CuEVM::TouchState &touch_state, const bn_t &address, const bn_t &key,
-                                        const bn_t &new_value) {
+                                        const CuEVM::TouchState &touch_state, const evm_word_t *address,
+                                        const bn_t &key, const bn_t &new_value) {
     // get the key warm
     if (touch_state.is_warm_key(arith, address, key) == false) {
         // #ifdef __CUDA_ARCH__
@@ -281,15 +281,13 @@ __host__ __device__ int32_t transaction_intrinsic_gas(ArithEnv &arith, const CuE
         }
     }
 
-    // if transaction type is 1 it might have access list
-    if (transaction.type == 1) {
-        // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for
-        // each address in transaction.access_list
-        for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
-            cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_ACCESS_LIST_ADDRESS);
-            cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic,
-                          GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count);
-        }
+    // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for
+    // each address in transaction.access_list
+
+    for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
+        cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic, GAS_ACCESS_LIST_ADDRESS);
+        cgbn_add_ui32(arith.env, gas_intrinsic, gas_intrinsic,
+                      GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count);
     }
 
 #ifdef EIP_3860

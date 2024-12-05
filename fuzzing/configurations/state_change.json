@@ -1,0 +1,22 @@
+{
+    "contract_name": "TestStateChange",
+    "storage" : {
+        "0x00" : "0x01"
+    },
+    "test_cases": [
+      {
+        "function": "increase",
+        "type": "exec",
+        "input_types": [],
+        "input": [],
+        "sender": 0
+      },
+      {
+        "function": "increase",
+        "type": "exec",
+        "input_types": [],
+        "input": [],
+        "sender": 0
+      }
+    ]
+  }

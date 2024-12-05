@@ -20,21 +20,21 @@ __host__ __device__ state_t &state_t::operator=(const state_t &other) {
     return *this;
 }
 __host__ __device__ void state_t::duplicate(const state_t &other) {
-    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts;
+    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts[CGBN_IBP];
     free();  // free the current state
     no_accounts = other.no_accounts;
     if (no_accounts > 0) {
         __ONE_GPU_THREAD_BEGIN__
-        tmp_accounts = (CuEVM::account_t *)malloc(no_accounts * sizeof(CuEVM::account_t));
+        tmp_accounts[INSTANCE_IDX_PER_BLOCK] = (CuEVM::account_t *)malloc(no_accounts * sizeof(CuEVM::account_t));
         __ONE_GPU_THREAD_END__
         for (uint32_t idx = 0; idx < no_accounts; idx++) {
-            tmp_accounts[idx].clear();
-            tmp_accounts[idx] = other.accounts[idx];
+            tmp_accounts[INSTANCE_IDX_PER_BLOCK][idx].clear();
+            tmp_accounts[INSTANCE_IDX_PER_BLOCK][idx] = other.accounts[idx];
         }
     } else {
-        tmp_accounts = nullptr;
+        tmp_accounts[INSTANCE_IDX_PER_BLOCK] = nullptr;
     }
-    accounts = tmp_accounts;
+    accounts = tmp_accounts[INSTANCE_IDX_PER_BLOCK];
 }
 
 __host__ __device__ state_t::~state_t() { free(); }
@@ -63,7 +63,7 @@ __host__ __device__ void state_t::clear() {
     no_accounts = 0;
 }
 
-__host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const bn_t &address, uint32_t &index) {
+__host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const evm_word_t *address, uint32_t &index) {
     // #ifdef __CUDA_ARCH__
     //     printf("get_account_index, no_accounts %d thread %d\n", no_accounts, threadIdx.x);
     //     print_bnt(arith, address);
@@ -73,7 +73,7 @@ __host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const bn
         //         printf("get_account_index, %d , accounts[index] %p thread %d\n", index, &(accounts[index].address),
         //                threadIdx.x);
         // #endif
-        if (accounts[index].has_address(arith, address)) {
+        if (accounts[index].address == *address) {
             return ERROR_SUCCESS;
         }
     }
@@ -81,7 +81,8 @@ __host__ __device__ int32_t state_t::get_account_index(ArithEnv &arith, const bn
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account) {
+__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const evm_word_t *address,
+                                                 CuEVM::account_t &account) {
     uint32_t index;
     if (get_account_index(arith, address, index) == ERROR_SUCCESS) {
         account = accounts[index];
@@ -90,7 +91,8 @@ __host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const bn_t &ad
     return ERROR_STATE_ADDRESS_NOT_FOUND;
 }
 
-__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr) {
+__host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const evm_word_t *address,
+                                                 CuEVM::account_t *&account_ptr) {
     uint32_t index;
     if (get_account_index(arith, address, index) == ERROR_SUCCESS) {
         account_ptr = &accounts[index];
@@ -100,28 +102,31 @@ __host__ __device__ int32_t state_t::get_account(ArithEnv &arith, const bn_t &ad
 }
 
 __host__ __device__ int32_t state_t::add_account(const CuEVM::account_t &account) {
-    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts;
+    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts[CGBN_IBP];
     __ONE_GPU_THREAD_BEGIN__
-    tmp_accounts = (CuEVM::account_t *)malloc((no_accounts + 1) * sizeof(CuEVM::account_t));
-    memcpy(tmp_accounts, accounts, no_accounts * sizeof(CuEVM::account_t));
+
+    tmp_accounts[INSTANCE_IDX_PER_BLOCK] = (CuEVM::account_t *)malloc((no_accounts + 1) * sizeof(CuEVM::account_t));
+    // printf("state_t::add_account malloc, instance idx %d, no_accounts %d thread idx %d, account pointer %p\n",
+    //        INSTANCE_IDX_PER_BLOCK, no_accounts, THREADIDX, tmp_accounts[INSTANCE_IDX_PER_BLOCK]);
+    memcpy(tmp_accounts[INSTANCE_IDX_PER_BLOCK], accounts, no_accounts * sizeof(CuEVM::account_t));
     __ONE_GPU_THREAD_END__
-    tmp_accounts[no_accounts].clear();
-    tmp_accounts[no_accounts] = account;
+    tmp_accounts[INSTANCE_IDX_PER_BLOCK][no_accounts].clear();
+    tmp_accounts[INSTANCE_IDX_PER_BLOCK][no_accounts] = account;
     if (accounts != nullptr) {
+        // printf("state_t::add_account free accounts, instance idx %d, account pointer %p \n", INSTANCE_IDX_PER_BLOCK,
+        //        accounts);
         __ONE_GPU_THREAD_BEGIN__
         std::free(accounts);
         __ONE_GPU_THREAD_END__
     }
-    accounts = tmp_accounts;
+    accounts = tmp_accounts[INSTANCE_IDX_PER_BLOCK];
     no_accounts++;
     return ERROR_SUCCESS;
 }
 
 __host__ __device__ int32_t state_t::set_account(ArithEnv &arith, const CuEVM::account_t &account) {
-    bn_t target_address;
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) & (account.address));
     for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        if (accounts[idx].has_address(arith, target_address)) {
+        if (accounts[idx].has_address(arith, &(account.address))) {
             accounts[idx] = account;
             return ERROR_SUCCESS;
         }
@@ -130,25 +135,28 @@ __host__ __device__ int32_t state_t::set_account(ArithEnv &arith, const CuEVM::a
     return add_account(account);
 }
 
-__host__ __device__ int32_t state_t::has_account(ArithEnv &arith, const bn_t &address) {
+__host__ __device__ int32_t state_t::update_account(ArithEnv &arith, const CuEVM::account_t &account,
+                                                    const CuEVM::account_flags_t flag) {
     for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        if (accounts[idx].has_address(arith, address)) {
-            return ERROR_SUCCESS;
-        }
-    }
-    return ERROR_STATE_ADDRESS_NOT_FOUND;
-}
-
-__host__ __device__ int32_t state_t::update_account(ArithEnv &arith, const CuEVM::account_t &account) {
-    bn_t target_address;
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr) & (account.address));
-    for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        if (accounts[idx].has_address(arith, target_address)) {
-            accounts[idx].update(arith, account);
+        if (accounts[idx].has_address(arith, &(account.address))) {
+            accounts[idx].update(arith, account, flag);
             return ERROR_SUCCESS;
         }
     }
     return add_account(account);
+}
+
+// __host__ __device__ int32_t update(ArithEnv &arith, CuEVM::account_t *accounts, CuEVM::account_flags_t *flags,
+__host__ __device__ int32_t state_t::update(ArithEnv &arith, const CuEVM::account_t *_accounts,
+                                            const CuEVM::account_flags_t *_flags, uint32_t account_count) {
+    int32_t error_code = ERROR_SUCCESS;
+    for (uint32_t i = 0; i < account_count; i++) {
+        // if update failed (not exist), add the account
+        if (update_account(arith, _accounts[i], _flags[i]) != ERROR_SUCCESS) {
+            error_code |= add_account(_accounts[i]);
+        }
+    }
+    return error_code;
 }
 
 // __host__ __device__ int32_t state_t::is_empty_account(ArithEnv &arith,

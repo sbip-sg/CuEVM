@@ -73,6 +73,7 @@
 #define EIP_4895
 #define EIP_6049
 #define PARIS
+
 #endif
 
 #ifdef PARIS
@@ -80,6 +81,7 @@
 #define EIP_4399
 #define EIP_5133
 #define LONDON
+
 #endif
 
 #ifdef LONDON
@@ -109,6 +111,7 @@
 #define EIP_2718
 #define EIP_2929
 #define EIP_2930
+#define EVM_PRECOMPILED_CONTRACTS 9  // 9 precompiled contracts
 #endif
 
 #ifdef EIP_2070
@@ -223,8 +226,8 @@ constexpr CONSTANT uint32_t max_initcode_size = std::numeric_limits<uint32_t>::m
 
 constexpr CONSTANT uint32_t no_precompile_contracts = 10;
 
-// CGBN parameters
-constexpr CONSTANT uint32_t cgbn_tpi = 8;
+constexpr CONSTANT uint32_t cgbn_tpi = CGBN_TPI;
+constexpr CONSTANT uint32_t cgbn_IBP = CGBN_IBP;
 
 // CUEVM parameters
 constexpr CONSTANT uint32_t max_transactions_count = 10000;
@@ -233,6 +236,8 @@ constexpr CONSTANT uint32_t cgbn_limbs = ((CuEVM::word_bits + 31) / 32);
 
 // specific implementation constants
 constexpr CONSTANT uint32_t initial_storage_capacity = 4;
+
+constexpr CONSTANT uint32_t shared_stack_size = SHARED_STACK_SIZE;
 
 /**
  * The CGBN context type.  This is a template type that takes

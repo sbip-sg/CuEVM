@@ -70,7 +70,7 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t &account,
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t &account,
                                             const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
@@ -81,7 +81,7 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If found 0. otherwise error.
      */
-    __host__ __device__ int32_t get_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+    __host__ __device__ int32_t get_account(ArithEnv &arith, const evm_word_t *address, CuEVM::account_t *&account_ptr,
                                             const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**
@@ -120,7 +120,8 @@ struct state_access_t : state_t {
      * @param[in] flag The flag access.
      * @return If added 0. otherwise error.
      */
-    __host__ __device__ int32_t add_new_account(ArithEnv &arith, const bn_t &address, CuEVM::account_t *&account_ptr,
+    __host__ __device__ int32_t add_new_account(ArithEnv &arith, const evm_word_t *address,
+                                                CuEVM::account_t *&account_ptr,
                                                 const CuEVM::account_flags_t flag = CuEVM::ACCOUNT_NONE_FLAG);
 
     /**

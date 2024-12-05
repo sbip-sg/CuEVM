@@ -22,9 +22,12 @@ __host__ __device__ evm_word_t &evm_word_t::operator=(const evm_word_t &src) {
     _limbs[index] = src._limbs[index];
   }
   return *this;*/
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    memcpy(_limbs, src._limbs, CuEVM::cgbn_limbs * sizeof(uint32_t));
-    __ONE_GPU_THREAD_END__
+    // __ONE_GPU_THREAD_BEGIN__
+    // memcpy(_limbs, src._limbs, CuEVM::cgbn_limbs * sizeof(uint32_t));
+    // __ONE_GPU_THREAD_END__
+    if (THREAD_IDX_PER_INSTANCE < CuEVM::cgbn_limbs) {
+        _limbs[THREAD_IDX_PER_INSTANCE] = src._limbs[THREAD_IDX_PER_INSTANCE];
+    }
     return *this;
 }
 
@@ -34,9 +37,32 @@ __host__ __device__ evm_word_t &evm_word_t::operator=(uint32_t value) {
 }
 
 __host__ __device__ int32_t evm_word_t::operator==(const evm_word_t &other) const {
+    // #pragma unroll
+    //     for (int32_t index = 0; index < CuEVM::cgbn_limbs; index++) {
+    //         if (_limbs[index] != other._limbs[index]) {
+    //             return 0;
+    //         }
+    //     }
+    //     return 1;
+    __SHARED_MEMORY__ int32_t res[CGBN_IBP];
+    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+    res[INSTANCE_IDX_PER_BLOCK] = 1;
+    __ONE_GPU_THREAD_END__
+    if (THREAD_IDX_PER_INSTANCE < CuEVM::cgbn_limbs &&
+        (_limbs[THREAD_IDX_PER_INSTANCE] != other._limbs[THREAD_IDX_PER_INSTANCE])) {
+        res[INSTANCE_IDX_PER_BLOCK] = 0;
+    }
+    __SYNC_THREADS__
+    return res[INSTANCE_IDX_PER_BLOCK];
+}
+// todo optimize
+__host__ __device__ int32_t evm_word_t::operator<(const uint32_t &value) const {
+    if (_limbs[0] >= value) {
+        return 0;
+    }
 #pragma unroll
-    for (int32_t index = 0; index < CuEVM::cgbn_limbs; index++) {
-        if (_limbs[index] != other._limbs[index]) {
+    for (int32_t index = 1; index < CuEVM::cgbn_limbs; index++) {
+        if (_limbs[index] != 0) {
             return 0;
         }
     }
@@ -58,35 +84,83 @@ __host__ __device__ int32_t evm_word_t::operator==(const uint32_t &value) const 
 
 __host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) {
 #ifdef __CUDA_ARCH__
-    // todo: make host function
+    // todo: make device function
 #else
     CuEVM::byte_array_t byte_array(hex_string, CuEVM::word_size, BIG_ENDIAN, CuEVM::PaddingDirection::LEFT_PADDING);
     return from_byte_array_t(byte_array);
 #endif
 }
 
-__host__ __device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {
+__device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {
     if (byte_array.size != CuEVM::word_size) {
         return ERROR_BYTE_ARRAY_INVALID_SIZE;
     }
     uint8_t *bytes = nullptr;
+
     if (endian == LITTLE_ENDIAN) {
-        bytes = byte_array.data;
+        bytes = byte_array.data;  //+ my_idx * 4;
+                                  // printf("my_idx: %d, bytes: %p\n", my_idx, bytes);
 #pragma unroll
+        // _limbs[my_idx] = (*(bytes++) | *(bytes++) << 8 | *(bytes++) << 16 | *(bytes++) << 24);
         for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
             _limbs[idx] = (*(bytes++) | *(bytes++) << 8 | *(bytes++) << 16 | *(bytes++) << 24);
         }
     } else if (endian == BIG_ENDIAN) {
-        bytes = byte_array.data + CuEVM::word_size - 1;
-#pragma unroll
-        for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
-            _limbs[idx] = (*(bytes--) | *(bytes--) << 8 | *(bytes--) << 16 | *(bytes--) << 24);
+        uint8_t my_idx = THREAD_IDX_PER_INSTANCE;
+        // printf("my_idx: %d, bytes: %p offset %d\n", my_idx, bytes, CuEVM::word_size - 1 - my_idx * 4);
+        if (my_idx < CuEVM::cgbn_limbs) {
+            // printf("my_idx: %d, bytes: %p offset %d\n", my_idx, bytes, CuEVM::word_size - 1 - my_idx * 4);
+            bytes = byte_array.data + CuEVM::word_size - 1 - my_idx * 4;
+            _limbs[my_idx] = (*(bytes--) | *(bytes--) << 8 | *(bytes--) << 16 | *(bytes--) << 24);
         }
+
     } else {
         return ERROR_NOT_IMPLEMENTED;
     }
     return ERROR_SUCCESS;
 }
+
+__host__ int32_t evm_word_t::from_byte_array_t_loop(byte_array_t &byte_array, int32_t endian) {
+    if (byte_array.size != CuEVM::word_size) {
+        return ERROR_BYTE_ARRAY_INVALID_SIZE;
+    }
+    uint8_t *bytes = nullptr;
+
+    if (endian == LITTLE_ENDIAN) {
+        bytes = byte_array.data;  //+ my_idx * 4;
+                                  // printf("my_idx: %d, bytes: %p\n", my_idx, bytes);
+#pragma unroll
+        // _limbs[my_idx] = (*(bytes++) | *(bytes++) << 8 | *(bytes++) << 16 | *(bytes++) << 24);
+        for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
+            _limbs[idx] = (*(bytes++) | *(bytes++) << 8 | *(bytes++) << 16 | *(bytes++) << 24);
+        }
+    } else if (endian == BIG_ENDIAN) {
+        // printf("my_idx: %d, bytes: %p offset %d\n", my_idx, bytes, CuEVM::word_size - 1 - my_idx * 4);
+        for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
+            bytes = byte_array.data + CuEVM::word_size - 1 - idx * 4;
+            _limbs[idx] = (*(bytes--) | *(bytes--) << 8 | *(bytes--) << 16 | *(bytes--) << 24);
+        }
+
+    } else {
+        return ERROR_NOT_IMPLEMENTED;
+    }
+    return ERROR_SUCCESS;
+}
+
+// __device__ __host__ __device__ int32_t evm_word_t::address_from_byte_array_t(byte_array_t &byte_array) {
+//     if (byte_array.size != CuEVM::word_size) {
+//         return ERROR_BYTE_ARRAY_INVALID_SIZE;
+//     }
+//     uint8_t *bytes = nullptr;
+
+//     uint8_t my_idx = THREAD_IDX_PER_INSTANCE;
+//     if (my_idx < CuEVM::cgbn_limbs) {
+//         bytes = byte_array.data + CuEVM::word_size - 1 - my_idx * 4;
+//         _limbs[my_idx] = (*(bytes--) | *(bytes--) << 8 | *(bytes--) << 16 | *(bytes--) << 24);
+//     }
+
+//     return ERROR_SUCCESS;
+// }
 
 __host__ __device__ int32_t evm_word_t::from_size_t(size_t value) {
     if (sizeof(size_t) == sizeof(uint64_t)) {
@@ -95,6 +169,15 @@ __host__ __device__ int32_t evm_word_t::from_size_t(size_t value) {
         return from_uint32_t(value);
     } else {
         return ERROR_NOT_IMPLEMENTED;
+    }
+}
+__host__ __device__ void evm_word_t::set_zero() {
+    uint8_t my_idx = THREAD_IDX_PER_INSTANCE;
+    // printf("my_idx: %d, bytes: %p offset %d\n", my_idx, bytes, CuEVM::word_size - 1 - my_idx * 4);
+    if (my_idx < CuEVM::cgbn_limbs) {
+        for (uint32_t idx = my_idx; idx < CuEVM::cgbn_limbs; idx = idx + CuEVM::cgbn_tpi) {
+            _limbs[idx] = 0;
+        }
     }
 }
 
@@ -180,9 +263,29 @@ __host__ __device__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty, u
     return hex_string;
 }
 
+__host__ __device__ char *evm_word_t::address_to_hex(char *hex_string, uint32_t count) const {
+    if (hex_string == nullptr) {
+        hex_string = new char[count * 5 + 3];
+    }
+    hex_string[0] = '0';
+    hex_string[1] = 'x';
+    for (uint32_t idx = 3; idx < count; idx++) {
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8, (_limbs[count - 1 - idx] >> 24) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8 + 2, (_limbs[count - 1 - idx] >> 16) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8 + 4, (_limbs[count - 1 - idx] >> 8) & 0xFF);
+        CuEVM::utils::hex_from_byte(hex_string + 2 + (idx - 3) * 8 + 6, _limbs[count - 1 - idx] & 0xFF);
+    }
+    hex_string[43] = '\0';
+
+    return hex_string;
+}
+
 __host__ __device__ int32_t evm_word_t::to_byte_array_t(byte_array_t &byte_array, int32_t endian) const {
     byte_array.grow(CuEVM::word_size, 1);
     uint8_t *bytes = nullptr;
+    // printf("evm_word_t::to_byte_array_t %d %d endian %d byte_array.data %p\n", THREADIDX,
+    // THREAD_IDX_PER_INSTANCE,
+    //        endian, byte_array.data);
     if (endian == BIG_ENDIAN) {
         __ONE_GPU_THREAD_WOSYNC_BEGIN__
         bytes = byte_array.data + CuEVM::word_size - 1;
