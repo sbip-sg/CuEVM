@@ -13,23 +13,25 @@
 
 namespace CuEVM {
 namespace stack {
-constexpr CONSTANT uint32_t max_size =
-    CuEVM::max_stack_size; /**< The maximum stack size*/
+constexpr CONSTANT uint32_t max_size = CuEVM::max_stack_size; /**< The maximum stack size*/
 // constexpr CONSTANT uint32_t alligment =
 //     sizeof(evm_word_t); /**< The alligment of the stack*/
-constexpr CONSTANT uint32_t initial_capacity =
-    16U; /**< The initial capacity of the stack can be change for performence
-            reasons*/
+// constexpr CONSTANT uint32_t initial_capacity = 16U; /**< The initial capacity of the stack can be change for
+// performence
+//    reasons*/
 
 struct evm_stack_t {
-    evm_word_t *stack_base; /**< The stack YP: (YP: \f$\mu_{s}\f$)*/
-    uint32_t stack_offset;  /**< The stack offset (YP: \f$|\mu_{s}|\f$)*/
-    uint32_t capacity;      /**< The capacity of the stack*/
+    evm_word_t *global_stack_base; /**< The stack YP: (YP: \f$\mu_{s}\f$)*/  // global memory store from X+1 element
+    evm_word_t *shared_stack_base;  // shared memory for X elements from the top
+    uint32_t stack_base_offset;     // offset of the stack base in shared memory or global memory
+    uint16_t stack_offset;          // offset of the current stack (its size) from it's base offset in shared memory
+    // uint16_t capacity;              /**< The capacity of the stack on global memory
 
     /**
      * The default constructor
+     * Stack base offset of the child stack = parent stack offset  + 1
      */
-    __host__ __device__ evm_stack_t();
+    __host__ __device__ evm_stack_t(evm_word_t *shared_stack_base = nullptr, uint32_t stack_base_offset = 0);
 
     /**
      * The destructor
@@ -40,7 +42,7 @@ struct evm_stack_t {
      * The copy constructor
      * @param[in] other The other stack
      */
-    __host__ __device__ evm_stack_t(const evm_stack_t &other);
+    // __host__ __device__ evm_stack_t(const evm_stack_t &other);
 
     /**
      * Free the memory
@@ -52,18 +54,24 @@ struct evm_stack_t {
      */
     __host__ __device__ void clear();
 
-    /**
-     * The assignment operator
-     * @param[in] other The other stack
-     * @return The reference to the stack
-     */
-    __host__ __device__ evm_stack_t &operator=(const evm_stack_t &other);
+    // /**
+    //  * The assignment operator
+    //  * @param[in] other The other stack
+    //  * @return The reference to the stack
+    //  */
+    // __host__ __device__ evm_stack_t &operator=(const evm_stack_t &other);
+
+    // /**
+    //  * Duplicate the stack
+    //  * @param[in] other The other stack
+    //  */
+    // __host__ __device__ void duplicate(const evm_stack_t &other);
 
     /**
-     * Duplicate the stack
+     * Extract the stack data for tracing
      * @param[in] other The other stack
      */
-    __host__ __device__ void duplicate(const evm_stack_t &other);
+    __host__ __device__ void extract_data(evm_word_t *other) const;
 
     /**
      * Grow the stack
@@ -90,7 +98,7 @@ struct evm_stack_t {
      * @return 0 if the value is pushed, error code otherwise
      */
     __host__ __device__ int32_t push(ArithEnv &arith, const bn_t &value);
-
+    __host__ __device__ int32_t push_evm_word_t(ArithEnv &arith, const evm_word_t *value);
     /**
      * Pop a value from the stack
      * @param[in] arith The arithmetical environment
@@ -98,7 +106,7 @@ struct evm_stack_t {
      * @return 0 if the value is popped, error code otherwise
      */
     __host__ __device__ int32_t pop(ArithEnv &arith, bn_t &y);
-
+    __host__ __device__ int32_t pop_evm_word(ArithEnv &arith, evm_word_t *&y);
     /**
      * Push a value to the stack from a byte array
      * @param[in] arith The arithmetical environment
@@ -107,9 +115,7 @@ struct evm_stack_t {
      * @param[in] src_byte_size The size of the source byte data
      * @return 0 if the value is pushed, error code otherwise
      */
-    __host__ __device__ int32_t pushx(ArithEnv &arith, uint8_t x,
-                                      uint8_t *src_byte_data,
-                                      uint8_t src_byte_size);
+    __host__ __device__ int32_t pushx(ArithEnv &arith, uint8_t x, uint8_t *src_byte_data, uint8_t src_byte_size);
 
     /**
      * Get the value from the stack at the given index
@@ -118,9 +124,9 @@ struct evm_stack_t {
      * @param[out] y The value at the given index
      * @return 0 if the value is popped, error code otherwise
      */
-    __host__ __device__ int32_t get_index(ArithEnv &arith, uint32_t index,
-                                          bn_t &y);
+    __host__ __device__ int32_t get_index(ArithEnv &arith, uint32_t index, bn_t &y);
 
+    __host__ __device__ evm_word_t *get_address_at_index(uint32_t index) const;
     /**
      * Duplicvate the value at the given index and push
      * it at the top of the stack.
@@ -170,8 +176,7 @@ struct evm_stack_t {
      * @param[in] count The number of instances
      * @return The stack gpu instances
      */
-    __host__ static evm_stack_t *gpu_from_cpu(evm_stack_t *cpu_instances,
-                                              uint32_t count);
+    __host__ static evm_stack_t *gpu_from_cpu(evm_stack_t *cpu_instances, uint32_t count);
 
     /**
      * Free the stack gpu instances
@@ -186,8 +191,7 @@ struct evm_stack_t {
      * @param[in] count The number of instances
      * @return The stack cpu instances
      */
-    __host__ static evm_stack_t *cpu_from_gpu(evm_stack_t *gpu_instances,
-                                              uint32_t count);
+    __host__ static evm_stack_t *cpu_from_gpu(evm_stack_t *gpu_instances, uint32_t count);
 };
 
 /**
@@ -196,8 +200,7 @@ struct evm_stack_t {
  * @param[in] src The source stack
  * @param[in] count The number of instances
  */
-__global__ void transfer_kernel_evm_stack_t(evm_stack_t *dst, evm_stack_t *src,
-                                            uint32_t count);
+__global__ void transfer_kernel_evm_stack_t(evm_stack_t *dst, evm_stack_t *src, uint32_t count);
 
 }  // namespace stack
    // Type alias for accessing evm_stack_t directly under the CuEVM namespace

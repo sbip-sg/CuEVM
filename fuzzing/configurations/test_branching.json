@@ -1,0 +1,30 @@
+{
+  "contract_name": "TestBranching",
+  "storage": {
+    "0x00": "0x10"
+  },
+  "test_cases": [
+    {
+      "function": "test_branch",
+      "type": "exec",
+      "input_types": [
+        "uint256"
+      ],
+      "input": [
+        10000
+      ],
+      "sender": 0
+    },
+    {
+      "function": "test_branch",
+      "type": "exec",
+      "input_types": [
+        "uint256"
+      ],
+      "input": [
+        12345
+      ],
+      "sender": 0
+    }
+  ]
+}

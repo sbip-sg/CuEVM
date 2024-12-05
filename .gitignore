@@ -24,3 +24,6 @@ cuevm.out
 geth.out
 *.out
 *.jsonl
+
+# fuzzing
+**/__pycache__/

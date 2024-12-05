@@ -3,7 +3,7 @@
 	url = https://github.com/sdcioc/CuBigInt.git
 [submodule "CuEVM/libraries/CGBN"]
 	path = CuEVM/libraries/CGBN
-	url = https://github.com/sdcioc/CGBN.git
+	url = https://github.com/sbip-sg/CGBN.git
 [submodule "CuEVM/libraries/CuCrypto"]
 	path = CuEVM/libraries/CuCrypto
 	url = https://github.com/sdcioc/CuCrypto.git

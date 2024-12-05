@@ -56,6 +56,14 @@ __host__ __device__ account_t::account_t(ArithEnv &arith, const bn_t &address) :
     cgbn_store(arith.env, &this->nonce, tmp);
 }
 
+__host__ __device__ account_t::account_t(ArithEnv &arith, evm_word_t *address) : storage(), byte_code(0U) {
+    this->address = *address;
+    bn_t tmp;
+    cgbn_set_ui32(arith.env, tmp, 0);
+    cgbn_store(arith.env, &this->balance, tmp);
+    cgbn_store(arith.env, &this->nonce, tmp);
+}
+
 __host__ __device__ account_t::~account_t() { free(); }
 
 __host__ __device__ void account_t::free() {
@@ -99,9 +107,6 @@ __host__ __device__ int32_t account_t::get_storage_value(ArithEnv &arith, const 
 }
 
 __host__ __device__ int32_t account_t::set_storage_value(ArithEnv &arith, const bn_t &key, const bn_t &value) {
-    // #ifdef __CUDA_ARCH__
-    //     printf("account_t::set_storage_value %d account ptr %p storage ptr %p\n", threadIdx.x, this, &storage);
-    // #endif
     return storage.set_value(arith, key, value);
 }
 
@@ -127,27 +132,15 @@ __host__ __device__ void account_t::set_balance(ArithEnv &arith, const bn_t &bal
     cgbn_store(arith.env, &this->balance, balance);
 }
 
-__host__ __device__ void account_t::set_address(ArithEnv &arith, const bn_t &address) {
-    cgbn_store(arith.env, &this->address, address);
+__host__ __device__ void account_t::set_address(ArithEnv &arith, const evm_word_t *address) {
+    // cgbn_store(arith.env, &this->address, address);
+    this->address = *address;
 }
 
 __host__ __device__ void account_t::set_byte_code(const byte_array_t &byte_code) { this->byte_code = byte_code; }
 
-__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const bn_t &address) {
-    bn_t local_address;
-    //  #ifdef __CUDA_ARCH__
-    //     printf("has_address, accounts[index] %p thread %d\n", &(this->address),  threadIdx.x);
-    // #endif
-    cgbn_load(arith.env, local_address, &this->address);
-
-    return (cgbn_compare(arith.env, local_address, address) == 0);
-}
-
-__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const evm_word_t &address) {
-    bn_t local_address, target_address;
-    cgbn_load(arith.env, local_address, &this->address);
-    cgbn_load(arith.env, target_address, (cgbn_evm_word_t_ptr)&address);
-    return (cgbn_compare(arith.env, local_address, target_address) == 0);
+__host__ __device__ int32_t account_t::has_address(ArithEnv &arith, const evm_word_t *address) {
+    return this->address == *address;
 }
 
 __host__ __device__ void account_t::update(ArithEnv &arith, const account_t &other, const account_flags_t &flags) {
@@ -185,6 +178,7 @@ __host__ __device__ bool account_t::is_empty() {
 
 __host__ __device__ bool account_t::is_empty_create() {
     // Goethereum: nonce ==0 && code == 0, can have balance
+
     return ((nonce == 0) && (byte_code.size == 0)) ? true : false;
 }
 
@@ -218,11 +212,11 @@ __host__ void account_t::from_json(const cJSON *account_json, int32_t managed) {
 
     storage.from_json(cJSON_GetObjectItemCaseSensitive(account_json, "storage"), managed);
 #ifdef EIP_3155
-    printf("byte_code.size %d\n", byte_code.size);
-    printf("byte_code.data %p\n", byte_code.data);
-    printf("storage.size %d\n", storage.size);
-    printf("storage.capacity %d\n", storage.capacity);
-    printf("storage.storage %p\n", storage.storage);
+// printf("byte_code.size %d\n", byte_code.size);
+// printf("byte_code.data %p\n", byte_code.data);
+// printf("storage.size %d\n", storage.size);
+// printf("storage.capacity %d\n", storage.capacity);
+// printf("storage.storage %p\n", storage.storage);
 #endif
 }
 

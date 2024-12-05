@@ -9,21 +9,21 @@
 
 namespace CuEVM {
 __host__ __device__ int32_t log_state_data_t::grow() {
-    __SHARED_MEMORY__ log_data_t *new_logs;
+    __SHARED_MEMORY__ log_data_t *new_logs[CGBN_IBP];
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    new_logs = new log_data_t[capacity + log_page_size];
+    new_logs[INSTANCE_IDX_PER_BLOCK] = new log_data_t[capacity + log_page_size];
     // printf("allocate capacity  %d for logpointer %p new_logs %p\n", capacity + log_page_size, this, new_logs);
     __ONE_GPU_THREAD_END__
-    if (new_logs == nullptr) {
+    if (new_logs[INSTANCE_IDX_PER_BLOCK] == nullptr) {
         return ERROR_MEMORY_ALLOCATION_FAILED;
     }
     __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (logs != nullptr && no_logs > 0) {
-        memcpy(new_logs, logs, no_logs * sizeof(log_data_t));
+        memcpy(new_logs[INSTANCE_IDX_PER_BLOCK], logs, no_logs * sizeof(log_data_t));
         delete[] logs;
     }
     __ONE_GPU_THREAD_END__
-    logs = new_logs;
+    logs = new_logs[INSTANCE_IDX_PER_BLOCK];
     capacity = capacity + log_page_size;
     return ERROR_SUCCESS;
 }

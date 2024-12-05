@@ -43,9 +43,9 @@ struct log_state_data_t {
      */
     __host__ __device__ ~log_state_data_t() {
         if (logs != nullptr && capacity > 0) {
-            __ONE_GPU_THREAD_BEGIN__
+            __ONE_GPU_THREAD_WOSYNC_BEGIN__
             delete[] logs;
-            __ONE_GPU_THREAD_END__
+            __ONE_GPU_THREAD_WOSYNC_END__
         }
         logs = nullptr;
         capacity = 0;
