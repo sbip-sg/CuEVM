@@ -324,6 +324,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     uint32_t static_env = 0;
     evm_word_t return_data_offset = 0;
     evm_word_t return_data_size = 0;
+    // printf("evm transaction get message call, gas limit %lu\n", this->gas_limit);
     if (is_create) {
         call_type = OP_CREATE;
         byte_code = data_init;
@@ -342,17 +343,13 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
         to_account->address.print();
 
     } else {
-        // CuEVM::account_t *to_account = nullptr;
-        // touch_state.get_account(arith, to_address, to_account, ACCOUNT_BYTE_CODE_FLAG);
-        // #ifdef __CUDA_ARCH__
-        //     printf("to_account %p size %d idx %d \n", to_account, to_account->byte_code.size  , threadIdx.x);
-        // #endif
-        byte_code = to_account->byte_code;
+         byte_code = to_account->byte_code;
         evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
             &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to, data_init,
             byte_code, return_data_offset, return_data_size, static_env);
     }
 
+    // printf("evm transaction get message call, gas limit %lu\n", evm_message_call_ptr->gas_limit);
     // #ifdef __CUDA_ARCH__
     //     printf("bytecode size %d idx %d \n", byte_code.size, threadIdx.x);
     // #endif
@@ -556,8 +553,12 @@ __host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJ
         transactions_ptr[idx].data_init.from_hex(cJSON_GetArrayItem(data_json, data_index)->valuestring, LITTLE_ENDIAN,
                                                  CuEVM::PaddingDirection::NO_PADDING, managed);
         evm_word_t tmp;
+        printf("gas limit hex string %s\n", cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
         tmp.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
-        transactions_ptr[idx].gas_limit = uint256_get_uint32_t(&tmp);
+        printf("gas limit \n");
+        tmp.print();
+        transactions_ptr[idx].gas_limit = uint256_get_uint64_t(&tmp);
+        printf("gas limit uint64_t %lu\n", transactions_ptr[idx].gas_limit);
         // better refactorign the boundary checks
         if (strlen(cJSON_GetArrayItem(value_json, value_index)->valuestring) > 66) {
             return ERROR_FAILED;

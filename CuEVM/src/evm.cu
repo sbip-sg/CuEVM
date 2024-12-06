@@ -20,9 +20,19 @@ namespace CuEVM {
 
 // define the kernel function
 __global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t *instances, uint32_t count) {
-    int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / CuEVM::cgbn_tpi;
+    int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
 
+    // if (instance == 0) {
+    //     printf("instance %d thread %d\n", instance, THREADIDX);
+    //     printf("world state\n");
+    //     instances[instance].world_state_data_ptr->print();
+    //     printf("touch state\n");
+    //     instances[instance].touch_state_data_ptr->print();
+    //     printf("instance %d\n", instance);
+    //     printf("transaction\n");
+    //     instances[instance].transaction_ptr->print();
+    // }
 #ifdef EIP_3155
     if (instance == 0) {
         printf("instance %d\n", instance);
@@ -35,16 +45,20 @@ __global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t *instances, 
         instances[instance].transaction_ptr->print();
     }
 #endif
-    return;
-    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
-    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
-    CuEVM::evm_t *evm = new CuEVM::evm_t(instances[instance], &shared_message_call[INSTANCE_IDX_PER_BLOCK],
-                                         shared_stack[INSTANCE_IDX_PER_BLOCK]);
 
+    // __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
+    __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
+    CuEVM::evm_t *evm = new CuEVM::evm_t(instances[instance], shared_stack[INSTANCE_IDX_PER_BLOCK]);
+
+    // printf("\n evm call state \n");
+    // evm->call_state_ptr->print();
+    // evm->call_state_ptr->message_ptr->print();
     if (evm->status == ERROR_SUCCESS) {
         CuEVM::cached_evm_call_state cached_state(evm->call_state_ptr);
 
-        __SYNC_THREADS__
+        // printf("\n\n evm cached call state\n");
+        // evm->call_state_ptr->print();
+
         evm->run(cached_state);
 
 #ifdef EIP_3155
@@ -82,8 +96,9 @@ __host__ __device__ evm_t::evm_t(CuEVM::state_t *world_state_data_ptr, CuEVM::bl
     call_state_ptr = new CuEVM::evm_call_state_t(&world_state, nullptr, nullptr, log_state_ptr, touch_state_data_ptr,
                                                  return_data_ptr);
 
-    int32_t error_code = transaction_ptr->validate(call_state_ptr->touch_state_ptr, *block_info_ptr,
-                                                   call_state_ptr->gas_used, gas_price, gas_priority_fee);
+    int32_t error_code = ERROR_SUCCESS;
+    //  transaction_ptr->validate(call_state_ptr->touch_state_ptr, *block_info_ptr,
+    //                                                call_state_ptr->gas_used, gas_price, gas_priority_fee);
 
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t_shadow *transaction_call_message_ptr = nullptr;
@@ -141,7 +156,8 @@ __host__ __device__ int32_t evm_t::start_CALL(cached_evm_call_state &cached_call
     const evm_word_t *sender = &call_state_ptr->message_ptr->sender;
     const evm_word_t *recipient = &call_state_ptr->message_ptr->recipient;
     call_state_ptr->message_ptr->get_value(value);
-
+    // printf("start call value \n");
+    // value.print();
     int32_t error_code = (((uint256_cmp_word(&value, 0) > 0) &&
                            // (cgbn_compare(arith.env, sender, recipient) != 0) &&
                            (call_state_ptr->message_ptr->call_type != OP_DELEGATECALL))
@@ -273,6 +289,7 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
     simplified_trace_data_ptr->start_call(0, call_state_ptr->message_ptr);
 #endif
     int32_t error_code = start_CALL(cached_call_state);
+    // printf("\n\n evm start_CALL error_code %d\n", error_code);
     if (error_code != ERROR_SUCCESS) {
 #ifdef BUILD_LIBRARY
         simplified_trace_data_ptr->finish_call(0);
@@ -303,8 +320,10 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
         //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-        //        THREADIDX);
+        printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc, opcode,
+               call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
+        // printf("Stack size %u\n", cached_call_state.stack_ptr->stack_offset);
+        // cached_call_state.stack_ptr->print();
 
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid

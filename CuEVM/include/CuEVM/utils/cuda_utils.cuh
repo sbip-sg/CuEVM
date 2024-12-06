@@ -2,11 +2,10 @@
 
 // CGBN parameters
 #ifndef CGBN_TPI
-#define CGBN_TPI 32
+#define CGBN_TPI 1
 #endif
-
-#define CGBN_IBP 8
-#define SHARED_STACK_SIZE 128
+#define CGBN_IBP 64
+#define SHARED_STACK_SIZE 12
 
 #include <cuda.h>
 
@@ -61,10 +60,10 @@
 #define CGBN_CHECK(report) cgbn_check(report, __FILE__, __LINE__)
 
 #ifdef __CUDA_ARCH__
-#define INSTANCE_BLK_IDX threadIdx.x / CGBN_TPI
-#define INSTANCE_GLOBAL_IDX (threadIdx.x + blockIdx.x * blockDim.x) / CGBN_TPI
-#define THREAD_IDX_PER_INSTANCE threadIdx.x % CGBN_TPI
-#define INSTANCE_IDX_PER_BLOCK threadIdx.x / CGBN_TPI
+#define INSTANCE_BLK_IDX threadIdx.x
+#define INSTANCE_GLOBAL_IDX threadIdx.x + blockIdx.x *blockDim.x
+#define THREAD_IDX_PER_INSTANCE 0
+#define INSTANCE_IDX_PER_BLOCK threadIdx.x
 #else
 #define INSTANCE_BLK_IDX 0
 #define INSTANCE_GLOBAL_IDX 0

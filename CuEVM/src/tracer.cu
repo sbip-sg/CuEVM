@@ -65,13 +65,11 @@ __host__ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_mess
     calls[no_calls].pc = pc;
     calls[no_calls].op = message_call_ptr->call_type;
     calls[no_calls].value = message_call_ptr->value;
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+
     no_calls++;
-    __ONE_GPU_THREAD_END__
 }
 __host__ __device__ void simplified_trace_data::finish_call(uint8_t success) {
     if (no_calls > MAX_CALLS_TRACING) return;
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
 
     // printf("no_calls %u \n", no_calls);
     for (int i = no_calls - 1; i >= 0; i--) {
@@ -80,7 +78,6 @@ __host__ __device__ void simplified_trace_data::finish_call(uint8_t success) {
             break;
         }
     }
-    __ONE_GPU_THREAD_END__
 }
 __host__ __device__ void simplified_trace_data::print() {
     printf("no_events %u\n", no_events);
@@ -202,16 +199,12 @@ __host__ __device__ tracer_t::~tracer_t() {
 }
 
 __host__ __device__ void tracer_t::grow() {
-    __SHARED_MEMORY__ trace_data_t *new_data[CGBN_IBP];
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    new_data[INSTANCE_IDX_PER_BLOCK] = new trace_data_t[capacity + 128];
+    trace_data_t *new_data = new trace_data_t[capacity + 128];
     if (data != nullptr) {
-        memcpy(new_data[INSTANCE_IDX_PER_BLOCK], data, sizeof(trace_data_t) * size);
+        memcpy(new_data, data, sizeof(trace_data_t) * size);
         delete[] data;
     }
-    __ONE_GPU_THREAD_END__
-    data = new_data[INSTANCE_IDX_PER_BLOCK];
-    __SYNC_THREADS__
+    data = new_data;
     capacity += 128;
 }
 

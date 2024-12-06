@@ -58,13 +58,13 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         // num_instances = 1;
         uint32_t num_blocks = (num_instances + CGBN_IBP - 1) / (CGBN_IBP);
         printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
-               CGBN_TPI * CGBN_IBP);
+               CGBN_IBP);
         // run the evm
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
         cudaEventRecord(start);
 
-        CuEVM::kernel_evm_multiple_instances<<<num_blocks, CGBN_TPI * CGBN_IBP>>>(instances_data, num_instances);
+        CuEVM::kernel_evm_multiple_instances<<<num_blocks, CGBN_IBP>>>(instances_data, num_instances);
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
 

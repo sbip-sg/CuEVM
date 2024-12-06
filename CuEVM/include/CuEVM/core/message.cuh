@@ -14,20 +14,19 @@ struct evm_message_call_t_shadow {
         evm_word_t *sender;
         evm_word_t *recipient;
         evm_word_t *contract_address;
-        evm_word_t *gas_limit;
         evm_word_t *value;
         evm_word_t *storage_address;
         evm_word_t *return_data_offset;
         evm_word_t *return_data_size;
     */
-    evm_word_t *params_data;  // store 8 evm_word_t elements
-
-    CuEVM::byte_array_t *data;      /**< The data YP: \f$d\f$ */
-    CuEVM::byte_array_t *byte_code; /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
-
+    evm_word_t *params_data;  // store 7 evm_word_t elements
+    gas_t gas_limit;
     uint32_t static_env; /**< The static flag (STATICCALL) YP: \f$w\f$ */
     uint32_t depth;      /**< The depth YP: \f$e\f$ */
     uint32_t call_type;  /**< The call type internal has the opcode */
+
+    CuEVM::byte_array_t *data;      /**< The data YP: \f$d\f$ */
+    CuEVM::byte_array_t *byte_code; /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
 
     CuEVM::jump_destinations_t *jump_destinations; /**< The jump destinations */
     __host__ __device__ evm_message_call_t_shadow(const evm_word_t *sender, const evm_word_t *recipient,
@@ -47,11 +46,11 @@ struct evm_message_call_t {
     evm_word_t sender;             /**< The sender address YP: \f$s\f$ */
     evm_word_t recipient;          /**< The recipient address YP: \f$r\f$ also \f$I_{a}\f$ */
     evm_word_t contract_address;   /**< The contract address YP: \f$c\f$ */
-    gas_t gas_limit;               /**< The gas limit YP: \f$g\f$ */
     evm_word_t value;              /**< The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL */
     evm_word_t storage_address;    /**< The storage address YP: \f$a\f$ */
     evm_word_t return_data_offset; /**< The return data offset in memory */
     evm_word_t return_data_size;   /**< The return data size in memory */
+    gas_t gas_limit;               /**< The gas limit YP: \f$g\f$ */
     // important store them adjacent in shared memory
     uint32_t depth;                                /**< The depth YP: \f$e\f$ */
     uint32_t call_type;                            /**< The call type internal has the opcode */

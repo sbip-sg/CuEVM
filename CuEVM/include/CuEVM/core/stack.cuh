@@ -6,11 +6,6 @@
 namespace CuEVM {
 namespace stack {
 constexpr CONSTANT uint32_t max_size = CuEVM::max_stack_size; /**< The maximum stack size*/
-// constexpr CONSTANT uint32_t alligment =
-//     sizeof(evm_word_t); /**< The alligment of the stack*/
-// constexpr CONSTANT uint32_t initial_capacity = 16U; /**< The initial capacity of the stack can be change for
-// performence
-//    reasons*/
 
 struct evm_stack_t {
     evm_word_t *global_stack_base; /**< The stack YP: (YP: \f$\mu_{s}\f$)*/  // global memory store from X+1 element
@@ -45,19 +40,6 @@ struct evm_stack_t {
      * Clear the content
      */
     __host__ __device__ void clear();
-
-    // /**
-    //  * The assignment operator
-    //  * @param[in] other The other stack
-    //  * @return The reference to the stack
-    //  */
-    // __host__ __device__ evm_stack_t &operator=(const evm_stack_t &other);
-
-    // /**
-    //  * Duplicate the stack
-    //  * @param[in] other The other stack
-    //  */
-    // __host__ __device__ void duplicate(const evm_stack_t &other);
 
     /**
      * Extract the stack data for tracing
@@ -185,14 +167,6 @@ struct evm_stack_t {
      */
     __host__ static evm_stack_t *cpu_from_gpu(evm_stack_t *gpu_instances, uint32_t count);
 };
-
-/**
- * The kernel to transfer the stack from the CPU to the GPU
- * @param[in] dst The destination stack
- * @param[in] src The source stack
- * @param[in] count The number of instances
- */
-__global__ void transfer_kernel_evm_stack_t(evm_stack_t *dst, evm_stack_t *src, uint32_t count);
 
 }  // namespace stack
    // Type alias for accessing evm_stack_t directly under the CuEVM namespace

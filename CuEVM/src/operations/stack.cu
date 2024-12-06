@@ -4,8 +4,6 @@
 
 namespace CuEVM::operations {
 __host__ __device__ int32_t POP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         evm_word_t y;
@@ -16,7 +14,6 @@ __host__ __device__ int32_t POP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
 }
 
 __host__ __device__ int32_t PUSH0(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         evm_word_t r;
@@ -30,12 +27,13 @@ __host__ __device__ int32_t PUSH0(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
 __host__ __device__ int32_t PUSHX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc,
                                   CuEVM::evm_stack_t &stack, const CuEVM::byte_array_t &byte_code,
                                   const uint8_t &opcode) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         uint8_t push_size = (opcode & 0x1F) + 1;
         uint8_t *byte_data = &(byte_code.data[pc + 1]);
         // if pushx is outside code size
+        printf("pushx pc %u push_size %u byte_code.size %u\n", pc, push_size, byte_code.size);
+
         uint32_t available_size = (pc + push_size >= byte_code.size) ? byte_code.size - pc - 1 : push_size;
         // TODO: maybe make it a byte array for better transmission
         error_code |= stack.pushx(push_size, byte_data, available_size);
@@ -47,7 +45,6 @@ __host__ __device__ int32_t PUSHX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
 
 __host__ __device__ int32_t DUPX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                  const uint8_t &opcode) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         uint8_t dup_index = (opcode & 0x0F) + 1;
@@ -59,7 +56,6 @@ __host__ __device__ int32_t DUPX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &ga
 
 __host__ __device__ int32_t SWAPX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                   const uint8_t &opcode) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         uint8_t swap_index = (opcode & 0x0F) + 1;

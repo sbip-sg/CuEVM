@@ -29,13 +29,10 @@ struct evm_t {
     const CuEVM::block_info_t* block_info_ptr;       /**< The block info pointer */
     const CuEVM::evm_transaction_t* transaction_ptr; /**< The transaction pointer */
     CuEVM::evm_call_state_t* call_state_ptr;         /**< The call state pointer store in global mem*/
-    // CuEVM::cached_evm_call_state
-    //     cached_call_state; /**< The state pointer store in local mem (constant register usage)*/
-    // CuEVM::evm_call_state_t call_state_local; /**< The state pointer store in local mem (constant register usage)*/
-    CuEVM::EccConstants* ecc_constants_ptr; /**< The ecc constants pointer*/
-    gas_t gas_price;                        /**< The gas price */
-    gas_t gas_priority_fee;                 /**< The gas priority fee */
-    uint32_t status;                        /**< The status */
+    CuEVM::EccConstants* ecc_constants_ptr;          /**< The ecc constants pointer*/
+    gas_t gas_price;                                 /**< The gas price */
+    gas_t gas_priority_fee;                          /**< The gas priority fee */
+    uint32_t status;                                 /**< The status */
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer */
 #endif

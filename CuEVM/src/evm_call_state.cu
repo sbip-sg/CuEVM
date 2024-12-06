@@ -46,28 +46,6 @@ __host__ __device__ evm_call_state_t::evm_call_state_t(CuEVM::evm_call_state_t* 
 #endif
 }
 
-// /**
-//  * The constructor with the parent state and message call
-//  */
-// __host__ __device__ evm_call_state_t::evm_call_state_t(ArithEnv& arith, CuEVM::evm_call_state_t* parent,
-//                                                        CuEVM::evm_message_call_t* message_ptr)
-//     : touch_state(new CuEVM::state_access_t(), &parent->touch_state) {
-//     this->parent = parent;
-//     this->depth = parent->depth + 1;
-//     this->pc = 0;
-//     cgbn_set_ui32(arith.env, this->gas_used, 0);
-//     cgbn_set(arith.env, this->gas_refund, parent->gas_refund);
-//     this->message_ptr = message_ptr;
-//     this->message_ptr->get_gas_limit(arith, this->gas_limit);
-//     this->stack_ptr = new CuEVM::evm_stack_t();
-//     this->memory_ptr = new CuEVM::evm_memory_t();
-//     this->log_state_ptr = new CuEVM::log_state_data_t();
-//     this->last_return_data_ptr = new CuEVM::evm_return_data_t();
-// #ifdef EIP_3155
-//     this->trace_idx = 0;
-// #endif
-// }
-
 /**
  * The constructor with the parent state and message call
  */
@@ -174,7 +152,7 @@ __host__ __device__ evm_call_state_t::~evm_call_state_t() {
         delete stack_ptr;
         delete memory_ptr;
         delete log_state_ptr;
-        delete last_return_data_ptr;
+        // delete last_return_data_ptr;
         // TODO delete touch_state_ptr;
     }
 }

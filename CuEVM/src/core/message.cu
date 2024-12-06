@@ -25,24 +25,16 @@ __host__ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
     this->params_data[2] = *contract_address;
     this->params_data[3] = *value;
     this->params_data[4] = *storage_address;
-    // this->params_data[6] = *return_data_offset;
-    // this->params_data[7] = *return_data_size;
     this->params_data[5] = return_data_offset;
     this->params_data[6] = return_data_size;
     // this->params_data[2].print();
 
+    this->gas_limit = gas_limit;
     this->depth = depth;
     this->call_type = call_type;
 
     this->data = new byte_array_t(data);
     this->byte_code = new byte_array_t(byte_code);
-
-    // printf("evm message call constructor return data offset: ");
-    // print_bnt(arith, return_data_offset);
-    // this->params_data[6].print();
-    // printf("evm message call constructor return data size: ");
-    // print_bnt(arith, return_data_size);
-    // this->params_data[7].print();
 
     this->static_env = static_env;
     // create the jump destinations
@@ -69,8 +61,8 @@ __host__ __device__ void evm_message_call_t::copy_from(const evm_message_call_t_
     byte_code = other->byte_code;
     static_env = other->static_env;
     depth = other->depth;
-    // printf("evm_message_call_t copy_from other->depth\n ");
     call_type = other->call_type;
+    gas_limit = other->gas_limit;
 }
 
 __host__ __device__ evm_message_call_t::~evm_message_call_t() {

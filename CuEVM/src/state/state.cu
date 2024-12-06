@@ -15,21 +15,19 @@ __host__ __device__ state_t &state_t::operator=(const state_t &other) {
     return *this;
 }
 __host__ __device__ void state_t::duplicate(const state_t &other) {
-    __SHARED_MEMORY__ CuEVM::account_t *tmp_accounts[CGBN_IBP];
+    CuEVM::account_t *tmp_accounts;
     free();  // free the current state
     no_accounts = other.no_accounts;
     if (no_accounts > 0) {
-        __ONE_GPU_THREAD_BEGIN__
-        tmp_accounts[INSTANCE_IDX_PER_BLOCK] = (CuEVM::account_t *)malloc(no_accounts * sizeof(CuEVM::account_t));
-        __ONE_GPU_THREAD_END__
+        tmp_accounts = (CuEVM::account_t *)malloc(no_accounts * sizeof(CuEVM::account_t));
         for (uint32_t idx = 0; idx < no_accounts; idx++) {
-            tmp_accounts[INSTANCE_IDX_PER_BLOCK][idx].clear();
-            tmp_accounts[INSTANCE_IDX_PER_BLOCK][idx] = other.accounts[idx];
+            tmp_accounts[idx].clear();
+            tmp_accounts[idx] = other.accounts[idx];
         }
     } else {
-        tmp_accounts[INSTANCE_IDX_PER_BLOCK] = nullptr;
+        tmp_accounts = nullptr;
     }
-    accounts = tmp_accounts[INSTANCE_IDX_PER_BLOCK];
+    accounts = tmp_accounts;
 }
 
 __host__ __device__ state_t::~state_t() { free(); }
@@ -39,9 +37,7 @@ __host__ __device__ void state_t::free() {
         for (uint32_t idx = 0; idx < no_accounts; idx++) {
             accounts[idx].free();
         }
-        __ONE_GPU_THREAD_BEGIN__
         std::free(accounts);
-        __ONE_GPU_THREAD_END__
     }
     clear();
 }

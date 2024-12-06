@@ -79,15 +79,12 @@ __host__ __device__ evm_word_t *evm_stack_t::top() {
     } else {
         // page size is max stack size
         if ((stack_base_offset + stack_offset - CuEVM::shared_stack_size) % max_stack_size == 0) {
-            __SHARED_MEMORY__ evm_word_t *new_stack_base[CGBN_IBP];
-            // allocate one
-            __ONE_GPU_THREAD_WOSYNC_BEGIN__
-            new_stack_base[INSTANCE_IDX_PER_BLOCK] = new evm_word_t[max_stack_size];
+            evm_word_t *new_stack_base = new evm_word_t[max_stack_size];
             if (global_stack_base != nullptr) {
                 delete[] global_stack_base;
             }
-            __ONE_GPU_THREAD_END__
-            global_stack_base = new_stack_base[INSTANCE_IDX_PER_BLOCK];
+
+            global_stack_base = new_stack_base;
         }
         return global_stack_base + stack_base_offset + stack_offset - CuEVM::shared_stack_size;
     }

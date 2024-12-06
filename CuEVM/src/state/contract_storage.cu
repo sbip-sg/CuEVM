@@ -74,7 +74,7 @@ __host__ __device__ int32_t contract_storage_t::set_value(const evm_word_t &key,
         }
     }
 
-    __SHARED_MEMORY__ storage_element_t *new_storage[CGBN_IBP];
+    storage_element_t *new_storage = nullptr;
     // #ifdef __CUDA_ARCH__
     //     printf("contract_storage_t::set_value before allocateidx %d size %d capacity %d  storage %p\n", threadIdx.x,
     //     size,
@@ -86,15 +86,14 @@ __host__ __device__ int32_t contract_storage_t::set_value(const evm_word_t &key,
         } else {
             capacity *= 2;
         }
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        new_storage[INSTANCE_IDX_PER_BLOCK] = new storage_element_t[capacity];
+
+        new_storage = new storage_element_t[capacity];
         // printf("allocate new storage %p, capacity %d\n", new_storage, capacity);
         if (size > 0) {
-            memcpy(new_storage[INSTANCE_IDX_PER_BLOCK], storage, size * sizeof(storage_element_t));
+            memcpy(new_storage, storage, size * sizeof(storage_element_t));
         }
         delete[] storage;
-        __ONE_GPU_THREAD_END__
-        storage = new_storage[INSTANCE_IDX_PER_BLOCK];
+        storage = new_storage;
         // printf("set storage size %d capacity %d  storage %p, new_storage %p\n", size, capacity, storage,
         // new_storage);
     }
