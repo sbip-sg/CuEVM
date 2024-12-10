@@ -16,6 +16,7 @@
 #include <CuEVM/utils/ecc_constants.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
+#include <CuEVM/managed_trace.cuh>
 
 namespace CuEVM {
 
@@ -29,20 +30,6 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM
     // printf("print simplified trace data device\n");
     // instances[instance].simplified_trace_data_ptr->print();
 // printf("new instance %d\n", instance);
-#ifdef EIP_3155
-    // if (instance == 0) {
-    //     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    //     printf("instance %d\n", instance);
-    //     printf("world state\n");
-    //     instances[instance].world_state_data_ptr->print();
-    //     printf("touch state\n");
-    //     instances[instance].touch_state_data_ptr->print();
-    //     printf("instance %d\n", instance);
-    //     printf("transaction\n");
-    //     instances[instance].transaction_ptr->print();
-    //     __ONE_GPU_THREAD_WOSYNC_END__
-    // }
-#endif
 
     __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
     __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
@@ -55,14 +42,13 @@ __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM
         __SYNC_THREADS__
         evm->run(arith, cached_state);
 
-#ifdef EIP_3155
-        if (instance == 0) {
-            __ONE_GPU_THREAD_BEGIN__
-            // instances[0].tracer_ptr->print(arith);
-            instances[0].tracer_ptr->print_err();
-            __ONE_GPU_THREAD_WOSYNC_END__
-        }
-#endif
+// #ifdef EIP_3155
+//         if (instance == 0) {
+//             __ONE_GPU_THREAD_BEGIN__
+//             instances[0].tracer_ptr->print_err(); // GPU printing
+//             __ONE_GPU_THREAD_WOSYNC_END__
+//         }
+// #endif
     }
 }
 
@@ -338,34 +324,20 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                       : OP_STOP);
         __SYNC_THREADS__
 #ifdef EIP_3155
-        // #ifdef __CUDA_ARCH__
-        //         __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        //         printf("idx %d before start_operation opcode %d tracer_idx %d , tracer ptr %p, tracer size %d\n",
-        //         threadIdx.x,
-        //                opcode, call_state_ptr->trace_idx, tracer_ptr, tracer_ptr->size);
-        //         __ONE_GPU_THREAD_WOSYNC_END__
-        // #endif
-        // printf("before start_operation mem ptr %p memsize %d threadidx %d\n", call_state_ptr->memory_ptr,
-        //        call_state_ptr->memory_ptr->size, THREADIDX);
         uint32_t trace_idx = tracer_ptr->start_operation(arith, cached_call_state.pc, opcode,
                                                          *call_state_ptr->memory_ptr, *cached_call_state.stack_ptr,
                                                          call_state_ptr->depth, *call_state_ptr->last_return_data_ptr,
                                                          cached_call_state.gas_limit, cached_call_state.gas_used);
+        on_operation_start(arith,
+                           cached_call_state.pc,
+                           opcode,
+                           *cached_call_state.stack_ptr,
+                           call_state_ptr->depth,
+                           cached_call_state.gas_limit,
+                           cached_call_state.gas_used);
         call_state_ptr->trace_idx = trace_idx;
 
-        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-        //        THREADIDX);
-        // // print_bnt(arith, cached_call_state.gas_limit);
-        // // print_bnt(arith, cached_call_state.gas_used);
-        // __ONE_GPU_THREAD_WOSYNC_END__
-
 #endif
-
-        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        // printf("\npc: %d opcode: %d, depth %d, thread %d \n", cached_call_state.pc, opcode, call_state_ptr->depth,
-        //        THREADIDX);
-        // __ONE_GPU_THREAD_WOSYNC_END__
 
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -374,12 +346,6 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         }
         if (opcode == OP_JUMPI) pc_src = cached_call_state.pc;
 #endif
-        // DEBUG PRINT
-
-        // __ONE_THREAD_PER_INSTANCE(printf("\npc: %d opcode: %d\n", call_state_ptr->pc, opcode););
-        // printf("touch state BEGIN BEGIN BEGIN\n");
-        // call_state_ptr->touch_state.print();
-        // printf("touch state END END END\n");
         if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70)) {
             error_code = CuEVM::operations::PUSHX(arith, cached_call_state.gas_limit, cached_call_state.gas_used,
                                                   cached_call_state.pc, *cached_call_state.stack_ptr,
@@ -925,14 +891,6 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
         cgbn_set(arith.env, call_state_ptr->parent->gas_used, call_state_ptr->gas_limit);
         // cgbn_mul(arith.env, gas_value, cached_call_state.gas_limit, gas_priority_fee);
         // set z to the given error or 1 TODO: 1 in YP
-#ifdef EIP_3155
-        // __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
-        // print_bnt(arith, gas_value);
-        // print_bnt(arith, call_state_ptr->gas_limit);
-        // print_bnt(arith, call_state_ptr->gas_used);
-        // print_bnt(arith, gas_priority_fee);
-
-#endif
         status = error_code;
     }
     // send the gas value to the beneficiary
@@ -955,9 +913,9 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
 //     printf("call_state_local %d\n", THREADIDX);
 //     call_state_local.print(arith);
 // #endif
-#ifdef EIP_3155
-    tracer_ptr->finish_transaction(arith, *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_used, status);
-#endif
+// #ifdef EIP_3155
+//     tracer_ptr->finish_transaction(arith, *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_used, status);
+// #endif
     // update the final world state : TODO combine both
     // __SYNC_THREADS__
     this->world_state.update(arith, call_state_ptr->touch_state_ptr->get_state());

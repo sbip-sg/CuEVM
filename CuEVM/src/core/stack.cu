@@ -77,6 +77,25 @@ __host__ __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
     __ONE_GPU_THREAD_WOSYNC_END__
 }
 
+// __host__ __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
+// #ifdef __CUDA_ARCH__
+//   if (threadId.x == 0){
+//     if (stack_offset + stack_base_offset < CuEVM::shared_stack_size) {
+//       memcpy(other, shared_stack_base, stack_offset * sizeof(evm_word_t));
+//     } else {
+//       int32_t left_over = CuEVM::shared_stack_size - stack_base_offset;
+//       if (left_over > 0) {
+//         memcpy(other, shared_stack_base, left_over * sizeof(evm_word_t));
+//         memcpy(other + left_over, global_stack_base, (stack_offset - left_over) * sizeof(evm_word_t));
+//       } else
+//         memcpy(other, global_stack_base, stack_offset * sizeof(evm_word_t));
+//     }
+//   }
+//   __syncthreads();
+// #endif
+// }
+
+
 // __host__ __device__ int32_t evm_stack_t::grow() {
 //     // capacity = (capacity == 0) ? initial_capacity : capacity * 2;
 //     // if (capacity > max_size) {
