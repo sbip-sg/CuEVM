@@ -226,6 +226,7 @@ __host__ __device__ uint32_t tracer_t::start_operation(ArithEnv &arith, const ui
                                                        const CuEVM::evm_stack_t &stack, const uint32_t depth,
                                                        const CuEVM::evm_return_data_t &return_data,
                                                        const bn_t &gas_limit, const bn_t &gas_used) {
+  return 0;
     if (size == capacity) {
         grow();
     }

@@ -48,7 +48,7 @@ __host__ __device__ void on_operation_start(CuEVM::ArithEnv &arith,
       trace_stack_buf_index += stack.size();
     }
   }
-  __syncthreads();
+  // __syncthreads();
 
 #else
   assert(0); // Not supported on CPU

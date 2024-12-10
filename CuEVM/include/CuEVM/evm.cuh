@@ -19,9 +19,6 @@ struct evm_instance_t {
     CuEVM::log_state_data_t* log_state_ptr;      /**< The log state pointer*/
     CuEVM::evm_return_data_t* return_data_ptr;   /**< The return data pointer*/
     CuEVM::EccConstants* ecc_constants_ptr;      /**< The ecc constants pointer*/
-#ifdef EIP_3155
-    CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer*/
-#endif
 
     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
     CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
@@ -38,9 +35,6 @@ struct evm_t {
     bn_t gas_price;                         /**< The gas price */
     bn_t gas_priority_fee;                  /**< The gas priority fee */
     uint32_t status;                        /**< The status */
-#ifdef EIP_3155
-    CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer */
-#endif
     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
     CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
     /**
@@ -59,13 +53,7 @@ struct evm_t {
                               CuEVM::block_info_t* block_info_ptr, CuEVM::evm_transaction_t* transaction_ptr,
                               CuEVM::state_access_t* touch_state_data_ptr, CuEVM::log_state_data_t* log_state_ptr,
                               CuEVM::evm_return_data_t* return_data_ptr, CuEVM::EccConstants* ecc_constants_ptr,
-                              CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr
-#ifdef EIP_3155
-                              ,
-                              CuEVM::utils::tracer_t* tracer_ptr
-#endif
-
-                              ,
+                              CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr,
                               CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr,
                               CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr);
 

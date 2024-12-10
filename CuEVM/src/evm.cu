@@ -56,13 +56,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
                                  CuEVM::block_info_t *block_info_ptr, CuEVM::evm_transaction_t *transaction_ptr,
                                  CuEVM::state_access_t *touch_state_data_ptr, CuEVM::log_state_data_t *log_state_ptr,
                                  CuEVM::evm_return_data_t *return_data_ptr, CuEVM::EccConstants *ecc_constants_ptr,
-                                 CuEVM::evm_message_call_t *shared_message_call_ptr, CuEVM::evm_word_t *shared_stack_ptr
-#ifdef EIP_3155
-                                 ,
-                                 CuEVM::utils::tracer_t *tracer_ptr
-#endif
-
-                                 ,
+                                 CuEVM::evm_message_call_t *shared_message_call_ptr, CuEVM::evm_word_t *shared_stack_ptr,
                                  CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr,
                                  CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr)
     : world_state(world_state_data_ptr),
@@ -106,9 +100,6 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::state_t *world_state_da
         cgbn_sub(arith.env, child_call_state_ptr->gas_limit, child_call_state_ptr->gas_limit, call_state_ptr->gas_used);
         call_state_ptr = child_call_state_ptr;
     }
-#ifdef EIP_3155
-    this->tracer_ptr = tracer_ptr;
-#endif
     status = error_code;
 }
 
@@ -116,12 +107,7 @@ __host__ __device__ evm_t::evm_t(ArithEnv &arith, CuEVM::evm_instance_t &evm_ins
                                  CuEVM::evm_message_call_t *message_call, CuEVM::evm_word_t *shared_stack_ptr)
     : evm_t(arith, evm_instance.world_state_data_ptr, evm_instance.block_info_ptr, evm_instance.transaction_ptr,
             evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr, evm_instance.return_data_ptr,
-            evm_instance.ecc_constants_ptr, message_call, shared_stack_ptr
-#ifdef EIP_3155
-            ,
-            evm_instance.tracer_ptr
-#endif
-            ,
+            evm_instance.ecc_constants_ptr, message_call, shared_stack_ptr,
             evm_instance.serialized_worldstate_data_ptr, evm_instance.simplified_trace_data_ptr) {
 }
 
@@ -134,9 +120,6 @@ __host__ __device__ evm_t::~evm_t() {
     call_state_ptr = nullptr;
     block_info_ptr = nullptr;
     transaction_ptr = nullptr;
-#ifdef EIP_3155
-    tracer_ptr = nullptr;
-#endif
 }
 
 __host__ __device__ int32_t evm_t::start_CALL(ArithEnv &arith, cached_evm_call_state &cached_call_state) {
@@ -324,10 +307,6 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                       : OP_STOP);
         __SYNC_THREADS__
 #ifdef EIP_3155
-        uint32_t trace_idx = tracer_ptr->start_operation(arith, cached_call_state.pc, opcode,
-                                                         *call_state_ptr->memory_ptr, *cached_call_state.stack_ptr,
-                                                         call_state_ptr->depth, *call_state_ptr->last_return_data_ptr,
-                                                         cached_call_state.gas_limit, cached_call_state.gas_used);
         on_operation_start(arith,
                            cached_call_state.pc,
                            opcode,
@@ -335,8 +314,6 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
                            call_state_ptr->depth,
                            cached_call_state.gas_limit,
                            cached_call_state.gas_used);
-        call_state_ptr->trace_idx = trace_idx;
-
 #endif
 
 #ifdef BUILD_LIBRARY
@@ -752,17 +729,6 @@ __host__ __device__ void evm_t::run(ArithEnv &arith, cached_evm_call_state &cach
         // increase program counter
         cached_call_state.pc++;
 
-#ifdef EIP_3155
-        if (call_state_ptr->trace_idx > 0 || (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1)) {
-            tracer_ptr->finish_operation(arith, call_state_ptr->trace_idx, cached_call_state.gas_used,
-                                         call_state_ptr->gas_refund
-#ifdef EIP_3155_OPTIONAL
-                                         ,
-                                         error_code
-#endif
-            );
-        }
-#endif
 #ifdef BUILD_LIBRARY
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
             simplified_trace_data_ptr->finish_operation(*cached_call_state.stack_ptr, error_code);
@@ -836,9 +802,6 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
     bn_t gas_value;
     const evm_word_t *beneficiary = &(block_info_ptr->coin_base);
     // block_info_ptr->get_coin_base(arith, beneficiary);
-#ifdef EIP_3155
-    __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
-#endif
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         bn_t gas_left;
         // \f$T_{g} - g\f$
@@ -1106,9 +1069,6 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
             evm_instances[index].touch_state_data_ptr = new CuEVM::state_access_t();
             evm_instances[index].log_state_ptr = new CuEVM::log_state_data_t();
             evm_instances[index].return_data_ptr = new CuEVM::evm_return_data_t();
-#ifdef EIP_3155
-            evm_instances[index].tracer_ptr = new CuEVM::utils::tracer_t();
-#endif
         } else {
             CuEVM::state_access_t *access_state = new CuEVM::state_access_t();
             CUDA_CHECK(cudaMallocManaged(&evm_instances[index].touch_state_data_ptr, sizeof(CuEVM::state_access_t)));
@@ -1127,12 +1087,6 @@ __host__ int32_t get_evm_instances(ArithEnv &arith, evm_instance_t *&evm_instanc
             CUDA_CHECK(cudaMallocManaged(&evm_instances[index].ecc_constants_ptr, sizeof(CuEVM::EccConstants)));
             memcpy(evm_instances[index].ecc_constants_ptr, ecc_constants_ptr, sizeof(CuEVM::EccConstants));
             delete ecc_constants_ptr;
-#ifdef EIP_3155
-            CuEVM::utils::tracer_t *tracer = new CuEVM::utils::tracer_t();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].tracer_ptr, sizeof(CuEVM::utils::tracer_t)));
-            memcpy(evm_instances[index].tracer_ptr, tracer, sizeof(CuEVM::utils::tracer_t));
-            delete tracer;
-#endif
 
             CuEVM::serialized_worldstate_data *serialized_worldstate_data = new CuEVM::serialized_worldstate_data();
             CUDA_CHECK(cudaMallocManaged(&evm_instances[index].serialized_worldstate_data_ptr,
@@ -1161,9 +1115,6 @@ __host__ void free_evm_instances(evm_instance_t *&evm_instances, uint32_t num_in
             delete evm_instances[index].touch_state_data_ptr;
             delete evm_instances[index].log_state_ptr;
             delete evm_instances[index].return_data_ptr;
-#ifdef EIP_3155
-            delete evm_instances[index].tracer_ptr;
-#endif
         }
         delete[] evm_instances[0].transaction_ptr;
         delete[] evm_instances;
@@ -1175,9 +1126,6 @@ __host__ void free_evm_instances(evm_instance_t *&evm_instances, uint32_t num_in
             CUDA_CHECK(cudaFree(evm_instances[index].touch_state_data_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].log_state_ptr));
             CUDA_CHECK(cudaFree(evm_instances[index].return_data_ptr));
-#ifdef EIP_3155
-            CUDA_CHECK(cudaFree(evm_instances[index].tracer_ptr));
-#endif
         }
         CUDA_CHECK(cudaFree(evm_instances[0].transaction_ptr));
         CUDA_CHECK(cudaFree(evm_instances));
