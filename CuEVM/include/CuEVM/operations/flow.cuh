@@ -26,8 +26,8 @@ namespace CuEVM::operations {
  * @param[in] message The message.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                                 const CuEVM::evm_message_call_t &message);
+__device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
+                        const CuEVM::evm_message_call_t &message);
 /**
  * The JUMPI operation implementation.
  * Takes the destination and the condition from the stack and sets the program counter
@@ -40,10 +40,10 @@ __host__ __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32
  * @param[in] message The message.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t JUMPI(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                                  const CuEVM::evm_message_call_t &message
+__device__ int32_t JUMPI(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
+                         const CuEVM::evm_message_call_t &message
 #ifdef BUILD_LIBRARY
-                                      CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
+                             CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
 #endif
 );
 
@@ -56,7 +56,7 @@ __host__ __device__ int32_t JUMPI(const gas_t &gas_limit, gas_t &gas_used, uint3
  * @param[out] stack The stack.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t PC(const gas_t &gas_limit, gas_t &gas_used, const uint32_t &pc, CuEVM::evm_stack_t &stack);
+__device__ int32_t PC(const gas_t &gas_limit, gas_t &gas_used, const uint32_t &pc, CuEVM::evm_stack_t &stack);
 
 /**
  * The GAS operation implementation.
@@ -66,7 +66,7 @@ __host__ __device__ int32_t PC(const gas_t &gas_limit, gas_t &gas_used, const ui
  * @param[out] stack The stack.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t GAS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t GAS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The JUMPDEST operation implementation.
@@ -76,7 +76,7 @@ __host__ __device__ int32_t GAS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @param[inout] gas_used The gas used.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t JUMPDEST(const gas_t &gas_limit, gas_t &gas_used);
+__device__ int32_t JUMPDEST(const gas_t &gas_limit, gas_t &gas_used);
 }  // namespace CuEVM::operations
 
 #endif

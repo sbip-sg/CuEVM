@@ -4,7 +4,7 @@
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/core/message.cuh>
-#include <CuEVM/state/touch_state.cuh>
+#include <CuEVM/state/state_db.cuh>
 
 namespace CuEVM {
 namespace transaction {
@@ -64,6 +64,24 @@ struct access_list_t {
      * @return 0 for success, error code for failure.
      */
     __host__ int32_t from_json(const cJSON *json, int32_t managed = 0);
+};
+
+class transactionList {
+   public:
+    uint32_t size;
+    uint32_t *type;
+    gas_t *gas_limit;
+    evm_word_t *nonce;
+    evm_word_t *to;
+    evm_word_t *value;
+    evm_word_t *sender;
+    evm_word_t *max_fee_per_gas;
+    evm_word_t *max_priority_fee_per_gas;
+    evm_word_t *gas_price;
+    uint8_t *call_data;
+    uint32_t *call_data_offset;
+    uint32_t *call_data_size;
+    // TODO: access list
 };
 /**
  * The transaction struct.
@@ -188,16 +206,16 @@ struct evm_transaction_t {
      * @param[out] m the max fee per gas YP: \f$m\f$.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t get_transaction_fees(CuEVM::block_info_t &block_info, gas_t &gas_value,
-                                                     gas_t &gas_limit, gas_t &gas_price, gas_t &gas_priority_fee,
-                                                     gas_t &up_front_cost, gas_t &m) const;
+    __device__ int32_t get_transaction_fees(CuEVM::block_info_t &block_info, gas_t &gas_value, gas_t &gas_limit,
+                                            gas_t &gas_price, gas_t &gas_priority_fee, gas_t &up_front_cost,
+                                            gas_t &m) const;
 
     /**
      * warm up the access list
      * @param[in] touch_state the touch state.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t access_list_warm_up(CuEVM::TouchState *touch_state_ptr) const;
+    __device__ int32_t access_list_warm_up(CuEVM::StateDb *state_db_ptr) const;
 
     /**
      * validate the transaction
@@ -209,8 +227,8 @@ struct evm_transaction_t {
      * @param[out] gas_priority_fee the gas priority fee YP: \f$f\f$.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t validate(CuEVM::TouchState *touch_state_ptr, CuEVM::block_info_t &block_info,
-                                         gas_t &gas_used, gas_t &gas_price, gas_t &gas_priority_fee) const;
+    __device__ int32_t validate(CuEVM::StateDb *state_db_ptr, CuEVM::block_info_t &block_info, gas_t &gas_used,
+                                gas_t &gas_price, gas_t &gas_priority_fee) const;
 
     /**
      * get the message call from the transaction
@@ -219,8 +237,8 @@ struct evm_transaction_t {
      * @param[out] evm_message_call_ptr the message call.
      * @return 0 for success, error code for failure.
      */
-    __host__ __device__ int32_t get_message_call(CuEVM::TouchState *touch_state_ptr,
-                                                 CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const;
+    __device__ int32_t get_message_call(CuEVM::StateDb *state_db_ptr,
+                                        CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const;
 
     __host__ __device__ void print();
 
@@ -247,7 +265,7 @@ __host__ uint32_t no_transactions(const cJSON *json);
  * @return 0 for success, error code for failure.
  */
 __host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJSON *json, uint32_t &transactions_count,
-                                  int32_t managed = 0, state_t *world_state = nullptr, uint32_t start_index = 0,
+                                  int32_t managed = 0, CuEVM::StateDb *state_db_ptr = nullptr, uint32_t start_index = 0,
                                   uint32_t clones = 1);
 
 /**

@@ -3,8 +3,8 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM::operations {
-__host__ __device__ int32_t BLOCKHASH(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                      const CuEVM::block_info_t &block) {
+__device__ int32_t BLOCKHASH(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                             const CuEVM::block_info_t &block) {
     gas_used += GAS_BLOCKHASH;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -23,8 +23,8 @@ __host__ __device__ int32_t BLOCKHASH(const CuEVM::gas_t &gas_limit, CuEVM::gas_
     return error_code;
 }
 
-__host__ __device__ int32_t COINBASE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                     const CuEVM::block_info_t &block) {
+__device__ int32_t COINBASE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                            const CuEVM::block_info_t &block) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -36,8 +36,8 @@ __host__ __device__ int32_t COINBASE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t
     return error_code;
 }
 
-__host__ __device__ int32_t TIMESTAMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                      const CuEVM::block_info_t &block) {
+__device__ int32_t TIMESTAMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                             const CuEVM::block_info_t &block) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -49,8 +49,8 @@ __host__ __device__ int32_t TIMESTAMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_
     return error_code;
 }
 
-__host__ __device__ int32_t NUMBER(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                   const CuEVM::block_info_t &block) {
+__device__ int32_t NUMBER(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                          const CuEVM::block_info_t &block) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -62,8 +62,8 @@ __host__ __device__ int32_t NUMBER(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &
     return error_code;
 }
 
-__host__ __device__ int32_t PREVRANDAO(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                       const CuEVM::block_info_t &block) {
+__device__ int32_t PREVRANDAO(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                              const CuEVM::block_info_t &block) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -77,8 +77,8 @@ __host__ __device__ int32_t PREVRANDAO(const CuEVM::gas_t &gas_limit, CuEVM::gas
     return error_code;
 }
 
-__host__ __device__ int32_t GASLIMIT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                     const CuEVM::block_info_t &block) {
+__device__ int32_t GASLIMIT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                            const CuEVM::block_info_t &block) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -90,8 +90,8 @@ __host__ __device__ int32_t GASLIMIT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t
     return error_code;
 }
 
-__host__ __device__ int32_t CHAINID(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                    const CuEVM::block_info_t &block) {
+__device__ int32_t CHAINID(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                           const CuEVM::block_info_t &block) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -103,8 +103,8 @@ __host__ __device__ int32_t CHAINID(const CuEVM::gas_t &gas_limit, CuEVM::gas_t 
     return error_code;
 }
 
-__host__ __device__ int32_t BASEFEE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                    const CuEVM::block_info_t &block) {
+__device__ int32_t BASEFEE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                           const CuEVM::block_info_t &block) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {

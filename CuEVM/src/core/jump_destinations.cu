@@ -5,7 +5,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 
 namespace CuEVM {
-__host__ __device__ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t &byte_code) {
+__device__ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t &byte_code) {
     return;  // temporarily disabled
     size = 0;
     capacity = 0;
@@ -52,7 +52,7 @@ __host__ __device__ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t
     //     }
     // }
 }
-__host__ __device__ void jump_destinations_t::set_bytecode(CuEVM::byte_array_t &byte_code) {
+__device__ void jump_destinations_t::set_bytecode(CuEVM::byte_array_t &byte_code) {
     return;  // temporarily disabled
     size = 0;
     uint8_t opcode;
@@ -86,13 +86,13 @@ __host__ __device__ void jump_destinations_t::set_bytecode(CuEVM::byte_array_t &
     //     printf("jump destination copied set_bytecode size %d capapcity %d\n", size, capacity, threadIdx.x);
     // #endif
 }
-__host__ __device__ jump_destinations_t::~jump_destinations_t() {
+__device__ jump_destinations_t::~jump_destinations_t() {
     if (capacity > 0) {
         delete[] destinations;
     }
 }
 
-__host__ __device__ uint32_t jump_destinations_t::has(uint32_t pc) {
+__device__ uint32_t jump_destinations_t::has(uint32_t pc) {
     return ERROR_SUCCESS;  // Temporarily disabled
     // return destinations.has_value(pc) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_INVALID_JUMP_DESTINATION;
 
@@ -109,7 +109,7 @@ __host__ __device__ uint32_t jump_destinations_t::has(uint32_t pc) {
     return error_code;
 }
 
-__host__ __device__ int32_t jump_destinations_t::grow_capacity(uint32_t new_capacity) {
+__device__ int32_t jump_destinations_t::grow_capacity(uint32_t new_capacity) {
     if (new_capacity == capacity) return ERROR_SUCCESS;
     uint16_t *new_data = new uint16_t[new_capacity];
     if (capacity > 0) {
@@ -127,7 +127,7 @@ __host__ __device__ int32_t jump_destinations_t::grow_capacity(uint32_t new_capa
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ void jump_destinations_t::print() {
+__device__ void jump_destinations_t::print() {
     // // Temporarily disabled
     // for (uint32_t i = 0; i < real_size; i++) {
     //     printf("Jump destination %d: %d\n", i, destinations[i]);

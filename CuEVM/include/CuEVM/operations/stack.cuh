@@ -1,6 +1,4 @@
-#ifndef _CUEVM_STACK_OP_H_
-#define _CUEVM_STACK_OP_H_
-
+#pragma once
 #include <CuEVM/core/stack.cuh>
 
 /**
@@ -12,8 +10,7 @@
  * - DUPX 80s: Duplication Operations
  * - SWAPX 90s: Exchange Operations
  */
-namespace CuEVM {
-namespace operations {
+namespace CuEVM::operations {
 /**
  * The POP operation implementation.
  * It pops the top element from the stack.
@@ -21,7 +18,7 @@ namespace operations {
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
  */
-__host__ __device__ int32_t POP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t POP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The PUSH0 operation implementation.
@@ -30,7 +27,7 @@ __host__ __device__ int32_t POP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__host__ __device__ int32_t PUSH0(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t PUSH0(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The PUSHX operation implementation.
@@ -45,8 +42,8 @@ __host__ __device__ int32_t PUSH0(const gas_t &gas_limit, gas_t &gas_used, CuEVM
  * @param[in] byte_code The bytecode.
  * @param[in] opcode The opcode.
  */
-__host__ __device__ int32_t PUSHX(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                                  const CuEVM::byte_array_t &byte_code, const uint8_t &opcode);
+__device__ int32_t PUSHX(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
+                         const CuEVM::byte_array_t &byte_code, const uint8_t &opcode);
 
 /**
  * The DUPX operation implementation.
@@ -63,8 +60,7 @@ __host__ __device__ int32_t PUSHX(const gas_t &gas_limit, gas_t &gas_used, uint3
  * @param[inout] stack The stack.
  * @param[in] opcode The opcode.
  */
-__host__ __device__ int32_t DUPX(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                 const uint8_t &opcode);
+__device__ int32_t DUPX(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, const uint8_t &opcode);
 
 /**
  * The SWAPX operation implementation.
@@ -81,9 +77,5 @@ __host__ __device__ int32_t DUPX(const gas_t &gas_limit, gas_t &gas_used, CuEVM:
  * @param[inout] stack The stack.
  * @param[in] opcode The opcode.
  */
-__host__ __device__ int32_t SWAPX(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  const uint8_t &opcode);
-}  // namespace operations
-}  // namespace CuEVM
-
-#endif
+__device__ int32_t SWAPX(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, const uint8_t &opcode);
+}  // namespace CuEVM::operations

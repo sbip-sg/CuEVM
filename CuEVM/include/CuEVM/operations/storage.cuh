@@ -1,11 +1,8 @@
-
-#ifndef _CUEVM_STORAGE_OP_H_
-#define _CUEVM_STORAGE_OP_H_
-
+#pragma once
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/state/touch_state.cuh>
-
+#include <CuEVM/gas_cost.cuh>
+#include <CuEVM/state/state_db.cuh>
 /**
  * 50s: Storage Operations:
  * - SLOAD
@@ -22,12 +19,12 @@ namespace CuEVM::operations {
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
- * @param[in] touch_state The touch state.
+ * @param[in] state_db The state db.
  * @param[in] message The message that started the execution.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  CuEVM::TouchState &touch_state, const CuEVM::evm_message_call_t &message);
+__device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, CuEVM::StateDb *state_db,
+                         const CuEVM::evm_message_call_t &message);
 
 /**
  * The SSTORE operation implementation.
@@ -41,14 +38,11 @@ __host__ __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM
  * @param[inout] gas_used The gas used.
  * @param[inout] gas_refund The gas refund.
  * @param[in] stack The stack.
- * @param[out] touch_state The touch state.
+ * @param[out] state_db The state db.
  * @param[in] message The message that started the execution.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t SSTORE(const gas_t &gas_limit, gas_t &gas_used, gas_t &gas_refund,
-                                   CuEVM::evm_stack_t &stack, CuEVM::TouchState &touch_state,
-                                   const CuEVM::evm_message_call_t &message);
+__device__ int32_t SSTORE(const gas_t &gas_limit, gas_t &gas_used, gas_t &gas_refund, CuEVM::evm_stack_t &stack,
+                          CuEVM::StateDb *state_db, const CuEVM::evm_message_call_t &message);
 
 }  // namespace CuEVM::operations
-
-#endif

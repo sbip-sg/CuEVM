@@ -3,11 +3,11 @@
 
 namespace CuEVM {
 namespace gas_cost {
-__host__ __device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used) {
+__device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used) {
     return (gas_limit < gas_used) ? ERROR_GAS_LIMIT_EXCEEDED : ERROR_SUCCESS;
 }
 
-__host__ __device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const gas_t &gas_used) {
+__device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const gas_t &gas_used) {
     // compute the remaining gas
     gas_t gas_left;
     gas_left = gas_limit - gas_used;
@@ -18,7 +18,7 @@ __host__ __device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit,
     gas_capped = gas_left - gas_capped;
 }
 
-__host__ __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word) {
+__device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word) {
     // gas_used += gas_per_word * emv word count of length
     // length = (length + 31) / 32
     gas_t evm_words_gas;
@@ -27,14 +27,14 @@ __host__ __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length
     gas_used += evm_words_gas;
 }
 
-__host__ __device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_byte) {
+__device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_byte) {
     // gas_used += gas_per_byte * bytes count of length
     gas_t evm_bytes_gas;
     evm_bytes_gas = length * gas_per_byte;
     gas_used += evm_bytes_gas;
 }
 
-__host__ __device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const evm_word_t &exponent) {
+__device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const evm_word_t &exponent) {
     // dynamic gas calculation (G_expbyte * bytes_in_exponent)
     // int32_t last_bit;
     // last_bit = CuEVM::word_bits - 1 - cgbn_clz(exponent);
@@ -46,49 +46,44 @@ __host__ __device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const evm_word_t
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ void initcode_cost(gas_t &gas_used, const gas_t &initcode_length) {
+__device__ void initcode_cost(gas_t &gas_used, const gas_t &initcode_length) {
     // gas_used += GAS_INITCODE_WORD_COST * emv word count of initcode
     // length = (initcode_length + 31) / 32
     evm_words_gas_cost(gas_used, initcode_length, GAS_INITCODE_WORD_COST);
 }
 
-__host__ __device__ void code_cost(gas_t &gas_used, const gas_t &code_length) {
+__device__ void code_cost(gas_t &gas_used, const gas_t &code_length) {
     // gas_used += GAS_CODE_DEPOSIT * length
     evm_bytes_gas_cost(gas_used, code_length, GAS_CODE_DEPOSIT);
 }
 
-__host__ __device__ void keccak_cost(gas_t &gas_used, const gas_t &length) {
+__device__ void keccak_cost(gas_t &gas_used, const gas_t &length) {
     evm_words_gas_cost(gas_used, length, GAS_KECCAK256_WORD);
 }
 
-__host__ __device__ void memory_cost(gas_t &gas_used, const gas_t &length) {
-    evm_words_gas_cost(gas_used, length, GAS_MEMORY);
-}
+__device__ void memory_cost(gas_t &gas_used, const gas_t &length) { evm_words_gas_cost(gas_used, length, GAS_MEMORY); }
 
-__host__ __device__ void log_record_cost(gas_t &gas_used, const gas_t &length) {
+__device__ void log_record_cost(gas_t &gas_used, const gas_t &length) {
     evm_bytes_gas_cost(gas_used, length, GAS_LOG_DATA);
 }
 
-__host__ __device__ void log_topics_cost(gas_t &gas_used, const uint32_t &no_topics) {
-    gas_used += GAS_LOG_TOPIC * no_topics;
-}
+__device__ void log_topics_cost(gas_t &gas_used, const uint32_t &no_topics) { gas_used += GAS_LOG_TOPIC * no_topics; }
 
-__host__ __device__ void sha256_cost(gas_t &gas_used, const gas_t &length) {
+__device__ void sha256_cost(gas_t &gas_used, const gas_t &length) {
     evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_SHA256_WORD);
 }
 
-__host__ __device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length) {
+__device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length) {
     evm_words_gas_cost(gas_used, length, GAS_PRECOMPILE_RIPEMD160_WORD);
 }
 
-__host__ __device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds) {
+__device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds) {
     // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
     gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds;
 }
 
-__host__ __device__ int32_t modexp_cost(gas_t &gas_used, const uint32_t &exponent_size,
-                                        const uint32_t &exponent_bit_length_bn,
-                                        const uint32_t &multiplication_complexity) {
+__device__ int32_t modexp_cost(gas_t &gas_used, const uint32_t &exponent_size, const uint32_t &exponent_bit_length_bn,
+                               const uint32_t &multiplication_complexity) {
     // compute the iteration count depending on the size
     // of the exponent and its most significant non-zero
     // bit of the least siginifcant 256 bits
@@ -166,30 +161,29 @@ __host__ __device__ int32_t modexp_cost(gas_t &gas_used, const uint32_t &exponen
     */ // TODO: reimplement this
     return ERROR_SUCCESS;
 }
-__host__ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
+__device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
     // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 *
     // GAS_PRECOMPILE_ECPAIRING_PAIR
     gas_used += GAS_PRECOMPILE_ECPAIRING + data_size / 192 * GAS_PRECOMPILE_ECPAIRING_PAIR;
 }
 
-__host__ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::TouchState &touch_state,
-                                                const evm_word_t *address) {
-    if (touch_state.is_warm_account(address)) {
+__device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address) {
+    if (state_db->is_warm_account(address)) {
         gas_used += GAS_WARM_ACCESS;
     } else {
         gas_used += GAS_COLD_ACCOUNT_ACCESS;
         // set the account warm in case it's cold
         // assuming this function is called only when the account is accessed
         // TODO: remove redundant logic
-        touch_state.set_warm_account(address);
+        state_db->set_warm_account(address);
     }
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::TouchState &touch_state, const evm_word_t *address,
-                                       const evm_word_t &key) {
+__device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::StateDb *state_db, const evm_word_t *address,
+                              const evm_word_t *key) {
     // get the key warm
-    if (touch_state.is_warm_key(address, key)) {
+    if (state_db->is_warm_key(address, key)) {
         gas_used += GAS_WARM_ACCESS;
     } else {
         gas_used += GAS_COLD_SLOAD;
@@ -197,15 +191,15 @@ __host__ __device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::TouchState 
 
     return ERROR_SUCCESS;
 }
-__host__ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::TouchState &touch_state,
-                                        const evm_word_t *address, const evm_word_t &key, const evm_word_t &new_value) {
+__device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::StateDb *state_db,
+                               const evm_word_t *address, const evm_word_t *key, const evm_word_t *new_value) {
     // get the key warm
-    if (touch_state.is_warm_key(address, key) == false) {
+    if (state_db->is_warm_key(address, key) == false) {
         gas_used += GAS_COLD_SLOAD;
     }
-    evm_word_t original_value, current_value;
-    touch_state.poke_original_value(address, key, original_value);
-    touch_state.poke_value(address, key, current_value);
+    evm_word_t *original_value, *current_value;
+    original_value = state_db->get_original_value(address, key);
+    current_value = state_db->get_value(address, key);
     // #ifdef __CUDA_ARCH__
     //     printf("SSTORE COST %d\n", threadIdx.x);
     //     print_bnt(arith, original_value);
@@ -213,29 +207,29 @@ __host__ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, cons
     //     print_bnt(arith, new_value);
     // #endif
     // EIP-2200
-    if (new_value == current_value) {
+    if (*new_value == *current_value) {
         gas_used += GAS_SLOAD;
     } else {
-        if (current_value == original_value) {
-            if (uint256_is_zero(&original_value)) {
+        if (*current_value == *original_value) {
+            if (uint256_is_zero(original_value)) {
                 gas_used += GAS_STORAGE_SET;
             } else {
                 gas_used += GAS_SSTORE_RESET;
-                if (uint256_is_zero(&new_value)) {
+                if (uint256_is_zero(new_value)) {
                     gas_refund += GAS_SSTORE_CLEARS_SCHEDULE;
                 }
             }
         } else {
             gas_used += GAS_SLOAD;
-            if (uint256_is_zero(&original_value)) {
-                if (uint256_is_zero(&current_value)) {
+            if (uint256_is_zero(original_value)) {
+                if (uint256_is_zero(current_value)) {
                     gas_refund -= GAS_STORAGE_CLEAR_REFUND;
-                } else if (uint256_is_zero(&new_value)) {
+                } else if (uint256_is_zero(new_value)) {
                     gas_refund += GAS_STORAGE_CLEAR_REFUND;
                 }
             }
             if (original_value == new_value) {
-                if (uint256_is_zero(&original_value)) {
+                if (uint256_is_zero(original_value)) {
                     gas_refund += GAS_STORAGE_SET - GAS_SLOAD;
                 } else {
                     gas_refund += GAS_STORAGE_RESET - GAS_SLOAD;
@@ -246,8 +240,7 @@ __host__ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, cons
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &transaction,
-                                                      gas_t &gas_intrinsic) {
+__device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &transaction, gas_t &gas_intrinsic) {
     // gas_intrinsic = GAS_TRANSACTION
     gas_intrinsic = GAS_TRANSACTION;
 
@@ -284,8 +277,8 @@ __host__ __device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transacti
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, const evm_word_t &index,
-                                             const evm_word_t &length, gas_t &memory_expansion_cost, gas_t &gas_used) {
+__device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, const evm_word_t &index,
+                                    const evm_word_t &length, gas_t &memory_expansion_cost, gas_t &gas_used) {
     // reset to 0;
     memory_expansion_cost = 0;
     /*

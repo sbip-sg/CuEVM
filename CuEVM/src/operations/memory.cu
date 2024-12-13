@@ -3,8 +3,8 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM::operations {
-__host__ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  CuEVM::evm_memory_t &memory) {
+__device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                         CuEVM::evm_memory_t &memory) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -41,8 +41,8 @@ __host__ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     return error_code;
 }
 
-__host__ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                   CuEVM::evm_memory_t &memory) {
+__device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                          CuEVM::evm_memory_t &memory) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -73,8 +73,8 @@ __host__ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &
     return error_code;
 }
 
-__host__ __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                    CuEVM::evm_memory_t &memory) {
+__device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                           CuEVM::evm_memory_t &memory) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     // #ifdef __CUDA_ARCH__
@@ -107,8 +107,8 @@ __host__ __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t 
     return error_code;
 }
 
-__host__ __device__ int32_t MSIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  const CuEVM::evm_memory_t &memory) {
+__device__ int32_t MSIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                         const CuEVM::evm_memory_t &memory) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {

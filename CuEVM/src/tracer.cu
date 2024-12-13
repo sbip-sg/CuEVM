@@ -6,8 +6,8 @@
 
 namespace CuEVM::utils {
 
-__host__ __device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
-                                                                const CuEVM::evm_stack_t &stack_ptr) {
+__device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
+                                                       const CuEVM::evm_stack_t &stack_ptr) {
     if (no_events >= MAX_TRACE_EVENTS) return;
     events[no_events].pc = pc;
     events[no_events].op = op;
@@ -20,7 +20,7 @@ __host__ __device__ void simplified_trace_data::start_operation(const uint32_t p
     }
 }
 
-__host__ __device__ void simplified_trace_data::record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed) {
+__device__ void simplified_trace_data::record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed) {
     if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
     branches[no_branches].pc_src = pc_src;
     branches[no_branches].pc_dst = pc_dst;
@@ -31,7 +31,7 @@ __host__ __device__ void simplified_trace_data::record_branch(uint32_t pc_src, u
     no_branches++;
 }
 
-__host__ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::evm_stack_t &stack_ptr) {
+__device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::evm_stack_t &stack_ptr) {
     evm_word_t distance, op1, op2;
     uint32_t stack_size = stack_ptr.size();
 
@@ -48,14 +48,13 @@ __host__ __device__ void simplified_trace_data::record_distance(uint8_t op, cons
     last_distance = distance;
 }
 
-__host__ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t &stack_ptr,
-                                                                 uint32_t error_code) {
+__device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t &stack_ptr, uint32_t error_code) {
     if (no_events >= MAX_TRACE_EVENTS) return;
     if (events[no_events].op < OP_REVERT && events[no_events].op != OP_SSTORE)
         events[no_events].res = *stack_ptr.get_address_at_index(1);
     no_events++;
 }
-__host__ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_message_call_t *message_call_ptr) {
+__device__ void simplified_trace_data::start_call(uint32_t pc, evm_message_call_t *message_call_ptr) {
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
@@ -68,7 +67,7 @@ __host__ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_mess
 
     no_calls++;
 }
-__host__ __device__ void simplified_trace_data::finish_call(uint8_t success) {
+__device__ void simplified_trace_data::finish_call(uint8_t success) {
     if (no_calls > MAX_CALLS_TRACING) return;
 
     // printf("no_calls %u \n", no_calls);
@@ -79,7 +78,7 @@ __host__ __device__ void simplified_trace_data::finish_call(uint8_t success) {
         }
     }
 }
-__host__ __device__ void simplified_trace_data::print() {
+__device__ void simplified_trace_data::print() {
     printf("no_events %u\n", no_events);
     printf("no_calls %u\n", no_calls);
     printf("events\n");
@@ -134,7 +133,7 @@ __host__ cJSON *trace_data_t::to_json() {
 // New device function to copy and print tracer data
 __device__ void tracer_t::print_device_err() {}
 
-__host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
+__device__ void trace_data_t::print_err(char *hex_string_ptr) {
     char *tmp = nullptr;
     if (hex_string_ptr == nullptr) {
         tmp = new char[CuEVM::word_size * 2 + 3];
@@ -183,9 +182,9 @@ __host__ __device__ void trace_data_t::print_err(char *hex_string_ptr) {
     }
 }
 
-__host__ __device__ tracer_t::tracer_t() : data(nullptr), size(0), capacity(0) {}
+__device__ tracer_t::tracer_t() : data(nullptr), size(0), capacity(0) {}
 
-__host__ __device__ tracer_t::~tracer_t() {
+__device__ tracer_t::~tracer_t() {
     if (data != nullptr) {
         for (uint32_t i = 0; i < size; i++) {
             delete[] data[i].stack;
@@ -198,7 +197,7 @@ __host__ __device__ tracer_t::~tracer_t() {
     }
 }
 
-__host__ __device__ void tracer_t::grow() {
+__device__ void tracer_t::grow() {
     trace_data_t *new_data = new trace_data_t[capacity + 128];
     if (data != nullptr) {
         memcpy(new_data, data, sizeof(trace_data_t) * size);
@@ -208,11 +207,10 @@ __host__ __device__ void tracer_t::grow() {
     capacity += 128;
 }
 
-__host__ __device__ uint32_t tracer_t::start_operation(const uint32_t pc, const uint8_t op,
-                                                       const CuEVM::evm_memory_t &memory,
-                                                       const CuEVM::evm_stack_t &stack, const uint32_t depth,
-                                                       const CuEVM::evm_return_data_t &return_data,
-                                                       const CuEVM::gas_t &gas_limit, const CuEVM::gas_t &gas_used) {
+__device__ uint32_t tracer_t::start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_memory_t &memory,
+                                              const CuEVM::evm_stack_t &stack, const uint32_t depth,
+                                              const CuEVM::evm_return_data_t &return_data,
+                                              const CuEVM::gas_t &gas_limit, const CuEVM::gas_t &gas_used) {
     if (size == capacity) {
         grow();
     }
@@ -247,11 +245,11 @@ __host__ __device__ uint32_t tracer_t::start_operation(const uint32_t pc, const 
     return size++;
 }
 
-__host__ __device__ void tracer_t::finish_operation(const uint32_t idx, const CuEVM::gas_t &gas_used,
-                                                    const CuEVM::gas_t &gas_refund
+__device__ void tracer_t::finish_operation(const uint32_t idx, const CuEVM::gas_t &gas_used,
+                                           const CuEVM::gas_t &gas_refund
 #ifdef EIP_3155_OPTIONAL
-                                                    ,
-                                                    const uint32_t error_code
+                                           ,
+                                           const uint32_t error_code
 // , const CuEVM::contract_storage_t &storage
 #endif
 ) {
@@ -266,14 +264,14 @@ __host__ __device__ void tracer_t::finish_operation(const uint32_t idx, const Cu
 #endif
 }
 
-__host__ __device__ void tracer_t::finish_transaction(const CuEVM::evm_return_data_t &return_data,
-                                                      const CuEVM::gas_t &gas_used, uint32_t error_code) {
+__device__ void tracer_t::finish_transaction(const CuEVM::evm_return_data_t &return_data, const CuEVM::gas_t &gas_used,
+                                             uint32_t error_code) {
     this->return_data = return_data;
     this->gas_used = gas_used;
     this->status = error_code;
 }
 
-__host__ __device__ void tracer_t::print() {
+__device__ void tracer_t::print() {
     for (uint32_t i = 0; i < size; i++) {
         printf("PC: %d\n", data[i].pc);
         printf("Opcode: %d\n", data[i].op);
@@ -301,7 +299,7 @@ __host__ __device__ void tracer_t::print() {
     }
 }
 
-__host__ __device__ void tracer_t::print_err() {
+__device__ void tracer_t::print_err() {
     char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
     for (uint32_t i = 0; i < size; i++) {
         data[i].print_err(hex_string_ptr);

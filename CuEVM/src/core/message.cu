@@ -2,7 +2,7 @@
 
 namespace CuEVM {
 
-__host__ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
+__device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
     const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *contract_address, const gas_t gas_limit,
     const evm_word_t *value, const uint32_t depth, const uint32_t call_type, const evm_word_t *storage_address,
     const CuEVM::byte_array_t &data, const CuEVM::byte_array_t &byte_code, const evm_word_t &return_data_offset,
@@ -43,7 +43,7 @@ __host__ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
 }
 
 // Copy function , only words global -> shared mem
-__host__ __device__ void evm_message_call_t::copy_from(const evm_message_call_t_shadow *other) {
+__device__ void evm_message_call_t::copy_from(const evm_message_call_t_shadow *other) {
     // printf("evm_message_call_t copy_from other\n ");
 
     // sender = other.sender;
@@ -65,7 +65,7 @@ __host__ __device__ void evm_message_call_t::copy_from(const evm_message_call_t_
     gas_limit = other->gas_limit;
 }
 
-__host__ __device__ evm_message_call_t::~evm_message_call_t() {
+__device__ evm_message_call_t::~evm_message_call_t() {
     // todo maybe to delete the inside vectors who knows
     delete jump_destinations;
     jump_destinations = nullptr;
@@ -80,21 +80,21 @@ __host__ __device__ evm_message_call_t::~evm_message_call_t() {
  * @param[in] arith The arithmetical environment.
  * @param[out] sender The sender address YP: \f$s\f$.
  */
-__host__ __device__ void evm_message_call_t::get_sender(evm_word_t &sender) const { sender = this->sender; }
+__device__ void evm_message_call_t::get_sender(evm_word_t &sender) const { sender = this->sender; }
 
 /**
  * Get the recipient address.
  * @param[in] arith The arithmetical environment.
  * @param[out] recipient The recipient address YP: \f$r\f$.
  */
-__host__ __device__ void evm_message_call_t::get_recipient(evm_word_t &recipient) const { recipient = this->recipient; }
+__device__ void evm_message_call_t::get_recipient(evm_word_t &recipient) const { recipient = this->recipient; }
 
 /**
  * Get the contract address.
  * @param[in] arith The arithmetical environment.
  * @param[out] contract_address The contract address YP: \f$c\f$.
  */
-__host__ __device__ void evm_message_call_t::get_contract_address(evm_word_t &contract_address) const {
+__device__ void evm_message_call_t::get_contract_address(evm_word_t &contract_address) const {
     contract_address = this->contract_address;
 }
 
@@ -103,33 +103,33 @@ __host__ __device__ void evm_message_call_t::get_contract_address(evm_word_t &co
  * @param[in] arith The arithmetical environment.
  * @param[out] gas_limit The gas limit YP: \f$g\f$.
  */
-__host__ __device__ void evm_message_call_t::get_gas_limit(gas_t &gas_limit) const { gas_limit = this->gas_limit; }
+__device__ void evm_message_call_t::get_gas_limit(gas_t &gas_limit) const { gas_limit = this->gas_limit; }
 
 /**
  * Get the value.
  * @param[in] arith The arithmetical environment.
  * @param[out] value The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL.
  */
-__host__ __device__ void evm_message_call_t::get_value(evm_word_t &value) const { value = this->value; }
+__device__ void evm_message_call_t::get_value(evm_word_t &value) const { value = this->value; }
 
 /**
  * Get the depth.
  * @return The depth YP: \f$e\f$.
  */
-__host__ __device__ uint32_t evm_message_call_t::get_depth() const { return this->depth; }
+__device__ uint32_t evm_message_call_t::get_depth() const { return this->depth; }
 
 /**
  * Get the call type.
  * @return The call type internal has the opcode YP: \f$w\f$.
  */
-__host__ __device__ uint32_t evm_message_call_t::get_call_type() const { return this->call_type; }
+__device__ uint32_t evm_message_call_t::get_call_type() const { return this->call_type; }
 
 /**
  * Get the storage address.
  * @param[in] arith The arithmetical environment.
  * @param[out] storage_address The storage address YP: \f$a\f$.
  */
-__host__ __device__ void evm_message_call_t::get_storage_address(evm_word_t &storage_address) const {
+__device__ void evm_message_call_t::get_storage_address(evm_word_t &storage_address) const {
     storage_address = this->storage_address;
 }
 
@@ -137,20 +137,20 @@ __host__ __device__ void evm_message_call_t::get_storage_address(evm_word_t &sto
  * Get the call/init data.
  * @return The data YP: \f$d\f$.
  */
-__host__ __device__ CuEVM::byte_array_t evm_message_call_t::get_data() const { return *this->data; }
+__device__ CuEVM::byte_array_t evm_message_call_t::get_data() const { return *this->data; }
 
 /**
  * Get the byte code.
  * @return The byte code YP: \f$b\f$.
  */
-__host__ __device__ CuEVM::byte_array_t evm_message_call_t::get_byte_code() const { return *this->byte_code; }
+__device__ CuEVM::byte_array_t evm_message_call_t::get_byte_code() const { return *this->byte_code; }
 
 /**
  * Get the return data offset.
  * @param[in] arith The arithmetical environment.
  * @param[out] return_data_offset The return data offset in memory.
  */
-__host__ __device__ void evm_message_call_t::get_return_data_offset(evm_word_t &return_data_offset) const {
+__device__ void evm_message_call_t::get_return_data_offset(evm_word_t &return_data_offset) const {
     return_data_offset = this->return_data_offset;
 }
 
@@ -159,7 +159,7 @@ __host__ __device__ void evm_message_call_t::get_return_data_offset(evm_word_t &
  * @param[in] arith The arithmetical environment.
  * @param[out] return_data_size The return data size in memory.
  */
-__host__ __device__ void evm_message_call_t::get_return_data_size(evm_word_t &return_data_size) const {
+__device__ void evm_message_call_t::get_return_data_size(evm_word_t &return_data_size) const {
     return_data_size = this->return_data_size;
 }
 
@@ -167,26 +167,26 @@ __host__ __device__ void evm_message_call_t::get_return_data_size(evm_word_t &re
  * Get the static flag.
  * @return The static flag (STATICCALL) YP: \f$w\f$.
  */
-__host__ __device__ uint32_t evm_message_call_t::get_static_env() const { return this->static_env; }
+__device__ uint32_t evm_message_call_t::get_static_env() const { return this->static_env; }
 
 /**
  * Set the gas limit.
  * @param[in] arith The arithmetical environment.
  * @param[in] gas_limit The gas limit YP: \f$g\f$.
  */
-__host__ __device__ void evm_message_call_t::set_gas_limit(gas_t &gas_limit) { this->gas_limit = gas_limit; }
+__device__ void evm_message_call_t::set_gas_limit(gas_t &gas_limit) { this->gas_limit = gas_limit; }
 
 /**
  * Set the call data.
  * @param[in] data The data YP: \f$d\f$.
  */
-__host__ __device__ void evm_message_call_t::set_data(CuEVM::byte_array_t &data) { *this->data = data; }
+__device__ void evm_message_call_t::set_data(CuEVM::byte_array_t &data) { *this->data = data; }
 
 /**
  * Set the byte code.
  * @param[in] byte_code The byte code YP: \f$b\f$.
  */
-__host__ __device__ void evm_message_call_t::set_byte_code(CuEVM::byte_array_t &byte_code) {
+__device__ void evm_message_call_t::set_byte_code(CuEVM::byte_array_t &byte_code) {
     *this->byte_code = byte_code;
     // printf("*this->byte_code = byte_code; \n");
     // this->byte_code->print();
@@ -210,7 +210,7 @@ __host__ __device__ void evm_message_call_t::set_byte_code(CuEVM::byte_array_t &
  * @param[in] arith The arithmetical environment.
  * @param[in] return_data_offset The return data offset in memory.
  */
-__host__ __device__ void evm_message_call_t::set_return_data_offset(evm_word_t &return_data_offset) {
+__device__ void evm_message_call_t::set_return_data_offset(evm_word_t &return_data_offset) {
     this->return_data_offset = return_data_offset;
 }
 
@@ -219,7 +219,7 @@ __host__ __device__ void evm_message_call_t::set_return_data_offset(evm_word_t &
  * @param[in] arith The arithmetical environment.
  * @param[in] return_data_size The return data size in memory.
  */
-__host__ __device__ void evm_message_call_t::set_return_data_size(evm_word_t &return_data_size) {
+__device__ void evm_message_call_t::set_return_data_size(evm_word_t &return_data_size) {
     this->return_data_size = return_data_size;
 }
 
@@ -227,7 +227,7 @@ __host__ __device__ void evm_message_call_t::set_return_data_size(evm_word_t &re
  * Get the jump destinations.
  * @return The jump destinations.
  */
-// __host__ __device__ CuEVM::jump_destinations_t *evm_message_call_t::get_jump_destinations() const {
+// __device__ CuEVM::jump_destinations_t *evm_message_call_t::get_jump_destinations() const {
 //     return jump_destinations;
 // }
 

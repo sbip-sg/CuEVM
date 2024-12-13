@@ -23,8 +23,8 @@ namespace CuEVM::operations {
  * @param[in] memory The memory.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t MLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  CuEVM::evm_memory_t &memory);
+__device__ int32_t MLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                         CuEVM::evm_memory_t &memory);
 
 /**
  * The MSTORE operation implementation.
@@ -37,8 +37,8 @@ __host__ __device__ int32_t MLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM
  * @param[out] memory The memory.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t MSTORE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                   CuEVM::evm_memory_t &memory);
+__device__ int32_t MSTORE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                          CuEVM::evm_memory_t &memory);
 
 /**
  * The MSTORE8 operation implementation.
@@ -51,8 +51,8 @@ __host__ __device__ int32_t MSTORE(const gas_t &gas_limit, gas_t &gas_used, CuEV
  * @param[out] memory The memory.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t MSTORE8(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                    CuEVM::evm_memory_t &memory);
+__device__ int32_t MSTORE8(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                           CuEVM::evm_memory_t &memory);
 
 /**
  * The MSIZE operation implementation.
@@ -63,8 +63,8 @@ __host__ __device__ int32_t MSTORE8(const gas_t &gas_limit, gas_t &gas_used, CuE
  * @param[in] memory The memory.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__host__ __device__ int32_t MSIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  const CuEVM::evm_memory_t &memory);
+__device__ int32_t MSIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                         const CuEVM::evm_memory_t &memory);
 }  // namespace CuEVM::operations
 
 #endif

@@ -4,19 +4,17 @@
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/evm_call_state.cuh>
-#include <CuEVM/state/state.cuh>
-#include <CuEVM/state/world_state.cuh>
+#include <CuEVM/state/state_db.cuh>
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/ecc_constants.cuh>
 namespace CuEVM {
 struct evm_instance_t {
-    CuEVM::state_t* world_state_data_ptr;        /**< The world state pointer*/
-    CuEVM::block_info_t* block_info_ptr;         /**< The block info pointer*/
-    CuEVM::evm_transaction_t* transaction_ptr;   /**< The transaction pointer*/
-    CuEVM::state_access_t* touch_state_data_ptr; /**< The final touch state pointer*/
-    CuEVM::log_state_data_t* log_state_ptr;      /**< The log state pointer*/
-    CuEVM::evm_return_data_t* return_data_ptr;   /**< The return data pointer*/
-    CuEVM::EccConstants* ecc_constants_ptr;      /**< The ecc constants pointer*/
+    CuEVM::StateDb* state_db_ptr;              /**< The world state pointer*/
+    CuEVM::block_info_t* block_info_ptr;       /**< The block info pointer*/
+    CuEVM::evm_transaction_t* transaction_ptr; /**< The transaction pointer*/
+    CuEVM::log_state_data_t* log_state_ptr;    /**< The log state pointer*/
+    CuEVM::evm_return_data_t* return_data_ptr; /**< The return data pointer*/
+    CuEVM::EccConstants* ecc_constants_ptr;    /**< The ecc constants pointer*/
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer*/
 #endif
@@ -25,7 +23,7 @@ struct evm_instance_t {
     CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
 };
 struct evm_t {
-    CuEVM::WorldState world_state;                   /**< The world state */
+    CuEVM::StateDb* state_db_ptr;                    /**< The world state pointer*/
     const CuEVM::block_info_t* block_info_ptr;       /**< The block info pointer */
     const CuEVM::evm_transaction_t* transaction_ptr; /**< The transaction pointer */
     CuEVM::evm_call_state_t* call_state_ptr;         /**< The call state pointer store in global mem*/
@@ -50,19 +48,17 @@ struct evm_t {
      * @param[in] return_data_ptr The return data pointer
      * @param[in] tracer_ptr The tracer pointer
      */
-    __host__ __device__ evm_t(CuEVM::state_t* world_state_data_ptr, CuEVM::block_info_t* block_info_ptr,
-                              CuEVM::evm_transaction_t* transaction_ptr, CuEVM::state_access_t* touch_state_data_ptr,
-                              CuEVM::log_state_data_t* log_state_ptr, CuEVM::evm_return_data_t* return_data_ptr,
-                              CuEVM::EccConstants* ecc_constants_ptr,
-                              CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr
+    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::block_info_t* block_info_ptr,
+                     CuEVM::evm_transaction_t* transaction_ptr, CuEVM::EccConstants* ecc_constants_ptr,
+                     CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
-                              ,
-                              CuEVM::utils::tracer_t* tracer_ptr
+                     ,
+                     CuEVM::utils::tracer_t* tracer_ptr
 #endif
 
-                              ,
-                              CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr,
-                              CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr);
+                     ,
+                     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr,
+                     CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr);
 
     /**
      * @brief Construct a new evm_t object
@@ -70,15 +66,14 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @param[in] evm_instance The evm instance
      */
-    __host__ __device__ evm_t(CuEVM::evm_instance_t& evm_instance,
-                              CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
-                              CuEVM::evm_word_t* shared_stack_ptr = nullptr);
+    __device__ evm_t(CuEVM::evm_instance_t& evm_instance, CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
+                     CuEVM::evm_word_t* shared_stack_ptr = nullptr);
 
     /**
      * @brief Destroy the evm_t object
      * Destroy the evm_t object
      */
-    __host__ __device__ ~evm_t();
+    __device__ ~evm_t();
 
     /**
      * @brief Start a new call operation
@@ -87,7 +82,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t start_CALL(cached_evm_call_state& cache_call_state);
+    __device__ int32_t start_CALL(cached_evm_call_state& cache_call_state);
 
     /**
      * @brief Finish a call operation
@@ -98,7 +93,7 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_CALL(int32_t error_code);
+    __device__ int32_t finish_CALL(int32_t error_code);
 
     /**
      * @brief Finish a CREATEX operation.
@@ -107,7 +102,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_CREATE(cached_evm_call_state& cache_call_state);
+    __device__ int32_t finish_CREATE(cached_evm_call_state& cache_call_state);
 
     /**
      * @brief Finish a transaction operation.
@@ -119,15 +114,15 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __host__ __device__ int32_t finish_TRANSACTION(int32_t error_code);
+    __device__ int32_t finish_TRANSACTION(int32_t error_code);
 
     /**
      * @brief run the EVM for the given transaction
      * Run the EVM for the given transaction
      * @param[in] arith The arithmetic environment
      */
-    __host__ __device__ void run(cached_evm_call_state& cache_call_state);
-    __host__ __device__ void run();
+    __device__ void run(cached_evm_call_state& cache_call_state);
+    __device__ void run();
 };
 
 typedef int32_t (*evm_operation_f)(CuEVM::evm_call_state_t* call_state);

@@ -37,9 +37,7 @@ struct log_state_data_t {
      */
     __host__ __device__ ~log_state_data_t() {
         if (logs != nullptr && capacity > 0) {
-            __ONE_GPU_THREAD_WOSYNC_BEGIN__
             delete[] logs;
-            __ONE_GPU_THREAD_WOSYNC_END__
         }
         logs = nullptr;
         capacity = 0;
@@ -50,7 +48,7 @@ struct log_state_data_t {
      * Increase the capacity of log state
      * @return 0 if success, error otherwise
      */
-    __host__ __device__ int32_t grow();
+    __device__ int32_t grow();
 
     /**
      * Push a log to the log state
@@ -64,9 +62,9 @@ struct log_state_data_t {
      * @param[in] no_topics The number of topics of the log
      * @return 0 if success, error otherwise
      */
-    __host__ __device__ int32_t push(const evm_word_t &address, const CuEVM::byte_array_t &record,
-                                     const evm_word_t &topic_1, const evm_word_t &topic_2, const evm_word_t &topic_3,
-                                     const evm_word_t &topic_4, const uint32_t &no_topics);
+    __device__ int32_t push(const evm_word_t &address, const CuEVM::byte_array_t &record, const evm_word_t &topic_1,
+                            const evm_word_t &topic_2, const evm_word_t &topic_3, const evm_word_t &topic_4,
+                            const uint32_t &no_topics);
 
     /**
      * Update the log state with the logs from another log state
@@ -74,12 +72,12 @@ struct log_state_data_t {
      * @param[in] other The other log state
      * @return 0 if success, error otherwise
      */
-    __host__ __device__ int32_t update(const log_state_data_t &other);
+    __device__ int32_t update(const log_state_data_t &other);
 
     /**
      * Print the log state
      */
-    __host__ __device__ void print() const;
+    __device__ void print() const;
 
     /**
      * Convert the log state to a JSON object

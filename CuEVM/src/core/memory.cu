@@ -3,14 +3,12 @@
 
 namespace CuEVM {
 namespace memory {
-__host__ __device__ void evm_memory_t::print() const {
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+__device__ void evm_memory_t::print() const {
     printf("Memory data: \n");
     printf("Size: %d\n", size);
     printf("Memory cost: %lu\n", memory_cost);
     printf("\n");
     data.print();
-    __ONE_GPU_THREAD_WOSYNC_END__
 }
 
 __host__ cJSON *evm_memory_t::to_json() const {
@@ -21,13 +19,13 @@ __host__ cJSON *evm_memory_t::to_json() const {
     return json;
 }
 
-__host__ __device__ void evm_memory_t::get_memory_cost(gas_t &cost) const { cost = memory_cost; }
+__device__ void evm_memory_t::get_memory_cost(gas_t &cost) const { cost = memory_cost; }
 
-__host__ __device__ void evm_memory_t::increase_memory_cost(gas_t memory_expansion_cost) {
+__device__ void evm_memory_t::increase_memory_cost(gas_t memory_expansion_cost) {
     memory_cost += memory_expansion_cost;
 }
 
-__host__ __device__ int32_t evm_memory_t::allocate_pages(uint32_t new_size) {
+__device__ int32_t evm_memory_t::allocate_pages(uint32_t new_size) {
     if (new_size < data.size) {
         return ERROR_SUCCESS;
     }
@@ -35,8 +33,8 @@ __host__ __device__ int32_t evm_memory_t::allocate_pages(uint32_t new_size) {
     return data.grow(new_page_count * CuEVM::memory::page_size, 1);
 }
 
-__host__ __device__ int32_t evm_memory_t::get_last_offset(const evm_word_t &index, const evm_word_t &length,
-                                                          uint32_t &offset) const {
+__device__ int32_t evm_memory_t::get_last_offset(const evm_word_t &index, const evm_word_t &length,
+                                                 uint32_t &offset) const {
     int32_t overflow = 0;
     /*    bn_t offset_bn;
         overflow = cgbn_add(arith.env, offset_bn, index, length);
@@ -55,7 +53,7 @@ __host__ __device__ int32_t evm_memory_t::get_last_offset(const evm_word_t &inde
     return overflow;
 }
 
-__host__ __device__ int32_t evm_memory_t::grow(const evm_word_t &index, const evm_word_t &length) {
+__device__ int32_t evm_memory_t::grow(const evm_word_t &index, const evm_word_t &length) {
     uint32_t offset;
     if (get_last_offset(index, length, offset) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
@@ -69,8 +67,7 @@ __host__ __device__ int32_t evm_memory_t::grow(const evm_word_t &index, const ev
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_memory_t::get(const evm_word_t &index, const evm_word_t &length,
-                                              CuEVM::byte_array_t &data) {
+__device__ int32_t evm_memory_t::get(const evm_word_t &index, const evm_word_t &length, CuEVM::byte_array_t &data) {
     int32_t error_code = ERROR_SUCCESS;
     if (uint256_is_zero(&length)) {
         data = CuEVM::byte_array_t();
@@ -88,8 +85,8 @@ __host__ __device__ int32_t evm_memory_t::get(const evm_word_t &index, const evm
     return error_code;
 }
 
-__host__ __device__ int32_t evm_memory_t::set(const CuEVM::byte_array_t &data, const evm_word_t &index,
-                                              const evm_word_t &length) {
+__device__ int32_t evm_memory_t::set(const CuEVM::byte_array_t &data, const evm_word_t &index,
+                                     const evm_word_t &length) {
     int32_t error_code = ERROR_SUCCESS;
     // error_code = (uint256_is_negative(&length)) ? ERR_MEMORY_INVALID_SIZE : error_code;
     error_code |= grow(index, length);

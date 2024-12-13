@@ -3,8 +3,8 @@
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
 namespace CuEVM::operations {
-__host__ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc,
-                                 CuEVM::evm_stack_t &stack, const CuEVM::evm_message_call_t &message) {
+__device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
+                        const CuEVM::evm_message_call_t &message) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -29,11 +29,11 @@ __host__ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &ga
     return error_code;
 }
 
-__host__ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc,
-                                  CuEVM::evm_stack_t &stack, const CuEVM::evm_message_call_t &message
+__device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
+                         const CuEVM::evm_message_call_t &message
 #ifdef BUILD_LIBRARY
-                                  ,
-                                  CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
+                         ,
+                         CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
 #endif
 ) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -73,8 +73,8 @@ __host__ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     return error_code;
 }
 
-__host__ __device__ int32_t PC(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, const uint32_t &pc,
-                               CuEVM::evm_stack_t &stack) {
+__device__ int32_t PC(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, const uint32_t &pc,
+                      CuEVM::evm_stack_t &stack) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     evm_word_t pc_bn;
@@ -83,7 +83,7 @@ __host__ __device__ int32_t PC(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
     return error_code;
 }
 
-__host__ __device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
+__device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     gas_t gas_left;
@@ -92,7 +92,7 @@ __host__ __device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
     return error_code;
 }
 
-__host__ __device__ int32_t JUMPDEST(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used) {
+__device__ int32_t JUMPDEST(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     return error_code;

@@ -2,7 +2,7 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
-__host__ __device__ int32_t log_state_data_t::grow() {
+__device__ int32_t log_state_data_t::grow() {
     log_data_t *new_logs;
     new_logs = new log_data_t[capacity + log_page_size];
     // printf("allocate capacity  %d for logpointer %p new_logs %p\n", capacity + log_page_size, this, new_logs);
@@ -19,10 +19,10 @@ __host__ __device__ int32_t log_state_data_t::grow() {
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t log_state_data_t::push(const evm_word_t &address, const byte_array_t &record,
-                                                   const evm_word_t &topic_1, const evm_word_t &topic_2,
-                                                   const evm_word_t &topic_3, const evm_word_t &topic_4,
-                                                   const uint32_t &no_topics) {
+__device__ int32_t log_state_data_t::push(const evm_word_t &address, const byte_array_t &record,
+                                          const evm_word_t &topic_1, const evm_word_t &topic_2,
+                                          const evm_word_t &topic_3, const evm_word_t &topic_4,
+                                          const uint32_t &no_topics) {
     int32_t error_code = ERROR_SUCCESS;
 
     if (no_logs == capacity) {
@@ -41,7 +41,7 @@ __host__ __device__ int32_t log_state_data_t::push(const evm_word_t &address, co
     return error_code;
 }
 
-__host__ __device__ int32_t log_state_data_t::update(const log_state_data_t &other) {
+__device__ int32_t log_state_data_t::update(const log_state_data_t &other) {
     int32_t error_code = ERROR_SUCCESS;
     evm_word_t address, topic_1, topic_2, topic_3, topic_4;
 
@@ -57,7 +57,7 @@ __host__ __device__ int32_t log_state_data_t::update(const log_state_data_t &oth
     return error_code;
 }
 
-__host__ __device__ void log_state_data_t::print() const {
+__device__ void log_state_data_t::print() const {
     printf("no_logs: %u\n", no_logs);
     for (uint32_t idx = 0; idx < no_logs; idx++) {
         printf("logs[%u]:\n", idx);

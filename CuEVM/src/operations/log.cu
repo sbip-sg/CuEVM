@@ -7,9 +7,9 @@
  * - LOGX
  */
 namespace CuEVM::operations {
-__host__ __device__ int32_t LOGX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                 CuEVM::evm_memory_t &memory, const CuEVM::evm_message_call_t &message,
-                                 CuEVM::log_state_data_t &log_state, const uint8_t &opcode) {
+__device__ int32_t LOGX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                        CuEVM::evm_memory_t &memory, const CuEVM::evm_message_call_t &message,
+                        CuEVM::log_state_data_t &log_state, const uint8_t &opcode) {
     int32_t error_code = (message.get_static_env() ? ERROR_STATIC_CALL_CONTEXT_SSTORE : ERROR_SUCCESS);
 
     uint32_t no_topics = opcode & 0x0F;

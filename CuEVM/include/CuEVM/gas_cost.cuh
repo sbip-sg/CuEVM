@@ -2,7 +2,7 @@
 
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/transaction.cuh>
-#include <CuEVM/state/touch_state.cuh>
+#include <CuEVM/state/state_db.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 
 #define GAS_ZERO 0
@@ -78,7 +78,7 @@ namespace gas_cost {
  * @param[in] gas_used The gas used
  * @return 0 for enough gas, 1 for not enough gas or error
  */
-__host__ __device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used);
+__device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used);
 /**
  * Compute the max gas call.
  * @param[in] arith The arithmetic environment
@@ -86,7 +86,7 @@ __host__ __device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_use
  * @param[in] gas_limit The gas limit
  * @param[in] gas_used The gas used
  */
-__host__ __device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const gas_t &gas_used);
+__device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const gas_t &gas_used);
 /**
  * Add the gas cost for the given length of bytes, but considering
  * evm words.
@@ -95,7 +95,7 @@ __host__ __device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit,
  * @param[in] length The length of the bytes
  * @param[in] gas_per_word The gas per evm word
  */
-__host__ __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word);
+__device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word);
 /**
  * Add the gas cost for the given length of bytes.
  * @param[in] arith The arithmetic environment
@@ -103,7 +103,7 @@ __host__ __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length
  * @param[in] length The length of the bytes
  * @param[in] gas_per_byte The gas per byte
  */
-__host__ __device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_byte);
+__device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_byte);
 
 /**
  * Add the gas cost for the number of bytes in the exponent.
@@ -112,7 +112,7 @@ __host__ __device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length
  * @param[in] exponent The exponent
  * @return the most significant non-zero bit position
  */
-__host__ __device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const gas_t &exponent);
+__device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const gas_t &exponent);
 /**
  * Add the cost for initiliasation code.
  * EIP-3860: https://eips.ethereum.org/EIPS/eip-3860
@@ -120,7 +120,7 @@ __host__ __device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const gas_t &exp
  * @param[inout] gas_used The gas used
  * @param[in] initcode_length The length of the initcode
  */
-__host__ __device__ void initcode_cost(gas_t &gas_used, const gas_t &initcode_length);
+__device__ void initcode_cost(gas_t &gas_used, const gas_t &initcode_length);
 
 /**
  * Add the cost for code storage.
@@ -128,49 +128,49 @@ __host__ __device__ void initcode_cost(gas_t &gas_used, const gas_t &initcode_le
  * @param[inout] gas_used The gas used
  * @param[in] code_length The length of the code
  */
-__host__ __device__ void code_cost(gas_t &gas_used, const gas_t &code_length);
+__device__ void code_cost(gas_t &gas_used, const gas_t &code_length);
 /**
  * Add the cost for keccak hashing.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
-__host__ __device__ void keccak_cost(gas_t &gas_used, const gas_t &length);
+__device__ void keccak_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the cost for memory operation on call data/return data.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
-__host__ __device__ void memory_cost(gas_t &gas_used, const gas_t &length);
+__device__ void memory_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the cost for log operation on record data.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the record in bytes
  */
-__host__ __device__ void log_record_cost(gas_t &gas_used, const gas_t &length);
+__device__ void log_record_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the cost for log operation on topic.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] no_topics The number of topics
  */
-__host__ __device__ void log_topics_cost(gas_t &gas_used, const uint32_t &no_topics);
+__device__ void log_topics_cost(gas_t &gas_used, const uint32_t &no_topics);
 /**
  * Add the cost for sha256 hashing.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
-__host__ __device__ void sha256_cost(gas_t &gas_used, const gas_t &length);
+__device__ void sha256_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the dynamic cost for ripemd160 hashing.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
-__host__ __device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length);
+__device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length);
 
 /**
  * Add the dynamics cost for blake2 hashing.
@@ -178,11 +178,10 @@ __host__ __device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length);
  * @param[inout] gas_used The gas used
  * @param[in] rounds Number of rounds (big-endian unsigned integer)
  */
-__host__ __device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds);
+__device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds);
 
-__host__ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
-                                        const evm_word_t &exponent_bit_length_bn,
-                                        const evm_word_t &multiplication_complexity);
+__device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
+                               const evm_word_t &exponent_bit_length_bn, const evm_word_t &multiplication_complexity);
 
 /**
  * Add the pairing cost to the gas used.
@@ -190,7 +189,7 @@ __host__ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &expon
  * @param[inout] gas_used The gas used
  * @param[in] data_size The size of the data in bytes
  */
-__host__ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size);
+__device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size);
 
 /**
  * Add the cost for accessing account information
@@ -200,8 +199,7 @@ __host__ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size)
  * @param[in] address The address of the account
  * @return 0 for success, 1 for failure
  */
-__host__ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::TouchState &touch_state,
-                                                const evm_word_t *address);
+__device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address);
 
 /**
  * Add the cost for the SLOAD operation.
@@ -211,22 +209,22 @@ __host__ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::TouchSta
  * @param[in] key The key of the storage
  * @return 0 for success, 1 for failure
  */
-__host__ __device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::TouchState &touch_state, const evm_word_t *address,
-                                       const evm_word_t &key);
+__device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::StateDb *state_db, const evm_word_t *address,
+                              const evm_word_t *key);
 
 /**
  * Add the cost and refund for the SSTORE operation.
  * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[inout] gas_refund The refund
- * @param[in] touch_state The touch state
+ * @param[in] state_db The state db
  * @param[in] address The address of the account
  * @param[in] key The key of the storage
  * @param[in] value The value of the storage
  * @return 0 for success, 1 for failure
  */
-__host__ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::TouchState &touch_state,
-                                        const evm_word_t *address, const evm_word_t &key, const evm_word_t &value);
+__device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::StateDb *state_db,
+                               const evm_word_t *address, const evm_word_t *key, const evm_word_t *value);
 
 /**
  * Get the transaction intrinsic gas.
@@ -235,8 +233,7 @@ __host__ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, cons
  * @param[out] gas_intrinsic The intrinsic gas
  * @return 0 for success, 1 for failure
  */
-__host__ __device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &transaction,
-                                                      gas_t &gas_intrinsic);
+__device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &transaction, gas_t &gas_intrinsic);
 
 /**
  * Get the memory grow cost.
@@ -248,8 +245,8 @@ __host__ __device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transacti
  * @param[out] gas_used The gas used
  * @return 0 for success, 1 for failure
  */
-__host__ __device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, const evm_word_t &index,
-                                             const evm_word_t &length, gas_t &memory_expansion_cost, gas_t &gas_used);
+__device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, const evm_word_t &index,
+                                    const evm_word_t &length, gas_t &memory_expansion_cost, gas_t &gas_used);
 
 }  // namespace gas_cost
 }  // namespace CuEVM

@@ -1,9 +1,7 @@
 #include <CuEVM/evm.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/operations/arithmetic.cuh>
-#include <CuEVM/operations/bitwise.cuh>
 #include <CuEVM/operations/block.cuh>
-#include <CuEVM/operations/compare.cuh>
 #include <CuEVM/operations/environmental.cuh>
 #include <CuEVM/operations/flow.cuh>
 #include <CuEVM/operations/log.cuh>
@@ -23,16 +21,6 @@ __global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t *instances, 
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
 
-    // if (instance == 0) {
-    //     printf("instance %d thread %d\n", instance, THREADIDX);
-    //     printf("world state\n");
-    //     instances[instance].world_state_data_ptr->print();
-    //     printf("touch state\n");
-    //     instances[instance].touch_state_data_ptr->print();
-    //     printf("instance %d\n", instance);
-    //     printf("transaction\n");
-    //     instances[instance].transaction_ptr->print();
-    // }
 #ifdef EIP_3155
     if (instance == 0) {
         printf("instance %d\n", instance);
@@ -46,9 +34,9 @@ __global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t *instances, 
     }
 #endif
 
-    // __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
+    __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
     __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
-    CuEVM::evm_t *evm = new CuEVM::evm_t(instances[instance], shared_stack[INSTANCE_IDX_PER_BLOCK]);
+    CuEVM::evm_t *evm = new CuEVM::evm_t(instances[instance], shared_message_call, shared_stack[threadIdx.x]);
 
     // printf("\n evm call state \n");
     // evm->call_state_ptr->print();
@@ -72,29 +60,27 @@ __global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t *instances, 
     }
 }
 
-__host__ __device__ evm_t::evm_t(CuEVM::state_t *world_state_data_ptr, CuEVM::block_info_t *block_info_ptr,
-                                 CuEVM::evm_transaction_t *transaction_ptr, CuEVM::state_access_t *touch_state_data_ptr,
-                                 CuEVM::log_state_data_t *log_state_ptr, CuEVM::evm_return_data_t *return_data_ptr,
-                                 CuEVM::EccConstants *ecc_constants_ptr,
-                                 CuEVM::evm_message_call_t *shared_message_call_ptr, CuEVM::evm_word_t *shared_stack_ptr
+__device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::block_info_t *block_info_ptr,
+                        CuEVM::evm_transaction_t *transaction_ptr, CuEVM::EccConstants *ecc_constants_ptr,
+                        CuEVM::evm_message_call_t *shared_message_call_ptr, CuEVM::evm_word_t *shared_stack_ptr
 #ifdef EIP_3155
-                                 ,
-                                 CuEVM::utils::tracer_t *tracer_ptr
+                        ,
+                        CuEVM::utils::tracer_t *tracer_ptr
 #endif
 
-                                 ,
-                                 CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr,
-                                 CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr)
-    : world_state(world_state_data_ptr),
+                        ,
+                        CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr,
+                        CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr)
+    : state_db_ptr(state_db_ptr),
       block_info_ptr(block_info_ptr),
       transaction_ptr(transaction_ptr),
-
-      serialized_worldstate_data_ptr(serialized_worldstate_data_ptr),
-      simplified_trace_data_ptr(simplified_trace_data_ptr),
+      //   serialized_worldstate_data_ptr(serialized_worldstate_data_ptr),
+      //   simplified_trace_data_ptr(simplified_trace_data_ptr),
       ecc_constants_ptr(ecc_constants_ptr) {
     // TODO: store in local/shared memory
-    call_state_ptr = new CuEVM::evm_call_state_t(&world_state, nullptr, nullptr, log_state_ptr, touch_state_data_ptr,
-                                                 return_data_ptr);
+    // call_state_ptr = new CuEVM::evm_call_state_t(state_db_ptr, nullptr, nullptr, log_state_ptr, return_data_ptr);
+    call_state_ptr = new CuEVM::evm_call_state_t(state_db_ptr, nullptr, nullptr, new CuEVM::log_state_data_t(),
+                                                 new CuEVM::evm_return_data_t());
 
     int32_t error_code = ERROR_SUCCESS;
     //  transaction_ptr->validate(call_state_ptr->touch_state_ptr, *block_info_ptr,
@@ -102,7 +88,7 @@ __host__ __device__ evm_t::evm_t(CuEVM::state_t *world_state_data_ptr, CuEVM::bl
 
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t_shadow *transaction_call_message_ptr = nullptr;
-        error_code = transaction_ptr->get_message_call(call_state_ptr->touch_state_ptr, transaction_call_message_ptr);
+        error_code = transaction_ptr->get_message_call(call_state_ptr->state_db_ptr, transaction_call_message_ptr);
 
         shared_message_call_ptr->copy_from(transaction_call_message_ptr);
 
@@ -120,20 +106,7 @@ __host__ __device__ evm_t::evm_t(CuEVM::state_t *world_state_data_ptr, CuEVM::bl
     status = error_code;
 }
 
-__host__ __device__ evm_t::evm_t(CuEVM::evm_instance_t &evm_instance, CuEVM::evm_message_call_t *message_call,
-                                 CuEVM::evm_word_t *shared_stack_ptr)
-    : evm_t(evm_instance.world_state_data_ptr, evm_instance.block_info_ptr, evm_instance.transaction_ptr,
-            evm_instance.touch_state_data_ptr, evm_instance.log_state_ptr, evm_instance.return_data_ptr,
-            evm_instance.ecc_constants_ptr, message_call, shared_stack_ptr
-#ifdef EIP_3155
-            ,
-            evm_instance.tracer_ptr
-#endif
-            ,
-            evm_instance.serialized_worldstate_data_ptr, evm_instance.simplified_trace_data_ptr) {
-}
-
-__host__ __device__ evm_t::~evm_t() {
+__device__ evm_t::~evm_t() {
     // if (call_state_ptr != nullptr) {
     //     call_state_ptr->touch_state.clear();
     //     delete call_state_ptr;
@@ -147,7 +120,7 @@ __host__ __device__ evm_t::~evm_t() {
 #endif
 }
 
-__host__ __device__ int32_t evm_t::start_CALL(cached_evm_call_state &cached_call_state) {
+__device__ int32_t evm_t::start_CALL(cached_evm_call_state &cached_call_state) {
     // printf("Start call sender receipient contract address %d\n", THREADIDX);
     // call_state_ptr->message_ptr->sender.print();
     // call_state_ptr->message_ptr->recipient.print();
@@ -161,7 +134,7 @@ __host__ __device__ int32_t evm_t::start_CALL(cached_evm_call_state &cached_call
     int32_t error_code = (((uint256_cmp_word(&value, 0) > 0) &&
                            // (cgbn_compare(arith.env, sender, recipient) != 0) &&
                            (call_state_ptr->message_ptr->call_type != OP_DELEGATECALL))
-                              ? call_state_ptr->touch_state_ptr->transfer(sender, recipient, value)
+                              ? call_state_ptr->state_db_ptr->transfer(sender, recipient, &value)
                               : ERROR_SUCCESS);
     if (error_code != ERROR_SUCCESS) {
         // avoid complication in the subsequent code
@@ -172,37 +145,36 @@ __host__ __device__ int32_t evm_t::start_CALL(cached_evm_call_state &cached_call
     if (call_state_ptr->message_ptr->call_type == OP_CALL || call_state_ptr->message_ptr->call_type == OP_CALLCODE ||
         call_state_ptr->message_ptr->call_type == OP_DELEGATECALL ||
         call_state_ptr->message_ptr->call_type == OP_STATICCALL) {
-        CuEVM::account_t *contract = nullptr;
-        const evm_word_t *contract_address = &call_state_ptr->message_ptr->contract_address;
-        call_state_ptr->touch_state_ptr->get_account(contract_address, contract, ACCOUNT_BYTE_CODE_FLAG);
-        call_state_ptr->message_ptr->set_byte_code(contract->byte_code);
+        uint8_t *byte_code = nullptr;
+        uint32_t byte_code_size = 0;
+        call_state_ptr->state_db_ptr->get_code(byte_code_size, &call_state_ptr->message_ptr->contract_address);
+        byte_array_t byte_code_array(byte_code, byte_code_size);
+        call_state_ptr->message_ptr->set_byte_code(byte_code_array);
     }
 
     // warmup the accounts
-    CuEVM::account_t *account_ptr = nullptr;
-    call_state_ptr->touch_state_ptr->set_warm_account(sender);
-    call_state_ptr->touch_state_ptr->set_warm_account(recipient);
-    call_state_ptr->touch_state_ptr->get_account(recipient, account_ptr, ACCOUNT_NONE_FLAG);
+    call_state_ptr->state_db_ptr->set_warm_account(sender);
+    call_state_ptr->state_db_ptr->set_warm_account(recipient);
 
     cached_call_state.set_byte_code(call_state_ptr->message_ptr->byte_code);
 
     if ((call_state_ptr->message_ptr->call_type == OP_CREATE) ||
         (call_state_ptr->message_ptr->call_type == OP_CREATE2)) {
-        error_code |= account_ptr->is_empty_create() ? ERROR_SUCCESS : ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
+        error_code |= call_state_ptr->state_db_ptr->is_empty_create(recipient)
+                          ? ERROR_SUCCESS
+                          : ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
         // printf("start_CALL contract ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS\n");
-        evm_word_t contract_nonce;
-        contract_nonce = 1;
-        error_code |= call_state_ptr->touch_state_ptr->set_nonce(recipient, contract_nonce);
-        evm_word_t sender_nonce;
-        error_code |= call_state_ptr->touch_state_ptr->get_nonce(sender, sender_nonce);
+
+        call_state_ptr->state_db_ptr->update_nonce(recipient, 1);
+        uint32_t sender_nonce = call_state_ptr->state_db_ptr->get_nonce(sender);
 
         // evm_word_t nonce;
         // TODO check overflow
         // error_code |= uint256_get_uint32_t(sender_nonce, nonce) == ERROR_VALUE_OVERFLOW
         //                   ? ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED
         //                   : ERROR_SUCCESS;
-        uint256_add_word(&sender_nonce, &sender_nonce, 1);
-        error_code |= call_state_ptr->touch_state_ptr->set_nonce(sender, sender_nonce);
+        // uint256_add_word(&sender_nonce, &sender_nonce, 1);
+        call_state_ptr->state_db_ptr->update_nonce(sender, sender_nonce + 1);
     } else {
         // Go-ethereum: check depth > 1024 before increase
         // -> depth > 1025 after increase
@@ -276,12 +248,12 @@ __host__ __device__ int32_t evm_t::start_CALL(cached_evm_call_state &cached_call
     // #endif
     return error_code;
 }
-__host__ __device__ void evm_t::run() {
+__device__ void evm_t::run() {
     cached_evm_call_state cached_call_state(call_state_ptr);
     run(cached_call_state);
 }
 
-__host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
+__device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
     if (status != ERROR_SUCCESS) {
         return;  // finish transaction
     }
@@ -474,9 +446,8 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                                                             *cached_call_state.stack_ptr, *call_state_ptr->message_ptr);
                     break;
                 case OP_BALANCE:
-                    error_code =
-                        CuEVM::operations::BALANCE(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                   *cached_call_state.stack_ptr, *call_state_ptr->touch_state_ptr);
+                    error_code = CuEVM::operations::BALANCE(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                            *cached_call_state.stack_ptr, call_state_ptr->state_db_ptr);
                     break;
                 case OP_ORIGIN:
                     error_code = CuEVM::operations::ORIGIN(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -524,12 +495,12 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                 case OP_EXTCODESIZE:
                     error_code =
                         CuEVM::operations::EXTCODESIZE(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                       *cached_call_state.stack_ptr, *call_state_ptr->touch_state_ptr);
+                                                       *cached_call_state.stack_ptr, call_state_ptr->state_db_ptr);
                     break;
                 case OP_EXTCODECOPY:
                     error_code = CuEVM::operations::EXTCODECOPY(
                         cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr,
-                        *call_state_ptr->touch_state_ptr, *call_state_ptr->memory_ptr);
+                        call_state_ptr->state_db_ptr, *call_state_ptr->memory_ptr);
                     break;
                 case OP_RETURNDATASIZE:
                     error_code = CuEVM::operations::RETURNDATASIZE(
@@ -544,7 +515,7 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                 case OP_EXTCODEHASH:
                     error_code =
                         CuEVM::operations::EXTCODEHASH(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                       *cached_call_state.stack_ptr, *call_state_ptr->touch_state_ptr);
+                                                       *cached_call_state.stack_ptr, call_state_ptr->state_db_ptr);
                     break;
                 case OP_BLOCKHASH:
                     error_code = CuEVM::operations::BLOCKHASH(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -577,7 +548,7 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                 case OP_SELFBALANCE:
                     error_code = CuEVM::operations::SELFBALANCE(
                         cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr,
-                        *call_state_ptr->touch_state_ptr, *call_state_ptr->message_ptr);
+                        call_state_ptr->state_db_ptr, *call_state_ptr->message_ptr);
                     break;
                 case OP_BASEFEE:
                     error_code = CuEVM::operations::BASEFEE(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -600,14 +571,14 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                                                             *cached_call_state.stack_ptr, *call_state_ptr->memory_ptr);
                     break;
                 case OP_SLOAD:
-                    error_code = CuEVM::operations::SLOAD(
-                        cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr,
-                        *call_state_ptr->touch_state_ptr, *call_state_ptr->message_ptr);
+                    error_code = CuEVM::operations::SLOAD(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                          *cached_call_state.stack_ptr, call_state_ptr->state_db_ptr,
+                                                          *call_state_ptr->message_ptr);
                     break;
                 case OP_SSTORE:
-                    error_code = CuEVM::operations::SSTORE(
-                        cached_call_state.gas_limit, cached_call_state.gas_used, call_state_ptr->gas_refund,
-                        *cached_call_state.stack_ptr, *call_state_ptr->touch_state_ptr, *call_state_ptr->message_ptr);
+                    error_code = CuEVM::operations::SSTORE(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                           call_state_ptr->gas_refund, *cached_call_state.stack_ptr,
+                                                           call_state_ptr->state_db_ptr, *call_state_ptr->message_ptr);
                     break;
                 case OP_JUMP:
                     error_code = CuEVM::operations::JUMP(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -697,7 +668,7 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                 case OP_SELFDESTRUCT:
                     error_code = CuEVM::operations::SELFDESTRUCT(
                         cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr,
-                        *call_state_ptr->message_ptr, *call_state_ptr->touch_state_ptr,
+                        *call_state_ptr->message_ptr, call_state_ptr->state_db_ptr,
                         *call_state_ptr->parent->last_return_data_ptr);
                     break;
 
@@ -796,7 +767,7 @@ __host__ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
     }
 }
 
-__host__ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
+__device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
     // sent the gas value to the block beneficiary
     gas_t gas_value;
     const evm_word_t *beneficiary = &(block_info_ptr->coin_base);
@@ -827,7 +798,7 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
         gas_t send_back_gas;
         send_back_gas = gas_value * gas_price;
         // add to sender balance g^{*}
-        evm_word_t sender_balance;
+        evm_word_t *sender_balance;
         // bn_t sender_address;
         // send back the gas left and gas refund to the sender
         // transaction_ptr->get_sender(arith, sender_address);
@@ -846,9 +817,9 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
             call_state_ptr->parent->update(*call_state_ptr);
         }
         // sent the value of unused gas to the sender
-        call_state_ptr->parent->touch_state_ptr->get_balance(&transaction_ptr->sender, sender_balance);
-        uint256_add_word(&sender_balance, &sender_balance, send_back_gas);
-        call_state_ptr->parent->touch_state_ptr->set_balance(&transaction_ptr->sender, sender_balance);
+        *call_state_ptr->parent->state_db_ptr->get_balance(&transaction_ptr->sender);
+        uint256_add_word(sender_balance, sender_balance, send_back_gas);
+        call_state_ptr->parent->state_db_ptr->update_balance(&transaction_ptr->sender, sender_balance);
 
         // set the eror code for a succesfull transaction
         status = error_code;
@@ -856,22 +827,13 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
         call_state_ptr->parent->gas_used = call_state_ptr->gas_limit;
         // cgbn_mul(arith.env, gas_value, cached_call_state.gas_limit, gas_priority_fee);
         // set z to the given error or 1 TODO: 1 in YP
-#ifdef EIP_3155
-        // __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
-        // print_bnt(arith, gas_value);
-        // print_bnt(arith, call_state_ptr->gas_limit);
-        // print_bnt(arith, call_state_ptr->gas_used);
-        // print_bnt(arith, gas_priority_fee);
-
-#endif
         status = error_code;
     }
     // send the gas value to the beneficiary
     if (gas_value > 0) {
-        evm_word_t beneficiary_balance;
-        call_state_ptr->parent->touch_state_ptr->get_balance(beneficiary, beneficiary_balance);
-        uint256_add_word(&beneficiary_balance, &beneficiary_balance, gas_value);
-        call_state_ptr->parent->touch_state_ptr->set_balance(beneficiary, beneficiary_balance);
+        evm_word_t *beneficiary_balance = call_state_ptr->parent->state_db_ptr->get_balance(beneficiary);
+        uint256_add_word(beneficiary_balance, beneficiary_balance, gas_value);
+        call_state_ptr->parent->state_db_ptr->update_balance(beneficiary, beneficiary_balance);
     }
 
     CuEVM::evm_call_state_t *parent_call_state_ptr = call_state_ptr->parent;
@@ -881,14 +843,14 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
 #ifdef EIP_3155
     tracer_ptr->finish_transaction(arith, *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_used, status);
 #endif
-    this->world_state.update(call_state_ptr->touch_state_ptr->get_state());
-    this->world_state.serialize_data(serialized_worldstate_data_ptr);
+
+    this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
     // printf("updated final world state\n");
 
     return status;
 }
 
-__host__ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
+__device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
     // printf("evm_t::finish_CALL %d error_code: %d\n", THREADIDX, error_code);
     // if the child call return from normal halting
@@ -926,9 +888,9 @@ __host__ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     simplified_trace_data_ptr->finish_call((error_code == ERROR_RETURN));
 #endif
 
-    call_state_ptr->parent->touch_state_ptr->set_warm_account(&call_state_ptr->message_ptr->sender);
+    call_state_ptr->parent->state_db_ptr->set_warm_account(&call_state_ptr->message_ptr->sender);
 
-    call_state_ptr->parent->touch_state_ptr->set_warm_account(&call_state_ptr->message_ptr->recipient);
+    call_state_ptr->parent->state_db_ptr->set_warm_account(&call_state_ptr->message_ptr->recipient);
     if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
         CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
     }
@@ -964,18 +926,13 @@ __host__ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     return error_code;
 }
 
-__host__ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_state &cached_call_state) {
+__device__ int32_t evm_t::finish_CREATE(cached_evm_call_state &cached_call_state) {
     // TODO: increase sender nonce if the sender is a contract
     // to see if the contract is a contract
     // bn_t sender_address;
     // call_state_ptr->message_ptr->get_sender(arith, sender_address);
-    CuEVM::account_t *sender_account = nullptr;
-    call_state_ptr->parent->touch_state_ptr->get_account(&call_state_ptr->message_ptr->sender, sender_account,
-                                                         ACCOUNT_BYTE_CODE_FLAG);
 
-    evm_word_t code_size;
-    code_size = call_state_ptr->parent->last_return_data_ptr->size;
-    CuEVM::gas_cost::code_cost(cached_call_state.gas_used, uint256_get_uint32_t(&code_size));
+    CuEVM::gas_cost::code_cost(cached_call_state.gas_used, call_state_ptr->parent->last_return_data_ptr->size);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(cached_call_state.gas_limit, cached_call_state.gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -993,8 +950,8 @@ __host__ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_state &cached_c
                 error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
             }
 #endif
-            call_state_ptr->touch_state_ptr->set_code(&call_state_ptr->message_ptr->recipient,
-                                                      *call_state_ptr->parent->last_return_data_ptr);
+            call_state_ptr->state_db_ptr->update_code(&call_state_ptr->message_ptr->recipient,
+                                                      call_state_ptr->parent->last_return_data_ptr);
         } else {
             error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
         }
@@ -1007,7 +964,8 @@ __host__ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_state &cached_c
 __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *test_json, uint32_t &num_instances,
                                    uint32_t clones, int32_t managed) {
     // get the world state
-    CuEVM::state_t *world_state_data_ptr = nullptr;
+
+    CuEVM::StateDb *state_db_ptr = nullptr;
     const cJSON *world_state_json = NULL;  // the json for the world state
     // get the world state json
     if (cJSON_IsObject(test_json))
@@ -1025,105 +983,60 @@ __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *
     CuEVM::evm_transaction_t *transactions_ptr = nullptr;
     uint32_t num_transactions = 0;
     uint32_t num_original_transactions = 0;
-    CuEVM::transaction::get_transactions(transactions_ptr, test_json, num_transactions, managed, world_state_data_ptr);
+    CuEVM::transaction::get_transactions(transactions_ptr, test_json, num_transactions, managed, state_db_ptr);
     num_original_transactions = num_transactions;
     num_transactions *= clones;
     // generate the evm instances
 
-    if (managed)
-        CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
-    else
-        evm_instances = new evm_instance_t[num_transactions];
+    // CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
+    printf("num_transactions %d\n", num_transactions);
+    evm_instances = new evm_instance_t[num_transactions];
+    state_db_ptr = new CuEVM::StateDb(num_transactions);
+    CuEVM::StateDb::CPUfromJson(state_db_ptr, world_state_json, num_transactions);
+    state_db_ptr->print();
     for (uint32_t index = 0; index < num_transactions; index++) {
-        if (managed)
-            CUDA_CHECK(cudaMallocManaged(&world_state_data_ptr, sizeof(CuEVM::state_t)));
-        else
-            world_state_data_ptr = new CuEVM::state_t();
-        world_state_data_ptr->from_json(world_state_json, managed);
-
-        evm_instances[index].world_state_data_ptr = world_state_data_ptr;
+        evm_instances[index].state_db_ptr = state_db_ptr;
         evm_instances[index].block_info_ptr = block_info_ptr;
         evm_instances[index].transaction_ptr = &transactions_ptr[index % num_original_transactions];
-        if (managed == 0) {
-            evm_instances[index].touch_state_data_ptr = new CuEVM::state_access_t();
-            evm_instances[index].log_state_ptr = new CuEVM::log_state_data_t();
-            evm_instances[index].return_data_ptr = new CuEVM::evm_return_data_t();
-#ifdef EIP_3155
-            evm_instances[index].tracer_ptr = new CuEVM::utils::tracer_t();
-#endif
-        } else {
-            CuEVM::state_access_t *access_state = new CuEVM::state_access_t();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].touch_state_data_ptr, sizeof(CuEVM::state_access_t)));
-            memcpy(evm_instances[index].touch_state_data_ptr, access_state, sizeof(CuEVM::state_access_t));
-            delete access_state;
-            CuEVM::log_state_data_t *log_state = new CuEVM::log_state_data_t();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].log_state_ptr, sizeof(CuEVM::log_state_data_t)));
-            memcpy(evm_instances[index].log_state_ptr, log_state, sizeof(CuEVM::log_state_data_t));
-            delete log_state;
-            CuEVM::evm_return_data_t *return_data = new CuEVM::evm_return_data_t();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].return_data_ptr, sizeof(CuEVM::evm_return_data_t)));
-            memcpy(evm_instances[index].return_data_ptr, return_data, sizeof(CuEVM::evm_return_data_t));
-            delete return_data;
-
-            CuEVM::EccConstants *ecc_constants_ptr = new CuEVM::EccConstants();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].ecc_constants_ptr, sizeof(CuEVM::EccConstants)));
-            memcpy(evm_instances[index].ecc_constants_ptr, ecc_constants_ptr, sizeof(CuEVM::EccConstants));
-            delete ecc_constants_ptr;
-#ifdef EIP_3155
-            CuEVM::utils::tracer_t *tracer = new CuEVM::utils::tracer_t();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].tracer_ptr, sizeof(CuEVM::utils::tracer_t)));
-            memcpy(evm_instances[index].tracer_ptr, tracer, sizeof(CuEVM::utils::tracer_t));
-            delete tracer;
-#endif
-
-            CuEVM::serialized_worldstate_data *serialized_worldstate_data = new CuEVM::serialized_worldstate_data();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].serialized_worldstate_data_ptr,
-                                         sizeof(CuEVM::serialized_worldstate_data)));
-            memcpy(evm_instances[index].serialized_worldstate_data_ptr, serialized_worldstate_data,
-                   sizeof(CuEVM::serialized_worldstate_data));
-            delete serialized_worldstate_data;
-
-            CuEVM::utils::simplified_trace_data *simplified_trace_data = new CuEVM::utils::simplified_trace_data();
-            CUDA_CHECK(cudaMallocManaged(&evm_instances[index].simplified_trace_data_ptr,
-                                         sizeof(CuEVM::utils::simplified_trace_data)));
-            memcpy(evm_instances[index].simplified_trace_data_ptr, simplified_trace_data,
-                   sizeof(CuEVM::utils::simplified_trace_data));
-            delete simplified_trace_data;
-        }
+        // CUDA_CHECK(cudaMalloc(&evm_instances[index].serialized_worldstate_data_ptr,
+        //                       sizeof(CuEVM::serialized_worldstate_data)));
+        // CUDA_CHECK(
+        //     cudaMalloc(&evm_instances[index].simplified_trace_data_ptr,
+        //     sizeof(CuEVM::utils::simplified_trace_data)));
     }
     num_instances = num_transactions;
     return ERROR_SUCCESS;
 }
 
 __host__ void free_evm_instances(evm_instance_t *&evm_instances, uint32_t num_instances, int32_t managed) {
-    if (managed == 0) {
-        delete evm_instances[0].world_state_data_ptr;
-        delete evm_instances[0].block_info_ptr;
-        for (uint32_t index = 0; index < num_instances; index++) {
-            delete evm_instances[index].touch_state_data_ptr;
-            delete evm_instances[index].log_state_ptr;
-            delete evm_instances[index].return_data_ptr;
-#ifdef EIP_3155
-            delete evm_instances[index].tracer_ptr;
-#endif
-        }
-        delete[] evm_instances[0].transaction_ptr;
-        delete[] evm_instances;
-    } else {
-        CUDA_CHECK(cudaFree(evm_instances[0].world_state_data_ptr));
-        CUDA_CHECK(cudaFree(evm_instances[0].block_info_ptr));
-        for (uint32_t index = 0; index < num_instances; index++) {
-            // CUDA_CHECK(cudaFree(evm_instances[index].access_state_data_ptr));
-            CUDA_CHECK(cudaFree(evm_instances[index].touch_state_data_ptr));
-            CUDA_CHECK(cudaFree(evm_instances[index].log_state_ptr));
-            CUDA_CHECK(cudaFree(evm_instances[index].return_data_ptr));
-#ifdef EIP_3155
-            CUDA_CHECK(cudaFree(evm_instances[index].tracer_ptr));
-#endif
-        }
-        CUDA_CHECK(cudaFree(evm_instances[0].transaction_ptr));
-        CUDA_CHECK(cudaFree(evm_instances));
-    }
+    delete evm_instances[0].state_db_ptr;
+    delete evm_instances[0].block_info_ptr;
+    /*
+     for (uint32_t index = 0; index < num_instances; index++) {
+         delete evm_instances[index].log_state_ptr;
+         delete evm_instances[index].log_state_ptr;
+         delete evm_instances[index].return_data_ptr;
+ #ifdef EIP_3155
+         delete evm_instances[index].tracer_ptr;
+ #endif
+     }
+     delete[] evm_instances[0].transaction_ptr;
+     delete[] evm_instances;
+
+          CUDA_CHECK(cudaFree(evm_instances[0].state_db_ptr));
+          CUDA_CHECK(cudaFree(evm_instances[0].block_info_ptr));
+          for (uint32_t index = 0; index < num_instances; index++) {
+              // CUDA_CHECK(cudaFree(evm_instances[index].access_state_data_ptr));
+
+              CUDA_CHECK(cudaFree(evm_instances[index].log_state_ptr));
+              CUDA_CHECK(cudaFree(evm_instances[index].return_data_ptr));
+  #ifdef EIP_3155
+              CUDA_CHECK(cudaFree(evm_instances[index].tracer_ptr));
+  #endif
+          }
+          CUDA_CHECK(cudaFree(evm_instances[0].transaction_ptr));
+          CUDA_CHECK(cudaFree(evm_instances));
+    */
 }
 
 }  // namespace CuEVM

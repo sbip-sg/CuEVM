@@ -4,7 +4,6 @@
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/core/jump_destinations.cuh>
-#include <CuEVM/state/state.cuh>
 
 namespace CuEVM {
 

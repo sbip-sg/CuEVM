@@ -32,8 +32,8 @@ namespace CuEVM::operations {
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                      const CuEVM::block_info_t &block);
+__device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                             const CuEVM::block_info_t &block);
 
 /**
  * The COINBASE operation implementation.
@@ -44,8 +44,8 @@ __host__ __device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, C
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                     const CuEVM::block_info_t &block);
+__device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                            const CuEVM::block_info_t &block);
 
 /**
  * The TIMESTAMP operation implementation.
@@ -56,8 +56,8 @@ __host__ __device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, Cu
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                      const CuEVM::block_info_t &block);
+__device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                             const CuEVM::block_info_t &block);
 
 /**
  * The NUMBER operation implementation.
@@ -68,8 +68,8 @@ __host__ __device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, C
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                   const CuEVM::block_info_t &block);
+__device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                          const CuEVM::block_info_t &block);
 
 /**
  * The DIFFICULTY/PREVRANDAO operation implementation.
@@ -80,8 +80,8 @@ __host__ __device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEV
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t PREVRANDAO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                       const CuEVM::block_info_t &block);
+__device__ int32_t PREVRANDAO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                              const CuEVM::block_info_t &block);
 
 /**
  * The GASLIMIT operation implementation.
@@ -92,8 +92,8 @@ __host__ __device__ int32_t PREVRANDAO(const gas_t &gas_limit, gas_t &gas_used, 
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t GASLIMIT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                     const CuEVM::block_info_t &block);
+__device__ int32_t GASLIMIT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                            const CuEVM::block_info_t &block);
 
 /**
  * The CHAINID operation implementation.
@@ -104,8 +104,8 @@ __host__ __device__ int32_t GASLIMIT(const gas_t &gas_limit, gas_t &gas_used, Cu
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t CHAINID(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                    const CuEVM::block_info_t &block);
+__device__ int32_t CHAINID(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                           const CuEVM::block_info_t &block);
 
 /**
  * The BASEFEE operation implementation.
@@ -116,6 +116,6 @@ __host__ __device__ int32_t CHAINID(const gas_t &gas_limit, gas_t &gas_used, CuE
  * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__host__ __device__ int32_t BASEFEE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                    const CuEVM::block_info_t &block);
+__device__ int32_t BASEFEE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                           const CuEVM::block_info_t &block);
 }  // namespace CuEVM::operations

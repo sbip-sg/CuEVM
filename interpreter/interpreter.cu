@@ -1,4 +1,3 @@
-
 #include <cjson/cJSON.h>
 #include <getopt.h>
 
@@ -28,11 +27,11 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("current stack size %zu\n", size_value);
     cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
     printf("current heap size %zu\n", size_value);
-    size_t heap_size = (size_t(500) << 20);  // 500MB
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
-    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    printf("current stack size %zu\n", size_value);
+    // size_t heap_size = (size_t(500) << 20);  // 500MB
+    // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
+    // CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
+    // cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+    // printf("current stack size %zu\n", size_value);
     CUDA_CHECK(cudaDeviceSynchronize());
     // CUDA_CHECK(cudaEventCreate(&start));
     // CUDA_CHECK(cudaEventCreate(&stop));
@@ -63,7 +62,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
         cudaEventRecord(start);
-
+        return;
         CuEVM::kernel_evm_multiple_instances<<<num_blocks, CGBN_IBP>>>(instances_data, num_instances);
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);

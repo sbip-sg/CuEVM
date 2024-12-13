@@ -7,7 +7,7 @@
 
 namespace CuEVM {
 namespace transaction {
-__host__ __device__ int32_t access_list_account_t::free(int32_t managed) {
+__device__ int32_t access_list_account_t::free(int32_t managed) {
     if (storage_keys != nullptr) {
         if (managed) {
             CUDA_CHECK(cudaFree(storage_keys));
@@ -48,7 +48,7 @@ __host__ int32_t access_list_account_t::from_json(const cJSON *json, int32_t man
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t access_list_t::free(int32_t managed) {
+__device__ int32_t access_list_t::free(int32_t managed) {
     if (accounts != nullptr) {
         for (uint32_t i = 0; i < accounts_count; i++) {
             accounts[i].free(managed);
@@ -85,28 +85,28 @@ __host__ int32_t access_list_t::from_json(const cJSON *json, int32_t managed) {
 /**
  * the destructor. TODO: improve it
  */
-__host__ __device__ evm_transaction_t::~evm_transaction_t() {}
+__device__ evm_transaction_t::~evm_transaction_t() {}
 
-__host__ __device__ void evm_transaction_t::get_nonce(evm_word_t &nonce) const { nonce = this->nonce; }
+__device__ void evm_transaction_t::get_nonce(evm_word_t &nonce) const { nonce = this->nonce; }
 
-__host__ __device__ void evm_transaction_t::get_gas_limit(evm_word_t &gas_limit) const { gas_limit = this->gas_limit; }
+__device__ void evm_transaction_t::get_gas_limit(evm_word_t &gas_limit) const { gas_limit = this->gas_limit; }
 
-__host__ __device__ void evm_transaction_t::get_to(evm_word_t &to) const { to = this->to; }
+__device__ void evm_transaction_t::get_to(evm_word_t &to) const { to = this->to; }
 
-__host__ __device__ void evm_transaction_t::get_value(evm_word_t &value) const { value = this->value; }
+__device__ void evm_transaction_t::get_value(evm_word_t &value) const { value = this->value; }
 
-__host__ __device__ void evm_transaction_t::get_sender(evm_word_t &sender) const { sender = this->sender; }
+__device__ void evm_transaction_t::get_sender(evm_word_t &sender) const { sender = this->sender; }
 
-__host__ __device__ void evm_transaction_t::get_max_fee_per_gas(evm_word_t &max_fee_per_gas) const {
+__device__ void evm_transaction_t::get_max_fee_per_gas(evm_word_t &max_fee_per_gas) const {
     max_fee_per_gas = this->max_fee_per_gas;
 }
 
-__host__ __device__ void evm_transaction_t::get_max_priority_fee_per_gas(evm_word_t &max_priority_fee_per_gas) const {
+__device__ void evm_transaction_t::get_max_priority_fee_per_gas(evm_word_t &max_priority_fee_per_gas) const {
     max_priority_fee_per_gas = this->max_priority_fee_per_gas;
 }
 
-__host__ __device__ int32_t evm_transaction_t::get_gas_price(const CuEVM::block_info_t &block_info,
-                                                             evm_word_t &gas_price) const {
+__device__ int32_t evm_transaction_t::get_gas_price(const CuEVM::block_info_t &block_info,
+                                                    evm_word_t &gas_price) const {
     if ((type == 0) || (type == 1)) {
         gas_price = this->gas_price;
     } else if (type == 2) {
@@ -131,14 +131,13 @@ __host__ __device__ int32_t evm_transaction_t::get_gas_price(const CuEVM::block_
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ void evm_transaction_t::get_data(byte_array_t &data_init) const { data_init = this->data_init; }
+__device__ void evm_transaction_t::get_data(byte_array_t &data_init) const { data_init = this->data_init; }
 
-__host__ __device__ int32_t evm_transaction_t::is_contract_creation() const { return to == 0; }
+__device__ int32_t evm_transaction_t::is_contract_creation() const { return to == 0; }
 
-__host__ __device__ int32_t evm_transaction_t::get_transaction_fees(CuEVM::block_info_t &block_info, gas_t &gas_value,
-                                                                    gas_t &gas_limit, gas_t &gas_price,
-                                                                    gas_t &gas_priority_fee, gas_t &up_front_cost,
-                                                                    gas_t &m) const {
+__device__ int32_t evm_transaction_t::get_transaction_fees(CuEVM::block_info_t &block_info, gas_t &gas_value,
+                                                           gas_t &gas_limit, gas_t &gas_price, gas_t &gas_priority_fee,
+                                                           gas_t &up_front_cost, gas_t &m) const {
     // simplify, temporarily remove
     /*
         evm_word_t max_fee_per_gas;  // YP: \f$T_{m}\f$
@@ -176,25 +175,19 @@ __host__ __device__ int32_t evm_transaction_t::get_transaction_fees(CuEVM::block
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_transaction_t::access_list_warm_up(CuEVM::TouchState *touch_state_ptr) const {
+__device__ int32_t evm_transaction_t::access_list_warm_up(CuEVM::StateDb *state_db_ptr) const {
     for (uint32_t i = 0; i < access_list.accounts_count; i++) {
-        // bn_t address;
-        // cgbn_load(arith.env, address, (cgbn_evm_word_t_ptr) & (access_list.accounts[i].address));
-        CuEVM::account_t *account_ptr = nullptr;
-        touch_state_ptr->set_warm_account(&(access_list.accounts[i].address));
+        state_db_ptr->set_warm_account(&(access_list.accounts[i].address));
         for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
-            evm_word_t key;
-            key = access_list.accounts[i].storage_keys[j];
-            evm_word_t value = 0;
-            touch_state_ptr->set_warm_key(&(access_list.accounts[i].address), key, value);
+            evm_word_t *key = &access_list.accounts[i].storage_keys[j];
+            state_db_ptr->set_warm_key(&(access_list.accounts[i].address), key);
         }
     }
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_transaction_t::validate(CuEVM::TouchState *touch_state_ptr,
-                                                        CuEVM::block_info_t &block_info, gas_t &gas_used,
-                                                        gas_t &gas_price, gas_t &gas_priority_fee) const {
+__device__ int32_t evm_transaction_t::validate(CuEVM::StateDb *state_db_ptr, CuEVM::block_info_t &block_info,
+                                               gas_t &gas_used, gas_t &gas_price, gas_t &gas_priority_fee) const {
     // printf("begin validating transaction\n");
     /*
     gas_t gas_intrinsic;
@@ -304,8 +297,8 @@ __host__ __device__ int32_t evm_transaction_t::validate(CuEVM::TouchState *touch
  * @param[out] evm_message_call_ptr the message call.
  * @return 1 for success, 0 for failure.
  */
-__host__ __device__ int32_t evm_transaction_t::get_message_call(
-    CuEVM::TouchState *touch_state_ptr, CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const {
+__device__ int32_t evm_transaction_t::get_message_call(CuEVM::StateDb *state_db_ptr,
+                                                       CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const {
     // bn_t sender_address, to_address, value, gas_limit;
     // get_sender(arith, sender_address);
     // printf("evm_transaction_t::get_message_call sender address\n");
@@ -317,14 +310,13 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     // get_gas_limit(arith, gas_limit);
     uint32_t depth = 0;
     uint32_t call_type = OP_CALL;
-    CuEVM::byte_array_t byte_code;
-    // if is a contract creation
-    CuEVM::account_t *to_account = nullptr;
-    touch_state_ptr->get_account(&this->to, to_account, CuEVM::ACCOUNT_BYTE_CODE_FLAG);
+    uint32_t code_size = 0;
+    uint8_t *code = state_db_ptr->get_code(code_size, &this->to);
+    CuEVM::byte_array_t byte_code(code, code_size);
     uint32_t static_env = 0;
     evm_word_t return_data_offset = 0;
     evm_word_t return_data_size = 0;
-    // printf("evm transaction get message call, gas limit %lu\n", this->gas_limit);
+
     if (is_create) {
         call_type = OP_CREATE;
         byte_code = data_init;
@@ -338,18 +330,14 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
             &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to,
             CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
 
-        printf("CREATE to_account %p init code size %d account code size %d idx %d \n", to_account,
-               to_account->byte_code.size, byte_code.size, THREADIDX);
-        to_account->address.print();
+        //  to_account->address.print();
 
     } else {
-         byte_code = to_account->byte_code;
         evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
             &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to, data_init,
             byte_code, return_data_offset, return_data_size, static_env);
     }
 
-    // printf("evm transaction get message call, gas limit %lu\n", evm_message_call_ptr->gas_limit);
     // #ifdef __CUDA_ARCH__
     //     printf("bytecode size %d idx %d \n", byte_code.size, threadIdx.x);
     // #endif
@@ -357,7 +345,7 @@ __host__ __device__ int32_t evm_transaction_t::get_message_call(
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ void evm_transaction_t::print() {
+__device__ void evm_transaction_t::print() {
     printf("Transaction:\n");
     printf("Type: %d\n", type);
     printf("Nonce: ");
@@ -446,7 +434,7 @@ __host__ uint32_t no_transactions(const cJSON *json) {
 }
 
 __host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJSON *json, uint32_t &transactions_count,
-                                  int32_t managed, CuEVM::state_t *world_state_ptr, uint32_t start_index,
+                                  int32_t managed, CuEVM::StateDb *state_db_ptr, uint32_t start_index,
                                   uint32_t clones) {
     cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
     uint32_t available_transactions = no_transactions(json);
@@ -482,15 +470,15 @@ __host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJ
     template_transaction_ptr->sender.from_hex(sender_json->valuestring);
 
     const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
-    // verify what is happening from strlen 0
+    // CREATE transaction
     if (strlen(to_json->valuestring) == 0) {
-        // printf(" CREATE when loading json\n");
-        CuEVM::account_t *sender_account = nullptr;
+        printf(" CREATE when loading json\n");
 
-        world_state_ptr->get_account(&template_transaction_ptr->sender, sender_account);
-
-        CuEVM::utils::get_contract_address_create_word(&template_transaction_ptr->to, &template_transaction_ptr->sender,
-                                                       &sender_account->nonce);
+        // uint32_t uint_nonce = state_db_ptr->get_nonce(&template_transaction_ptr->sender);
+        // CuEVM::evm_word_t nonce(uint_nonce);
+        // CuEVM::utils::get_contract_address_create_word(&template_transaction_ptr->to,
+        // &template_transaction_ptr->sender,
+        //                                                &nonce);
         // printf("contract address\n");
         // template_transaction_ptr->to.print();
         template_transaction_ptr->is_create = true;

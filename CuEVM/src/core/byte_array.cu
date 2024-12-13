@@ -3,7 +3,7 @@
 #include <CuEVM/utils/evm_utils.cuh>
 
 namespace CuEVM {
-__host__ __device__ byte_array_t::byte_array_t(const uint32_t size) : size(size) {
+__device__ byte_array_t::byte_array_t(const uint32_t size) : size(size) {
     uint8_t *local_data = nullptr;
     if (size > 0) {
         local_data = new uint8_t[size];
@@ -23,8 +23,7 @@ __device__ byte_array_t::byte_array_t(uint8_t *data, uint32_t size) : size(size)
     this->data = local_data;
 }
 
-__host__ __device__ byte_array_t::byte_array_t(const byte_array_t &src_byte_array, uint32_t offset, uint32_t size)
-    : size(size) {
+__device__ byte_array_t::byte_array_t(const byte_array_t &src_byte_array, uint32_t offset, uint32_t size) : size(size) {
     uint8_t *local_data = nullptr;
     // printf("byte_array_t::byte_array_t %d %d %d %d\n", THREADIDX, THREAD_IDX_PER_INSTANCE, offset, size);
     if (size > 0) {
@@ -48,9 +47,9 @@ __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size, int32
     from_hex(hex_string, endian, padding, 0);
 }
 
-__host__ __device__ byte_array_t::~byte_array_t() { free(); }
+__device__ byte_array_t::~byte_array_t() { free(); }
 
-__host__ __device__ void byte_array_t::free() {
+__device__ void byte_array_t::free() {
     if ((size > 0) && (data != nullptr)) {
         delete[] data;
         clear();
@@ -62,12 +61,12 @@ __host__ void byte_array_t::free_managed() {
     }
     clear();
 }
-__host__ __device__ void byte_array_t::clear() {
+__device__ void byte_array_t::clear() {
     data = nullptr;
     size = 0;
 }
 
-__host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other) : size(other.size) {
+__device__ byte_array_t::byte_array_t(const byte_array_t &other) : size(other.size) {
     uint8_t *local_data = nullptr;
     if (size > 0) {
         local_data = new uint8_t[size];
@@ -76,7 +75,7 @@ __host__ __device__ byte_array_t::byte_array_t(const byte_array_t &other) : size
     data = local_data;
 }
 
-__host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &other) {
+__device__ byte_array_t &byte_array_t::operator=(const byte_array_t &other) {
     uint8_t *local_data = nullptr;
 
     if (this != &other) {
@@ -98,7 +97,7 @@ __host__ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &ot
     return *this;
 }
 
-__host__ __device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_padding) {
+__device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_padding) {
     // printf("byte_array_t::grow %d %d size %d zero_padding %d, new_size %d, data %p\n", THREADIDX,
     //        THREAD_IDX_PER_INSTANCE, size, zero_padding, new_size, data);
     if (new_size == size) return ERROR_SUCCESS;
@@ -124,7 +123,7 @@ __host__ __device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_p
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ uint32_t byte_array_t::has_value(uint8_t value) const {
+__device__ uint32_t byte_array_t::has_value(uint8_t value) const {
     uint32_t error_code = ERROR_VALUE_NOT_FOUND;
     uint32_t index;
     for (index = 0; index < size; index++) {
@@ -135,16 +134,14 @@ __host__ __device__ uint32_t byte_array_t::has_value(uint8_t value) const {
     return error_code;
 }
 
-__host__ __device__ void byte_array_t::print() const {
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
+__device__ void byte_array_t::print() const {
     printf("size: %u\n", size);
     printf("data: ");
     for (uint32_t index = 0; index < size; index++) printf("%02x", data[index]);
     printf("\n");
-    __ONE_GPU_THREAD_WOSYNC_END__
 }
 
-__host__ __device__ char *byte_array_t::to_hex() const {
+__device__ char *byte_array_t::to_hex() const {
     char *hex_string = new char[size * 2 + 3];  // 3 - 0x and \0
     hex_string[0] = '0';
     hex_string[1] = 'x';
@@ -272,7 +269,7 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
     return error_code;
 }
 
-__host__ __device__ int32_t byte_array_t::padded_copy_BE(const byte_array_t src) {
+__device__ int32_t byte_array_t::padded_copy_BE(const byte_array_t src) {
     uint32_t copy_size;
     int32_t size_diff;
     if (src.size == size) {
@@ -290,7 +287,7 @@ __host__ __device__ int32_t byte_array_t::padded_copy_BE(const byte_array_t src)
     return size_diff;
 }
 
-__host__ __device__ uint8_t &byte_array_t::operator[](uint32_t index) { return data[index]; }
+__device__ uint8_t &byte_array_t::operator[](uint32_t index) { return data[index]; }
 
 // STATIC FUNCTIONS
 

@@ -2,7 +2,7 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
-__host__ __device__ block_info_t::block_info_t() {
+__device__ block_info_t::block_info_t() {
     coin_base.from_uint32_t(0);
     difficulty.from_uint32_t(0);
     prevrandao.from_uint32_t(0);
@@ -17,7 +17,7 @@ __host__ __device__ block_info_t::block_info_t() {
     }
 }
 
-__host__ __device__ block_info_t::~block_info_t() {}
+__device__ block_info_t::~block_info_t() {}
 
 __host__ block_info_t::block_info_t(const cJSON *json) { from_json(json); }
 
@@ -91,24 +91,23 @@ __host__ int32_t block_info_t::from_json(const cJSON *json) {
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ void block_info_t::get_coin_base(evm_word_t &coin_base) const { coin_base = this->coin_base; }
+__device__ void block_info_t::get_coin_base(evm_word_t &coin_base) const { coin_base = this->coin_base; }
 
-__host__ __device__ void block_info_t::get_time_stamp(evm_word_t &time_stamp) const { time_stamp = this->time_stamp; }
+__device__ void block_info_t::get_time_stamp(evm_word_t &time_stamp) const { time_stamp = this->time_stamp; }
 
-__host__ __device__ void block_info_t::get_number(evm_word_t &number) const { number = this->number; }
+__device__ void block_info_t::get_number(evm_word_t &number) const { number = this->number; }
 
-__host__ __device__ void block_info_t::get_difficulty(evm_word_t &difficulty) const { difficulty = this->difficulty; }
+__device__ void block_info_t::get_difficulty(evm_word_t &difficulty) const { difficulty = this->difficulty; }
 
-__host__ __device__ void block_info_t::get_prevrandao(evm_word_t &val) const { val = this->prevrandao; }
+__device__ void block_info_t::get_prevrandao(evm_word_t &val) const { val = this->prevrandao; }
 
-__host__ __device__ void block_info_t::get_gas_limit(evm_word_t &gas_limit) const { gas_limit = this->gas_limit; }
+__device__ void block_info_t::get_gas_limit(evm_word_t &gas_limit) const { gas_limit = this->gas_limit; }
 
-__host__ __device__ void block_info_t::get_chain_id(evm_word_t &chain_id) const { chain_id = this->chain_id; }
+__device__ void block_info_t::get_chain_id(evm_word_t &chain_id) const { chain_id = this->chain_id; }
 
-__host__ __device__ void block_info_t::get_base_fee(evm_word_t &base_fee) const { base_fee = this->base_fee; }
+__device__ void block_info_t::get_base_fee(evm_word_t &base_fee) const { base_fee = this->base_fee; }
 
-__host__ __device__ int32_t block_info_t::get_previous_hash(evm_word_t &previous_hash,
-                                                            const evm_word_t &previous_number) const {
+__device__ int32_t block_info_t::get_previous_hash(evm_word_t &previous_hash, const evm_word_t &previous_number) const {
     uint32_t idx = 0;
     uint32_t number_uint = this->number.get_uint32_t();
     uint32_t previous_number_uint = previous_number.get_uint32_t();
@@ -129,7 +128,7 @@ __host__ __device__ int32_t block_info_t::get_previous_hash(evm_word_t &previous
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ void block_info_t::print() const {
+__device__ void block_info_t::print() const {
     uint32_t idx = 0;
     printf("BLOCK: \n");
     printf("COINBASE: ");

@@ -12,10 +12,9 @@ namespace CuEVM::operations {
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t &args_size,
-                                         CuEVM::evm_call_state_t &current_state,
-                                         CuEVM::evm_call_state_t *&new_state_ptr,
-                                         CuEVM::cached_evm_call_state &cached_state) {
+__device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t &args_size,
+                                CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                                CuEVM::cached_evm_call_state &cached_state) {
     // try to send value in call
     evm_word_t value;
     new_state_ptr->message_ptr->get_value(value);
@@ -87,7 +86,7 @@ __host__ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const ev
     // bn_t contract_address;
     evm_word_t *contract_address_ptr = &new_state_ptr->message_ptr->contract_address;
     // new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
-    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, *current_state.touch_state_ptr, contract_address_ptr);
+    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, current_state.state_db_ptr, contract_address_ptr);
     // positive value call cost (except delegate call)
     // empty account call cost
     // #ifdef __CUDA_ARCH__
@@ -104,7 +103,7 @@ __host__ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const ev
             gas_stippend = GAS_CALL_STIPEND;
             // If the empty account is called
             // only for call opcode
-            if ((new_state_ptr->touch_state_ptr->is_empty_account(contract_address_ptr)) &&
+            if ((current_state.state_db_ptr->is_empty_account(contract_address_ptr)) &&
                 (new_state_ptr->message_ptr->get_call_type() == OP_CALL)) {
                 cached_state.gas_used += GAS_NEW_ACCOUNT;
             };
@@ -154,9 +153,8 @@ __host__ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const ev
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t generic_CREATE(CuEVM::evm_call_state_t &current_state,
-                                           CuEVM::evm_call_state_t *&new_state_ptr, const uint32_t opcode,
-                                           cached_evm_call_state &cached_state) {
+__device__ int32_t generic_CREATE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                                  const uint32_t opcode, cached_evm_call_state &cached_state) {
     evm_word_t value, memory_offset, length;
     int32_t error_code = cached_state.stack_ptr->pop(value);
     error_code |= cached_state.stack_ptr->pop(memory_offset);
@@ -213,23 +211,19 @@ __host__ __device__ int32_t generic_CREATE(CuEVM::evm_call_state_t &current_stat
         //     contract_address);
         // printf("generic_CREATE senderaddress ptr %p\n", sender_address_ptr);
         // sender_address_ptr->print();
-        CuEVM::account_t *sender_account = nullptr;
-        current_state.touch_state_ptr->get_account(sender_address_ptr, sender_account, ACCOUNT_NON_STORAGE_FLAG);
+
+        uint32_t sender_nonce_uint = current_state.state_db_ptr->get_nonce(sender_address_ptr);
+        evm_word_t sender_nonce(sender_nonce_uint);
         // Do not get_account after this to reuse sender_account
         if (opcode == OP_CREATE2) {
             CuEVM::utils::get_contract_address_create2(&contract_address, &sender_address, &salt, initialisation_code);
         } else {
-            evm_word_t sender_nonce;
-            sender_account->get_nonce(sender_nonce);
             CuEVM::utils::get_contract_address_create(&contract_address, &sender_address, &sender_nonce);
         }
 
-        __ONE_THREAD_PER_INSTANCE(printf("\n\ncontract address\n"););
-        contract_address.print();
-
-        if (!current_state.touch_state_ptr->is_empty_account_create(&contract_address)) {
+        if (!current_state.state_db_ptr->is_empty_account(&contract_address)) {
             // corner collision case: must set warm for the contract address
-            current_state.touch_state_ptr->set_warm_account(&contract_address);
+            current_state.state_db_ptr->set_warm_account(&contract_address);
             error_code |= ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
         }
 
@@ -263,17 +257,9 @@ __host__ __device__ int32_t generic_CREATE(CuEVM::evm_call_state_t &current_stat
 #endif
         );
         // printf("generic_CREATE error_code: %d\n", error_code);
-        if (sender_account->is_contract()) {
-            evm_word_t sender_nonce;
-            sender_account->get_nonce(sender_nonce);
-            // sender_nonce += 1;
-            uint256_add_word(&sender_nonce, &sender_nonce, 1);
-            sender_account->set_nonce(sender_nonce);
-            // propagate to child state
-            // printf("generic_CREATE set_nonce %p\n", sender_address_ptr);
-            // sender_address_ptr->print();
-            // sender_account->address.print();
-            new_state_ptr->touch_state_ptr->set_nonce(&sender_account->address, sender_nonce);
+        if (current_state.state_db_ptr->is_contract(&sender_address)) {
+            current_state.state_db_ptr->update_nonce(&sender_address,
+                                                     current_state.state_db_ptr->get_nonce(&sender_address) + 1);
         }
     }
 
@@ -286,7 +272,7 @@ __host__ __device__ int32_t generic_CREATE(CuEVM::evm_call_state_t &current_stat
  * @param[out] return_data The return data.
  * @return return error code.
  */
-__host__ __device__ int32_t STOP(CuEVM::evm_return_data_t &return_data) {
+__device__ int32_t STOP(CuEVM::evm_return_data_t &return_data) {
     return_data = CuEVM::evm_return_data_t();
     return ERROR_RETURN;
 }
@@ -298,8 +284,8 @@ __host__ __device__ int32_t STOP(CuEVM::evm_return_data_t &return_data) {
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CREATE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                                   CuEVM::cached_evm_call_state &cached_state) {
+__device__ int32_t CREATE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                          CuEVM::cached_evm_call_state &cached_state) {
     return generic_CREATE(current_state, new_state_ptr, OP_CREATE, cached_state);
 }
 
@@ -310,8 +296,8 @@ __host__ __device__ int32_t CREATE(CuEVM::evm_call_state_t &current_state, CuEVM
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                                 CuEVM::cached_evm_call_state &cached_state) {
+__device__ int32_t CALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                        CuEVM::cached_evm_call_state &cached_state) {
     evm_word_t gas_word, address, value, args_offset, args_size, ret_offset, ret_size;
     // #ifdef __CUDA_ARCH__
     //     printf("opcode CALL %d\n", threadIdx.x);
@@ -372,8 +358,8 @@ __host__ __device__ int32_t CALL(CuEVM::evm_call_state_t &current_state, CuEVM::
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CALLCODE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                                     CuEVM::cached_evm_call_state &cached_state) {
+__device__ int32_t CALLCODE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                            CuEVM::cached_evm_call_state &cached_state) {
     evm_word_t gas_word, address, value, args_offset, args_size, ret_offset, ret_size;
     int32_t error_code = cached_state.stack_ptr->pop(gas_word);
     error_code |= cached_state.stack_ptr->pop(address);
@@ -414,8 +400,8 @@ __host__ __device__ int32_t CALLCODE(CuEVM::evm_call_state_t &current_state, CuE
  * @return ERROR_RETURN if the operation is successful, otherwise the error
  * code.
  */
-__host__ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                   CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data) {
+__device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                          CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data) {
     evm_word_t memory_offset, length;
     int32_t error_code = stack.pop(memory_offset);
     error_code |= stack.pop(length);
@@ -441,9 +427,8 @@ __host__ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t DELEGATECALL(CuEVM::evm_call_state_t &current_state,
-                                         CuEVM::evm_call_state_t *&new_state_ptr,
-                                         CuEVM::cached_evm_call_state &cached_state) {
+__device__ int32_t DELEGATECALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                                CuEVM::cached_evm_call_state &cached_state) {
     evm_word_t gas_word, address, value, args_offset, args_size, ret_offset, ret_size;
     int32_t error_code = cached_state.stack_ptr->pop(gas_word);
     error_code |= cached_state.stack_ptr->pop(address);
@@ -481,8 +466,8 @@ __host__ __device__ int32_t DELEGATECALL(CuEVM::evm_call_state_t &current_state,
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t CREATE2(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                                    CuEVM::cached_evm_call_state &cached_state) {
+__device__ int32_t CREATE2(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                           CuEVM::cached_evm_call_state &cached_state) {
     return generic_CREATE(current_state, new_state_ptr, OP_CREATE2, cached_state);
 }
 
@@ -493,8 +478,8 @@ __host__ __device__ int32_t CREATE2(CuEVM::evm_call_state_t &current_state, CuEV
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t STATICCALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                                       CuEVM::cached_evm_call_state &cached_state) {
+__device__ int32_t STATICCALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
+                              CuEVM::cached_evm_call_state &cached_state) {
     evm_word_t gas_word, address, value, args_offset, args_size, ret_offset, ret_size;
     int32_t error_code = cached_state.stack_ptr->pop(gas_word);
     error_code |= cached_state.stack_ptr->pop(address);
@@ -534,8 +519,8 @@ __host__ __device__ int32_t STATICCALL(CuEVM::evm_call_state_t &current_state, C
  * @param[in] memory The memory.
  * @param[out] return_data The return data.
  */
-__host__ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                   CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data) {
+__device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                          CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data) {
     evm_word_t memory_offset, length;
     int32_t error_code = stack.pop(memory_offset);
     error_code |= stack.pop(length);
@@ -558,7 +543,7 @@ __host__ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &
  * The INVALID operation.
  * @return The error code.
  */
-__host__ __device__ int32_t INVALID() { return ERROR_NOT_IMPLEMENTED; }
+__device__ int32_t INVALID() { return ERROR_NOT_IMPLEMENTED; }
 
 /**
  * The SELFDESTRUCT operation.
@@ -571,9 +556,9 @@ __host__ __device__ int32_t INVALID() { return ERROR_NOT_IMPLEMENTED; }
  * @param[out] return_data The return data.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__host__ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                         CuEVM::evm_stack_t &stack, CuEVM::evm_message_call_t &message,
-                                         CuEVM::TouchState &touch_state, CuEVM::evm_return_data_t &return_data) {
+__device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                                CuEVM::evm_message_call_t &message, CuEVM::StateDb *state_db_ptr,
+                                CuEVM::evm_return_data_t &return_data) {
     int32_t error_code = ERROR_SUCCESS;
     if (message.get_static_env()) {
         error_code = ERROR_STATIC_CALL_CONTEXT_SELFDESTRUCT;
@@ -582,32 +567,27 @@ __host__ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::g
         error_code |= stack.pop(recipient);
 
         // custom logic, cannot use access_account_cost (no warm cost)
-        if (!touch_state.is_warm_account(&recipient)) gas_used += GAS_COLD_ACCOUNT_ACCESS;
+        if (!state_db_ptr->is_warm_account(&recipient)) gas_used += GAS_COLD_ACCOUNT_ACCESS;
 
-        evm_word_t sender_balance;
-        touch_state.get_balance(&message.contract_address, sender_balance);
+        evm_word_t *sender_balance = state_db_ptr->get_balance(&message.contract_address);
 
-        if (uint256_is_zero(&sender_balance)) {
-            if (touch_state.is_empty_account(&recipient)) {
+        if (uint256_is_zero(sender_balance)) {
+            if (state_db_ptr->is_empty_account(&recipient)) {
                 gas_used += GAS_NEW_ACCOUNT;
             }
         }
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
-            evm_word_t recipient_balance;
-            touch_state.get_balance(&recipient, recipient_balance);
-            // recipient_balance += sender_balance;
-            uint256_add(&recipient_balance, &recipient_balance, &sender_balance);
-            sender_balance.set_zero();
-            touch_state.set_balance(&recipient, recipient_balance);
-            touch_state.set_balance(&message.contract_address, sender_balance);
+            evm_word_t *recipient_balance = state_db_ptr->get_balance(&recipient);
+            uint256_add(recipient_balance, recipient_balance, sender_balance);
+            sender_balance->set_zero();
+            state_db_ptr->update_balance(&recipient, recipient_balance);
+            state_db_ptr->update_balance(&message.contract_address, sender_balance);
             // receiver = self => 0 balance
             return_data = CuEVM::evm_return_data_t();
             error_code |= ERROR_RETURN;
         }
     }
-    // printf("touch state after SELFDESTRUCT %d\n", THREADIDX);
-    // touch_state.print();
     return error_code;
 }
 }  // namespace CuEVM::operations

@@ -6,7 +6,6 @@
 #include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/evm_call_state.cuh>
-#include <CuEVM/state/touch_state.cuh>
 
 namespace CuEVM::utils {
 // PyObject* branches = PyList_New(0);
@@ -64,13 +63,13 @@ struct simplified_trace_data {
     uint32_t no_branches = 0;
     evm_word_t last_distance;  // use to track branch distance by comparison opcodes
 
-    __host__ __device__ void start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_stack_t &stack_ptr);
-    __host__ __device__ void finish_operation(const CuEVM::evm_stack_t &stack_ptr, uint32_t error_code);
-    __host__ __device__ void start_call(uint32_t pc, evm_message_call_t *message_call_ptr);
-    __host__ __device__ void finish_call(uint8_t success);
-    __host__ __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
-    __host__ __device__ void record_distance(uint8_t op, const CuEVM::evm_stack_t &stack_ptr);
-    __host__ __device__ void print();
+    __device__ void start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_stack_t &stack_ptr);
+    __device__ void finish_operation(const CuEVM::evm_stack_t &stack_ptr, uint32_t error_code);
+    __device__ void start_call(uint32_t pc, evm_message_call_t *message_call_ptr);
+    __device__ void finish_call(uint8_t success);
+    __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
+    __device__ void record_distance(uint8_t op, const CuEVM::evm_stack_t &stack_ptr);
+    __device__ void print();
 };
 struct trace_data_t {
     uint32_t pc;               /**< The program counter */
@@ -91,7 +90,7 @@ struct trace_data_t {
 
     __host__ cJSON *to_json();
 
-    __host__ __device__ void print_err(char *hex_string_ptr = nullptr);
+    __device__ void print_err(char *hex_string_ptr = nullptr);
 };
 
 struct tracer_t {
@@ -102,25 +101,25 @@ struct tracer_t {
     uint32_t size;            /**< The size of the trace */
     uint32_t capacity;        /**< The capacity of the trace */
 
-    __host__ __device__ tracer_t();
+    __device__ tracer_t();
 
-    __host__ __device__ ~tracer_t();
+    __device__ ~tracer_t();
 
-    __host__ __device__ void grow();
+    __device__ void grow();
 
-    __host__ __device__ uint32_t start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_memory_t &memory,
-                                                 const CuEVM::evm_stack_t &stack, const uint32_t depth,
-                                                 const CuEVM::evm_return_data_t &return_data,
-                                                 const CuEVM::gas_t &gas_limit, const CuEVM::gas_t &gas_used);
+    __device__ uint32_t start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_memory_t &memory,
+                                        const CuEVM::evm_stack_t &stack, const uint32_t depth,
+                                        const CuEVM::evm_return_data_t &return_data, const CuEVM::gas_t &gas_limit,
+                                        const CuEVM::gas_t &gas_used);
 
-    __host__ __device__ void finish_operation(const uint32_t idx, const gas_t &gas_used, const gas_t &gas_refund);
+    __device__ void finish_operation(const uint32_t idx, const gas_t &gas_used, const gas_t &gas_refund);
 
-    __host__ __device__ void finish_transaction(const CuEVM::byte_array_t &return_data, const gas_t &gas_used,
-                                                uint32_t error_code);
+    __device__ void finish_transaction(const CuEVM::byte_array_t &return_data, const gas_t &gas_used,
+                                       uint32_t error_code);
 
-    __host__ __device__ void print();
+    __device__ void print();
 
-    __host__ __device__ void print_err();
+    __device__ void print_err();
 
     __device__ void print_device_err();
 
