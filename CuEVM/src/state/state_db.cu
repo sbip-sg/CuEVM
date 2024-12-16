@@ -230,9 +230,66 @@ __device__ bool StateDb::is_contract(const evm_word_t *address) const {
     // todo :implement
     return true;
 }
-__host__ void StateDb::GPUfromJson(StateDb *state_db, const cJSON *state_json, uint32_t num_states) {}
+__host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states) {
+    StateDb *state_db_cpu = new StateDb(num_states);
+    StateDb::CPUfromJson(state_db_cpu, state_json, num_states);
+    StateDb *tmp_state_db = new StateDb(num_states);
+    tmp_state_db->num_accounts = state_db_cpu->num_accounts;
+    tmp_state_db->num_states = state_db_cpu->num_states;
+    tmp_state_db->num_storage_elements = state_db_cpu->num_storage_elements;
+    tmp_state_db->storage_capacity = state_db_cpu->storage_capacity;
+
+    uint32_t num_accounts = state_db_cpu->num_accounts;
+    uint32_t code_size =
+        state_db_cpu->account_codes_size[num_accounts - 1] + state_db_cpu->account_codes_offset[num_accounts - 1];
+
+    // Grouped memory allocation
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->address_list, num_accounts * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->account_balances, num_accounts * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->account_nonces, num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->account_storage_size, num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->account_codes_size, num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->account_codes_offset, num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->all_keys, account_prealloc_keys_size * num_accounts * sizeof(KeyOffset)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->keys_list_offset, num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(
+        cudaMalloc(&tmp_state_db->values_pool, state_db_cpu->storage_capacity * num_states * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->all_account_codes, code_size * sizeof(uint8_t)));
+
+    // Grouped memory copy
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->address_list, state_db_cpu->address_list, num_accounts * sizeof(evm_word_t),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->account_balances, state_db_cpu->account_balances,
+                          num_accounts * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->account_nonces, state_db_cpu->account_nonces, num_accounts * sizeof(uint32_t),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->account_storage_size, state_db_cpu->account_storage_size,
+                          num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->account_codes_size, state_db_cpu->account_codes_size,
+                          num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->account_codes_offset, state_db_cpu->account_codes_offset,
+                          num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->all_keys, state_db_cpu->all_keys,
+                          account_prealloc_keys_size * num_accounts * sizeof(KeyOffset), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->keys_list_offset, state_db_cpu->keys_list_offset,
+                          num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->values_pool, state_db_cpu->values_pool,
+                          state_db_cpu->storage_capacity * num_states * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->all_account_codes, state_db_cpu->all_account_codes, code_size * sizeof(uint8_t),
+                          cudaMemcpyHostToDevice));
+
+    printf("state db cpu\n");
+    state_db_cpu->print();
+
+    StateDb *state_db_gpu;
+    CUDA_CHECK(cudaMalloc(&state_db_gpu, sizeof(StateDb)));
+    CUDA_CHECK(cudaMemcpy(state_db_gpu, tmp_state_db, sizeof(StateDb), cudaMemcpyHostToDevice));
+    delete state_db_cpu;
+    delete tmp_state_db;
+    state_db = state_db_gpu;
+}
 // Return a pointer to the StateDb object on device memory
-__host__ void StateDb::CPUfromJson(StateDb *state_db, const cJSON *state_json, uint32_t num_states) {
+__host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states) {
     // if (!cJSON_IsArray(state_json)) return 0;
     uint32_t num_accounts = cJSON_GetArraySize(state_json);
     // if (num_accounts == 0)
@@ -327,7 +384,12 @@ __host__ void StateDb::CPUfromJson(StateDb *state_db, const cJSON *state_json, u
         idx++;
     }
 }
-__host__ StateDb *StateDb::CPUFromGPU(StateDb *state_db) {
+__host__ StateDb *StateDb::GPUFromCPU(StateDb *&state_db) {
+    StateDb *state_db_gpu = (StateDb *)malloc(sizeof(StateDb));
+    memcpy(state_db_gpu, state_db, sizeof(StateDb));
+    return state_db_gpu;
+}
+__host__ StateDb *StateDb::CPUFromGPU(StateDb *&state_db) {
     StateDb *state_db_cpu = (StateDb *)malloc(sizeof(StateDb));
     memcpy(state_db_cpu, state_db, sizeof(StateDb));
     // copy other inner data

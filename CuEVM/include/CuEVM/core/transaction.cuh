@@ -6,8 +6,7 @@
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/state/state_db.cuh>
 
-namespace CuEVM {
-namespace transaction {
+namespace CuEVM::transaction {
 /**
  * The access list account.
  * YP: \f$E_{a}\f$
@@ -66,22 +65,26 @@ struct access_list_t {
     __host__ int32_t from_json(const cJSON *json, int32_t managed = 0);
 };
 
-class transactionList {
+class TransactionList {
    public:
     uint32_t size;
-    uint32_t *type;
-    gas_t *gas_limit;
-    evm_word_t *nonce;
-    evm_word_t *to;
+    // shared among all transactions (eth-tests)
+    evm_word_t nonce;
+    evm_word_t sender;
+    evm_word_t to;
+    evm_word_t max_fee_per_gas;
+    evm_word_t max_priority_fee_per_gas;
+    evm_word_t gas_price;
+    uint32_t type;
+    // different for each transaction (eth-tests)
     evm_word_t *value;
-    evm_word_t *sender;
-    evm_word_t *max_fee_per_gas;
-    evm_word_t *max_priority_fee_per_gas;
-    evm_word_t *gas_price;
+    gas_t *gas_limit;
     uint8_t *call_data;
     uint32_t *call_data_offset;
     uint32_t *call_data_size;
     // TODO: access list
+
+    __host__ __device__ void print();
 };
 /**
  * The transaction struct.
@@ -264,9 +267,9 @@ __host__ uint32_t no_transactions(const cJSON *json);
  * @param[in] clones the number of clones.
  * @return 0 for success, error code for failure.
  */
-__host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJSON *json, uint32_t &transactions_count,
-                                  int32_t managed = 0, CuEVM::StateDb *state_db_ptr = nullptr, uint32_t start_index = 0,
-                                  uint32_t clones = 1);
+__host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const cJSON *json,
+                                  uint32_t &transactions_count, uint32_t clones = 1,
+                                  CuEVM::StateDb *state_db_ptr = nullptr);
 
 /**
  * free the transactions
@@ -276,7 +279,8 @@ __host__ int32_t get_transactions(evm_transaction_t *&transactions_ptr, const cJ
  * @return 0 for success, error code for failure.
  */
 __host__ int32_t free_instaces(evm_transaction_t *transactions_ptr, uint32_t transactions_count, int32_t managed = 0);
-}  // namespace transaction
+
+}  // namespace CuEVM::transaction
 // alias fro transaction
-using evm_transaction_t = transaction::evm_transaction_t;
-}  // namespace CuEVM
+// using evm_transaction_t = CuEVM::transaction::evm_transaction_t;
+// namespace CuEVM

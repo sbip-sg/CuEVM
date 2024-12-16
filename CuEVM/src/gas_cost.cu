@@ -240,19 +240,20 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::
     return ERROR_SUCCESS;
 }
 
-__device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &transaction, gas_t &gas_intrinsic) {
+__device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::TransactionList *transaction_list,
+                                             gas_t &gas_intrinsic) {
     // gas_intrinsic = GAS_TRANSACTION
     gas_intrinsic = GAS_TRANSACTION;
 
     // gas_intrinsic += GAS_TRANSACTION_CREATE if transaction.create
-    if (transaction.is_create) {
-        gas_intrinsic += GAS_TX_CREATE;
-    }
+    // if (transaction_list->is_create) {
+    //     gas_intrinsic += GAS_TX_CREATE;
+    // }
 
     // gas_intrinsic += GAS_TX_DATA_ZERO/GAS_TX_DATA_NONZERO for each byte in
     // transaction.data
-    for (uint32_t idx = 0; idx < transaction.data_init.size; idx++) {
-        if (transaction.data_init.data[idx] == 0) {
+    for (uint32_t idx = 0; idx < transaction_list->call_data_size[THREADIDX]; idx++) {
+        if (transaction_list->call_data[transaction_list->call_data_offset[THREADIDX] + idx] == 0) {
             gas_intrinsic += GAS_TX_DATA_ZERO;
         } else {
             gas_intrinsic += GAS_TX_DATA_NONZERO;
@@ -262,17 +263,17 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &tra
     // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for
     // each address in transaction.access_list
 
-    for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
-        gas_intrinsic += GAS_ACCESS_LIST_ADDRESS;
-        gas_intrinsic += GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count;
-    }
+    // for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
+    //     gas_intrinsic += GAS_ACCESS_LIST_ADDRESS;
+    //     gas_intrinsic += GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count;
+    // }
 
 #ifdef EIP_3860
     // gas_intrinsic += GAS_INITCODE_COST if create transaction
-    if (transaction.is_create) {
-        if (transaction.data_init.size > max_initcode_size > 0) return ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
-        initcode_cost(gas_intrinsic, transaction.data_init.size);
-    }
+    // if (transaction.is_create) {
+    //     if (transaction.data_init.size > max_initcode_size > 0) return ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
+    //     initcode_cost(gas_intrinsic, transaction.data_init.size);
+    // }
 #endif
     return ERROR_SUCCESS;
 }

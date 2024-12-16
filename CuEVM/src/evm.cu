@@ -17,9 +17,19 @@
 namespace CuEVM {
 
 // define the kernel function
-__global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t *instances, uint32_t count) {
+__global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
+                                              CuEVM::transaction::TransactionList *transaction_list_ptr,
+                                              uint32_t count) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
+
+    printf("instance %d\n", instance);
+    printf("state db ptr %p\n", state_db_ptr);
+    printf("transaction list ptr %p\n", transaction_list_ptr);
+    printf("printing state db\n");
+    state_db_ptr->print();
+    printf("printing transaction list\n");
+    transaction_list_ptr->print();
 
 #ifdef EIP_3155
     if (instance == 0) {
@@ -36,44 +46,46 @@ __global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t *instances, 
 
     __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
     __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
-    CuEVM::evm_t *evm = new CuEVM::evm_t(instances[instance], shared_message_call, shared_stack[threadIdx.x]);
+    // CuEVM::evm_t *evm = new CuEVM::evm_t(instances[instance], shared_message_call, shared_stack[threadIdx.x]);
 
     // printf("\n evm call state \n");
     // evm->call_state_ptr->print();
     // evm->call_state_ptr->message_ptr->print();
-    if (evm->status == ERROR_SUCCESS) {
-        CuEVM::cached_evm_call_state cached_state(evm->call_state_ptr);
+    /*
+        if (evm->status == ERROR_SUCCESS) {
+            CuEVM::cached_evm_call_state cached_state(evm->call_state_ptr);
 
-        // printf("\n\n evm cached call state\n");
-        // evm->call_state_ptr->print();
+            // printf("\n\n evm cached call state\n");
+            // evm->call_state_ptr->print();
 
-        evm->run(cached_state);
+            evm->run(cached_state);
 
-#ifdef EIP_3155
-        if (instance == 0) {
-            __ONE_GPU_THREAD_BEGIN__
-            // instances[0].tracer_ptr->print(arith);
-            instances[0].tracer_ptr->print_err();
-            __ONE_GPU_THREAD_WOSYNC_END__
+    #ifdef EIP_3155
+            if (instance == 0) {
+                __ONE_GPU_THREAD_BEGIN__
+                // instances[0].tracer_ptr->print(arith);
+                instances[0].tracer_ptr->print_err();
+                __ONE_GPU_THREAD_WOSYNC_END__
+            }
+    #endif
         }
-#endif
-    }
+        */
 }
 
 __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::block_info_t *block_info_ptr,
-                        CuEVM::evm_transaction_t *transaction_ptr, CuEVM::EccConstants *ecc_constants_ptr,
-                        CuEVM::evm_message_call_t *shared_message_call_ptr, CuEVM::evm_word_t *shared_stack_ptr
+                        CuEVM::transaction::TransactionList *transaction_list_ptr,
+                        CuEVM::EccConstants *ecc_constants_ptr, CuEVM::evm_message_call_t *shared_message_call_ptr,
+                        CuEVM::evm_word_t *shared_stack_ptr
 #ifdef EIP_3155
                         ,
                         CuEVM::utils::tracer_t *tracer_ptr
 #endif
-
                         ,
                         CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr,
                         CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr)
     : state_db_ptr(state_db_ptr),
       block_info_ptr(block_info_ptr),
-      transaction_ptr(transaction_ptr),
+      transaction_list_ptr(transaction_list_ptr),
       //   serialized_worldstate_data_ptr(serialized_worldstate_data_ptr),
       //   simplified_trace_data_ptr(simplified_trace_data_ptr),
       ecc_constants_ptr(ecc_constants_ptr) {
@@ -88,7 +100,9 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::block_info_t *block
 
     if (error_code == ERROR_SUCCESS) {
         CuEVM::evm_message_call_t_shadow *transaction_call_message_ptr = nullptr;
-        error_code = transaction_ptr->get_message_call(call_state_ptr->state_db_ptr, transaction_call_message_ptr);
+        // TODO: fix this
+        // error_code = transaction_list_ptr->get_message_call(call_state_ptr->state_db_ptr,
+        // transaction_call_message_ptr);
 
         shared_message_call_ptr->copy_from(transaction_call_message_ptr);
 
@@ -114,11 +128,13 @@ __device__ evm_t::~evm_t() {
     /// Todo double check touch_state_ptr
     call_state_ptr = nullptr;
     block_info_ptr = nullptr;
-    transaction_ptr = nullptr;
+    transaction_list_ptr = nullptr;
 #ifdef EIP_3155
     tracer_ptr = nullptr;
 #endif
 }
+__host__ evm_t::evm_t(CuEVM::evm_instance_t &evm_instance, CuEVM::evm_message_call_t *shared_message_call_ptr,
+                      CuEVM::evm_word_t *shared_stack_ptr) {}
 
 __device__ int32_t evm_t::start_CALL(cached_evm_call_state &cached_call_state) {
     // printf("Start call sender receipient contract address %d\n", THREADIDX);
@@ -451,7 +467,7 @@ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                     break;
                 case OP_ORIGIN:
                     error_code = CuEVM::operations::ORIGIN(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                           *cached_call_state.stack_ptr, *transaction_ptr);
+                                                           *cached_call_state.stack_ptr, transaction_list_ptr);
                     break;
                 case OP_CALLER:
                     error_code = CuEVM::operations::CALLER(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -488,9 +504,9 @@ __device__ void evm_t::run(cached_evm_call_state &cached_call_state) {
                                                              *call_state_ptr->memory_ptr);
                     break;
                 case OP_GASPRICE:
-                    error_code =
-                        CuEVM::operations::GASPRICE(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                    *cached_call_state.stack_ptr, *block_info_ptr, *transaction_ptr);
+                    error_code = CuEVM::operations::GASPRICE(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                             *cached_call_state.stack_ptr, *block_info_ptr,
+                                                             transaction_list_ptr);
                     break;
                 case OP_EXTCODESIZE:
                     error_code =
@@ -817,9 +833,9 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
             call_state_ptr->parent->update(*call_state_ptr);
         }
         // sent the value of unused gas to the sender
-        *call_state_ptr->parent->state_db_ptr->get_balance(&transaction_ptr->sender);
+        *call_state_ptr->parent->state_db_ptr->get_balance(&transaction_list_ptr->sender);
         uint256_add_word(sender_balance, sender_balance, send_back_gas);
-        call_state_ptr->parent->state_db_ptr->update_balance(&transaction_ptr->sender, sender_balance);
+        call_state_ptr->parent->state_db_ptr->update_balance(&transaction_list_ptr->sender, sender_balance);
 
         // set the eror code for a succesfull transaction
         status = error_code;
@@ -980,24 +996,28 @@ __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *
     CuEVM::get_block_info(block_info_ptr, test_json, managed);
 
     // get the transaction
-    CuEVM::evm_transaction_t *transactions_ptr = nullptr;
+    CuEVM::transaction::TransactionList *transaction_list_ptr = nullptr;
     uint32_t num_transactions = 0;
     uint32_t num_original_transactions = 0;
-    CuEVM::transaction::get_transactions(transactions_ptr, test_json, num_transactions, managed, state_db_ptr);
-    num_original_transactions = num_transactions;
-    num_transactions *= clones;
+    CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones, state_db_ptr);
+    // num_original_transactions = num_transactions;
+    // num_transactions *= clones;
     // generate the evm instances
 
     // CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
     printf("num_transactions %d\n", num_transactions);
+    printf("transactions %p\n", transaction_list_ptr);
+    // transaction_list_ptr->print();
+
     evm_instances = new evm_instance_t[num_transactions];
-    state_db_ptr = new CuEVM::StateDb(num_transactions);
-    CuEVM::StateDb::CPUfromJson(state_db_ptr, world_state_json, num_transactions);
-    state_db_ptr->print();
+
+    CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions);
+    // state_db_ptr->print();
     for (uint32_t index = 0; index < num_transactions; index++) {
         evm_instances[index].state_db_ptr = state_db_ptr;
         evm_instances[index].block_info_ptr = block_info_ptr;
-        evm_instances[index].transaction_ptr = &transactions_ptr[index % num_original_transactions];
+        evm_instances[index].transaction_list_ptr = transaction_list_ptr;
+        // evm_instances[index].transaction_ptr = &transactions_ptr[index % num_original_transactions];
         // CUDA_CHECK(cudaMalloc(&evm_instances[index].serialized_worldstate_data_ptr,
         //                       sizeof(CuEVM::serialized_worldstate_data)));
         // CUDA_CHECK(

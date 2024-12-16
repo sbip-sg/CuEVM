@@ -78,12 +78,11 @@ __device__ int32_t BALANCE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
 }
 
 __device__ int32_t ORIGIN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          const CuEVM::evm_transaction_t &transaction) {
+                          const CuEVM::transaction::TransactionList *transaction_list) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t origin;
-        transaction.get_sender(origin);
+        evm_word_t origin = transaction_list->sender;
 
         error_code |= stack.push(origin);
     }
@@ -232,11 +231,11 @@ __device__ int32_t CODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_use
 }
 
 __device__ int32_t GASPRICE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::block_info_t &block, const CuEVM::evm_transaction_t &transaction) {
+                            const CuEVM::block_info_t &block,
+                            const CuEVM::transaction::TransactionList *transaction_list) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    evm_word_t gas_price;
-    error_code |= transaction.get_gas_price(block, gas_price);
+    evm_word_t gas_price = transaction_list->gas_price;
     error_code |= stack.push(gas_price);
     return error_code;
 }

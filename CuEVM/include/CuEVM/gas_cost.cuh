@@ -233,7 +233,8 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::
  * @param[out] gas_intrinsic The intrinsic gas
  * @return 0 for success, 1 for failure
  */
-__device__ int32_t transaction_intrinsic_gas(const CuEVM::evm_transaction_t &transaction, gas_t &gas_intrinsic);
+__device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::TransactionList *transaction_list,
+                                             gas_t &gas_intrinsic);
 
 /**
  * Get the memory grow cost.

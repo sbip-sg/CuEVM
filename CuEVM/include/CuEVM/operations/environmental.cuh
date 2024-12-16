@@ -93,7 +93,7 @@ __device__ int32_t BALANCE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_s
  * @return The error code. 0 if no error.
  */
 __device__ int32_t ORIGIN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          const CuEVM::evm_transaction_t &transaction);
+                          const CuEVM::transaction::TransactionList *transaction_list);
 
 /**
  * The CALLER operation implementation.
@@ -219,7 +219,8 @@ __device__ int32_t CODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  * @return The error code. 0 if no error.
  */
 __device__ int32_t GASPRICE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::block_info_t &block, const CuEVM::evm_transaction_t &transaction);
+                            const CuEVM::block_info_t &block,
+                            const CuEVM::transaction::TransactionList *transaction_list);
 
 /**
  * The EXTCODESIZE operation implementation.

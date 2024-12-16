@@ -114,11 +114,11 @@ class StateDb {
 
     __host__ __device__ void print();
 
-    __host__ static void GPUfromJson(StateDb *state_db, const cJSON *state_json, uint32_t num_states);
-    __host__ static void CPUfromJson(StateDb *state_db, const cJSON *state_json, uint32_t num_states);
+    __host__ static void GPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states);
+    __host__ static void CPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states);
 
-    __host__ static StateDb *CPUFromGPU(StateDb *state_db);
-    __host__ static StateDb *GPUFromCPU(StateDb *state_db);
+    __host__ static StateDb *CPUFromGPU(StateDb *&state_db);
+    __host__ static StateDb *GPUFromCPU(StateDb *&state_db);
 };
 
 }  // namespace CuEVM

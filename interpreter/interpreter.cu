@@ -56,14 +56,17 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         // TODO remove DEBUG num instances
         // num_instances = 1;
         uint32_t num_blocks = (num_instances + CGBN_IBP - 1) / (CGBN_IBP);
+        printf("\n\n ----------\n\n");
         printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
                CGBN_IBP);
         // run the evm
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
         cudaEventRecord(start);
-        return;
-        CuEVM::kernel_evm_multiple_instances<<<num_blocks, CGBN_IBP>>>(instances_data, num_instances);
+
+        CuEVM::kernel_evm_multiple_instances<<<num_blocks, CGBN_IBP>>>(
+            instances_data->state_db_ptr, instances_data->transaction_list_ptr, num_instances);
+
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
 
@@ -72,7 +75,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 
         CUDA_CHECK(cudaGetLastError());
         printf("GPU kernel finished\n");
-
+        return;
         // CUDA_CHECK(cudaEventRecord(stop));
         // CUDA_CHECK(cudaEventSynchronize(stop));
         // CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));

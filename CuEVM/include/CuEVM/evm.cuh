@@ -9,12 +9,12 @@
 #include <CuEVM/utils/ecc_constants.cuh>
 namespace CuEVM {
 struct evm_instance_t {
-    CuEVM::StateDb* state_db_ptr;              /**< The world state pointer*/
-    CuEVM::block_info_t* block_info_ptr;       /**< The block info pointer*/
-    CuEVM::evm_transaction_t* transaction_ptr; /**< The transaction pointer*/
-    CuEVM::log_state_data_t* log_state_ptr;    /**< The log state pointer*/
-    CuEVM::evm_return_data_t* return_data_ptr; /**< The return data pointer*/
-    CuEVM::EccConstants* ecc_constants_ptr;    /**< The ecc constants pointer*/
+    CuEVM::StateDb* state_db_ptr;                              /**< The world state pointer*/
+    CuEVM::block_info_t* block_info_ptr;                       /**< The block info pointer*/
+    CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer*/
+    CuEVM::log_state_data_t* log_state_ptr;                    /**< The log state pointer*/
+    CuEVM::evm_return_data_t* return_data_ptr;                 /**< The return data pointer*/
+    CuEVM::EccConstants* ecc_constants_ptr;                    /**< The ecc constants pointer*/
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer*/
 #endif
@@ -23,14 +23,14 @@ struct evm_instance_t {
     CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
 };
 struct evm_t {
-    CuEVM::StateDb* state_db_ptr;                    /**< The world state pointer*/
-    const CuEVM::block_info_t* block_info_ptr;       /**< The block info pointer */
-    const CuEVM::evm_transaction_t* transaction_ptr; /**< The transaction pointer */
-    CuEVM::evm_call_state_t* call_state_ptr;         /**< The call state pointer store in global mem*/
-    CuEVM::EccConstants* ecc_constants_ptr;          /**< The ecc constants pointer*/
-    gas_t gas_price;                                 /**< The gas price */
-    gas_t gas_priority_fee;                          /**< The gas priority fee */
-    uint32_t status;                                 /**< The status */
+    CuEVM::StateDb* state_db_ptr;                                    /**< The world state pointer*/
+    const CuEVM::block_info_t* block_info_ptr;                       /**< The block info pointer */
+    const CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer */
+    CuEVM::evm_call_state_t* call_state_ptr;                         /**< The call state pointer store in global mem*/
+    CuEVM::EccConstants* ecc_constants_ptr;                          /**< The ecc constants pointer*/
+    gas_t gas_price;                                                 /**< The gas price */
+    gas_t gas_priority_fee;                                          /**< The gas priority fee */
+    uint32_t status;                                                 /**< The status */
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer */
 #endif
@@ -49,7 +49,7 @@ struct evm_t {
      * @param[in] tracer_ptr The tracer pointer
      */
     __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::block_info_t* block_info_ptr,
-                     CuEVM::evm_transaction_t* transaction_ptr, CuEVM::EccConstants* ecc_constants_ptr,
+                     CuEVM::transaction::TransactionList* transaction_list_ptr, CuEVM::EccConstants* ecc_constants_ptr,
                      CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
                      ,
@@ -66,8 +66,9 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @param[in] evm_instance The evm instance
      */
-    __device__ evm_t(CuEVM::evm_instance_t& evm_instance, CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
-                     CuEVM::evm_word_t* shared_stack_ptr = nullptr);
+    __host__ __device__ evm_t(CuEVM::evm_instance_t& evm_instance,
+                              CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
+                              CuEVM::evm_word_t* shared_stack_ptr = nullptr);
 
     /**
      * @brief Destroy the evm_t object
@@ -149,6 +150,8 @@ __host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* 
  */
 __host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances, int32_t managed = 0);
 
-__global__ void kernel_evm_multiple_instances(CuEVM::evm_instance_t* instances, uint32_t count);
+__global__ void kernel_evm_multiple_instances(StateDb* state_db_ptr,
+                                              CuEVM::transaction::TransactionList* transaction_list_ptr,
+                                              uint32_t count);
 
 }  // namespace CuEVM
