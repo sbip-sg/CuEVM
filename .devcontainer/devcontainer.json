@@ -1,6 +1,6 @@
 {
   "name": "CuEVM dev container",
-  "image": "augustus/goevmlab-cuevm:cuda-12.4.1-cudnn-devel-ubuntu22.04",
+  "image": "augustus/goevmlab-cuevm:20241216",
   "runArgs": [
     "--rm"
   ],

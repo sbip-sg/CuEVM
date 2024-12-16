@@ -266,4 +266,4 @@ This project is part of the [Singapore Blockchain Innovation Programme (SBIP)](h
 
 ## Documentation
 
-An auto generated source code documentation is available at [https://sbip-sg.github.io/CuEVM-internal/files.html](https://sbip-sg.github.io/CuEVM-internal/files.html)
+An auto generated source code documentation is available at [https://sbip-sg.github.io/CuEVM/files.html](https://sbip-sg.github.io/CuEVM/files.html)
