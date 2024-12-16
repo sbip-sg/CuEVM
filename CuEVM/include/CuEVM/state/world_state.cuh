@@ -31,7 +31,7 @@ struct serialized_worldstate_data {
     // currently dont support copy back the bytecode hex string
     // TODO: use 1 large preallocated buffer for bytecode
     void print();
-  void print_json();
+    void print_json();
 };
 /**
  * The world state classs
