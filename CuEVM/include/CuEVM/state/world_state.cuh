@@ -22,6 +22,7 @@ struct serialized_worldstate_data {
     uint32_t no_accounts;
     uint32_t no_storage_elements;
     char addresses[worldstate_addresses_size][43];  // 0x + ... + \0
+    char code_hash[worldstate_addresses_size][67]; // 0x + ... + \0
     char balance[worldstate_addresses_size][67];    // 0x + ... + \0
     uint32_t nonce[worldstate_addresses_size];
     uint16_t storage_indexes[worldstate_storage_values_size];
@@ -30,6 +31,7 @@ struct serialized_worldstate_data {
     // currently dont support copy back the bytecode hex string
     // TODO: use 1 large preallocated buffer for bytecode
     void print();
+  void print_json();
 };
 /**
  * The world state classs

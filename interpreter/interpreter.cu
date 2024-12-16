@@ -71,6 +71,8 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         CUDA_CHECK(cudaGetLastError());
         printf("GPU kernel finished\n");
         CGBN_CHECK(report);
+
+        instances_data[0].serialized_worldstate_data_ptr->print_json();
 #ifdef EIP_3155
         // print only the first instance
 
