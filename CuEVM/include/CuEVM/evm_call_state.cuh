@@ -23,6 +23,8 @@ struct evm_call_state_t {
     CuEVM::evm_memory_t* memory_ptr;                    /**< The memory */
     CuEVM::StateDb* state_db_ptr;                       /**< The state db */
     CuEVM::log_state_data_t* log_state_ptr;             /**< The logs state */
+    uint32_t last_return_data_size;                     /**< The size of the return data */
+    uint32_t last_return_data_offset;                   /**< The offset of the return data */
     CuEVM::evm_return_data_t* last_return_data_ptr;     /**< The return data */
 #ifdef EIP_3155
     uint32_t trace_idx; /**< The index in the trace */
@@ -34,7 +36,7 @@ struct evm_call_state_t {
     __device__ evm_call_state_t(CuEVM::evm_call_state_t* parent, uint32_t depth, uint32_t pc, gas_t gas_used,
                                 gas_t gas_refund, CuEVM::evm_message_call_t* message_ptr, CuEVM::evm_stack_t* stack_ptr,
                                 CuEVM::evm_memory_t* memory_ptr, CuEVM::log_state_data_t* log_state_ptr,
-                                CuEVM::StateDb* state_db_ptr, CuEVM::evm_return_data_t* last_return_data_ptr);
+                                CuEVM::StateDb* state_db_ptr);
 
     /**
      * The constructor with the parent state and message call
@@ -50,8 +52,7 @@ struct evm_call_state_t {
      * The constructor with no parent state and message call
      */
     __device__ evm_call_state_t(CuEVM::StateDb* state_db_ptr, CuEVM::evm_stack_t* stack_ptr,
-                                CuEVM::evm_memory_t* memory_ptr, CuEVM::log_state_data_t* log_state_ptr,
-                                CuEVM::evm_return_data_t* last_return_data_ptr);
+                                CuEVM::evm_memory_t* memory_ptr, CuEVM::log_state_data_t* log_state_ptr);
     /**
      * The destructor of the evm_call_state_t
      */

@@ -36,12 +36,16 @@ struct log_state_data_t {
      * The destructor
      */
     __host__ __device__ ~log_state_data_t() {
+        // TODO: fix this
+        /*
         if (logs != nullptr && capacity > 0) {
+
             delete[] logs;
         }
         logs = nullptr;
         capacity = 0;
         no_logs = 0;
+        */
     }
 
     /**

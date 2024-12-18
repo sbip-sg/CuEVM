@@ -42,8 +42,8 @@ __device__ int32_t PUSH0(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_sta
  * @param[in] byte_code The bytecode.
  * @param[in] opcode The opcode.
  */
-__device__ int32_t PUSHX(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                         const CuEVM::byte_array_t &byte_code, const uint8_t &opcode);
+__device__ int32_t PUSHX(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t *stack,
+                         uint8_t *byte_code, uint32_t byte_code_size, const uint8_t &opcode);
 
 /**
  * The DUPX operation implementation.

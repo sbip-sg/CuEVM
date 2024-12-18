@@ -297,8 +297,9 @@ __device__ int32_t evm_transaction_t::validate(CuEVM::StateDb *state_db_ptr, CuE
  * @param[out] evm_message_call_ptr the message call.
  * @return 1 for success, 0 for failure.
  */
-__device__ int32_t evm_transaction_t::get_message_call(CuEVM::StateDb *state_db_ptr,
-                                                       CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const {
+__device__ int32_t evm_transaction_t::get_message_call(
+    CuEVM::StateDb *state_db_ptr/*,
+    CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr*/) const {
     // bn_t sender_address, to_address, value, gas_limit;
     // get_sender(arith, sender_address);
     // printf("evm_transaction_t::get_message_call sender address\n");
@@ -326,16 +327,16 @@ __device__ int32_t evm_transaction_t::get_message_call(CuEVM::StateDb *state_db_
         // CuEVM::utils::get_contract_address_create(arith, contract_address, sender_address, sender_nonce);
         // cgbn_store(arith.env, (cgbn_evm_word_t_ptr) & (this->to), contract_address);
         // blank call data in create
-        evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to,
-            CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
+        // evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+        //     &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to,
+        //     CuEVM::byte_array_t(), byte_code, return_data_offset, return_data_size, static_env);
 
         //  to_account->address.print();
 
     } else {
-        evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-            &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to, data_init,
-            byte_code, return_data_offset, return_data_size, static_env);
+        // evm_message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+        //     &this->sender, &this->to, &this->to, this->gas_limit, &this->value, depth, call_type, &this->to,
+        //     data_init, byte_code, return_data_offset, return_data_size, static_env);
     }
 
     // #ifdef __CUDA_ARCH__
@@ -567,9 +568,7 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         CuEVM::byte_array_t data_init;
         data_init.from_hex(cJSON_GetArrayItem(data_json, index)->valuestring, LITTLE_ENDIAN,
                            CuEVM::PaddingDirection::NO_PADDING);
-        printf("data_init size %d\n", data_init.size);
-        printf("data_init data %p\n", data_init.data);
-        printf("data_init data[0] %02x\n", data_init.data[0]);
+
         if (data_init.size > 0) {
             if (transaction_list_ptr->call_data == nullptr) {
                 transaction_list_ptr->call_data = new uint8_t[data_init.size];
@@ -593,7 +592,7 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     }
     uint32_t call_data_size = transaction_list_ptr->call_data_offset[transactions_count - 1] +
                               transaction_list_ptr->call_data_size[transactions_count - 1];
-    printf("call_data_size %d\n", call_data_size);
+    // printf("call_data_size %d\n", call_data_size);
     TransactionList *d_transaction_list_ptr;
 
     TransactionList *temp_transaction_list_ptr = new TransactionList();
@@ -619,8 +618,8 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     CUDA_CHECK(
         cudaMemcpy(d_transaction_list_ptr, temp_transaction_list_ptr, sizeof(TransactionList), cudaMemcpyHostToDevice));
 
-    printf("transaction on host\n");
-    transaction_list_ptr->print();
+    // printf("transaction on host\n");
+    // transaction_list_ptr->print();
 
     delete temp_transaction_list_ptr;
     // delete transaction_list_ptr;

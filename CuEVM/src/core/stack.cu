@@ -7,7 +7,10 @@ __device__ evm_stack_t::evm_stack_t(evm_word_t *shared_stack_base, uint32_t stac
     : shared_stack_base(shared_stack_base),
       global_stack_base(nullptr),
       stack_base_offset(stack_base_offset),
-      stack_offset(0) {}
+      stack_offset(0) {
+    // printf("stack_base_offset %d\n", stack_base_offset);
+    // printf("shared_stack_base %p\n", shared_stack_base);
+}
 
 __device__ evm_stack_t::~evm_stack_t() { free(); }
 
@@ -73,6 +76,7 @@ __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
 __device__ uint32_t evm_stack_t::size() const { return stack_offset; }
 
 __device__ evm_word_t *evm_stack_t::top() {
+    // printf("top stack base %p stack offset %d\n", shared_stack_base, stack_offset);
     if (stack_base_offset + stack_offset < CuEVM::shared_stack_size) {
         // printf("shared stack base %p stack offset %d\n", shared_stack_base, stack_offset);
         return shared_stack_base + stack_offset;
@@ -135,7 +139,10 @@ __device__ int32_t evm_stack_t::pop_evm_word(evm_word_t *&y) {
 __device__ int32_t evm_stack_t::pushx(uint8_t x, uint8_t *src_byte_data, uint8_t src_byte_size) {
     if (stack_offset < max_stack_size) {
         evm_word_t *top_ = top();
-
+        // printf("pushx top %p\n", top_);
+        // printf("pushx src_byte_data %p\n", src_byte_data);
+        // printf("pushx src_byte_size %u\n", src_byte_size);
+        // printf("pushx src_byte_data[0] %d\n", src_byte_data[0]);
         uint256_from_bytes(top_, src_byte_data, src_byte_size);
         stack_offset++;
 

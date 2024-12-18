@@ -9,9 +9,13 @@ __device__ cached_evm_call_state::cached_evm_call_state(evm_call_state_t* state)
     gas_used = state->gas_used;
     gas_limit = state->gas_limit;
     stack_ptr = state->stack_ptr;
+    // printf("cached_evm_call_state stack ptr %p\n", stack_ptr);
+    // printf("cached_evm_call_state stack ptr shared_stack_base %p\n", stack_ptr->shared_stack_base);
+    // printf("cached_evm_call_state stack ptr stack_base_offset %d\n", stack_ptr->stack_base_offset);
+    // printf("cached_evm_call_state stack ptr stack_offset %d\n", stack_ptr->stack_offset);
     // printf("message ptr %p\n", state->message_ptr);
-    byte_code_size = state->message_ptr->byte_code->size;
-    byte_code_data = state->message_ptr->byte_code->data;
+    byte_code_size = state->message_ptr->byte_code_size;
+    byte_code_data = state->message_ptr->byte_code;
 }
 __device__ void cached_evm_call_state::write_cache_to_state(evm_call_state_t* state) {
     state->pc = pc;
@@ -24,8 +28,7 @@ __device__ void cached_evm_call_state::set_byte_code(const byte_array_t* byte_co
 __device__ evm_call_state_t::evm_call_state_t(CuEVM::evm_call_state_t* parent, uint32_t depth, uint32_t pc,
                                               gas_t gas_used, gas_t gas_refund, CuEVM::evm_message_call_t* message_ptr,
                                               CuEVM::evm_stack_t* stack_ptr, CuEVM::evm_memory_t* memory_ptr,
-                                              CuEVM::log_state_data_t* log_state_ptr, CuEVM::StateDb* state_db_ptr,
-                                              CuEVM::evm_return_data_t* last_return_data_ptr) {
+                                              CuEVM::log_state_data_t* log_state_ptr, CuEVM::StateDb* state_db_ptr) {
     this->parent = parent;
     this->depth = depth;
     this->pc = pc;
@@ -37,7 +40,8 @@ __device__ evm_call_state_t::evm_call_state_t(CuEVM::evm_call_state_t* parent, u
     this->memory_ptr = memory_ptr;
     this->log_state_ptr = log_state_ptr;
     this->state_db_ptr = state_db_ptr;
-    this->last_return_data_ptr = last_return_data_ptr;
+    this->last_return_data_size = 0;
+    this->last_return_data_offset = 0;
 #ifdef EIP_3155
     this->trace_idx = 0;
     // printf("evm_call_state_t constructor no parent %d\n", THREADIDX);
@@ -62,18 +66,20 @@ __device__ evm_call_state_t::evm_call_state_t(CuEVM::evm_call_state_t* parent,
     this->message_ptr = shared_message_ptr;
     this->message_ptr_copy = shadow_message_ptr;  // point to global memory, deallocate in destructor
     this->message_ptr->get_gas_limit(this->gas_limit);
-    evm_stack_t* stack_ptr;
 
     if (parent->stack_ptr != nullptr) {
-        stack_ptr = new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base + parent->stack_ptr->stack_offset,
-                                           parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
+        this->stack_ptr =
+            new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base + parent->stack_ptr->stack_offset,
+                                   parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
         // printf("parent stack found %p thread %d\n", parent->stack_ptr, THREADIDX);
     } else {
-        stack_ptr = new CuEVM::evm_stack_t(shared_stack_ptr);
-        // printf("parent stack not found %p thread %d\n", parent->stack_ptr, THREADIDX);
+        this->stack_ptr = new CuEVM::evm_stack_t(shared_stack_ptr);
+        // printf("parent stack not found %p thread %d\n", shared_stack_ptr, THREADIDX);
     }
-
-    this->stack_ptr = stack_ptr;
+    // printf("evm_call_state_t stack ptr %p\n", this->stack_ptr);
+    // printf("evm_call_state_t stack ptr shared_stack_base %p\n", this->stack_ptr->shared_stack_base);
+    // printf("evm_call_state_t stack ptr stack_base_offset %d\n", this->stack_ptr->stack_base_offset);
+    // printf("evm_call_state_t stack ptr stack_offset %d\n", this->stack_ptr->stack_offset);
 
     evm_memory_t* memory_ptr;
     memory_ptr = new CuEVM::evm_memory_t();
@@ -106,15 +112,15 @@ __device__ evm_call_state_t::evm_call_state_t(CuEVM::evm_call_state_t* other) {
     this->log_state_ptr = other->log_state_ptr;
     this->state_db_ptr = other->state_db_ptr;
     // this->touch_state_ptr = other->touch_state_ptr;
-    this->last_return_data_ptr = other->last_return_data_ptr;
+    this->last_return_data_size = other->last_return_data_size;
+    this->last_return_data_offset = other->last_return_data_offset;
 }
 
 /**
  * The constructor with no parent state and message call
  */
 __device__ evm_call_state_t::evm_call_state_t(CuEVM::StateDb* state_db_ptr, CuEVM::evm_stack_t* stack_ptr,
-                                              CuEVM::evm_memory_t* memory_ptr, CuEVM::log_state_data_t* log_state_ptr,
-                                              CuEVM::evm_return_data_t* last_return_data_ptr)
+                                              CuEVM::evm_memory_t* memory_ptr, CuEVM::log_state_data_t* log_state_ptr)
 // : touch_state(state_access_ptr, word_state_ptr) {
 {
     this->state_db_ptr = state_db_ptr;
@@ -128,7 +134,8 @@ __device__ evm_call_state_t::evm_call_state_t(CuEVM::StateDb* state_db_ptr, CuEV
     this->stack_ptr = stack_ptr;
     this->memory_ptr = memory_ptr;
     this->log_state_ptr = log_state_ptr;
-    this->last_return_data_ptr = last_return_data_ptr;
+    this->last_return_data_size = 0;
+    this->last_return_data_offset = 0;
 #ifdef EIP_3155
     this->trace_idx = 0;
 #endif
@@ -162,7 +169,8 @@ __device__ void evm_call_state_t::print() const {
     printf("Log state pointer: %p\n", log_state_ptr);
     // printf("Touch state\n");
     // touch_state.print();
-    printf("Last return data pointer: %p\n", last_return_data_ptr);
+    printf("Last return data size: %d\n", last_return_data_size);
+    printf("Last return data offset: %d\n", last_return_data_offset);
     printf("\n");
 }
 

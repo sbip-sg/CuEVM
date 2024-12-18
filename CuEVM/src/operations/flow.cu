@@ -13,7 +13,7 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
         uint32_t destination_u32;
         error_code =
             uint256_get_uint32_t(&destination) == ERROR_VALUE_OVERFLOW ? ERROR_INVALID_JUMP_DESTINATION : error_code;
-        if ((destination_u32 >= message.byte_code->size) || (message.byte_code->data[destination_u32] != OP_JUMPDEST)) {
+        if ((destination_u32 >= message.byte_code_size) || (message.byte_code[destination_u32] != OP_JUMPDEST)) {
             return ERROR_INVALID_JUMP_DESTINATION;
         }
 
@@ -51,8 +51,7 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
             simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
 #endif
 
-            if ((destination_u32 >= message.byte_code->size) ||
-                (message.byte_code->data[destination_u32] != OP_JUMPDEST)) {
+            if ((destination_u32 >= message.byte_code_size) || (message.byte_code[destination_u32] != OP_JUMPDEST)) {
                 return ERROR_INVALID_JUMP_DESTINATION;
             }
             if (error_code == ERROR_SUCCESS) {

@@ -3,7 +3,6 @@
 
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/core/byte_array.cuh>
-#include <CuEVM/core/message.cuh>
 #include <CuEVM/state/state_db.cuh>
 
 namespace CuEVM::transaction {
@@ -240,8 +239,7 @@ struct evm_transaction_t {
      * @param[out] evm_message_call_ptr the message call.
      * @return 0 for success, error code for failure.
      */
-    __device__ int32_t get_message_call(CuEVM::StateDb *state_db_ptr,
-                                        CuEVM::evm_message_call_t_shadow *&evm_message_call_ptr) const;
+    __device__ int32_t get_message_call(CuEVM::StateDb *state_db_ptr) const;
 
     __host__ __device__ void print();
 

@@ -129,9 +129,12 @@ __device__ int32_t CALLDATALOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         //        data_offset_ui32);
         if (uint256_cmp_word(&index, data_offset_ui32) != 0) data_offset_ui32 = UINT32_MAX;
         length_ui32 = CuEVM::word_size;
-        CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
-
-        error_code |= stack.pushx(CuEVM::word_size, data.data, data.size);
+        // CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
+        if (data_offset_ui32 > message.call_data_size) {
+            error_code |= stack.push(evm_word_t(0));
+        } else {
+            error_code |= stack.pushx(CuEVM::word_size, message.call_data + data_offset_ui32, length_ui32);
+        }
     }
     return error_code;
 }
@@ -141,9 +144,7 @@ __device__ int32_t CALLDATASIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t length;
-        uint256_from_word(&length, message.get_data().size);
-
+        evm_word_t length = message.call_data_size;
         error_code |= stack.push(length);
     }
     return error_code;
@@ -176,9 +177,10 @@ __device__ int32_t CALLDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         if (uint256_cmp_word(&data_offset, data_offset_ui32) != 0) data_offset_ui32 = UINT32_MAX;
         length_ui32 = uint256_get_uint32_t(&length);
         if (uint256_cmp_word(&length, length_ui32) != 0) length_ui32 = UINT32_MAX;
-        CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
-
-        error_code |= memory.set(data, memory_offset, length);
+        // CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
+        // TODO: fix this
+        // error_code |= memory.set(message.call_data + data_offset_ui32, memory_offset, length);
+        // error_code |= memory.set(data, memory_offset, length);
     }
     return error_code;
 }
@@ -188,9 +190,7 @@ __device__ int32_t CODESIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_use
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t code_size;
-        uint256_from_word(&code_size, message.get_byte_code().size);
-
+        evm_word_t code_size = message.byte_code_size;
         error_code |= stack.push(code_size);
     }
     return error_code;
@@ -223,9 +223,10 @@ __device__ int32_t CODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_use
         if (uint256_cmp_word(&code_offset, data_offset_ui32) != 0) data_offset_ui32 = UINT32_MAX;
         length_ui32 = uint256_get_uint32_t(&length);
         if (uint256_cmp_word(&length, length_ui32) != 0) length_ui32 = UINT32_MAX;
-        CuEVM::byte_array_t data(message.get_byte_code(), data_offset_ui32, length_ui32);
+        // TODO: fix this
+        // CuEVM::byte_array_t data(message.get_byte_code(), data_offset_ui32, length_ui32);
 
-        error_code |= memory.set(data, memory_offset, length);
+        // error_code |= memory.set(data, memory_offset, length);
     }
     return error_code;
 }

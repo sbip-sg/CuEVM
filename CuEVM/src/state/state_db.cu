@@ -278,8 +278,8 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
     CUDA_CHECK(cudaMemcpy(tmp_state_db->all_account_codes, state_db_cpu->all_account_codes, code_size * sizeof(uint8_t),
                           cudaMemcpyHostToDevice));
 
-    printf("state db cpu\n");
-    state_db_cpu->print();
+    // printf("state db cpu\n");
+    // state_db_cpu->print();
 
     StateDb *state_db_gpu;
     CUDA_CHECK(cudaMalloc(&state_db_gpu, sizeof(StateDb)));

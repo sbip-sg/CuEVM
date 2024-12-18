@@ -42,6 +42,21 @@ __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
     this->jump_destinations = new CuEVM::jump_destinations_t(*this->byte_code);
 }
 
+__device__ evm_message_call_t::evm_message_call_t(StateDb *state_db_ptr,
+                                                  CuEVM::transaction::TransactionList *transaction_list_ptr) {
+    this->sender = transaction_list_ptr->sender;
+    this->recipient = transaction_list_ptr->to;
+    this->contract_address = transaction_list_ptr->to;
+    this->gas_limit = transaction_list_ptr->gas_limit[threadIdx.x];
+    this->value = transaction_list_ptr->value[threadIdx.x];
+    this->storage_address = transaction_list_ptr->to;
+    this->return_data_offset = 0;
+    this->return_data_size = 0;
+    this->static_env = 0;
+    this->call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[threadIdx.x]];
+    this->call_data_size = transaction_list_ptr->call_data_size[threadIdx.x];
+    this->byte_code = state_db_ptr->get_code(this->byte_code_size, &transaction_list_ptr->to);
+}
 // Copy function , only words global -> shared mem
 __device__ void evm_message_call_t::copy_from(const evm_message_call_t_shadow *other) {
     // printf("evm_message_call_t copy_from other\n ");
@@ -57,8 +72,8 @@ __device__ void evm_message_call_t::copy_from(const evm_message_call_t_shadow *o
 
     memcpy(sender.words, other->params_data[0].words, UINT256_WORDS * sizeof(uint32_t) * 7);
     // printf("evm_message_call_t copy_from other after memcpy\n ");
-    data = other->data;
-    byte_code = other->byte_code;
+    // call_data = other->call_data;
+    // byte_code = other->byte_code;
     static_env = other->static_env;
     depth = other->depth;
     call_type = other->call_type;
@@ -69,10 +84,10 @@ __device__ evm_message_call_t::~evm_message_call_t() {
     // todo maybe to delete the inside vectors who knows
     delete jump_destinations;
     jump_destinations = nullptr;
-    delete data;
-    data = nullptr;
-    delete byte_code;
-    byte_code = nullptr;
+    // delete data;
+    // data = nullptr;
+    // delete byte_code;
+    // byte_code = nullptr;
 }
 
 /**
@@ -134,18 +149,6 @@ __device__ void evm_message_call_t::get_storage_address(evm_word_t &storage_addr
 }
 
 /**
- * Get the call/init data.
- * @return The data YP: \f$d\f$.
- */
-__device__ CuEVM::byte_array_t evm_message_call_t::get_data() const { return *this->data; }
-
-/**
- * Get the byte code.
- * @return The byte code YP: \f$b\f$.
- */
-__device__ CuEVM::byte_array_t evm_message_call_t::get_byte_code() const { return *this->byte_code; }
-
-/**
  * Get the return data offset.
  * @param[in] arith The arithmetical environment.
  * @param[out] return_data_offset The return data offset in memory.
@@ -177,17 +180,12 @@ __device__ uint32_t evm_message_call_t::get_static_env() const { return this->st
 __device__ void evm_message_call_t::set_gas_limit(gas_t &gas_limit) { this->gas_limit = gas_limit; }
 
 /**
- * Set the call data.
- * @param[in] data The data YP: \f$d\f$.
- */
-__device__ void evm_message_call_t::set_data(CuEVM::byte_array_t &data) { *this->data = data; }
-
-/**
  * Set the byte code.
  * @param[in] byte_code The byte code YP: \f$b\f$.
  */
-__device__ void evm_message_call_t::set_byte_code(CuEVM::byte_array_t &byte_code) {
-    *this->byte_code = byte_code;
+__device__ void evm_message_call_t::set_byte_code(uint8_t *byte_code, uint32_t byte_code_size) {
+    this->byte_code = byte_code;
+    this->byte_code_size = byte_code_size;
     // printf("*this->byte_code = byte_code; \n");
     // this->byte_code->print();
     // printf("other byte_code; \n");
@@ -197,12 +195,16 @@ __device__ void evm_message_call_t::set_byte_code(CuEVM::byte_array_t &byte_code
 #endif
     // __ONE_GPU_THREAD_WOSYNC_BEGIN__
     if (jump_destinations == nullptr) {
-        jump_destinations = new CuEVM::jump_destinations_t(*this->byte_code);
+        // jump_destinations = new CuEVM::jump_destinations_t(*this->byte_code);
         // delete jump_destinations;
         //  jump_destinations = nullptr;
     }
     // __ONE_GPU_THREAD_END__
-    jump_destinations->set_bytecode(byte_code);
+    // jump_destinations->set_bytecode(byte_code);
+}
+
+__device__ byte_array_t evm_message_call_t::get_data() const {
+    return byte_array_t(this->call_data, this->call_data_size);
 }
 
 /**
@@ -248,10 +250,14 @@ __host__ __device__ void evm_message_call_t::print() const {
     printf("\ncall_type: %d", call_type);
     printf("\nstorage_address: ");
     storage_address.print();
-    printf("\ndata: ");
-    data->print();
-    printf("\nbyte_code: ");
-    byte_code->print();
+    printf("\ndata size: %d\n", call_data_size);
+    for (uint32_t i = 0; i < call_data_size; i++) {
+        printf("%02x", call_data[i]);
+    }
+    printf("\nbyte_code size: %d\n", byte_code_size);
+    for (uint32_t i = 0; i < byte_code_size; i++) {
+        printf("%02x", byte_code[i]);
+    }
     printf("\nreturn_data_offset: ");
     return_data_offset.print();
     printf("\nreturn_data_size: ");

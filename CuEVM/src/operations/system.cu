@@ -138,7 +138,8 @@ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t 
         //     contract->byte_code);
 
         // get/set the call data
-        error_code |= current_state.memory_ptr->get(args_offset, args_size, *new_state_ptr->message_ptr->data);
+        // error_code |= current_state.memory_ptr->get(args_offset, args_size, *new_state_ptr->message_ptr->data);
+        // TODO: fix this
     }
     // #ifdef __CUDA_ARCH__
     //     printf("generic_CALL error_code: %d idx %d\n", error_code, threadIdx.x);
@@ -273,7 +274,8 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_state_t &current_state, CuEVM:
  * @return return error code.
  */
 __device__ int32_t STOP(CuEVM::evm_return_data_t &return_data) {
-    return_data = CuEVM::evm_return_data_t();
+    // TODO: fix this
+    // return_data = CuEVM::evm_return_data_t();
     return ERROR_RETURN;
 }
 

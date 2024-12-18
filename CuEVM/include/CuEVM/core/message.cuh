@@ -4,7 +4,8 @@
 #include <CuEVM/core/byte_array.cuh>
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/core/jump_destinations.cuh>
-
+#include <CuEVM/core/transaction.cuh>
+#include <CuEVM/state/state_db.cuh>
 namespace CuEVM {
 
 struct evm_message_call_t_shadow {
@@ -51,10 +52,12 @@ struct evm_message_call_t {
     evm_word_t return_data_size;   /**< The return data size in memory */
     gas_t gas_limit;               /**< The gas limit YP: \f$g\f$ */
     // important store them adjacent in shared memory
-    uint32_t depth;                                /**< The depth YP: \f$e\f$ */
-    uint32_t call_type;                            /**< The call type internal has the opcode */
-    CuEVM::byte_array_t *data;                     /**< The data YP: \f$d\f$ */
-    CuEVM::byte_array_t *byte_code;                /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
+    uint32_t depth;     /**< The depth YP: \f$e\f$ */
+    uint32_t call_type; /**< The call type internal has the opcode */
+    uint8_t *call_data; /**< The data YP: \f$d\f$ */
+    uint32_t call_data_size;
+    uint8_t *byte_code; /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
+    uint32_t byte_code_size;
     uint32_t static_env;                           /**< The static flag (STATICCALL) YP: \f$w\f$ */
     CuEVM::jump_destinations_t *jump_destinations; /**< The jump destinations */
 
@@ -90,6 +93,8 @@ struct evm_message_call_t {
     // Default constructor
     __host__ __device__ evm_message_call_t() {}
 
+    __device__ evm_message_call_t(StateDb *state_db_ptr, CuEVM::transaction::TransactionList *transaction_list_ptr);
+
     // Copy function
     __host__ __device__ void copy_from(const evm_message_call_t_shadow *other);
     /**
@@ -99,34 +104,29 @@ struct evm_message_call_t {
 
     /**
      * Get the sender address.
-     * @param[in] arith The arithmetical environment.
      * @param[out] sender The sender address YP: \f$s\f$.
      */
     __host__ __device__ void get_sender(evm_word_t &sender) const;
 
     /**
      * Get the recipient address.
-     * @param[in] arith The arithmetical environment.
      * @param[out] recipient The recipient address YP: \f$r\f$.
      */
     __host__ __device__ void get_recipient(evm_word_t &recipient) const;
 
     /**
      * Get the contract address.
-     * @param[in] arith The arithmetical environment.
      * @param[out] contract_address The contract address YP: \f$c\f$.
      */
     __host__ __device__ void get_contract_address(evm_word_t &contract_address) const;
 
     /**
      * Get the gas limit.
-     * @param[in] arith The arithmetical environment.
      * @param[out] gas_limit The gas limit YP: \f$g\f$.
      */
     __host__ __device__ void get_gas_limit(gas_t &gas_limit) const;
     /**
      * Get the value.
-     * @param[in] arith The arithmetical environment.
      * @param[out] value The value YP: \f$v\f$ or \f$v^{'}\f$ for DelegateCALL.
      */
     __host__ __device__ void get_value(evm_word_t &value) const;
@@ -149,18 +149,6 @@ struct evm_message_call_t {
      * @param[out] storage_address The storage address YP: \f$a\f$.
      */
     __host__ __device__ void get_storage_address(evm_word_t &storage_address) const;
-
-    /**
-     * Get the call/init data.
-     * @return The data YP: \f$d\f$.
-     */
-    __host__ __device__ CuEVM::byte_array_t get_data() const;
-
-    /**
-     * Get the byte code.
-     * @return The byte code YP: \f$b\f$.
-     */
-    __host__ __device__ CuEVM::byte_array_t get_byte_code() const;
 
     /**
      * Get the return data offset.
@@ -192,21 +180,22 @@ struct evm_message_call_t {
      */
     __host__ __device__ void set_data(CuEVM::byte_array_t &data);
 
+    // dummy to avoid compilation error
+    __device__ byte_array_t get_data() const;
+
     /**
      * Set the byte code.
      * @param[in] byte_code The byte code YP: \f$b\f$.
      */
-    __host__ __device__ void set_byte_code(CuEVM::byte_array_t &byte_code);
+    __host__ __device__ void set_byte_code(uint8_t *byte_code, uint32_t byte_code_size);
 
     /**
      * Set the return data offset.
-     * @param[in] arith The arithmetical environment.
      * @param[in] return_data_offset The return data offset in memory.
      */
     __host__ __device__ void set_return_data_offset(evm_word_t &return_data_offset);
     /**
      * Set the return data size.
-     * @param[in] arith The arithmetical environment.
      * @param[in] return_data_size The return data size in memory.
      */
     __host__ __device__ void set_return_data_size(evm_word_t &return_data_size);
