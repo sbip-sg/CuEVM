@@ -19,6 +19,23 @@
 
 namespace CuEVM {
 
+  __global__ void copy_state_kernel(CuEVM::flatten_state *flatten_state){
+    int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx > 0){
+      return;
+    }
+
+    flatten_state->no_accounts = flatten_state_ptr->no_accounts;
+    flatten_state->no_storage_elements = flatten_state_ptr->no_storage_elements;
+    for (int32_t i = 0; i < flatten_state->no_accounts; i++){
+      memcpy(flatten_state->accounts[i].address, flatten_state_ptr->accounts[i].address, 43);
+    }
+    for (int32_t i = 0; i < flatten_state->no_accounts; i++){
+      memcpy(flatten_state->accounts[i].code_hash, flatten_state_ptr->accounts[i].code_hash, 67);
+    }
+  }
+
+
 // define the kernel function
 __global__ void kernel_evm_multiple_instances(cgbn_error_report_t *report, CuEVM::evm_instance_t *instances,
                                               uint32_t count) {
@@ -962,6 +979,7 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
     // __SYNC_THREADS__
     this->world_state.update(arith, call_state_ptr->touch_state_ptr->get_state());
     this->world_state.serialize_data(arith, serialized_worldstate_data_ptr);
+    this->world_state.flatten(arith, flatten_state_ptr);
     // printf("updated final world state\n");
 
     return status;

@@ -13,6 +13,8 @@
 #include <chrono>
 #include <fstream>
 
+__managed__ CuEVM::flatten_state *flatten_state_ptr = nullptr;
+
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose = false) {
     CuEVM::evm_instance_t *instances_data;
     CuEVM::ArithEnv arith(cgbn_no_checks, 0);
@@ -65,6 +67,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         // TODO remove DEBUG num instances
         // num_instances = 1;
         printf("Running on GPU %d %d\n", num_instances, CuEVM::cgbn_tpi);
+        CUDA_CHECK(cudaMallocManaged(&flatten_state_ptr, num_instances * sizeof(CuEVM::flatten_state)));
         // run the evm
         CuEVM::kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
         CUDA_CHECK(cudaDeviceSynchronize());
@@ -72,7 +75,44 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         printf("GPU kernel finished\n");
         CGBN_CHECK(report);
 
-        instances_data[0].serialized_worldstate_data_ptr->print_json();
+        printf("Found %d accounts\n", flatten_state_ptr->no_accounts);
+
+        CuEVM::flatten_state *host_flatten_data = nullptr, *device_flatten_data = nullptr;
+        CuEVM::plain_account *host_accounts = nullptr, *device_accounts = nullptr;
+        CuEVM::plain_storage *host_storage = nullptr, *device_storage = nullptr;
+        auto accounts_size = flatten_state_ptr->no_accounts * sizeof(CuEVM::plain_account);
+        auto storage_size = flatten_state_ptr->no_storage_elements * sizeof(CuEVM::plain_storage);
+        CUDA_CHECK(cudaMalloc(&device_flatten_data, sizeof(CuEVM::flatten_state)));
+        CUDA_CHECK(cudaMalloc(&device_accounts, accounts_size));
+        CUDA_CHECK(cudaMalloc(&device_storage, storage_size));
+        CUDA_CHECK(cudaMemcpy(&device_flatten_data->accounts, device_accounts, sizeof(device_accounts), cudaMemcpyDeviceToDevice));
+        CUDA_CHECK(cudaMemcpy(&device_flatten_data->storage_elements, device_storage, sizeof(device_storage), cudaMemcpyDeviceToDevice));
+
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        CuEVM::copy_state_kernel<<<1, 1>>>(device_flatten_data);
+
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        host_flatten_data = (CuEVM::flatten_state *)malloc(sizeof(CuEVM::flatten_state));
+        host_accounts = (CuEVM::plain_account *)malloc(accounts_size);
+        host_storage = (CuEVM::plain_storage *)malloc(storage_size);
+
+        CUDA_CHECK(cudaMemcpy(host_flatten_data, device_flatten_data, sizeof(CuEVM::flatten_state), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_accounts, device_accounts, accounts_size, cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_storage, device_storage, storage_size, cudaMemcpyDeviceToHost));
+
+        host_flatten_data->accounts = host_accounts;
+        host_flatten_data->storage_elements = host_storage;
+
+        for (auto i =0; i< host_flatten_data->no_accounts; i++){
+            printf("Account %d\n", i);
+            printf("Address %s\n", host_flatten_data->accounts[i].address);
+            printf("Balance %s\n", host_flatten_data->accounts[i].balance);
+            printf("Nonce %d\n", host_flatten_data->accounts[i].nonce);
+            printf("Code hash %s\n", host_flatten_data->accounts[i].code_hash);
+        }
+
 #ifdef EIP_3155
         // print only the first instance
 
