@@ -85,33 +85,48 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         CUDA_CHECK(cudaMalloc(&device_flatten_data, sizeof(CuEVM::flatten_state)));
         CUDA_CHECK(cudaMalloc(&device_accounts, accounts_size));
         CUDA_CHECK(cudaMalloc(&device_storage, storage_size));
-        CUDA_CHECK(cudaMemcpy(&device_flatten_data->accounts, device_accounts, sizeof(device_accounts), cudaMemcpyDeviceToDevice));
-        CUDA_CHECK(cudaMemcpy(&device_flatten_data->storage_elements, device_storage, sizeof(device_storage), cudaMemcpyDeviceToDevice));
+        // CUDA_CHECK(cudaMemcpy(&device_flatten_data->accounts, device_accounts, sizeof(device_accounts), cudaMemcpyDeviceToDevice));
+        // CUDA_CHECK(cudaMemcpy(&device_flatten_data->storage_elements, device_storage, sizeof(device_storage), cudaMemcpyDeviceToDevice));
 
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        // CuEVM::copy_state_kernel<<<1, 1>>>(device_flatten_data);
+        CuEVM::copy_state_kernel<<<1, 1>>>(device_flatten_data, device_accounts, device_storage);
 
-        // CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(cudaDeviceSynchronize());
 
-        // host_flatten_data = (CuEVM::flatten_state *)malloc(sizeof(CuEVM::flatten_state));
-        // host_accounts = (CuEVM::plain_account *)malloc(accounts_size);
-        // host_storage = (CuEVM::plain_storage *)malloc(storage_size);
+        host_flatten_data = (CuEVM::flatten_state *)malloc(sizeof(CuEVM::flatten_state));
+        host_accounts = (CuEVM::plain_account *)malloc(accounts_size);
+        host_storage = (CuEVM::plain_storage *)malloc(storage_size);
 
-        // CUDA_CHECK(cudaMemcpy(host_flatten_data, device_flatten_data, sizeof(CuEVM::flatten_state), cudaMemcpyDeviceToHost));
-        // CUDA_CHECK(cudaMemcpy(host_accounts, device_accounts, accounts_size, cudaMemcpyDeviceToHost));
-        // CUDA_CHECK(cudaMemcpy(host_storage, device_storage, storage_size, cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_flatten_data, device_flatten_data, sizeof(CuEVM::flatten_state), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_accounts, device_accounts, accounts_size, cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_storage, device_storage, storage_size, cudaMemcpyDeviceToHost));
 
-        // host_flatten_data->accounts = host_accounts;
-        // host_flatten_data->storage_elements = host_storage;
+        host_flatten_data->accounts = host_accounts;
+        host_flatten_data->storage_elements = host_storage;
 
-        // for (auto i =0; i< host_flatten_data->no_accounts; i++){
-        //     printf("Account %d\n", i);
-        //     printf("Address %s\n", host_flatten_data->accounts[i].address);
-        //     printf("Balance %s\n", host_flatten_data->accounts[i].balance);
-        //     printf("Nonce %d\n", host_flatten_data->accounts[i].nonce);
-        //     printf("Code hash %s\n", host_flatten_data->accounts[i].code_hash);
-        // }
+        printf("{\"accounts\":[");
+        for (auto i =0; i< host_flatten_data->no_accounts; i++){
+          auto account = host_flatten_data->accounts[i];
+          printf("{\"address\": \"%s\", ", account.address);
+          printf("\"balance\": \"%s\", ", account.balance);
+          printf("\"nonce\": %d, ", account.nonce);
+          printf("\"codeHash\": \"%s\", ", account.code_hash);
+          printf("\"storage\":{");
+          for (auto j = account.storage_idx_start; j < account.storage_idx_end; j++){
+            auto storage = host_flatten_data->storage_elements[j];
+            printf("\"%s\": \"%s\" ", storage.key, storage.value);
+            if (j + 1 < account.storage_idx_end){
+              printf(",");
+            }
+          }
+          printf("}}");
+          if (i + 1 < host_flatten_data->no_accounts) {
+            printf(",");
+          }
+        }
+
+        printf("]}\n");
 
 #ifdef EIP_3155
         // print only the first instance

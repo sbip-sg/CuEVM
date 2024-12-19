@@ -162,7 +162,7 @@ __host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_in
 __global__ void kernel_evm_multiple_instances(cgbn_error_report_t* report, CuEVM::evm_instance_t* instances,
                                               uint32_t count);
 
-  __global__ void copy_state_kernel(CuEVM::flatten_state *flatten_state);
+  __global__ void copy_state_kernel(CuEVM::flatten_state *flatten_state, CuEVM::plain_account *accounts, CuEVM::plain_storage *storage);
 }  // namespace CuEVM
 
 #endif

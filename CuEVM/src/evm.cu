@@ -19,13 +19,16 @@
 
 namespace CuEVM {
 
-  __global__ void copy_state_kernel(CuEVM::flatten_state *flatten_state){
+  __global__ void copy_state_kernel(CuEVM::flatten_state *flatten_state, CuEVM::plain_account *accounts, CuEVM::plain_storage *storage){
     int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx > 0){
       return;
     }
 
     flatten_state->no_accounts = flatten_state_ptr->no_accounts;
+    flatten_state->storage_elements = storage;
+    flatten_state->accounts = accounts;
+
     flatten_state->no_storage_elements = flatten_state_ptr->no_storage_elements;
     for (int32_t i = 0; i < flatten_state->no_accounts; i++){
       memcpy(flatten_state->accounts[i].address, flatten_state_ptr->accounts[i].address, 43);
