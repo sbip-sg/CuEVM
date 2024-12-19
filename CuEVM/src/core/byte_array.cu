@@ -90,9 +90,9 @@ __host__ __device__ byte_array_t::~byte_array_t() { free(); }
 
 __host__ __device__ void byte_array_t::free() {
     if ((size > 0) && (data != nullptr)) {
-        // __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        // delete[] data;
-        // __ONE_GPU_THREAD_WOSYNC_END__
+        __ONE_GPU_THREAD_WOSYNC_BEGIN__
+        delete[] data;
+        __ONE_GPU_THREAD_WOSYNC_END__
         clear();
     }
 }

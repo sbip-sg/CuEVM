@@ -115,9 +115,9 @@ __host__ __device__ int32_t state_t::add_account(const CuEVM::account_t &account
     if (accounts != nullptr) {
         // printf("state_t::add_account free accounts, instance idx %d, account pointer %p \n", INSTANCE_IDX_PER_BLOCK,
         //        accounts);
-        // __ONE_GPU_THREAD_BEGIN__
-        // std::free(accounts);
-        // __ONE_GPU_THREAD_END__
+        __ONE_GPU_THREAD_BEGIN__
+        std::free(accounts);
+        __ONE_GPU_THREAD_END__
     }
     accounts = tmp_accounts[INSTANCE_IDX_PER_BLOCK];
     no_accounts++;
