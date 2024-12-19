@@ -28,14 +28,10 @@ namespace CuEVM {
     flatten_state->no_accounts = flatten_state_ptr->no_accounts;
     flatten_state->storage_elements = storage;
     flatten_state->accounts = accounts;
-
     flatten_state->no_storage_elements = flatten_state_ptr->no_storage_elements;
-    for (int32_t i = 0; i < flatten_state->no_accounts; i++){
-      memcpy(flatten_state->accounts[i].address, flatten_state_ptr->accounts[i].address, 43);
-    }
-    for (int32_t i = 0; i < flatten_state->no_accounts; i++){
-      memcpy(flatten_state->accounts[i].code_hash, flatten_state_ptr->accounts[i].code_hash, 67);
-    }
+
+    memcpy(flatten_state->accounts, flatten_state_ptr->accounts, sizeof(CuEVM::plain_account) * flatten_state_ptr->no_accounts);
+    memcpy(flatten_state->storage_elements, flatten_state_ptr->storage_elements, sizeof(CuEVM::plain_storage) * flatten_state_ptr->no_storage_elements);
   }
 
 
