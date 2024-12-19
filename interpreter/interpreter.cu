@@ -85,9 +85,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         CUDA_CHECK(cudaMalloc(&device_flatten_data, sizeof(CuEVM::flatten_state)));
         CUDA_CHECK(cudaMalloc(&device_accounts, accounts_size));
         CUDA_CHECK(cudaMalloc(&device_storage, storage_size));
-        // CUDA_CHECK(cudaMemcpy(&device_flatten_data->accounts, device_accounts, sizeof(device_accounts), cudaMemcpyDeviceToDevice));
-        // CUDA_CHECK(cudaMemcpy(&device_flatten_data->storage_elements, device_storage, sizeof(device_storage), cudaMemcpyDeviceToDevice));
-
         CUDA_CHECK(cudaDeviceSynchronize());
 
         CuEVM::copy_state_kernel<<<1, 1>>>(device_flatten_data, device_accounts, device_storage);

@@ -26,36 +26,12 @@ __host__ __device__ int32_t WorldState::update(ArithEnv &arith, const CuEVM::sta
 
 __host__ __device__ void WorldState::serialize_data(ArithEnv &arith, serialized_worldstate_data *data) {
     data->no_accounts = _state->no_accounts;
-    char *code_hash_hex_string_ptr = nullptr;
-    char *code_hex_string_ptr = nullptr;
-    CuEVM::byte_array_t *hash = nullptr;
-
-    // Check if there is enough allocated memory, exit program if not
-    if (data->no_accounts > worldstate_addresses_size) {
-        printf("Error: not enough allocated memory for world state data\n");
-    }
-
     for (uint32_t idx = 0; idx < _state->no_accounts; idx++) {
         account_t *account_ptr = &_state->accounts[idx];
-
-
         account_ptr->address.address_to_hex(data->addresses[idx]);
         account_ptr->balance.to_hex(data->balance[idx]);
         data->nonce[idx] = account_ptr->nonce._limbs[0];  // check if limbs 0
-
-
-        hash = new CuEVM::byte_array_t(CuEVM::hash_size);
-        CuCrypto::keccak::sha3(account_ptr->byte_code.data, account_ptr->byte_code.size, hash->data, hash->size);
-        code_hash_hex_string_ptr = hash->to_hex();
-
-        for (auto i=0; i<67; i++){
-          data->code_hash[idx][i] = code_hash_hex_string_ptr[i];
-        }
-
         if (account_ptr->storage.size > 0) {
-          if (data->no_storage_elements + account_ptr->storage.size > worldstate_storage_values_size){
-            printf("Error: not enough allocated memory for world state storage data\n");
-          }
             for (uint32_t idx_storage = 0; idx_storage < account_ptr->storage.size; idx_storage++) {
                 account_ptr->storage.storage[idx_storage].key.to_hex(
                     data->storage_keys[data->no_storage_elements + idx_storage]);
@@ -64,13 +40,8 @@ __host__ __device__ void WorldState::serialize_data(ArithEnv &arith, serialized_
                 data->storage_indexes[data->no_storage_elements + idx_storage] = idx;
             }
         }
-
         data->no_storage_elements += account_ptr->storage.size;
     }
-
-    if (hash) delete hash;
-    if (code_hash_hex_string_ptr) delete code_hash_hex_string_ptr;
-    if (code_hex_string_ptr) delete code_hex_string_ptr;
 }
 
   __host__ __device__ void WorldState::flatten(ArithEnv &arith, CuEVM::flatten_state *data) {
@@ -120,34 +91,6 @@ __host__ __device__ void WorldState::serialize_data(ArithEnv &arith, serialized_
     if (code_hash_hex_string_ptr) delete code_hash_hex_string_ptr;
     if (code_hex_string_ptr) delete code_hex_string_ptr;
 }
-
-  __host__ void serialized_worldstate_data::print_json() {
-    printf("{\"accounts\":[");
-    for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        printf("{\"address\": \"%s\", ", addresses[idx]);
-        printf("\"balance\": \"%s\", ", balance[idx]);
-        printf("\"nonce\": %d, ", nonce[idx]);
-        printf("\"codeHash\": \"%s\", ", code_hash[idx]);
-        printf("\"storage\":{");
-        for (auto j = 0; j < no_storage_elements; j++){
-          auto account_idx = storage_indexes[j];
-          if (account_idx > idx) break;
-          if (account_idx == idx){
-            printf("\"%s\": \"%s\" ", storage_keys[j], storage_values[j]);
-            if (j + 1 < no_storage_elements && storage_indexes[j+1]==idx){
-              printf(",");
-            }
-          }
-        }
-        printf("}}");
-        if (idx + 1 < no_accounts) {
-            printf(",");
-        }
-    }
-    printf("]}\n");
-
-}
-
 
 __host__ void serialized_worldstate_data::print() {
     printf("\nPrinting serialized worldstate data\n");
