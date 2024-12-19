@@ -75,8 +75,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         printf("GPU kernel finished\n");
         CGBN_CHECK(report);
 
-        printf("Found %d accounts\n", flatten_state_ptr->no_accounts);
-
         CuEVM::flatten_state *host_flatten_data = nullptr, *device_flatten_data = nullptr;
         CuEVM::plain_account *host_accounts = nullptr, *device_accounts = nullptr;
         CuEVM::plain_storage *host_storage = nullptr, *device_storage = nullptr;
@@ -122,9 +120,21 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
             printf(",");
           }
         }
-
         printf("]}\n");
 
+        free(host_accounts);
+        free(host_storage);
+        free(host_flatten_data);
+        host_flatten_data = nullptr;
+        host_storage = nullptr;
+        host_accounts = nullptr;
+
+        CUDA_CHECK(cudaFree(device_storage));
+        CUDA_CHECK(cudaFree(device_accounts));
+        CUDA_CHECK(cudaFree(device_flatten_data));
+        device_storage = nullptr;
+        device_accounts = nullptr;
+        device_flatten_data = nullptr;
 #ifdef EIP_3155
         // print only the first instance
 

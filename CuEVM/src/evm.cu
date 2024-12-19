@@ -32,6 +32,13 @@ namespace CuEVM {
 
     memcpy(flatten_state->accounts, flatten_state_ptr->accounts, sizeof(CuEVM::plain_account) * flatten_state_ptr->no_accounts);
     memcpy(flatten_state->storage_elements, flatten_state_ptr->storage_elements, sizeof(CuEVM::plain_storage) * flatten_state_ptr->no_storage_elements);
+
+    free(flatten_state_ptr->accounts);
+    free(flatten_state_ptr->storage_elements);
+    flatten_state_ptr->accounts = nullptr;
+    flatten_state_ptr->storage_elements = nullptr;
+    flatten_state_ptr->no_accounts = 0;
+    flatten_state_ptr->no_storage_elements = 0;
   }
 
 
