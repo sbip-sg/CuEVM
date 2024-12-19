@@ -90,28 +90,28 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        CuEVM::copy_state_kernel<<<1, 1>>>(device_flatten_data);
+        // CuEVM::copy_state_kernel<<<1, 1>>>(device_flatten_data);
 
-        CUDA_CHECK(cudaDeviceSynchronize());
+        // CUDA_CHECK(cudaDeviceSynchronize());
 
-        host_flatten_data = (CuEVM::flatten_state *)malloc(sizeof(CuEVM::flatten_state));
-        host_accounts = (CuEVM::plain_account *)malloc(accounts_size);
-        host_storage = (CuEVM::plain_storage *)malloc(storage_size);
+        // host_flatten_data = (CuEVM::flatten_state *)malloc(sizeof(CuEVM::flatten_state));
+        // host_accounts = (CuEVM::plain_account *)malloc(accounts_size);
+        // host_storage = (CuEVM::plain_storage *)malloc(storage_size);
 
-        CUDA_CHECK(cudaMemcpy(host_flatten_data, device_flatten_data, sizeof(CuEVM::flatten_state), cudaMemcpyDeviceToHost));
-        CUDA_CHECK(cudaMemcpy(host_accounts, device_accounts, accounts_size, cudaMemcpyDeviceToHost));
-        CUDA_CHECK(cudaMemcpy(host_storage, device_storage, storage_size, cudaMemcpyDeviceToHost));
+        // CUDA_CHECK(cudaMemcpy(host_flatten_data, device_flatten_data, sizeof(CuEVM::flatten_state), cudaMemcpyDeviceToHost));
+        // CUDA_CHECK(cudaMemcpy(host_accounts, device_accounts, accounts_size, cudaMemcpyDeviceToHost));
+        // CUDA_CHECK(cudaMemcpy(host_storage, device_storage, storage_size, cudaMemcpyDeviceToHost));
 
-        host_flatten_data->accounts = host_accounts;
-        host_flatten_data->storage_elements = host_storage;
+        // host_flatten_data->accounts = host_accounts;
+        // host_flatten_data->storage_elements = host_storage;
 
-        for (auto i =0; i< host_flatten_data->no_accounts; i++){
-            printf("Account %d\n", i);
-            printf("Address %s\n", host_flatten_data->accounts[i].address);
-            printf("Balance %s\n", host_flatten_data->accounts[i].balance);
-            printf("Nonce %d\n", host_flatten_data->accounts[i].nonce);
-            printf("Code hash %s\n", host_flatten_data->accounts[i].code_hash);
-        }
+        // for (auto i =0; i< host_flatten_data->no_accounts; i++){
+        //     printf("Account %d\n", i);
+        //     printf("Address %s\n", host_flatten_data->accounts[i].address);
+        //     printf("Balance %s\n", host_flatten_data->accounts[i].balance);
+        //     printf("Nonce %d\n", host_flatten_data->accounts[i].nonce);
+        //     printf("Code hash %s\n", host_flatten_data->accounts[i].code_hash);
+        // }
 
 #ifdef EIP_3155
         // print only the first instance

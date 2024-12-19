@@ -33,7 +33,6 @@ __host__ __device__ void WorldState::serialize_data(ArithEnv &arith, serialized_
     // Check if there is enough allocated memory, exit program if not
     if (data->no_accounts > worldstate_addresses_size) {
         printf("Error: not enough allocated memory for world state data\n");
-        exit(1);
     }
 
     for (uint32_t idx = 0; idx < _state->no_accounts; idx++) {
@@ -56,7 +55,6 @@ __host__ __device__ void WorldState::serialize_data(ArithEnv &arith, serialized_
         if (account_ptr->storage.size > 0) {
           if (data->no_storage_elements + account_ptr->storage.size > worldstate_storage_values_size){
             printf("Error: not enough allocated memory for world state storage data\n");
-            exit(1);
           }
             for (uint32_t idx_storage = 0; idx_storage < account_ptr->storage.size; idx_storage++) {
                 account_ptr->storage.storage[idx_storage].key.to_hex(
