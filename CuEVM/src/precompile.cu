@@ -28,14 +28,14 @@ namespace precompile_operations {
  * @param[in] message The message
  */
 __device__ int32_t operation_IDENTITY(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                      CuEVM::evm_message_call_t *message) {
+                                      CuEVM::evm_call_context_t *call_context) {
     // static gas
     gas_used += GAS_PRECOMPILE_IDENTITY;
 
     // dynamic gas
     // compute the dynamic gas cost
 
-    CuEVM::gas_cost::memory_cost(gas_used, message->call_data_size);
+    CuEVM::gas_cost::memory_cost(gas_used, call_context->call_data_size);
 
     int32_t error = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -43,7 +43,7 @@ __device__ int32_t operation_IDENTITY(gas_t &gas_limit, gas_t &gas_used, CuEVM::
         return error;
     }
 
-    *return_data = byte_array_t(message->call_data, message->call_data_size);
+    *return_data = byte_array_t(call_context->call_data, call_context->call_data_size);
 
     return ERROR_RETURN;
 }
@@ -59,13 +59,13 @@ __device__ int32_t operation_IDENTITY(gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @param[in] message The message
  */
 __device__ int32_t operation_SHA256(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                    CuEVM::evm_message_call_t *message) {
+                                    CuEVM::evm_call_context_t *call_context) {
     // static gas
     gas_used += GAS_PRECOMPILE_SHA256;
 
     // dynamic gas
     // compute the dynamic gas cost
-    CuEVM::gas_cost::sha256_cost(gas_used, message->call_data_size);
+    CuEVM::gas_cost::sha256_cost(gas_used, call_context->call_data_size);
 
     int32_t error = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -74,17 +74,17 @@ __device__ int32_t operation_SHA256(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     }
 
     uint8_t hash[32] = {0};
-    CuCrypto::sha256::sha(message->call_data, message->call_data_size, &(hash[0]));
+    CuCrypto::sha256::sha(call_context->call_data, call_context->call_data_size, &(hash[0]));
     *return_data = byte_array_t(hash, 32);
     return ERROR_RETURN;
 }
 
 __device__ int32_t operation_RIPEMD160(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                       CuEVM::evm_message_call_t *message) {
+                                       CuEVM::evm_call_context_t *call_context) {
     // static gas
     gas_used += GAS_PRECOMPILE_RIPEMD160;
 
-    CuEVM::gas_cost::ripemd160_cost(gas_used, message->call_data_size);
+    CuEVM::gas_cost::ripemd160_cost(gas_used, call_context->call_data_size);
 
     int32_t error = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -96,19 +96,19 @@ __device__ int32_t operation_RIPEMD160(gas_t &gas_limit, gas_t &gas_used, CuEVM:
     uint8_t output[32] = {0};
     uint8_t *hash;
     hash = output + 12;
-    CuCrypto::ripemd160::ripemd160(message->call_data, message->call_data_size, hash);
+    CuCrypto::ripemd160::ripemd160(call_context->call_data, call_context->call_data_size, hash);
     *return_data = byte_array_t(output, 32);
 
     return ERROR_RETURN;
 }
 
 __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                    CuEVM::evm_message_call_t *message) {
+                                    CuEVM::evm_call_context_t *call_context) {
     evm_word_t base_size, exponent_size, modulus_size;
     // TODO: fix this
     // CuEVM::byte_array_t input_data(message->get_data(), 0, 96);
-    byte_array_t bsize_array = byte_array_t(message->call_data, 32);
-    byte_array_t esize_array = byte_array_t(message->call_data + 32, 32);
+    byte_array_t bsize_array = byte_array_t(call_context->call_data, 32);
+    byte_array_t esize_array = byte_array_t(call_context->call_data + 32, 32);
     // byte_array_t msize_array = byte_array_t(input_data.data + 64, 32);
     int32_t error = ERROR_SUCCESS;
 
@@ -329,15 +329,15 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 }
 
 __device__ int32_t operation_BLAKE2(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                    CuEVM::evm_message_call_t *message) {
+                                    CuEVM::evm_call_context_t *call_context) {
     // expecting 213 bytes inputs
-    uint32_t length_size = message->call_data_size;
+    uint32_t length_size = call_context->call_data_size;
 
     if (length_size != 213) {
         return ERROR_PRECOMPILE_UNEXPECTED_INPUT_LENGTH;
     }
 
-    uint8_t *input = message->call_data;
+    uint8_t *input = call_context->call_data;
     uint8_t f = input[212];
 
     // final byte must be 1 or 0
@@ -373,7 +373,7 @@ __device__ int32_t operation_BLAKE2(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 }
 
 __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                       CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+                                       CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_PRECOMPILE_ECRECOVER;
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -385,7 +385,7 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
     if (error_code == ERROR_SUCCESS) {
         // complete with zeroes the remaing bytes
         // input = arith.padded_malloc_byte_array(tmp_input, size, 128);
-        CuEVM::byte_array_t input(message->get_data(), 0, 128);
+        CuEVM::byte_array_t input(call_context->call_data, 128);
         ecc::signature_t *signature = new ecc::signature_t();
         evm_word_t msg_hash, v, r, s, signer;
         uint256_from_bytes(&msg_hash, input.data, 32);
@@ -438,13 +438,13 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
 }
 
 __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                   CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+                                   CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
     printf("ecAdd\n");
     int32_t error_code = ERROR_SUCCESS;
     gas_used += GAS_PRECOMPILE_ECADD;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        CuEVM::byte_array_t input(message->get_data(), 0, 128);
+        CuEVM::byte_array_t input(call_context->call_data, 128);
 
         // ecc::Curve curve = ecc::get_curve(arith, 128);
 
@@ -476,12 +476,12 @@ __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t 
 }
 
 __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                   CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+                                   CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_PRECOMPILE_ECMUL;
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        CuEVM::byte_array_t input(message->get_data(), 0, 128);
+        CuEVM::byte_array_t input(call_context->call_data, 128);
 
         evm_word_t x, y, k;
         uint256_from_bytes(&x, input.data, 32);
@@ -513,16 +513,16 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t 
 }
 
 __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                       CuEVM::evm_return_data_t *return_data, CuEVM::evm_message_call_t *message) {
+                                       CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
     printf("ecPairing\n");
-    printf("input size %d\n", message->call_data_size);
+    printf("input size %d\n", call_context->call_data_size);
     // input = message.get_data(index, length, size);
-    CuEVM::byte_array_t input(message->get_data(), 0, message->call_data_size);
-    CuEVM::gas_cost::ecpairing_cost(gas_used, message->call_data_size);
+    CuEVM::byte_array_t input(call_context->call_data, call_context->call_data_size);
+    CuEVM::gas_cost::ecpairing_cost(gas_used, call_context->call_data_size);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        if (message->call_data_size % 192 != 0) {
+        if (call_context->call_data_size % 192 != 0) {
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         } else {
             // 0 inputs is valid and returns 1.

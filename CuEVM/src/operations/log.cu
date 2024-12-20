@@ -1,6 +1,5 @@
-#include <CuEVM/gas_cost.cuh>
+
 #include <CuEVM/operations/log.cuh>
-#include <CuEVM/utils/error_codes.cuh>
 
 /**
  * a0s: Logging Operations:
@@ -8,9 +7,9 @@
  */
 namespace CuEVM::operations {
 __device__ int32_t LOGX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                        CuEVM::evm_memory_t &memory, const CuEVM::evm_message_call_t &message,
+                        CuEVM::evm_memory_t &memory, const CuEVM::evm_call_context_t *call_context,
                         CuEVM::log_state_data_t &log_state, const uint8_t &opcode) {
-    int32_t error_code = (message.get_static_env() ? ERROR_STATIC_CALL_CONTEXT_SSTORE : ERROR_SUCCESS);
+    int32_t error_code = (call_context->static_env ? ERROR_STATIC_CALL_CONTEXT_SSTORE : ERROR_SUCCESS);
 
     uint32_t no_topics = opcode & 0x0F;
 
@@ -47,10 +46,9 @@ __device__ int32_t LOGX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
             CuEVM::byte_array_t record;
             error_code |= memory.get(memory_offset, length, record);
 
-            evm_word_t address;
-            message.get_contract_address(address);
 #ifdef ENABLE_LOGS
-            log_state.push(address, record, topics[0], topics[1], topics[2], topics[3], no_topics);
+            log_state.push(call_context->contract_address, record, topics[0], topics[1], topics[2], topics[3],
+                           no_topics);
 #endif
         }
     }

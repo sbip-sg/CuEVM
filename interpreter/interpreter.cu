@@ -1,9 +1,9 @@
 #include <cjson/cJSON.h>
 #include <getopt.h>
 
+#include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/evm.cuh>
-#include <CuEVM/evm_call_state.cuh>
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
@@ -50,11 +50,10 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     int32_t managed = 1;
 
     const cJSON *test_json = nullptr;
-    cJSON_ArrayForEach(test_json, read_root) {
+    test_json = cJSON_GetArrayItem(read_root, 0);
+    if (test_json != nullptr) {
         CuEVM::get_evm_instances(instances_data, test_json, num_instances, clones, managed);
-
-        // TODO remove DEBUG num instances
-        // num_instances = 1;
+        CuEVM::memory_pool::create_memory_pool(num_instances);
         uint32_t num_blocks = (num_instances + CGBN_IBP - 1) / (CGBN_IBP);
         printf("\n\n ----------\n\n");
         printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
@@ -75,16 +74,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 
         CUDA_CHECK(cudaGetLastError());
         printf("GPU kernel finished\n");
-        return;
-        // CUDA_CHECK(cudaEventRecord(stop));
-        // CUDA_CHECK(cudaEventSynchronize(stop));
-        // CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
-
-        printf("GPU EVM finished\n");
-        printf("Main GPU kernel execution took %f ms\n", milliseconds);
-
-        break;
-        // run only one test
     }
 
     printf("Freeing the memory ...\n");

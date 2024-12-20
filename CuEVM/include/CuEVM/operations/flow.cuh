@@ -1,11 +1,11 @@
 #ifndef _CUEVM_FLOW_OP_H_
 #define _CUEVM_FLOW_OP_H_
 
-#include <CuEVM/core/jump_destinations.cuh>
-#include <CuEVM/core/message.cuh>
+#include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/tracer.cuh>
-
+#include <CuEVM/gas_cost.cuh>
+#include <CuEVM/utils/error_codes.cuh>
+#include <CuEVM/utils/opcodes.cuh>
 /**
  * 50s: Flow Operations:
  * - JUMP
@@ -27,7 +27,7 @@ namespace CuEVM::operations {
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                        const CuEVM::evm_message_call_t &message);
+                        evm_call_context_t *call_context);
 /**
  * The JUMPI operation implementation.
  * Takes the destination and the condition from the stack and sets the program counter
@@ -41,7 +41,7 @@ __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, C
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t JUMPI(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                         const CuEVM::evm_message_call_t &message
+                         evm_call_context_t *call_context
 #ifdef BUILD_LIBRARY
                              CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
 #endif

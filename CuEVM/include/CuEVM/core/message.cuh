@@ -1,24 +1,10 @@
 #pragma once
 
-#include <CuCrypto/keccak.cuh>
-#include <CuEVM/core/byte_array.cuh>
-#include <CuEVM/core/evm_word.cuh>
-#include <CuEVM/core/jump_destinations.cuh>
-#include <CuEVM/core/transaction.cuh>
-#include <CuEVM/state/state_db.cuh>
 namespace CuEVM {
-
+#ifdef DEPRECATED_CODE
 struct evm_message_call_t_shadow {
     // store in global mem to load back
-    /*
-        evm_word_t *sender;
-        evm_word_t *recipient;
-        evm_word_t *contract_address;
-        evm_word_t *value;
-        evm_word_t *storage_address;
-        evm_word_t *return_data_offset;
-        evm_word_t *return_data_size;
-    */
+
     evm_word_t *params_data;  // store 7 evm_word_t elements
     gas_t gas_limit;
     uint32_t static_env; /**< The static flag (STATICCALL) YP: \f$w\f$ */
@@ -210,5 +196,5 @@ struct evm_message_call_t {
      */
     __host__ __device__ void print() const;
 };
-
+#endif
 }  // namespace CuEVM

@@ -1,4 +1,5 @@
 #pragma once
+#include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/gas_cost.cuh>
@@ -24,7 +25,7 @@ namespace CuEVM::operations {
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, CuEVM::StateDb *state_db,
-                         const CuEVM::evm_message_call_t &message);
+                         evm_call_context_t *call_context);
 
 /**
  * The SSTORE operation implementation.
@@ -43,6 +44,6 @@ __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_sta
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t SSTORE(const gas_t &gas_limit, gas_t &gas_used, gas_t &gas_refund, CuEVM::evm_stack_t &stack,
-                          CuEVM::StateDb *state_db, const CuEVM::evm_message_call_t &message);
+                          CuEVM::StateDb *state_db, evm_call_context_t *call_context);
 
 }  // namespace CuEVM::operations

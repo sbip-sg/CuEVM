@@ -284,6 +284,7 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
     StateDb *state_db_gpu;
     CUDA_CHECK(cudaMalloc(&state_db_gpu, sizeof(StateDb)));
     CUDA_CHECK(cudaMemcpy(state_db_gpu, tmp_state_db, sizeof(StateDb), cudaMemcpyHostToDevice));
+    cudaMemcpyToSymbol(global_state_db_ptr, &state_db_gpu, sizeof(StateDb *));
     delete state_db_cpu;
     delete tmp_state_db;
     state_db = state_db_gpu;
@@ -473,4 +474,5 @@ __host__ void serialized_worldstate_data::print() {
         printf("storage_index: %d\n", storage_indexes[idx]);
     }
 }
+__device__ StateDb *global_state_db_ptr;
 }  // namespace CuEVM

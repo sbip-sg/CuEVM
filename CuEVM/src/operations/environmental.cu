@@ -46,14 +46,11 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
 }
 
 __device__ int32_t ADDRESS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                           const CuEVM::evm_message_call_t &message) {
+                           const CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t recipient_address;
-        message.get_recipient(recipient_address);
-
-        error_code |= stack.push(recipient_address);
+        error_code |= stack.push(call_context->to);
     }
     return error_code;
 }
@@ -90,33 +87,27 @@ __device__ int32_t ORIGIN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 }
 
 __device__ int32_t CALLER(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          const CuEVM::evm_message_call_t &message) {
+                          const CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t caller;
-        message.get_sender(caller);
-
-        error_code |= stack.push(caller);
+        error_code |= stack.push(call_context->from);
     }
     return error_code;
 }
 
 __device__ int32_t CALLVALUE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                             const CuEVM::evm_message_call_t &message) {
+                             const CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t call_value;
-        message.get_value(call_value);
-
-        error_code |= stack.push(call_value);
+        error_code |= stack.push(call_context->value);
     }
     return error_code;
 }
 
 __device__ int32_t CALLDATALOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_message_call_t &message) {
+                                const CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -130,28 +121,27 @@ __device__ int32_t CALLDATALOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         if (uint256_cmp_word(&index, data_offset_ui32) != 0) data_offset_ui32 = UINT32_MAX;
         length_ui32 = CuEVM::word_size;
         // CuEVM::byte_array_t data = CuEVM::byte_array_t(message.get_data(), data_offset_ui32, length_ui32);
-        if (data_offset_ui32 > message.call_data_size) {
+        if (data_offset_ui32 > call_context->call_data_size) {
             error_code |= stack.push(evm_word_t(0));
         } else {
-            error_code |= stack.pushx(CuEVM::word_size, message.call_data + data_offset_ui32, length_ui32);
+            error_code |= stack.pushx(CuEVM::word_size, call_context->call_data + data_offset_ui32, length_ui32);
         }
     }
     return error_code;
 }
 
 __device__ int32_t CALLDATASIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_message_call_t &message) {
+                                const CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t length = message.call_data_size;
-        error_code |= stack.push(length);
+        error_code |= stack.push(call_context->call_data_size);
     }
     return error_code;
 }
 
 __device__ int32_t CALLDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_message_call_t &message, CuEVM::evm_memory_t &memory) {
+                                const CuEVM::evm_call_context_t *call_context, CuEVM::evm_memory_t &memory) {
     gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -186,18 +176,17 @@ __device__ int32_t CALLDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
 }
 
 __device__ int32_t CODESIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::evm_message_call_t &message) {
+                            const CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t code_size = message.byte_code_size;
-        error_code |= stack.push(code_size);
+        error_code |= stack.push(call_context->byte_code_size);
     }
     return error_code;
 }
 
 __device__ int32_t CODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::evm_message_call_t &message, CuEVM::evm_memory_t &memory) {
+                            const CuEVM::evm_call_context_t *call_context, CuEVM::evm_memory_t &memory) {
     gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -388,14 +377,14 @@ __device__ int32_t EXTCODEHASH(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
 }
 
 __device__ int32_t SELFBALANCE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                               CuEVM::StateDb *state_db, const CuEVM::evm_message_call_t &message) {
+                               CuEVM::StateDb *state_db, const CuEVM::evm_call_context_t *call_context) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     // bn_t address;
     // message.get_recipient(arith, address);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         evm_word_t *balance;
-        balance = state_db->get_balance(&message.recipient);
+        balance = state_db->get_balance(&call_context->to);
 
         error_code |= stack.push(*balance);
     }

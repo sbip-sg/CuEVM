@@ -1,12 +1,14 @@
 #pragma once
 #include <cjson/cJSON.h>
 
+#include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/message.cuh>
 #include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/evm_call_state.cuh>
-
+#include <CuEVM/utils/error_codes.cuh>
+#include <CuEVM/utils/opcodes.cuh>
+#include <iostream>
+#include <string>
 namespace CuEVM::utils {
 // PyObject* branches = PyList_New(0);
 // PyObject* bugs = PyList_New(0);
@@ -65,7 +67,7 @@ struct simplified_trace_data {
 
     __device__ void start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_stack_t &stack_ptr);
     __device__ void finish_operation(const CuEVM::evm_stack_t &stack_ptr, uint32_t error_code);
-    __device__ void start_call(uint32_t pc, evm_message_call_t *message_call_ptr);
+    __device__ void start_call(uint32_t pc, evm_call_context_t *call_context_ptr);
     __device__ void finish_call(uint8_t success);
     __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
     __device__ void record_distance(uint8_t op, const CuEVM::evm_stack_t &stack_ptr);

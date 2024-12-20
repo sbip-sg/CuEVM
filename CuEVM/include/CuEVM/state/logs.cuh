@@ -1,7 +1,4 @@
-
-#ifndef _CUEVM_LOGS_H_
-#define _CUEVM_LOGS_H_
-
+#pragma once
 #include <cjson/cJSON.h>
 
 #include <CuEVM/core/byte_array.cuh>
@@ -90,5 +87,3 @@ struct log_state_data_t {
     __host__ cJSON *to_json() const;
 };
 }  // namespace CuEVM
-
-#endif

@@ -1,8 +1,4 @@
 #include <CuEVM/tracer.cuh>
-#include <CuEVM/utils/error_codes.cuh>
-#include <CuEVM/utils/opcodes.cuh>
-#include <iostream>
-#include <string>
 
 namespace CuEVM::utils {
 
@@ -54,16 +50,16 @@ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t
         events[no_events].res = *stack_ptr.get_address_at_index(1);
     no_events++;
 }
-__device__ void simplified_trace_data::start_call(uint32_t pc, evm_message_call_t *message_call_ptr) {
+__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t *call_context_ptr) {
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
     // printf("start call simplified trace data pc %d op %d\n", pc, message_call_ptr->call_type);
-    calls[no_calls].sender = message_call_ptr->sender;
-    calls[no_calls].receiver = message_call_ptr->recipient;
+    calls[no_calls].sender = call_context_ptr->from;
+    calls[no_calls].receiver = call_context_ptr->to;
     calls[no_calls].pc = pc;
-    calls[no_calls].op = message_call_ptr->call_type;
-    calls[no_calls].value = message_call_ptr->value;
+    calls[no_calls].op = call_context_ptr->call_type;
+    calls[no_calls].value = call_context_ptr->value;
 
     no_calls++;
 }

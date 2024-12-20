@@ -1,12 +1,26 @@
 #pragma once
 
 #include <CuEVM/core/block_info.cuh>
+#include <CuEVM/core/evm_call_context.cuh>
+#include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/transaction.cuh>
-#include <CuEVM/evm_call_state.cuh>
+#include <CuEVM/gas_cost.cuh>
+#include <CuEVM/operations/arithmetic.cuh>
+#include <CuEVM/operations/block.cuh>
+#include <CuEVM/operations/environmental.cuh>
+#include <CuEVM/operations/flow.cuh>
+#include <CuEVM/operations/log.cuh>
+#include <CuEVM/operations/memory.cuh>
+#include <CuEVM/operations/stack.cuh>
+#include <CuEVM/operations/storage.cuh>
+#include <CuEVM/operations/system.cuh>
+#include <CuEVM/precompile.cuh>
 #include <CuEVM/state/state_db.cuh>
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/ecc_constants.cuh>
+#include <CuEVM/utils/error_codes.cuh>
+#include <CuEVM/utils/opcodes.cuh>
 namespace CuEVM {
 struct evm_instance_t {
     CuEVM::StateDb* state_db_ptr;                              /**< The world state pointer*/
@@ -26,7 +40,7 @@ struct evm_t {
     CuEVM::StateDb* state_db_ptr;                                    /**< The world state pointer*/
     const CuEVM::block_info_t* block_info_ptr;                       /**< The block info pointer */
     const CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer */
-    CuEVM::evm_call_state_t* call_state_ptr;                         /**< The call state pointer store in global mem*/
+    CuEVM::evm_call_context_t* call_state_ptr;                       /**< The call state pointer store in global mem*/
     CuEVM::EccConstants* ecc_constants_ptr;                          /**< The ecc constants pointer*/
     gas_t gas_price;                                                 /**< The gas price */
     gas_t gas_priority_fee;                                          /**< The gas priority fee */
@@ -50,7 +64,7 @@ struct evm_t {
      */
     __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::block_info_t* block_info_ptr,
                      CuEVM::transaction::TransactionList* transaction_list_ptr, CuEVM::EccConstants* ecc_constants_ptr,
-                     CuEVM::evm_message_call_t* shared_message_call_ptr, CuEVM::evm_word_t* shared_stack_ptr
+                     CuEVM::evm_call_context_t* call_context_ptr, CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
                      ,
                      CuEVM::utils::tracer_t* tracer_ptr
@@ -67,12 +81,12 @@ struct evm_t {
      * @param[in] evm_instance The evm instance
      */
     __host__ __device__ evm_t(CuEVM::evm_instance_t& evm_instance,
-                              CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
+                              CuEVM::evm_call_context_t* call_context_ptr = nullptr,
                               CuEVM::evm_word_t* shared_stack_ptr = nullptr);
 
-    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr,
-                     CuEVM::evm_message_call_t* shared_message_call_ptr = nullptr,
-                     CuEVM::evm_word_t* shared_stack_ptr = nullptr);
+    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr
+    /*               CuEVM::evm_call_context_t* call_context_ptr = nullptr,
+                     CuEVM::evm_word_t* shared_stack_ptr = nullptr*/);
 
     /**
      * @brief Destroy the evm_t object
@@ -87,7 +101,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __device__ int32_t start_CALL(cached_evm_call_state& cache_call_state);
+    __device__ int32_t start_CALL(cached_evm_call_context& cache_call_state);
 
     /**
      * @brief Finish a call operation
@@ -107,7 +121,7 @@ struct evm_t {
      * @param[in] arith The arithmetic environment
      * @return int32_t The error code, or 0 if successful
      */
-    __device__ int32_t finish_CREATE(cached_evm_call_state& cache_call_state);
+    __device__ int32_t finish_CREATE(cached_evm_call_context& cache_call_state);
 
     /**
      * @brief Finish a transaction operation.
@@ -126,11 +140,11 @@ struct evm_t {
      * Run the EVM for the given transaction
      * @param[in] arith The arithmetic environment
      */
-    __device__ void run(cached_evm_call_state& cache_call_state);
+    __device__ void run(cached_evm_call_context& cache_call_state);
     __device__ void run();
 };
 
-typedef int32_t (*evm_operation_f)(CuEVM::evm_call_state_t* call_state);
+// typedef int32_t (*evm_operation_f)(CuEVM::evm_call_context_t* call_state);
 
 /**
  * @brief Get the CPU EVM instances object
@@ -154,8 +168,7 @@ __host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* 
  */
 __host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances, int32_t managed = 0);
 
-__global__ void kernel_evm_multiple_instances(StateDb* state_db_ptr,
-                                              CuEVM::transaction::TransactionList* transaction_list_ptr,
+__global__ void kernel_evm_multiple_instances(StateDb* state_db_ptr, transaction::TransactionList* transaction_list_ptr,
                                               uint32_t count);
 
 }  // namespace CuEVM

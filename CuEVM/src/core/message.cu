@@ -1,7 +1,7 @@
 #include <CuEVM/core/message.cuh>
 
 namespace CuEVM {
-
+#ifdef DEPRECATED_CODE
 __device__ evm_message_call_t_shadow::evm_message_call_t_shadow(
     const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *contract_address, const gas_t gas_limit,
     const evm_word_t *value, const uint32_t depth, const uint32_t call_type, const evm_word_t *storage_address,
@@ -264,4 +264,5 @@ __host__ __device__ void evm_message_call_t::print() const {
     return_data_size.print();
     printf("\nstatic_env: %d\n", static_env);
 }
+#endif
 }  // namespace CuEVM

@@ -6,6 +6,7 @@
 #include <CuEVM/state/state_db.cuh>
 
 namespace CuEVM::transaction {
+#ifdef DEPRECATED_CODE
 /**
  * The access list account.
  * YP: \f$E_{a}\f$
@@ -63,6 +64,7 @@ struct access_list_t {
      */
     __host__ int32_t from_json(const cJSON *json, int32_t managed = 0);
 };
+#endif
 
 class TransactionList {
    public:
@@ -93,6 +95,7 @@ class TransactionList {
  * - yParity (YP: \f$T_{y}\f$)
  * - w (YP: \f$T_{w}\f$)
  */
+#ifdef DEPRECATED_CODE
 struct evm_transaction_t {
     uint32_t type;                       /**< The transaction type EIP-2718 (YP: YP: \f$\T_{x}\f$) */
     evm_word_t nonce;                    /**< The nonce YP: \f$T_{n}\f$ */
@@ -245,7 +248,7 @@ struct evm_transaction_t {
 
     __host__ cJSON *to_json();
 };
-
+#endif
 /**
  * Get the number of transactions from json
  * @param[in] json the json object.
@@ -276,7 +279,8 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
  * @param[in] managed the managed flag.
  * @return 0 for success, error code for failure.
  */
-__host__ int32_t free_instaces(evm_transaction_t *transactions_ptr, uint32_t transactions_count, int32_t managed = 0);
+// __host__ int32_t free_instaces(evm_transaction_t *transactions_ptr, uint32_t transactions_count, int32_t managed =
+// 0);
 
 }  // namespace CuEVM::transaction
 // alias fro transaction

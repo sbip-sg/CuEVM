@@ -120,5 +120,5 @@ class StateDb {
     __host__ static StateDb *CPUFromGPU(StateDb *&state_db);
     __host__ static StateDb *GPUFromCPU(StateDb *&state_db);
 };
-
+extern __device__ StateDb *global_state_db_ptr;
 }  // namespace CuEVM

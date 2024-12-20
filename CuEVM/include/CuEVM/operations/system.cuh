@@ -1,10 +1,10 @@
 #ifndef _CUEVM_SYSTEMS_OP_H_
 #define _CUEVM_SYSTEMS_OP_H_
 
+#include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/stack.cuh>
-#include <CuEVM/evm_call_state.cuh>
 #include <CuEVM/state/state_db.cuh>
 
 /**
@@ -38,8 +38,8 @@ __device__ int32_t STOP(CuEVM::evm_return_data_t &return_data);
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__device__ int32_t CREATE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                          CuEVM::cached_evm_call_state &cached_state);
+__device__ int32_t CREATE(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
+                          CuEVM::cached_evm_call_context &cached_state);
 
 /**
  * The CALL operation. gives the new evm call state
@@ -47,8 +47,8 @@ __device__ int32_t CREATE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_cal
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__device__ int32_t CALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                        CuEVM::cached_evm_call_state &cached_state);
+__device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
+                        CuEVM::cached_evm_call_context &cached_state);
 
 /**
  * The CALLCODE operation. gives the new evm call state
@@ -56,8 +56,8 @@ __device__ int32_t CALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__device__ int32_t CALLCODE(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                            CuEVM::cached_evm_call_state &cached_state);
+__device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
+                            CuEVM::cached_evm_call_context &cached_state);
 
 /**
  * The RETURN operation.
@@ -76,8 +76,8 @@ __device__ int32_t RETURN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__device__ int32_t DELEGATECALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                                CuEVM::cached_evm_call_state &cached_state);
+__device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
+                                CuEVM::cached_evm_call_context &cached_state);
 
 /**
  * The CREATE2 operation. gives the new evm call state
@@ -85,8 +85,8 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_state_t &current_state, CuEVM::e
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__device__ int32_t CREATE2(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                           CuEVM::cached_evm_call_state &cached_state);
+__device__ int32_t CREATE2(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
+                           CuEVM::cached_evm_call_context &cached_state);
 
 /**
  * The STATICCALL operation. gives the new evm call state
@@ -94,8 +94,8 @@ __device__ int32_t CREATE2(CuEVM::evm_call_state_t &current_state, CuEVM::evm_ca
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__device__ int32_t STATICCALL(CuEVM::evm_call_state_t &current_state, CuEVM::evm_call_state_t *&new_state_ptr,
-                              CuEVM::cached_evm_call_state &cached_state);
+__device__ int32_t STATICCALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
+                              CuEVM::cached_evm_call_context &cached_state);
 
 /**
  * The REVERT operation.
@@ -125,8 +125,7 @@ __device__ int32_t INVALID();
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __device__ int32_t SELFDESTRUCT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                CuEVM::evm_message_call_t &message, CuEVM::StateDb *state_db,
-                                CuEVM::evm_return_data_t &return_data);
+                                CuEVM::evm_call_context_t &call_context, CuEVM::evm_return_data_t &return_data);
 }  // namespace CuEVM::operations
 
 #endif

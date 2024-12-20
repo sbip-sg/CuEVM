@@ -6,7 +6,9 @@
 #include <CuEVM/utils/opcodes.cuh>
 
 namespace CuEVM {
+
 namespace transaction {
+#ifdef DEPRECATED_CODE
 __device__ int32_t access_list_account_t::free(int32_t managed) {
     if (storage_keys != nullptr) {
         if (managed) {
@@ -346,6 +348,8 @@ __device__ int32_t evm_transaction_t::get_message_call(
     return ERROR_SUCCESS;
 }
 
+#endif
+
 __host__ __device__ void TransactionList::print() {
     printf("TransactionList:\n");
     printf("nonce: %lu\n", nonce);
@@ -375,40 +379,7 @@ __host__ __device__ void TransactionList::print() {
     }
 }
 
-__device__ void evm_transaction_t::print() {
-    printf("Transaction:\n");
-    printf("Type: %d\n", type);
-    printf("Nonce: ");
-    nonce.print();
-    printf("Gas Limit: %lu\n", gas_limit);
-    printf("To: ");
-    to.print();
-    printf("Value: ");
-    value.print();
-    printf("Sender: ");
-    sender.print();
-    printf("Max Fee Per Gas: ");
-    max_fee_per_gas.print();
-    printf("Max Priority Fee Per Gas: ");
-    max_priority_fee_per_gas.print();
-    printf("Gas Price: ");
-    gas_price.print();
-    printf("Data: ");
-    data_init.print();
-    printf("Access List:\n");
-    printf("Accounts Count: %d\n", access_list.accounts_count);
-    for (uint32_t i = 0; i < access_list.accounts_count; i++) {
-        printf("Account %d:\n", i);
-        printf("Address: ");
-        access_list.accounts[i].address.print();
-        printf("Storage Keys Count: %d\n", access_list.accounts[i].storage_keys_count);
-        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
-            printf("Storage Key %d: ", j);
-            access_list.accounts[i].storage_keys[j].print();
-        }
-    }
-    printf("end printing transaction\n");
-}
+#ifdef DEPRECATED_CODE
 
 __host__ cJSON *evm_transaction_t::to_json() {
     cJSON *json = cJSON_CreateObject();
@@ -451,6 +422,7 @@ __host__ cJSON *evm_transaction_t::to_json() {
     delete[] hex_string_ptr;
     return json;
 }
+#endif
 
 __host__ uint32_t no_transactions(const cJSON *json) {
     cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
@@ -627,20 +599,5 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     return ERROR_SUCCESS;
 }
 
-__host__ int32_t free_instaces(evm_transaction_t *transactions_ptr, uint32_t transactions_count, int32_t managed) {
-    if (transactions_ptr != nullptr) {
-        transactions_ptr[0].access_list.free(managed);
-        for (uint32_t i = 0; i < transactions_count; i++) {
-            // TODO: to see how to delete managed memory
-            transactions_ptr[i].data_init.~byte_array_t();
-        }
-        if (managed) {
-            CUDA_CHECK(cudaFree(transactions_ptr));
-        } else {
-            delete[] transactions_ptr;
-        }
-    }
-    return ERROR_SUCCESS;
-}
 }  // namespace transaction
 }  // namespace CuEVM

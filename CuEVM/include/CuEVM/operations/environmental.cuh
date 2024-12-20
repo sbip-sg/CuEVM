@@ -2,6 +2,7 @@
 #define _CUEVM_ENV_OP_H_
 
 #include <CuEVM/core/block_info.cuh>
+#include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/return_data.cuh>
@@ -65,7 +66,7 @@ __device__ int32_t SHA3(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stac
  * @return The error code. 0 if no error.
  */
 __device__ int32_t ADDRESS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                           const CuEVM::evm_message_call_t &message);
+                           const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The BALANCE operation implementation.
@@ -106,7 +107,7 @@ __device__ int32_t ORIGIN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          const CuEVM::evm_message_call_t &message);
+                          const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLVALUE operation implementation.
@@ -118,7 +119,7 @@ __device__ int32_t CALLER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLVALUE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                             const CuEVM::evm_message_call_t &message);
+                             const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLDATALOAD operation implementation.
@@ -134,7 +135,7 @@ __device__ int32_t CALLVALUE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLDATALOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_message_call_t &message);
+                                const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLDATASIZE operation implementation.
@@ -146,7 +147,7 @@ __device__ int32_t CALLDATALOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_message_call_t &message);
+                                const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLDATACOPY operation implementation.
@@ -168,7 +169,7 @@ __device__ int32_t CALLDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_message_call_t &message, CuEVM::evm_memory_t &memory);
+                                const CuEVM::evm_call_context_t *call_context, CuEVM::evm_memory_t &memory);
 
 /**
  * The CODESIZE operation implementation.
@@ -181,7 +182,7 @@ __device__ int32_t CALLDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::evm_message_call_t &message);
+                            const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CODECOPY operation implementation.
@@ -204,7 +205,7 @@ __device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::evm_message_call_t &message, CuEVM::evm_memory_t &memory);
+                            const CuEVM::evm_call_context_t *call_context, CuEVM::evm_memory_t &memory);
 
 /**
  * The GASPRICE operation implementation.
@@ -329,7 +330,7 @@ __device__ int32_t EXTCODEHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::e
  * @return The error code. 0 if no error.
  */
 __device__ int32_t SELFBALANCE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                               CuEVM::StateDb *state_db, const CuEVM::evm_message_call_t &message);
+                               CuEVM::StateDb *state_db, const CuEVM::evm_call_context_t *call_context);
 }  // namespace CuEVM::operations
 
 #endif

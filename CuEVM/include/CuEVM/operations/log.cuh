@@ -1,11 +1,12 @@
 #ifndef _CUEVM_LOG_OP_H_
 #define _CUEVM_LOG_OP_H_
 
+#include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/message.cuh>
 #include <CuEVM/core/stack.cuh>
+#include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/logs.cuh>
-
+#include <CuEVM/utils/error_codes.cuh>
 /**
  * a0s: Logging Operations:
  * - LOGX
@@ -28,7 +29,7 @@ namespace CuEVM::operations {
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t LOGX(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, CuEVM::evm_memory_t &memory,
-                        const CuEVM::evm_message_call_t &message, CuEVM::log_state_data_t &log_state,
+                        const CuEVM::evm_call_context_t &call_context, CuEVM::log_state_data_t &log_state,
                         const uint8_t &opcode);
 }  // namespace CuEVM::operations
 
