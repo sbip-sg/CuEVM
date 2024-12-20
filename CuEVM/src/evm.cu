@@ -984,8 +984,12 @@ __host__ __device__ int32_t evm_t::finish_TRANSACTION(ArithEnv &arith, int32_t e
     // update the final world state : TODO combine both
     // __SYNC_THREADS__
     this->world_state.update(arith, call_state_ptr->touch_state_ptr->get_state());
+#ifdef BUILD_LIBRARY
     this->world_state.serialize_data(arith, serialized_worldstate_data_ptr);
+#endif
+#ifdef EIP_3155
     this->world_state.flatten(arith, flatten_state_ptr);
+#endif
     // printf("updated final world state\n");
 
     return status;

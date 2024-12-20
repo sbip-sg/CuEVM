@@ -63,6 +63,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     cJSON_ArrayForEach(test_json, read_root) {
         CuEVM::get_evm_instances(arith, instances_data, test_json, num_instances, managed);
 
+
 #ifdef GPU
         // TODO remove DEBUG num instances
         // num_instances = 1;
@@ -75,6 +76,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         printf("GPU kernel finished\n");
         CGBN_CHECK(report);
 
+#ifdef EIP_3155
         CuEVM::flatten_state *host_flatten_data = nullptr, *device_flatten_data = nullptr;
         CuEVM::plain_account *host_accounts = nullptr, *device_accounts = nullptr;
         CuEVM::plain_storage *host_storage = nullptr, *device_storage = nullptr;
@@ -135,15 +137,8 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         device_storage = nullptr;
         device_accounts = nullptr;
         device_flatten_data = nullptr;
-#ifdef EIP_3155
-        // print only the first instance
-
-        // CuEVM::utils::print_err_device_data(instances_data[0].tracer_ptr);
-#endif
-        // CUDA_CHECK(cudaEventRecord(stop));
-        // CUDA_CHECK(cudaEventSynchronize(stop));
-        // CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
-#else
+#endif // EIP_3155
+#else // not GPU
         printf("Running CPU EVM\n");
         // run the evm
         CuEVM::evm_t *evm = nullptr;
