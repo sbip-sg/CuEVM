@@ -13,6 +13,8 @@
 #include <chrono>
 #include <fstream>
 
+__managed__ CuEVM::flatten_state *flatten_state_ptr = nullptr;
+
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose = false) {
     CuEVM::evm_instance_t *instances_data;
     CuEVM::ArithEnv arith(cgbn_no_checks, 0);
@@ -61,25 +63,82 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     cJSON_ArrayForEach(test_json, read_root) {
         CuEVM::get_evm_instances(arith, instances_data, test_json, num_instances, managed);
 
+
 #ifdef GPU
         // TODO remove DEBUG num instances
         // num_instances = 1;
         printf("Running on GPU %d %d\n", num_instances, CuEVM::cgbn_tpi);
+        CUDA_CHECK(cudaMallocManaged(&flatten_state_ptr, num_instances * sizeof(CuEVM::flatten_state)));
         // run the evm
         CuEVM::kernel_evm_multiple_instances<<<num_instances, CuEVM::cgbn_tpi>>>(report, instances_data, num_instances);
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaGetLastError());
         printf("GPU kernel finished\n");
         CGBN_CHECK(report);
-#ifdef EIP_3155
-        // print only the first instance
 
-        // CuEVM::utils::print_err_device_data(instances_data[0].tracer_ptr);
-#endif
-        // CUDA_CHECK(cudaEventRecord(stop));
-        // CUDA_CHECK(cudaEventSynchronize(stop));
-        // CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
-#else
+#ifdef EIP_3155
+        CuEVM::flatten_state *host_flatten_data = nullptr, *device_flatten_data = nullptr;
+        CuEVM::plain_account *host_accounts = nullptr, *device_accounts = nullptr;
+        CuEVM::plain_storage *host_storage = nullptr, *device_storage = nullptr;
+        auto accounts_size = flatten_state_ptr->no_accounts * sizeof(CuEVM::plain_account);
+        auto storage_size = flatten_state_ptr->no_storage_elements * sizeof(CuEVM::plain_storage);
+        CUDA_CHECK(cudaMalloc(&device_flatten_data, sizeof(CuEVM::flatten_state)));
+        CUDA_CHECK(cudaMalloc(&device_accounts, accounts_size));
+        CUDA_CHECK(cudaMalloc(&device_storage, storage_size));
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        CuEVM::copy_state_kernel<<<1, 1>>>(device_flatten_data, device_accounts, device_storage);
+
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        host_flatten_data = (CuEVM::flatten_state *)malloc(sizeof(CuEVM::flatten_state));
+        host_accounts = (CuEVM::plain_account *)malloc(accounts_size);
+        host_storage = (CuEVM::plain_storage *)malloc(storage_size);
+
+        CUDA_CHECK(cudaMemcpy(host_flatten_data, device_flatten_data, sizeof(CuEVM::flatten_state), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_accounts, device_accounts, accounts_size, cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_storage, device_storage, storage_size, cudaMemcpyDeviceToHost));
+
+        host_flatten_data->accounts = host_accounts;
+        host_flatten_data->storage_elements = host_storage;
+
+        printf("{\"accounts\":[");
+        for (auto i =0; i< host_flatten_data->no_accounts; i++){
+          auto account = host_flatten_data->accounts[i];
+          printf("{\"address\": \"%s\", ", account.address);
+          printf("\"balance\": \"%s\", ", account.balance);
+          printf("\"nonce\": %d, ", account.nonce);
+          printf("\"codeHash\": \"%s\", ", account.code_hash);
+          printf("\"storage\":{");
+          for (auto j = account.storage_idx_start; j < account.storage_idx_end; j++){
+            auto storage = host_flatten_data->storage_elements[j];
+            printf("\"%s\": \"%s\" ", storage.key, storage.value);
+            if (j + 1 < account.storage_idx_end){
+              printf(",");
+            }
+          }
+          printf("}}");
+          if (i + 1 < host_flatten_data->no_accounts) {
+            printf(",");
+          }
+        }
+        printf("]}\n");
+
+        free(host_accounts);
+        free(host_storage);
+        free(host_flatten_data);
+        host_flatten_data = nullptr;
+        host_storage = nullptr;
+        host_accounts = nullptr;
+
+        CUDA_CHECK(cudaFree(device_storage));
+        CUDA_CHECK(cudaFree(device_accounts));
+        CUDA_CHECK(cudaFree(device_flatten_data));
+        device_storage = nullptr;
+        device_accounts = nullptr;
+        device_flatten_data = nullptr;
+#endif // EIP_3155
+#else // not GPU
         printf("Running CPU EVM\n");
         // run the evm
         CuEVM::evm_t *evm = nullptr;

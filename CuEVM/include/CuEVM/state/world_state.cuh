@@ -10,6 +10,7 @@
 #include <CuEVM/state/state.cuh>
 #include <CuEVM/state/state_access.cuh>
 #include <CuEVM/utils/arith.cuh>
+
 namespace CuEVM {
 // for convenient data transfer between host and device. set a fixed maximum size for the number of addresses to be
 // transferred
@@ -30,7 +31,30 @@ struct serialized_worldstate_data {
     // currently dont support copy back the bytecode hex string
     // TODO: use 1 large preallocated buffer for bytecode
     void print();
+    void print_json();
 };
+
+  struct plain_account {
+    uint32_t storage_idx_start; // inclusive
+    uint32_t storage_idx_end; //exclusive
+    char address[43];  // 0x + ... + \0
+    char code_hash[67]; // 0x + ... + \0
+    char balance[67];    // 0x + ... + \0
+    uint32_t nonce;
+  };
+
+  struct plain_storage {
+    char key[67];    // 0x + ... + \0
+    char value[67];  // 0x + ... + \0
+  };
+
+  struct flatten_state{
+    uint32_t no_accounts;
+    uint32_t no_storage_elements;
+    plain_account *accounts;
+    plain_storage *storage_elements;
+  };
+
 /**
  * The world state classs
  */
@@ -76,7 +100,10 @@ class WorldState {
      * and the value is set to 0.
      */
     __host__ __device__ int32_t get_value(ArithEnv &arith, const evm_word_t *address, const bn_t &key, bn_t &value);
-    __host__ __device__ void serialize_data(ArithEnv &arith, serialized_worldstate_data *data);
+  __host__ __device__ void serialize_data(ArithEnv &arith, serialized_worldstate_data *data);
+  __host__ __device__ void flatten(ArithEnv &arith, CuEVM::flatten_state *data);
 };
 
 }  // namespace CuEVM
+
+extern __managed__ CuEVM::flatten_state *flatten_state_ptr;

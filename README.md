@@ -172,61 +172,64 @@ python ./run-ethtest-without-stateroot-comparison.py -t /tmp/out --runtest-bin r
 | stNonZeroCallsTest                   | 24     | 0      | 0       | 0       |
 | stEIP3607                            | 12     | 0      | 0       | 0       |
 | stEIP150singleCodeGasPrices          | 340    | 0      | 1       | 0       |
-| stCallDelegateCodesCallCodeHomestead | 58     | 0      | 0       | 0       |
+| stCallDelegateCodesCallCodeHomestead | 57     | 1      | 0       | 0       |
 | stArgsZeroOneBalance                 | 96     | 0      | 0       | 0       |
 | stStaticFlagEnabled                  | 25     | 9      | 0       | 0       |
 | stShift                              | 40     | 0      | 0       | 2       |
-| stEIP158Specific                     | 6      | 1      | 0       | 0       |
+| stEIP158Specific                     | 7      | 0      | 0       | 0       |
 | stMemoryTest                         | 569    | 0      | 0       | 9       |
 | stZeroKnowledge2                     | 519    | 0      | 0       | 0       |
-| stEIP1559                            | 1824   | 19     | 0       | 2       |
-| stReturnDataTest                     | 223    | 50     | 0       | 0       |
+| stEIP1559                            | 1841   | 4      | 0       | 0       |
+| stReturnDataTest                     | 260    | 13     | 0       | 0       |
 | stCodeCopyTest                       | 2      | 0      | 0       | 0       |
 | stMemoryStressTest                   | 80     | 2      | 0       | 0       |
 | stInitCodeTest                       | 22     | 0      | 0       | 0       |
-| stMemExpandingEIP150Calls            | 10     | 0      | 0       | 0       |
+| stMemExpandingEIP150Calls            | 9      | 1      | 0       | 0       |
 | stWalletTest                         | 20     | 26     | 0       | 0       |
-| stSpecialTest                        | 18     | 2      | 0       | 2       |
-| stExtCodeHash                        | 64     | 1      | 0       | 0       |
+| stSpecialTest                        | 18     | 1      | 0       | 3       |
+| stExtCodeHash                        | 63     | 2      | 0       | 0       |
 | stTimeConsuming                      | 5187   | 0      | 0       | 3       |
-| stCreateTest                         | 166    | 34     | 0       | 3       |
-| stRecursiveCreate                    | 1      | 0      | 0       | 1       |
+| stCreateTest                         | 168    | 31     | 0       | 4       |
+| stRecursiveCreate                    | 1      | 1      | 0       | 0       |
 | stCallDelegateCodesHomestead         | 58     | 0      | 0       | 0       |
 | stZeroKnowledge                      | 751    | 49     | 0       | 0       |
 | stTransitionTest                     | 6      | 0      | 0       | 0       |
 | stCallCodes                          | 87     | 0      | 0       | 0       |
 | stHomesteadSpecific                  | 5      | 0      | 0       | 0       |
-| stCallCreateCallCodeTest             | 40     | 9      | 0       | 6       |
-| stSolidityTest                       | 13     | 8      | 0       | 2       |
-| stExample                            | 33     | 6      | 0       | 0       |
+| stCallCreateCallCodeTest             | 41     | 2      | 0       | 12      |
+| stSolidityTest                       | 14     | 7      | 0       | 2       |
+| stExample                            | 38     | 1      | 0       | 0       |
 | stSStoreTest                         | 468    | 7      | 0       | 0       |
 | stZeroCallsTest                      | 24     | 0      | 0       | 0       |
-| stSelfBalance                        | 32     | 9      | 0       | 1       |
-| stDelegatecallTestHomestead          | 23     | 3      | 0       | 5       |
-| stQuadraticComplexityTest            | 13     | 1      | 0       | 18      |
+| stSelfBalance                        | 35     | 7      | 0       | 0       |
+| stDelegatecallTestHomestead          | 23     | 0      | 0       | 8       |
+| stQuadraticComplexityTest            | 12     | 2      | 0       | 18      |
 | stEIP150Specific                     | 25     | 0      | 0       | 0       |
-| stStackTests                         | 247    | 118    | 0       | 10      |
+| stStackTests                         | 248    | 117    | 0       | 10      |
 | stChainId                            | 2      | 0      | 0       | 0       |
-| stAttackTest                         | 0      | 1      | 0       | 1       |
+| stAttackTest                         | 1      | 0      | 0       | 1       |
 | stBugs                               | 9      | 0      | 0       | 0       |
-| stBadOpcode                          | 3651   | 448    | 1       | 116     |
+| stBadOpcode                          | 3404   | 808    | 1       | 3       |
 | stTransactionTest                    | 164    | 0      | 0       | 0       |
-| stCreate2                            | 183    | 3      | 0       | 4       |
-| stPreCompiledContracts2              | 248    | 0      | 0       | 0       |
-| stRevertTest                         | 259    | 5      | 0       | 7       |
+| stCreate2                            | 182    | 3      | 0       | 5       |
+| stPreCompiledContracts2              | 247    | 0      | 0       | 1       |
+| stRevertTest                         | 257    | 4      | 0       | 10      |
 | stLogTests                           | 46     | 0      | 0       | 0       |
-| stRandom                             | 303    | 4      | 0       | 7       |
+| stRandom                             | 302    | 12     | 0       | 0       |
 | stRefundTest                         | 26     | 0      | 1       | 0       |
-| stStaticCall                         | 415    | 5      | 0       | 58      |
-| stRandom2                            | 214    | 7      | 0       | 5       |
+| stStaticCall                         | 390    | 7      | 0       | 81      |
+| stRandom2                            | 214    | 11     | 0       | 1       |
 | Shanghai                             | 25     | 1      | 0       | 1       |
 | stCodeSizeLimit                      | 7      | 0      | 0       | 0       |
 | stZeroCallsRevert                    | 16     | 0      | 0       | 0       |
-| stPreCompiledContracts               | 791    | 169    | 0       | 0       |
-| stSystemOperationsTest               | 79     | 1      | 0       | 3       |
-| stEIP2930                            | 15     | 125    | 0       | 0       |
-| VMTests                              | 628    | 0      | 3       | 0       |
+| stPreCompiledContracts               | 935    | 25     | 0       | 0       |
+| stSystemOperationsTest               | 73     | 1      | 0       | 9       |
+| stEIP2930                            | 140    | 0      | 0       | 0       |
+| VMTests*                             | 570    | 55     | 3       | 3       |
 | stSLoadTest                          | 1      | 0      | 0       | 0       |
+
+
+> *Note: For `VMTests`, the `vmPerformance` folder is skipped and all other failures except one is from `vmIOandFlowOperations`.
 
 
 ## Citation
@@ -266,4 +269,4 @@ This project is part of the [Singapore Blockchain Innovation Programme (SBIP)](h
 
 ## Documentation
 
-An auto generated source code documentation is available at [https://sbip-sg.github.io/CuEVM-internal/files.html](https://sbip-sg.github.io/CuEVM-internal/files.html)
+An auto generated source code documentation is available at [https://sbip-sg.github.io/CuEVM/files.html](https://sbip-sg.github.io/CuEVM/files.html)
