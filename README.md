@@ -225,9 +225,11 @@ python ./run-ethtest-without-stateroot-comparison.py -t /tmp/out --runtest-bin r
 | stPreCompiledContracts               | 935    | 25     | 0       | 0       |
 | stSystemOperationsTest               | 73     | 1      | 0       | 9       |
 | stEIP2930                            | 140    | 0      | 0       | 0       |
-| VMTests                              | 570    | 55     | 3       | 3       |
+| VMTests*                             | 570    | 55     | 3       | 3       |
 | stSLoadTest                          | 1      | 0      | 0       | 0       |
 
+
+> *Note: For `VMTests`, the `vmPerformance` folder is skipped and all other failures except one is from `vmIOandFlowOperations`.
 
 
 ## Citation
