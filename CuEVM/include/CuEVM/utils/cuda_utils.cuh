@@ -1,17 +1,16 @@
 #pragma once
 
-// CGBN parameters
-#ifndef CGBN_TPI
-#define CGBN_TPI 1
-#endif
-#define CGBN_IBP 64
-#define SHARED_STACK_SIZE 12
+// // CGBN parameters
+// #ifndef CGBN_TPI
+// #define CGBN_TPI 1
+// #endif
+#define INSTANCES_PER_BLOCK 64
+// #define SHARED_STACK_SIZE 12
 
 #include <cuda.h>
 
 #include <CuBigInt/uint256.cuh>
 
-#define THREADIDX threadIdx.x
 #define __SHARED_MEMORY__ __shared__
 
 #ifdef DEBUG
@@ -26,11 +25,13 @@
 #define CGBN_CHECK(report) cgbn_check(report, __FILE__, __LINE__)
 
 #ifdef __CUDA_ARCH__
+#define THREADIDX threadIdx.x
 #define INSTANCE_BLK_IDX threadIdx.x
 #define INSTANCE_GLOBAL_IDX threadIdx.x + blockIdx.x *blockDim.x
 #else
 #define INSTANCE_BLK_IDX 0
 #define INSTANCE_GLOBAL_IDX 0
+#define THREADIDX 0
 #endif
 
 void cuda_check(cudaError_t status, const char *action = NULL, const char *file = NULL, int32_t line = 0);

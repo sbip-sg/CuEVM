@@ -1,23 +1,14 @@
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-
 namespace CuEVM::stack {
 
-__device__ evm_stack_t::evm_stack_t(evm_word_t *shared_stack_base, uint32_t stack_base_offset)
-    : shared_stack_base(shared_stack_base),
-      global_stack_base(nullptr),
-      stack_base_offset(stack_base_offset),
-      stack_offset(0) {
+__device__ evm_stack_t::evm_stack_t(evm_word_t *shared_stack_base)
+    : shared_stack_base(shared_stack_base), global_stack_base(nullptr), current_capacity(16) {
     // printf("stack_base_offset %d\n", stack_base_offset);
     // printf("shared_stack_base %p\n", shared_stack_base);
 }
 
 __device__ evm_stack_t::~evm_stack_t() { free(); }
-
-// __device__ evm_stack_t::evm_stack_t(const evm_stack_t &other) {
-//     // free();
-//     duplicate(other);
-// }
 
 __device__ void evm_stack_t::free() {
     if (global_stack_base != nullptr) {
@@ -33,35 +24,14 @@ __device__ void evm_stack_t::clear() {
     global_stack_base = nullptr;
 }
 
-// __device__ evm_stack_t &evm_stack_t::operator=(const evm_stack_t &other) {
-//     if (this != &other) {
-//         free();
-//         duplicate(other);
-//     }
-//     return *this;
-// }
-
-// __device__ void evm_stack_t::duplicate(const evm_stack_t &other) {
-//     __SHARED_MEMORY__ evm_word_t *tmp_stack_base;
-//     __ONE_GPU_THREAD_BEGIN__
-//     tmp_stack_base = new evm_word_t[other.capacity];
-//     if (tmp_stack_base != nullptr) {
-//         memcpy(tmp_stack_base, other.global_stack_base, other.stack_offset * sizeof(evm_word_t));
-//     }
-//     __ONE_GPU_THREAD_END__
-//     stack_offset = other.stack_offset;
-//     capacity = other.stack_offset;
-//     global_stack_base = tmp_stack_base;
-// }
-
 // TODO : reimplement
 __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
     // printf("Extract data stack offset %d\n", stack_offset);
 
-    if (stack_offset + stack_base_offset < CuEVM::shared_stack_size) {
+    if (stack_offset + stack_base_offset < memory_pool_stack_preallocate) {
         memcpy(other, shared_stack_base, stack_offset * sizeof(evm_word_t));
     } else {
-        int32_t left_over = CuEVM::shared_stack_size - stack_base_offset;
+        int32_t left_over = memory_pool_stack_preallocate - stack_base_offset;
         if (left_over > 0) {
             memcpy(other, shared_stack_base, left_over * sizeof(evm_word_t));
             memcpy(other + left_over, global_stack_base, (stack_offset - left_over) * sizeof(evm_word_t));
@@ -76,21 +46,28 @@ __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
 __device__ uint32_t evm_stack_t::size() const { return stack_offset; }
 
 __device__ evm_word_t *evm_stack_t::top() {
-    // printf("top stack base %p stack offset %d\n", shared_stack_base, stack_offset);
-    if (stack_base_offset + stack_offset < CuEVM::shared_stack_size) {
-        // printf("shared stack base %p stack offset %d\n", shared_stack_base, stack_offset);
+    printf("top stack base %p stack offset %d THREADIDX %d\n", shared_stack_base, stack_offset, THREADIDX);
+    if (stack_offset < memory_pool_stack_preallocate) {
+        printf("shared stack base %p stack offset %d THREADIDX %d\n", shared_stack_base, stack_offset, THREADIDX);
         return shared_stack_base + stack_offset;
     } else {
+        if (THREADIDX == 0) {
+            printf("(stack_offset - memory_pool_stack_preallocate) %d\n",
+                   (stack_offset - memory_pool_stack_preallocate));
+            printf("max_stack_size %d\n", max_stack_size);
+        }
+
         // page size is max stack size
-        if ((stack_base_offset + stack_offset - CuEVM::shared_stack_size) % max_stack_size == 0) {
-            evm_word_t *new_stack_base = new evm_word_t[max_stack_size];
+        if ((stack_offset >= current_capacity)) {
+            evm_word_t *new_stack_base = new evm_word_t[1024];
+            printf("new stack base %p\n", new_stack_base);
             if (global_stack_base != nullptr) {
                 delete[] global_stack_base;
             }
-
+            current_capacity = current_capacity * 2;
             global_stack_base = new_stack_base;
         }
-        return global_stack_base + stack_base_offset + stack_offset - CuEVM::shared_stack_size;
+        return global_stack_base + stack_offset - memory_pool_stack_preallocate;
     }
 }
 
@@ -139,10 +116,7 @@ __device__ int32_t evm_stack_t::pop_evm_word(evm_word_t *&y) {
 __device__ int32_t evm_stack_t::pushx(uint8_t x, uint8_t *src_byte_data, uint8_t src_byte_size) {
     if (stack_offset < max_stack_size) {
         evm_word_t *top_ = top();
-        // printf("pushx top %p\n", top_);
-        // printf("pushx src_byte_data %p\n", src_byte_data);
-        // printf("pushx src_byte_size %u\n", src_byte_size);
-        // printf("pushx src_byte_data[0] %d\n", src_byte_data[0]);
+        printf("pushx top %p, thread %d\n", top_, THREADIDX);
         uint256_from_bytes(top_, src_byte_data, src_byte_size);
         stack_offset++;
 
@@ -156,10 +130,10 @@ __device__ int32_t evm_stack_t::pushx(uint8_t x, uint8_t *src_byte_data, uint8_t
 // The caller must check underflow
 __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) const {
     // printf("global stack base %p shared stack base %p\n", global_stack_base, shared_stack_base);
-    if (stack_base_offset + stack_offset - index < CuEVM::shared_stack_size)  // stack_offset is after added
+    if (stack_offset - index < memory_pool_stack_preallocate)  // stack_offset is after added
         return shared_stack_base + stack_offset - index;
     else
-        return global_stack_base + stack_base_offset + stack_offset - index - CuEVM::shared_stack_size;
+        return global_stack_base + stack_offset - index - memory_pool_stack_preallocate;
 }
 
 __device__ int32_t evm_stack_t::dupx(uint32_t x) {
@@ -197,18 +171,6 @@ __device__ void evm_stack_t::print() {
     }
 }
 
-__host__ cJSON *evm_stack_t::to_json() {
-    cJSON *json = cJSON_CreateObject();
-    char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
-    cJSON *stack = cJSON_CreateArray();
-    for (uint32_t idx = 0; idx < size(); idx++) {
-        global_stack_base[idx].to_hex(hex_string_ptr);
-        cJSON_AddItemToArray(stack, cJSON_CreateString(hex_string_ptr));
-    }
-    cJSON_AddItemToObject(json, "data", stack);
-    delete[] hex_string_ptr;
-    return json;
-}
 __host__ evm_stack_t *evm_stack_t::get_cpu(uint32_t count) {
     evm_stack_t *instances = new evm_stack_t[count];
     return instances;

@@ -4,7 +4,7 @@
 namespace CuEVM {
 __host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) {
 #pragma unroll
-    for (int32_t index = 0; index < CuEVM::cgbn_limbs; index++) {
+    for (int32_t index = 0; index < 8; index++) {
         words[index] = src.words[index];
     }
 }
@@ -44,7 +44,7 @@ __host__ __device__ uint32_t evm_word_t::get_uint32_t() const { return uint256_g
 
 __host__ __device__ int32_t evm_word_t::from_uint64_t(uint64_t value) {
 #pragma unroll
-    for (uint32_t idx = 2; idx < CuEVM::cgbn_limbs; idx++) {
+    for (uint32_t idx = 2; idx < uint256_limbs; idx++) {
         words[idx] = 0;
     }
     words[0] = value & 0xFFFFFFFF;
@@ -59,8 +59,8 @@ __host__ __device__ int32_t evm_word_t_compare(const evm_word_t *a, const evm_wo
 }
 
 __host__ __device__ void evm_word_t::print() const {
-    for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
-        printf("%08x ", words[CuEVM::cgbn_limbs - 1 - idx]);
+    for (uint32_t idx = 0; idx < uint256_limbs; idx++) {
+        printf("%08x ", words[uint256_limbs - 1 - idx]);
     }
     printf("\n");
 }

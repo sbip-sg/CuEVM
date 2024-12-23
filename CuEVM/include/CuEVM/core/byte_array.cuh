@@ -143,58 +143,6 @@ struct byte_array_t {
      */
     __host__ __device__ uint8_t &operator[](uint32_t index);
 
-    // STATIC FUNCTIONS
-
-    /**
-     * Get the cpu instances for the return data
-     * @param[in] count the number of instances
-     * @return the cpu instances
-     */
-    __host__ static byte_array_t *get_cpu(uint32_t count);
-
-    /**
-     * Free the cpu instances
-     * @param[in] cpu_instances the cpu instances
-     * @param[in] count the number of instances
-     */
-    __host__ static void cpu_free(byte_array_t *cpu_instances, uint32_t count);
-
-    /**
-     * Get the gpu instances for the return data from the cpu instances
-     * @param[in] cpu_instances the cpu instances
-     * @param[in] count the number of instances
-     * @return the gpu instances
-     */
-    __host__ static byte_array_t *gpu_from_cpu(byte_array_t *cpu_instances, uint32_t count);
-
-    /**
-     * Free the gpu instances
-     * @param[in] gpu_instances the gpu instances
-     * @param[in] count the number of instances
-     */
-    __host__ static void gpu_free(byte_array_t *gpu_instances, uint32_t count);
-
-    /**
-     * Get the cpu instances from the gpu instances
-     * @param[in] gpu_instances the gpu instances
-     * @param[in] count the number of instances
-     * @return the cpu instances
-     */
-    __host__ static byte_array_t *cpu_from_gpu(byte_array_t *gpu_instances, uint32_t count);
-
-    /**
-     * Copy data content between two device memories
-     * @param[out] dst the destination memory
-     * @param[in] src the source memory
-     */
-    __host__ __device__ static void transfer_memory(byte_array_t &dst, byte_array_t &src);
-
-    /**
-     * Reset the reutnr data pointer, used frequently in finish sub context
-     *
-     * @param[in] return_data_ptr the data pointer to be reset
-     */
-
     __host__ __device__ static void reset_return_data(byte_array_t *&return_data_ptr) {
         return_data_ptr->free();
         // printf("reset return data thread %d", THREADIDX);
@@ -223,11 +171,5 @@ struct byte_array_t {
      */
     __host__ __device__ int32_t from_hex_set_be(const char *clean_hex_string, int32_t length, PaddingDirection padding);
 };
-/**
- * Copy data content between two device memories
- * @param[out] dst_instances the destination memory
- * @param[in] src_instances the source memory
- * @param[in] count the number of instances to copy
- */
-__global__ void byte_array_t_transfer_kernel(byte_array_t *dst_instances, byte_array_t *src_instances, uint32_t count);
+
 }  // namespace CuEVM

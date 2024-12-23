@@ -21,6 +21,7 @@
 #include <CuEVM/utils/ecc_constants.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
+
 namespace CuEVM {
 struct evm_instance_t {
     CuEVM::StateDb* state_db_ptr;                              /**< The world state pointer*/
@@ -36,6 +37,7 @@ struct evm_instance_t {
     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
     CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
 };
+
 struct evm_t {
     CuEVM::StateDb* state_db_ptr;                                    /**< The world state pointer*/
     const CuEVM::block_info_t* block_info_ptr;                       /**< The block info pointer */

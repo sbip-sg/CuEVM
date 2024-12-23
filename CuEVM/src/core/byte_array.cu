@@ -289,27 +289,4 @@ __device__ int32_t byte_array_t::padded_copy_BE(const byte_array_t src) {
 
 __device__ uint8_t &byte_array_t::operator[](uint32_t index) { return data[index]; }
 
-// STATIC FUNCTIONS
-
-__host__ byte_array_t *byte_array_t::get_cpu(uint32_t count) {
-    byte_array_t *cpu_instances = new byte_array_t[count];
-    return cpu_instances;
-}
-
-__host__ void byte_array_t::cpu_free(byte_array_t *cpu_instances, uint32_t count) { delete[] cpu_instances; }
-
-__host__ void byte_array_t::gpu_free(byte_array_t *gpu_instances, uint32_t count) {
-    byte_array_t *cpu_instances = new byte_array_t[count];
-    CUDA_CHECK(cudaMemcpy(cpu_instances, gpu_instances, sizeof(byte_array_t) * count, cudaMemcpyDeviceToHost));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        if (cpu_instances[idx].size > 0) {
-            CUDA_CHECK(cudaFree(cpu_instances[idx].data));
-            cpu_instances[idx].data = nullptr;
-            cpu_instances[idx].size = 0;
-        }
-    }
-    delete[] cpu_instances;
-    CUDA_CHECK(cudaFree(gpu_instances));
-}
-
 }  // namespace CuEVM

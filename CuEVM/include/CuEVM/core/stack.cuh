@@ -10,15 +10,14 @@ constexpr CONSTANT uint32_t max_size = CuEVM::max_stack_size; /**< The maximum s
 struct evm_stack_t {
     evm_word_t *global_stack_base; /**< The stack YP: (YP: \f$\mu_{s}\f$)*/  // global memory store from X+1 element
     evm_word_t *shared_stack_base;  // shared memory for X elements from the top
-    uint32_t stack_base_offset;     // offset of the stack base in shared memory or global memory
+    uint32_t current_capacity;      // offset of the stack base in shared memory or global memory
     uint16_t stack_offset;          // offset of the current stack (its size) from it's base offset in shared memory
-    // uint16_t capacity;              /**< The capacity of the stack on global memory
 
     /**
      * The default constructor
      * Stack base offset of the child stack = parent stack offset  + 1
      */
-    __host__ __device__ evm_stack_t(evm_word_t *shared_stack_base = nullptr, uint32_t stack_base_offset = 0);
+    __host__ __device__ evm_stack_t(evm_word_t *shared_stack_base = nullptr);
 
     /**
      * The destructor
@@ -46,12 +45,6 @@ struct evm_stack_t {
      * @param[in] other The other stack
      */
     __host__ __device__ void extract_data(evm_word_t *other) const;
-
-    /**
-     * Grow the stack
-     * @return 0 if the stack is grown, error code otherwise
-     */
-    __host__ __device__ int32_t grow();
 
     /**
      * Get the size of the stack

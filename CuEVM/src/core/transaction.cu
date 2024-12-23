@@ -379,51 +379,6 @@ __host__ __device__ void TransactionList::print() {
     }
 }
 
-#ifdef DEPRECATED_CODE
-
-__host__ cJSON *evm_transaction_t::to_json() {
-    cJSON *json = cJSON_CreateObject();
-    char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
-    char *bytes_string = nullptr;
-    cJSON_AddNumberToObject(json, "type", type);
-    nonce.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(json, "nonce", hex_string_ptr);
-    cJSON_AddNumberToObject(json, "gas_limit", gas_limit);
-    to.to_hex(hex_string_ptr, 0, 5);
-    cJSON_AddStringToObject(json, "to", hex_string_ptr);
-    value.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(json, "value", hex_string_ptr);
-    sender.to_hex(hex_string_ptr, 0, 5);
-    cJSON_AddStringToObject(json, "sender", hex_string_ptr);
-    cJSON_AddStringToObject(json, "origin", hex_string_ptr);
-    max_fee_per_gas.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(json, "max_fee_per_gas", hex_string_ptr);
-    max_priority_fee_per_gas.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(json, "max_priority_fee_per_gas", hex_string_ptr);
-    gas_price.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(json, "gas_price", hex_string_ptr);
-    bytes_string = data_init.to_hex();
-    cJSON_AddStringToObject(json, "data", bytes_string);
-    delete[] bytes_string;
-    cJSON *access_list_json = cJSON_CreateArray();
-    cJSON_AddItemToObject(json, "access_list", access_list_json);
-    for (uint32_t i = 0; i < access_list.accounts_count; i++) {
-        cJSON *account_json = cJSON_CreateObject();
-        cJSON_AddItemToArray(access_list_json, account_json);
-        access_list.accounts[i].address.to_hex(hex_string_ptr, 0, 5);
-        cJSON_AddStringToObject(account_json, "address", hex_string_ptr);
-        cJSON *storage_keys_json = cJSON_CreateArray();
-        cJSON_AddItemToObject(account_json, "storage_keys", storage_keys_json);
-        for (uint32_t j = 0; j < access_list.accounts[i].storage_keys_count; j++) {
-            access_list.accounts[i].storage_keys[j].to_hex(hex_string_ptr);
-            cJSON_AddItemToArray(storage_keys_json, cJSON_CreateString(hex_string_ptr));
-        }
-    }
-    delete[] hex_string_ptr;
-    return json;
-}
-#endif
-
 __host__ uint32_t no_transactions(const cJSON *json) {
     cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
     const cJSON *data_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "data");

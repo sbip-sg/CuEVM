@@ -92,7 +92,7 @@ __host__ __device__ int32_t get_contract_address_create_word(evm_word_t *contrac
     // __ONE_THREAD_PER_INSTANCE(printf("\n\nhash_address_bytes\n"););
     hash_address_bytes.print();
     contract_address->from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
-    for (uint32_t idx = CuEVM::cgbn_limbs - 3; idx < CuEVM::cgbn_limbs; idx++) {
+    for (uint32_t idx = uint256_limbs - 3; idx < uint256_limbs; idx++) {
         contract_address->words[idx] = 0;
     }
 

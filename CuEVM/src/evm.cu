@@ -37,7 +37,7 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
 
     // parent_call_state_ptr->print();
     // printf("constructing message call\n");
-
+    printf("evm stack pointer %p instance %d\n", evm.call_state_ptr->stack_ptr, instance);
     // shared_message_call[threadIdx.x] = CuEVM::evm_message_call_t(state_db_ptr, transaction_list_ptr);
     // shared_message_call[threadIdx.x].print();
 
@@ -338,9 +338,14 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 #endif
         // printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc, opcode,
         //        call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
-        if (cached_call_state.pc > 16) break;
-        // printf("Stack size %u\n", cached_call_state.stack_ptr->stack_offset);
-        // cached_call_state.stack_ptr->print();
+        // if (THREADIDX == 0) {
+        //     printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
+        //     cached_call_state.stack_ptr->print();
+        // }
+        // if (THREADIDX == 1) {
+        //     printf("print Stack 2, size %u\n", cached_call_state.stack_ptr->stack_offset);
+        //     cached_call_state.stack_ptr->print();
+        // }
 
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -366,8 +371,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         } else {
             switch (opcode) {
                 case OP_STOP:
-                    // TODO: fix this
-                    // error_code = CuEVM::operations::STOP(*call_state_ptr->return_data_ptr);
+                    error_code = CuEVM::operations::STOP(call_state_ptr);
                     break;
                 case OP_ADD:
                     error_code = CuEVM::operations::ADD(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -688,6 +692,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                     //                                        *cached_call_state.stack_ptr,
                     //                                        *call_state_ptr->memory_ptr,
                     //                                        *call_state_ptr->parent->last_return_data_ptr);
+                    error_code = ERROR_RETURN;
                     break;
 
                 case OP_DELEGATECALL:

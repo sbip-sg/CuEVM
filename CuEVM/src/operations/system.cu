@@ -271,9 +271,10 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
  * @param[out] return_data The return data.
  * @return return error code.
  */
-__device__ int32_t STOP(CuEVM::evm_return_data_t &return_data) {
+__device__ int32_t STOP(CuEVM::evm_call_context_t *call_state_ptr) {
     // TODO: fix this
-    // return_data = CuEVM::evm_return_data_t();
+    call_state_ptr->return_data_size = 0;
+    call_state_ptr->return_data_offset = 0;
     return ERROR_RETURN;
 }
 

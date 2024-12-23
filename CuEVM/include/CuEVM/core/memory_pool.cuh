@@ -1,16 +1,15 @@
 #pragma once
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/evm_word.cuh>
-#define memory_pool_word_preallocate 16         // times num_instances
-#define memory_pool_call_context_preallocate 2  // times num_instances
 
 namespace CuEVM::memory_pool {
 struct memory_pool_t {
     evm_call_context_t* call_context;
-    evm_word_t* words;
+    evm_word_t* stack_base;
     uint32_t num_instances;
     uint32_t count_words;
     uint32_t count_call_context;
+    uint32_t current_stack_page_size;
     __host__ memory_pool_t() {};
 };
 extern __device__ memory_pool_t* global_memory_pool;
