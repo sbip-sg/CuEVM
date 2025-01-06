@@ -13,13 +13,13 @@ struct memory_pool_t {
     __host__ memory_pool_t() {};
 };
 extern __device__ memory_pool_t* global_memory_pool;
+extern __device__ evm_word_t* preallocated_stack_base;
 __host__ void create_memory_pool(uint32_t num_instances);
+__host__ evm_word_t* preallocate_stack(uint32_t num_instances);
 __device__ void expand_call_context(uint32_t num_instances);
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth);
 
-__device__ evm_stack_t* get_stack(uint16_t depth);
-__device__ evm_word_t* get_stack_base(uint16_t depth = 0);
 __device__ evm_memory_t* get_memory(uint16_t depth);
 
 __device__ void expand_words(uint32_t num_instances);

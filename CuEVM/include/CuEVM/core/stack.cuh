@@ -2,23 +2,27 @@
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
-
 namespace CuEVM {
 namespace stack {
 constexpr CONSTANT uint32_t max_size = CuEVM::max_stack_size; /**< The maximum stack size*/
 
 struct evm_stack_t {
     evm_word_t *global_stack_base; /**< The stack YP: (YP: \f$\mu_{s}\f$)*/  // global memory store from X+1 element
-    evm_word_t *shared_stack_base;  // shared memory for X elements from the top
-    uint32_t current_capacity;      // offset of the stack base in shared memory or global memory
+    evm_word_t *shared_stack_base;  // shared memory for X elements from the top => becomes preallocated stackbase
     uint16_t stack_offset;          // offset of the current stack (its size) from it's base offset in shared memory
-
+    uint32_t stack_base_offset;     // offset of the stack base in shared memory or global memory
     /**
      * The default constructor
      * Stack base offset of the child stack = parent stack offset  + 1
      */
-    __host__ __device__ evm_stack_t(evm_word_t *shared_stack_base = nullptr);
-
+    __host__ __device__ evm_stack_t::evm_stack_t(evm_word_t *shared_stack_base, uint32_t stack_base_offset = 0)
+        : global_stack_base(nullptr),
+          shared_stack_base(shared_stack_base),
+          stack_base_offset(stack_base_offset),
+          stack_offset(0) {
+        // printf("stack constructor shared stack base %p, stack base offset %d, stack offset %d\n", shared_stack_base,
+        //        stack_base_offset, stack_offset);
+    }
     /**
      * The destructor
      */
@@ -122,21 +126,6 @@ struct evm_stack_t {
      */
     __host__ cJSON *to_json();
 
-    // STATIC FUNCTIONS
-    /**
-     * Geenrat ethe stack cpu instances
-     * @param[in] count The number of instances
-     * @return The stack cpu instances
-     */
-    __host__ static evm_stack_t *get_cpu(uint32_t count);
-
-    /**
-     * Free the stack cpu instances
-     * @param[in] instances The stack cpu instances
-     * @param[in] count The number of instances
-     */
-    __host__ static void cpu_free(evm_stack_t *instances, uint32_t count);
-
     /**
      * Generate the stack gpu instances from the stack cpu instances
      * @param[in] cpu_instances The stack cpu instances
@@ -151,14 +140,6 @@ struct evm_stack_t {
      * @param[in] count The number of instances
      */
     __host__ static void gpu_free(evm_stack_t *gpu_instances, uint32_t count);
-
-    /**
-     * Generate the stack cpu instances from the stack gpu instances
-     * @param[in] gpu_instances The stack gpu instances
-     * @param[in] count The number of instances
-     * @return The stack cpu instances
-     */
-    __host__ static evm_stack_t *cpu_from_gpu(evm_stack_t *gpu_instances, uint32_t count);
 };
 
 }  // namespace stack

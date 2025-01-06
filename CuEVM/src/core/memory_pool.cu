@@ -2,6 +2,7 @@
 
 namespace CuEVM::memory_pool {
 __device__ memory_pool_t* global_memory_pool;
+__device__ evm_word_t* preallocated_stack_base;
 __host__ void create_memory_pool(uint32_t num_instances) {
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
@@ -12,6 +13,8 @@ __host__ void create_memory_pool(uint32_t num_instances) {
     // memory_pool->words = new evm_word_t[num_instances * memory_pool_word_preallocate];
     // memory_pool->call_context = new evm_call_context_t[num_instances * memory_pool_call_context_preallocate];
     cudaMalloc(&memory_pool->stack_base, num_instances * memory_pool_stack_preallocate * sizeof(evm_word_t));
+    printf("host: allocated stack base %p size %d\n", memory_pool->stack_base,
+           num_instances * memory_pool_stack_preallocate);
     cudaMalloc(&memory_pool->call_context,
                num_instances * memory_pool_call_context_preallocate * sizeof(evm_call_context_t));
     memory_pool_t* d_memory_pool;
@@ -19,6 +22,8 @@ __host__ void create_memory_pool(uint32_t num_instances) {
     cudaMemcpy(d_memory_pool, memory_pool, sizeof(memory_pool_t), cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(global_memory_pool, &d_memory_pool, sizeof(memory_pool_t*));
 
+    // copy pointer to preallocated stack base
+    cudaMemcpyToSymbol(preallocated_stack_base, &memory_pool->stack_base, sizeof(evm_word_t*));
     delete memory_pool;
 }
 
@@ -33,7 +38,7 @@ __device__ void expand_call_context(uint32_t num_instances) {
 }
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth) {
-    return &global_memory_pool->call_context[depth * global_memory_pool->num_instances + threadIdx.x];
+    return &global_memory_pool->call_context[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
 }
 
 __device__ void expand_stack(uint32_t num_instances) {

@@ -27,7 +27,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("current stack size %zu\n", size_value);
     cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
     printf("current heap size %zu\n", size_value);
-    size_t heap_size = (size_t(1000) << 20);  // 100MB
+    size_t heap_size = (size_t(1) << 32);  // 4GB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
     cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
@@ -54,6 +54,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     if (test_json != nullptr) {
         CuEVM::get_evm_instances(instances_data, test_json, num_instances, clones, managed);
         CuEVM::memory_pool::create_memory_pool(num_instances);
+        // CuEVM::memory_pool::preallocate_stack(num_instances);
         uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
         printf("\n\n ----------\n\n");
         printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,

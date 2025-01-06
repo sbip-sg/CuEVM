@@ -37,7 +37,10 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
 
     // parent_call_state_ptr->print();
     // printf("constructing message call\n");
-    printf("evm stack pointer %p instance %d\n", evm.call_state_ptr->stack_ptr, instance);
+    // if (threadIdx.x == 0) {
+    //     printf("evm stack pointer %p instance %d\n", evm.call_state_ptr->stack_ptr, instance);
+    // }
+    cached_evm_call_context cached_call_state(evm.call_state_ptr);
     // shared_message_call[threadIdx.x] = CuEVM::evm_message_call_t(state_db_ptr, transaction_list_ptr);
     // shared_message_call[threadIdx.x].print();
 
@@ -49,7 +52,7 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
     // printf("evm call state stack pointer %p\n", evm.call_state_ptr->stack_ptr);
     // printf("evm call state stack pointer shared_stack_base %p\n", evm.call_state_ptr->stack_ptr->shared_stack_base);
 
-    evm.run();
+    evm.run(cached_call_state);
 
     /*
         if (evm->status == ERROR_SUCCESS) {
@@ -125,22 +128,24 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
     : state_db_ptr(state_db_ptr), transaction_list_ptr(transaction_list_ptr) {
     // printf("evm_t constructor\n");
     call_state_ptr = memory_pool::get_call_context(0);
-    CuEVM::evm_call_context_t *root_call_state_ptr = memory_pool::get_call_context(0);
+    // CuEVM::evm_call_context_t *root_call_state_ptr = memory_pool::get_call_context(INSTANCE_GLOBAL_IDX);
     uint8_t *byte_code = nullptr;
     uint32_t byte_code_size = 0;
-    uint8_t *call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[threadIdx.x]];
-    uint32_t call_data_size = transaction_list_ptr->call_data_size[threadIdx.x];
+    uint8_t *call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
+    uint32_t call_data_size = transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
 
-    transaction_list_ptr->call_data_size[threadIdx.x];
+    transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
     byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
     // printf("\n evm call state \n");
-    CuEVM::evm_stack_t *stack_ptr = new CuEVM::evm_stack_t(memory_pool::get_stack_base(threadIdx.x));
+    // CuEVM::evm_stack_t *stack_ptr = new CuEVM::evm_stack_t(memory_pool::get_stack_base(threadIdx.x));
+    CuEVM::evm_stack_t *stack_ptr = new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
     CuEVM::evm_memory_t *memory_ptr =
         new CuEVM::evm_memory_t();  // memory_pool::global_memory_pool->get_memory(threadIdx.x);
-    call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[threadIdx.x], stack_ptr, memory_ptr,
+    // printf("instance %d gas limit %lu\n", INSTANCE_GLOBAL_IDX, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX]);
+    call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                     transaction_list_ptr->sender, transaction_list_ptr->to, transaction_list_ptr->to,
-                                    transaction_list_ptr->value[threadIdx.x], OP_CALL, call_data, call_data_size,
-                                    byte_code, byte_code_size);
+                                    transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CALL, call_data,
+                                    call_data_size, byte_code, byte_code_size);
     // printf("\n\ncall state ptr created %p\n\n", call_state_ptr);
     // call_state_ptr->print();
 }
@@ -336,9 +341,11 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        // printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc, opcode,
-        //        call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
-        // if (THREADIDX == 0) {
+        // if (INSTANCE_GLOBAL_IDX == 10000) {
+        //     printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
+        //            opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit,
+        //            cached_call_state.gas_used);
+
         //     printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
         //     cached_call_state.stack_ptr->print();
         // }

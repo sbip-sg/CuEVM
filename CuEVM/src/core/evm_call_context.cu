@@ -1,8 +1,8 @@
 
 #include <CuEVM/core/evm_call_context.cuh>
+#include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
-
 namespace CuEVM {
 __device__ cached_evm_call_context::cached_evm_call_context(evm_call_context_t* state) {  // copy from state to cache
     pc = state->pc;
@@ -129,7 +129,9 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
 
     if (parent->stack_ptr != nullptr) {
         this->stack_ptr =
-            new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base + parent->stack_ptr->stack_offset,
+            new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base +
+                                       (parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset) *
+                                           CuEVM::memory_pool::global_memory_pool->num_instances,
                                    parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
         // printf("parent stack found %p thread %d\n", parent->stack_ptr, THREADIDX);
     } else {
