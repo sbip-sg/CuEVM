@@ -341,7 +341,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        // if (INSTANCE_GLOBAL_IDX == 10000) {
+        // if (INSTANCE_GLOBAL_IDX == 2) {
         //     printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
         //            opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit,
         //            cached_call_state.gas_used);

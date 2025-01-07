@@ -5,19 +5,23 @@ namespace CuEVM::operations {
 __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                          CuEVM::StateDb *state_db, evm_call_context_t *call_context) {
     // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
-    evm_word_t key;
-    int32_t error_code = stack.pop(key);
+    evm_word_t *key;
+    if (stack.size() < 1) {
+        return ERROR_STACK_UNDERFLOW;
+    }
+    key = stack.get_address_at_index(1);
+    stack.reduce_size(1);
     // bn_t storage_address;
     // message.get_storage_address(arith, storage_address);
-    error_code |= CuEVM::gas_cost::sload_cost(gas_used, state_db, &call_context->storage_address, &key);
+    int error_code = CuEVM::gas_cost::sload_cost(gas_used, state_db, &call_context->storage_address, key);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    // #ifdef __CUDA_ARCH__
-    //     printf("SLOAD %d error_code: %d\n", threadIdx.x, error_code);
-    // #endif
+
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t *value;
-        value = state_db->get_value(&call_context->storage_address, &key);
-        error_code |= stack.push(*value);
+        evm_word_t *value = state_db->get_value(&call_context->storage_address, key);
+        if (value == nullptr)
+            error_code |= stack.push0();
+        else
+            error_code |= stack.push(*value);
     }
     return error_code;
 }
@@ -33,18 +37,28 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (error_code != ERROR_SUCCESS) {
         return error_code;
     }
-    evm_word_t key;
-    error_code |= stack.pop(key);
-    evm_word_t value;
-    error_code |= stack.pop(value);
+    // evm_word_t key;
+    // error_code |= stack.pop(key);
+    // evm_word_t value;
+    // error_code |= stack.pop(value);
+    if (stack.size() < 2) {
+        return ERROR_STACK_UNDERFLOW;
+    }
+    // pop the pointers without mem copy
+    evm_word_t *key = stack.get_address_at_index(1);
+    evm_word_t *value = stack.get_address_at_index(2);
+    stack.reduce_size(2);
+
     // bn_t storage_address;
     // message.get_storage_address(arith, storage_address);
+
     error_code |=
-        CuEVM::gas_cost::sstore_cost(gas_used, gas_refund, state_db, &call_context->storage_address, &key, &value);
+        CuEVM::gas_cost::sstore_cost(gas_used, gas_refund, state_db, &call_context->storage_address, key, value);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        state_db->write_storage(&call_context->storage_address, &key, &value, call_context->depth);
+        state_db->write_storage(&call_context->storage_address, key, value, call_context->depth);
     }
+
     return error_code;
 }
 }  // namespace CuEVM::operations

@@ -193,25 +193,29 @@ __device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::StateDb *state_db, c
 }
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::StateDb *state_db,
                                const evm_word_t *address, const evm_word_t *key, const evm_word_t *new_value) {
+    // printf("address %p\n");
+    // address->print();
+    // printf("key %p\n");
+    // key->print();
+    // printf("new_value %p\n");
+    // new_value->print();
     // get the key warm
     if (state_db->is_warm_key(address, key) == false) {
         gas_used += GAS_COLD_SLOAD;
     }
+
     evm_word_t *original_value, *current_value;
     original_value = state_db->get_original_value(address, key);
     current_value = state_db->get_value(address, key);
-    // #ifdef __CUDA_ARCH__
-    //     printf("SSTORE COST %d\n", threadIdx.x);
-    //     print_bnt(arith, original_value);
-    //     print_bnt(arith, current_value);
-    //     print_bnt(arith, new_value);
-    // #endif
+    // printf("original value %p\n", original_value);
+    // printf("current value %p\n", current_value);
+    // printf("new value %p\n", new_value);
     // EIP-2200
-    if (*new_value == *current_value) {
+    if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
     } else {
-        if (*current_value == *original_value) {
-            if (uint256_is_zero(original_value)) {
+        if (uint256_cmp(current_value, original_value) == 0) {
+            if (original_value == nullptr || uint256_is_zero(original_value)) {
                 gas_used += GAS_STORAGE_SET;
             } else {
                 gas_used += GAS_SSTORE_RESET;
@@ -221,15 +225,15 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::
             }
         } else {
             gas_used += GAS_SLOAD;
-            if (uint256_is_zero(original_value)) {
-                if (uint256_is_zero(current_value)) {
+            if (original_value == nullptr || uint256_is_zero(original_value)) {
+                if (current_value == nullptr || uint256_is_zero(current_value)) {
                     gas_refund -= GAS_STORAGE_CLEAR_REFUND;
                 } else if (uint256_is_zero(new_value)) {
                     gas_refund += GAS_STORAGE_CLEAR_REFUND;
                 }
             }
-            if (original_value == new_value) {
-                if (uint256_is_zero(original_value)) {
+            if (uint256_cmp(original_value, new_value) == 0) {
+                if (original_value == nullptr || uint256_is_zero(original_value)) {
                     gas_refund += GAS_STORAGE_SET - GAS_SLOAD;
                 } else {
                     gas_refund += GAS_STORAGE_RESET - GAS_SLOAD;

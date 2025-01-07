@@ -57,6 +57,12 @@ struct evm_stack_t {
     __host__ __device__ uint32_t size() const;
 
     /**
+     * Reduce the size (remove items) of the stack without memory operations
+     * @param[in] num_items The number of items to remove
+     */
+    __device__ void reduce_size(uint32_t num_items);
+
+    /**
      * Get the top of the stack
      * @return The top of the stack pointer
      */
@@ -69,6 +75,7 @@ struct evm_stack_t {
      * @return 0 if the value is pushed, error code otherwise
      */
     __host__ __device__ int32_t push(const evm_word_t &value);
+    __host__ __device__ int32_t push0();
     __host__ __device__ int32_t push_evm_word_t(const evm_word_t *value);
     /**
      * Pop a value from the stack

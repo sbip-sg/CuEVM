@@ -37,6 +37,12 @@ __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
 
 __device__ uint32_t evm_stack_t::size() const { return stack_offset; }
 
+__device__ void evm_stack_t::reduce_size(uint32_t num_items) {
+    if (stack_offset >= num_items) {
+        stack_offset -= num_items;
+    }
+}
+
 __device__ evm_word_t *evm_stack_t::top() {
     if (stack_base_offset + stack_offset < memory_pool_stack_preallocate) {
         // if (THREADIDX == 0) {
@@ -65,6 +71,15 @@ __device__ evm_word_t *evm_stack_t::top() {
             global_stack_base = new evm_word_t[max_stack_size];
         }  // TODO reuse global stack allocation for child calls
         return global_stack_base + stack_base_offset + stack_offset - memory_pool_stack_preallocate;
+    }
+}
+__device__ int32_t evm_stack_t::push0() {
+    if (stack_offset < max_stack_size) {
+        *top() = 0;
+        stack_offset++;
+        return ERROR_SUCCESS;
+    } else {
+        return ERROR_STACK_OVERFLOW;
     }
 }
 
