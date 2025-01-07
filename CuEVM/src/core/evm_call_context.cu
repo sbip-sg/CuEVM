@@ -67,8 +67,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
                                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
                                                     uint32_t byte_code_size, evm_call_context_t* parent,
-                                                    CuEVM::jump_destinations_t* jump_destinations, bool static_env,
-                                                    gas_t gas_refund
+                                                    bool static_env, gas_t gas_refund
 #ifdef EIP_3155
                                                     ,
                                                     uint32_t trace_idx
@@ -93,7 +92,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->byte_code = byte_code;
     this->byte_code_size = byte_code_size;
     this->parent = parent;
-    this->jump_destinations = jump_destinations;
+    this->jump_destinations = nullptr;  // jump_destinations;
     this->static_env = static_env;
     this->gas_refund = gas_refund;
 #ifdef EIP_3155
@@ -107,9 +106,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
 __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, gas_t gas_limit, evm_word_t from,
                                                     evm_word_t to, evm_word_t storage_address, evm_word_t value,
                                                     uint32_t call_type, uint8_t* call_data, uint32_t call_data_size,
-                                                    uint8_t* byte_code, uint32_t byte_code_size,
-                                                    evm_word_t* shared_stack_ptr,
-                                                    CuEVM::jump_destinations_t* jump_destinations, bool static_env,
+                                                    uint8_t* byte_code, uint32_t byte_code_size, bool static_env,
                                                     gas_t gas_refund
 #ifdef EIP_3155
                                                     ,
@@ -117,6 +114,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
 #endif
 ) {
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
+
     if (parent == nullptr) {
         printf("parent is nullptr\n");
         return;
@@ -126,6 +124,19 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     this->pc = 0;
     this->gas_used = 0;
     this->gas_refund = parent->gas_refund;
+    this->gas_limit = gas_limit;
+    this->call_type = call_type;
+    this->call_data = call_data;
+    this->call_data_size = call_data_size;
+    this->byte_code = byte_code;
+    this->byte_code_size = byte_code_size;
+    this->static_env = static_env;
+    this->gas_refund = gas_refund;
+    this->jump_destinations = nullptr;
+    this->from = from;
+    this->to = to;
+    this->storage_address = storage_address;
+    this->value = value;
 
     if (parent->stack_ptr != nullptr) {
         this->stack_ptr =
@@ -135,7 +146,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
                                    parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
         // printf("parent stack found %p thread %d\n", parent->stack_ptr, THREADIDX);
     } else {
-        this->stack_ptr = new CuEVM::evm_stack_t(shared_stack_ptr);
+        this->stack_ptr = new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
         // printf("parent stack not found %p thread %d\n", shared_stack_ptr, THREADIDX);
     }
 
@@ -145,6 +156,8 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     this->trace_idx = 0;
 #endif
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
+    printf("this context\n");
+    this->print();
 }
 
 /**

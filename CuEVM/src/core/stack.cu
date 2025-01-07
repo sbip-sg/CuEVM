@@ -73,9 +73,9 @@ __device__ evm_word_t *evm_stack_t::top() {
         return global_stack_base + stack_base_offset + stack_offset - memory_pool_stack_preallocate;
     }
 }
-__device__ int32_t evm_stack_t::push0() {
+__device__ int32_t evm_stack_t::push_uint32(uint32_t value) {
     if (stack_offset < max_stack_size) {
-        *top() = 0;
+        *top() = value;
         stack_offset++;
         return ERROR_SUCCESS;
     } else {

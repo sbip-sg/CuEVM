@@ -37,7 +37,7 @@ __host__ __device__ void byte_array_from_cgbn_memory(uint8_t *dst_array, size_t 
 }
 
 __host__ __device__ void evm_address_conversion(evm_word_t &address) {
-    for (uint32_t idx = 0; idx < 3; idx++) {
+    for (uint32_t idx = UINT256_WORDS - 3; idx < UINT256_WORDS; idx++) {
         address.words[idx] = 0;
     }
 }

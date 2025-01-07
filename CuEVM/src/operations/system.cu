@@ -12,25 +12,17 @@ namespace CuEVM::operations {
  * @param[out] new_state_ptr The new state pointer.
  * @return 0 if the operation is successful, otherwise the error code.
  */
-__device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t &args_size,
+__device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t *args_size,
                                 CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                                 CuEVM::cached_evm_call_context &cached_state) {
     // try to send value in call
     evm_word_t value = new_context_ptr->value;
-    // #ifdef __CUDA_ARCH__
-    //     printf("generic_CALL message_ptr->get_value %d\n", threadIdx.x);
-    // #endif
+
     int32_t error_code =
         ((new_context_ptr->static_env && (uint256_cmp_word(&value, 0) != 0) && (new_context_ptr->call_type == OP_CALL))
              ? ERROR_STATIC_CALL_CONTEXT_CALL_VALUE
              : ERROR_SUCCESS);
 
-    // charge the gas for the call
-    // #ifdef __CUDA_ARCH__
-    //     printf("Before memory_grow_cost %d\n", threadIdx.x);
-    //     __SYNC_THREADS__
-    //     print_bnt(arith, cached_state.gas_used);
-    // #endif
     // memory call data
     gas_t memory_expansion_cost_args;
 
@@ -40,16 +32,9 @@ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t 
     // reset to 0;
     temp_memory_gas_used = 0;
 
-    error_code |= CuEVM::gas_cost::memory_grow_cost(*current_context->memory_ptr, args_offset, args_size,
+    error_code |= CuEVM::gas_cost::memory_grow_cost(*current_context->memory_ptr, *args_offset, *args_size,
                                                     memory_expansion_cost_args, temp_memory_gas_used);
-
-    // printf("generic_CALL memory_expansion_cost_args idx %d error_code %d mempointer %p memsize %d\n", THREADIDX,
-    //        error_code, current_state.memory_ptr, current_state.memory_ptr->size);
-    // __SYNC_THREADS__
-    // print_bnt(arith, temp_memory_gas_used);
-    // print_bnt(arith, args_offset);
-    // print_bnt(arith, args_size);
-
+    printf("temp memory gas used %d\n", temp_memory_gas_used);
     // memory return data
     evm_word_t ret_offset = new_context_ptr->return_data_offset;
     evm_word_t ret_size = new_context_ptr->return_data_size;
@@ -57,14 +42,7 @@ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t 
     error_code |= CuEVM::gas_cost::memory_grow_cost(*current_context->memory_ptr, ret_offset, ret_size,
                                                     memory_expansion_cost_ret, temp_memory_gas_used);
 
-    // #ifdef __CUDA_ARCH__
-    //     printf("generic_CALL memory_expansion_cost_ret idx %d error_code %d mempointer %p memsize %d\n", threadIdx.x,
-    //            error_code, current_state.memory_ptr, current_state.memory_ptr->size);
-    //     __SYNC_THREADS__
-    //     print_bnt(arith, temp_memory_gas_used);
-    //     print_bnt(arith, ret_offset);
-    //     print_bnt(arith, ret_size);
-    // #endif
+    printf("temp memory gas used %d\n", temp_memory_gas_used);
     // compute the total memory expansion cost
     gas_t memory_expansion_cost;
     if (memory_expansion_cost_args > memory_expansion_cost_ret) {
@@ -72,26 +50,14 @@ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t 
     } else {
         memory_expansion_cost = memory_expansion_cost_ret;
     }
+    printf("memory expansion cost %d\n", memory_expansion_cost);
     cached_state.gas_used += memory_expansion_cost;
 
-    // #ifdef __CUDA_ARCH__
-    //     printf("after memory_grow_cost %d\n", threadIdx.x);
-    //     __SYNC_THREADS__
-    //     print_bnt(arith, cached_state.gas_used);
-    // #endif
-
     // adress warm call
-    // bn_t contract_address;
     evm_word_t *contract_address_ptr = &new_context_ptr->to;
-    // new_state_ptr->message_ptr->get_contract_address(arith, contract_address);
+    printf("contract address \n");
+    contract_address_ptr->print();
     CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, contract_address_ptr);
-    // positive value call cost (except delegate call)
-    // empty account call cost
-    // #ifdef __CUDA_ARCH__
-    //     printf("After access_account_cost cost %d\n", threadIdx.x);
-    //     __SYNC_THREADS__
-    //     print_bnt(arith, cached_state.gas_used);
-    // #endif
 
     gas_t gas_stippend;
     gas_stippend = 0;
@@ -138,10 +104,19 @@ __device__ int32_t generic_CALL(const evm_word_t &args_offset, const evm_word_t 
         // get/set the call data
         // error_code |= current_state.memory_ptr->get(args_offset, args_size, *new_state_ptr->message_ptr->data);
         // TODO: fix this
+        new_context_ptr->byte_code =
+            CuEVM::global_state_db_ptr->get_code(new_context_ptr->byte_code_size, contract_address_ptr);
+        printf("byte code size %d\n", new_context_ptr->byte_code_size);
+        printf("byte code data %p\n", new_context_ptr->byte_code);
+        printf("contract address \n");
+        contract_address_ptr->print();
+        byte_array_t *call_data = new byte_array_t();
+        if (args_size > 0) error_code |= current_context->memory_ptr->get(*args_offset, *args_size, *call_data);
+        new_context_ptr->call_data = call_data->data;
+        new_context_ptr->call_data_size = call_data->size;
     }
-    // #ifdef __CUDA_ARCH__
-    //     printf("generic_CALL error_code: %d idx %d\n", error_code, threadIdx.x);
-    // #endif
+
+    printf("generic_CALL error_code: %d idx %d\n", error_code, THREADIDX);
     return error_code;
 }
 
@@ -299,56 +274,51 @@ __device__ int32_t CREATE(CuEVM::evm_call_context_t *current_context, CuEVM::evm
  */
 __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                         CuEVM::cached_evm_call_context &cached_state) {
-    evm_word_t gas_word, address, value, args_offset, args_size, ret_offset, ret_size;
-    // #ifdef __CUDA_ARCH__
-    //     printf("opcode CALL %d\n", threadIdx.x);
-    // #endif
-    int32_t error_code = cached_state.stack_ptr->pop(gas_word);
-    error_code |= cached_state.stack_ptr->pop(address);
-    error_code |= cached_state.stack_ptr->pop(value);
-    error_code |= cached_state.stack_ptr->pop(args_offset);
-    error_code |= cached_state.stack_ptr->pop(args_size);
-    error_code |= cached_state.stack_ptr->pop(ret_offset);
-    error_code |= cached_state.stack_ptr->pop(ret_size);
-    gas_t gas = uint256_get_uint32_t(&gas_word);
-    // printf("opcode CALL params after pop\n");
-    // print_bnt(arith, gas);
-    // print_bnt(arith, address);
-    // print_bnt(arith, value);
-    // print_bnt(arith, args_offset);
-    // print_bnt(arith, args_size);
-    // print_bnt(arith, ret_offset);
-    // print_bnt(arith, ret_size);
-    // #ifdef __CUDA_ARCH__
-    //     printf("opcode CALL before error_code == ERROR_SUCCESS %d\n", threadIdx.x);
-    // #endif
-    if (error_code == ERROR_SUCCESS) {
-        // clean the address
-        CuEVM::utils::evm_address_conversion(address);
+    evm_word_t *gas_word, *original_address, *value, *args_offset, *args_size, *ret_offset, *ret_size;
+    if (cached_state.stack_ptr->size() < 7) return ERROR_STACK_UNDERFLOW;
+    gas_word = cached_state.stack_ptr->get_address_at_index(1);
+    original_address = cached_state.stack_ptr->get_address_at_index(2);
+    value = cached_state.stack_ptr->get_address_at_index(3);
+    args_offset = cached_state.stack_ptr->get_address_at_index(4);
+    args_size = cached_state.stack_ptr->get_address_at_index(5);
+    ret_offset = cached_state.stack_ptr->get_address_at_index(6);
+    ret_size = cached_state.stack_ptr->get_address_at_index(7);
+    cached_state.stack_ptr->reduce_size(7);
+    gas_t gas = uint256_get_uint32_t(gas_word);
 
-        CuEVM::byte_array_t call_data;
-        CuEVM::byte_array_t code;
+    // printf("opcode CALL parameters\n");
+    // gas_word->print();
+    // original_address->print();
+    // value->print();
+    // args_offset->print();
+    // args_size->print();
+    // ret_offset->print();
+    // ret_size->print();
 
-        // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-        //     &current_context->to, &address, &address, gas, &value, current_context->depth + 1, OP_CALL, &address,
-        //     call_data, code, ret_offset, ret_size, current_context->static_env);
+    evm_word_t address = *original_address;
+    // clean the address
+    CuEVM::utils::evm_address_conversion(address);
+    printf("original address\n");
+    original_address->print();
+    printf("address\n");
+    address.print();
 
-        // current_context->message_ptr->copy_from(message_call_ptr);
-        // TODO: fix this
-        // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
+    // evm_call_context_t *new_context_ptr = new CuEVM::evm_call_context_t(
+    //     &current_context->to, &address, &address, gas, &value, current_context->depth + 1, OP_CALL, &address,
+    //     call_data, code, ret_offset, ret_size, current_context->static_env);
 
-        // #ifdef __CUDA_ARCH__
-        //         printf("opcode CALL after constructing message call t  %d\n", threadIdx.x);
-        // #endif
-        // #ifdef __CUDA_ARCH__
-        // printf("opcode CALL after constructing message call t  %d\n", threadIdx.x);
-        // #endif
-    }
-    if (error_code == ERROR_SUCCESS)  // break down scope to avoid stack problems
-        error_code |= generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
+    // current_context->message_ptr->copy_from(message_call_ptr);
+    // TODO: fix this
+    new_context_ptr = new CuEVM::evm_call_context_t();
+    // new_context_ptr->initiate_values(current_context, gas, current_context->to, address, value, OP_CALL, call_data,
+    //                                  code, ret_offset, ret_size, current_context->static_env);
 
-    // printf("opcode CALL error_code %d thread %d\n", error_code, THREADIDX);
-    return error_code;
+    new_context_ptr->initiate_values(current_context, gas, current_context->to, address, address, *value, OP_CALL,
+                                     nullptr, 0, nullptr, 0, current_context->static_env);
+    printf("new context ptr\n");
+    new_context_ptr->print();
+
+    return generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
 }
 
 /**
@@ -360,33 +330,36 @@ __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_c
  */
 __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                             CuEVM::cached_evm_call_context &cached_state) {
-    evm_word_t gas_word, address, value, args_offset, args_size, ret_offset, ret_size;
-    int32_t error_code = cached_state.stack_ptr->pop(gas_word);
-    error_code |= cached_state.stack_ptr->pop(address);
-    error_code |= cached_state.stack_ptr->pop(value);
-    error_code |= cached_state.stack_ptr->pop(args_offset);
-    error_code |= cached_state.stack_ptr->pop(args_size);
-    error_code |= cached_state.stack_ptr->pop(ret_offset);
-    error_code |= cached_state.stack_ptr->pop(ret_size);
-    gas_t gas = uint256_get_uint32_t(&gas_word);
-    if (error_code == ERROR_SUCCESS) {
-        // clean the address
-        CuEVM::utils::evm_address_conversion(address);
+    evm_word_t *gas_word, *original_address, *value, *args_offset, *args_size, *ret_offset, *ret_size;
+    if (cached_state.stack_ptr->size() < 7) return ERROR_STACK_UNDERFLOW;
+    gas_word = cached_state.stack_ptr->get_address_at_index(1);
+    original_address = cached_state.stack_ptr->get_address_at_index(2);
+    value = cached_state.stack_ptr->get_address_at_index(3);
+    args_offset = cached_state.stack_ptr->get_address_at_index(4);
+    args_size = cached_state.stack_ptr->get_address_at_index(5);
+    ret_offset = cached_state.stack_ptr->get_address_at_index(6);
+    ret_size = cached_state.stack_ptr->get_address_at_index(7);
+    cached_state.stack_ptr->reduce_size(7);
 
-        CuEVM::byte_array_t call_data;
-        CuEVM::byte_array_t code;
+    gas_t gas = uint256_get_uint32_t(gas_word);
 
-        // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-        //     &current_context->to, &current_context->to, &address, gas, &value, current_context->depth + 1,
-        //     OP_CALLCODE, &current_context->to, call_data, code, ret_offset, ret_size, current_context->static_env);
+    // clean the address
+    evm_word_t address = *original_address;
+    CuEVM::utils::evm_address_conversion(address);
 
-        // current_context->message_ptr->copy_from(message_call_ptr);
-        // TODO: fix this
-        // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
+    CuEVM::byte_array_t call_data;
+    CuEVM::byte_array_t code;
 
-        error_code |= generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
-    }
-    return error_code;
+    // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+    //     &current_context->to, &current_context->to, &address, gas, &value, current_context->depth + 1,
+    //     OP_CALLCODE, &current_context->to, call_data, code, ret_offset, ret_size,
+    //     current_context->static_env);
+
+    // current_context->message_ptr->copy_from(message_call_ptr);
+    // TODO: fix this
+    // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
+
+    return generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
 }
 
 /**
@@ -429,34 +402,36 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
  */
 __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                                 CuEVM::cached_evm_call_context &cached_state) {
-    evm_word_t gas_word, address, args_offset, args_size, ret_offset, ret_size;
-    int32_t error_code = cached_state.stack_ptr->pop(gas_word);
-    error_code |= cached_state.stack_ptr->pop(address);
+    evm_word_t *gas_word, *original_address, *args_offset, *args_size, *ret_offset, *ret_size;
     evm_word_t value = current_context->value;
-    error_code |= cached_state.stack_ptr->pop(args_offset);
-    error_code |= cached_state.stack_ptr->pop(args_size);
-    error_code |= cached_state.stack_ptr->pop(ret_offset);
-    error_code |= cached_state.stack_ptr->pop(ret_size);
-    gas_t gas = uint256_get_uint32_t(&gas_word);
 
-    if (error_code == ERROR_SUCCESS) {
-        // clean the address
-        CuEVM::utils::evm_address_conversion(address);
+    if (cached_state.stack_ptr->size() < 6) return ERROR_STACK_UNDERFLOW;
+    gas_word = cached_state.stack_ptr->get_address_at_index(1);
+    original_address = cached_state.stack_ptr->get_address_at_index(2);
+    args_offset = cached_state.stack_ptr->get_address_at_index(3);
+    args_size = cached_state.stack_ptr->get_address_at_index(4);
+    ret_offset = cached_state.stack_ptr->get_address_at_index(5);
+    ret_size = cached_state.stack_ptr->get_address_at_index(6);
+    cached_state.stack_ptr->reduce_size(6);
 
-        CuEVM::byte_array_t call_data;
-        CuEVM::byte_array_t code;
+    gas_t gas = uint256_get_uint32_t(gas_word);
 
-        // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-        //     &current_context->from, &current_context->to, &address, gas, &value, current_context->depth + 1,
-        //     OP_DELEGATECALL, &current_context->to, call_data, code, ret_offset, ret_size,
-        //     current_context->static_env);
-        // current_context->message_ptr->copy_from(message_call_ptr);
-        // TODO: fix this
-        // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
+    // clean the address
+    evm_word_t address = *original_address;
+    CuEVM::utils::evm_address_conversion(address);
 
-        error_code |= generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
-    }
-    return error_code;
+    CuEVM::byte_array_t call_data;
+    CuEVM::byte_array_t code;
+
+    // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+    //     &current_context->from, &current_context->to, &address, gas, &value, current_context->depth + 1,
+    //     OP_DELEGATECALL, &current_context->to, call_data, code, ret_offset, ret_size,
+    //     current_context->static_env);
+    // current_context->message_ptr->copy_from(message_call_ptr);
+    // TODO: fix this
+    // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
+
+    return generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
 }
 
 /**
@@ -480,36 +455,37 @@ __device__ int32_t CREATE2(CuEVM::evm_call_context_t *current_context, CuEVM::ev
  */
 __device__ int32_t STATICCALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                               CuEVM::cached_evm_call_context &cached_state) {
-    evm_word_t gas_word, address, value, args_offset, args_size, ret_offset, ret_size;
-    int32_t error_code = cached_state.stack_ptr->pop(gas_word);
-    error_code |= cached_state.stack_ptr->pop(address);
-    value.set_zero();
-    error_code |= cached_state.stack_ptr->pop(args_offset);
-    error_code |= cached_state.stack_ptr->pop(args_size);
-    error_code |= cached_state.stack_ptr->pop(ret_offset);
-    error_code |= cached_state.stack_ptr->pop(ret_size);
-    gas_t gas = uint256_get_uint32_t(&gas_word);
+    evm_word_t *gas_word, *original_address, *args_offset, *args_size, *ret_offset, *ret_size;
+    evm_word_t value = 0;
+    if (cached_state.stack_ptr->size() < 6) return ERROR_STACK_UNDERFLOW;
+    gas_word = cached_state.stack_ptr->get_address_at_index(1);
+    original_address = cached_state.stack_ptr->get_address_at_index(2);
+    args_offset = cached_state.stack_ptr->get_address_at_index(3);
+    args_size = cached_state.stack_ptr->get_address_at_index(4);
+    ret_offset = cached_state.stack_ptr->get_address_at_index(5);
+    ret_size = cached_state.stack_ptr->get_address_at_index(6);
+    cached_state.stack_ptr->reduce_size(6);
 
-    if (error_code == ERROR_SUCCESS) {
-        // clean the address
-        CuEVM::utils::evm_address_conversion(address);
+    gas_t gas = uint256_get_uint32_t(gas_word);
 
-        CuEVM::byte_array_t call_data;
-        CuEVM::byte_array_t code;
+    // clean the address
+    evm_word_t address = *original_address;
+    CuEVM::utils::evm_address_conversion(address);
 
-        // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-        //     &current_context->from, &current_context->to, &address, gas, &value, current_context->depth + 1,
-        //     OP_STATICCALL, &current_context->to, call_data, code, ret_offset, ret_size, current_context->static_env);
-        // current_context->message_ptr->copy_from(message_call_ptr);
-        // TODO: fix this
-        // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
+    CuEVM::byte_array_t call_data;
+    CuEVM::byte_array_t code;
 
-        // new_state_ptr = new CuEVM::evm_call_state_t(&current_state, current_state.message_ptr, message_call_ptr);
+    // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
+    //     &current_context->from, &current_context->to, &address, gas, &value, current_context->depth + 1,
+    //     OP_STATICCALL, &current_context->to, call_data, code, ret_offset, ret_size,
+    //     current_context->static_env);
+    // current_context->message_ptr->copy_from(message_call_ptr);
+    // TODO: fix this
+    // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
 
-        error_code |= generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
-    }
+    // new_state_ptr = new CuEVM::evm_call_state_t(&current_state, current_state.message_ptr, message_call_ptr);
 
-    return error_code;
+    return generic_CALL(args_offset, args_size, current_context, new_context_ptr, cached_state);
 }
 
 /**

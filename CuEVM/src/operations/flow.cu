@@ -6,12 +6,14 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
                         evm_call_context_t *call_context) {
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t destination;
-        error_code |= stack.pop(destination);
-        uint32_t destination_u32;
-        error_code =
-            uint256_get_uint32_t(&destination) == ERROR_VALUE_OVERFLOW ? ERROR_INVALID_JUMP_DESTINATION : error_code;
+        if (stack.size() < 1) return ERROR_STACK_UNDERFLOW;
+        evm_word_t *destination = stack.get_address_at_index(1);
+        stack.reduce_size(1);
+        uint32_t destination_u32 = uint256_get_uint32_t(destination);
+        if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
+
         if ((destination_u32 >= call_context->byte_code_size) ||
             (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
             return ERROR_INVALID_JUMP_DESTINATION;
@@ -39,14 +41,14 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t destination;
-        error_code |= stack.pop(destination);
-        evm_word_t condition;
-        error_code |= stack.pop(condition);
-        uint32_t destination_u32;
-        error_code =
-            uint256_get_uint32_t(&destination) == ERROR_VALUE_OVERFLOW ? ERROR_INVALID_JUMP_DESTINATION : error_code;
-        if ((error_code == ERROR_SUCCESS) && (uint256_cmp_word(&condition, 0) != 0)) {
+        if (stack.size() < 2) return ERROR_STACK_UNDERFLOW;
+        evm_word_t *destination = stack.get_address_at_index(1);
+        evm_word_t *condition = stack.get_address_at_index(2);
+        stack.reduce_size(2);
+        uint32_t destination_u32 = uint256_get_uint32_t(destination);
+        if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
+
+        if ((error_code == ERROR_SUCCESS) && (uint256_cmp_word(condition, 0) != 0)) {
 #ifdef BUILD_LIBRARY
             simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
 #endif

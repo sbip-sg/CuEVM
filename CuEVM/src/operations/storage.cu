@@ -19,7 +19,7 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     if (error_code == ERROR_SUCCESS) {
         evm_word_t *value = state_db->get_value(&call_context->storage_address, key);
         if (value == nullptr)
-            error_code |= stack.push0();
+            error_code |= stack.push_uint32(0);
         else
             error_code |= stack.push(*value);
     }

@@ -151,11 +151,6 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
 }
 
 __device__ evm_t::~evm_t() {
-    // if (call_state_ptr != nullptr) {
-    //     call_state_ptr->touch_state.clear();
-    //     delete call_state_ptr;
-    // }
-    /// Todo double check touch_state_ptr
     call_state_ptr = nullptr;
     block_info_ptr = nullptr;
     transaction_list_ptr = nullptr;
@@ -341,14 +336,14 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        // if (INSTANCE_GLOBAL_IDX == 2) {
-        //     printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
-        //            opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit,
-        //            cached_call_state.gas_used);
+        if (INSTANCE_GLOBAL_IDX == 0) {
+            printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
+                   opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
-        //     printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
-        //     cached_call_state.stack_ptr->print();
-        // }
+            printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
+            cached_call_state.stack_ptr->print();
+            if (cached_call_state.pc > 32) break;
+        }
         // if (THREADIDX == 1) {
         //     printf("print Stack 2, size %u\n", cached_call_state.stack_ptr->stack_offset);
         //     cached_call_state.stack_ptr->print();
@@ -926,7 +921,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
 
 __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
-    // printf("evm_t::finish_CALL %d error_code: %d\n", THREADIDX, error_code);
+    printf("evm_t::finish_CALL %d error_code: %d\n", THREADIDX, error_code);
     // if the child call return from normal halting
     // no errors
     // #ifdef EIP_3155
@@ -939,10 +934,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         gas_left = call_state_ptr->gas_limit - call_state_ptr->gas_used;
 
         // call_state_ptr->parent->gas_used -= gas_left;
-        // #ifdef __CUDA_ARCH__
-        //         printf("finish_CALL %d gas_left: ", threadIdx.x);
-        //         print_bnt(arith, gas_left);
-        // #endif
+
         // if is a succesfull call
         if (error_code == ERROR_RETURN) {
             // update the parent state with the states of the child
@@ -963,41 +955,33 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
 #endif
 
     // TODO: fix this
-    /*
+
     // call_state_ptr->parent->state_db_ptr->set_warm_account(&call_state_ptr->message_ptr->sender);
     // call_state_ptr->parent->state_db_ptr->set_warm_account(&call_state_ptr->message_ptr->recipient);
-    if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
-        CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
-    }
+    // if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT)
+    //     call_state_ptr->parent->return_data_size = 0;
+
     // get the memory offset and size of the return data
     // in the parent memory
-    evm_word_t ret_offset, ret_size;
-    call_state_ptr->message_ptr->get_return_data_offset(ret_offset);
-    call_state_ptr->message_ptr->get_return_data_size(ret_size);
+    evm_word_t ret_offset = call_state_ptr->return_data_offset;
+    evm_word_t ret_size = call_state_ptr->return_data_size;
     // reset the error code for the parent
     error_code = ERROR_SUCCESS;
-    // #ifdef __CUDA_ARCH__
-    //     printf("evm_t::finish_CALL %d after getting return data error_code: %d\n", threadIdx.x, error_code);
-    // #endif
+
     if (call_state_ptr->depth > 1) {
         // push the result in the parent stack
         error_code |= call_state_ptr->parent->stack_ptr->push(child_success);
 
         // write the return data in the memory
-        error_code |= call_state_ptr->parent->memory_ptr->set(*call_state_ptr->parent->last_return_data_ptr,
-    ret_offset, ret_size);
+        error_code |= call_state_ptr->parent->memory_ptr->set(call_state_ptr->memory_ptr->data, ret_offset, ret_size);
 
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
         delete call_state_ptr;
 
         call_state_ptr = parent_call_state_ptr;
-
-        // copy back the shadow message_call t to shared memory
-        call_state_ptr->message_ptr->copy_from(call_state_ptr->message_ptr_copy);
-        // cached_call_state = cached_evm_call_state(arith, call_state_ptr);
     }
-    */
+
     // printf("end finish_CALL error_code: %d idx %d\n", error_code, THREADIDX);
     return error_code;
 }

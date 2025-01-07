@@ -48,8 +48,7 @@ struct evm_call_context_t {
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
                                     uint32_t byte_code_size, evm_call_context_t* parent = nullptr,
-                                    CuEVM::jump_destinations_t* jump_destinations = nullptr, bool static_env = false,
-                                    gas_t gas_refund = 0
+                                    bool static_env = false, gas_t gas_refund = 0
 #ifdef EIP_3155
                                     ,
                                     uint32_t trace_idx
@@ -62,9 +61,7 @@ struct evm_call_context_t {
     __device__ void initiate_values(evm_call_context_t* parent, gas_t gas_limit, evm_word_t from, evm_word_t to,
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
-                                    uint32_t byte_code_size, evm_word_t* shared_stack_ptr,
-                                    CuEVM::jump_destinations_t* jump_destinations = nullptr, bool static_env = false,
-                                    gas_t gas_refund = 0
+                                    uint32_t byte_code_size, bool static_env = false, gas_t gas_refund = 0
 #ifdef EIP_3155
                                     ,
                                     uint32_t trace_idx
