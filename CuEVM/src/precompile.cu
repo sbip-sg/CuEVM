@@ -397,27 +397,12 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
         signature->r = r;
         signature->s = s;
         signature->v = uint256_get_uint32_t(&v);
-#ifdef EIP_3155
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("\n v %d\n", signature->v);
-        printf("r : \n");
-        print_bnt(arith, r);
-        printf("s : \n");
-        print_bnt(arith, s);
-        printf("msgh: \n");
-        print_bnt(arith, msg_hash);
-        __ONE_GPU_THREAD_WOSYNC_END__
-#endif
+
         // TODO: is not 27 and 28, only?
         if (signature->v <= 28) {
             uint8_t *output = new uint8_t[32];
             size_t res = 0;  // ecc::ec_recover(constants, *signature, signer);
-#ifdef EIP_3155
-            __ONE_GPU_THREAD_WOSYNC_BEGIN__
-            printf("ec recover %d\n", res);
-            print_bnt(arith, signer);
-            __ONE_GPU_THREAD_WOSYNC_END__
-#endif
+
             if (res == ERROR_SUCCESS) {
                 // memory_from_cgbn(arith, output, signer);
                 uint256_to_bytes(output, &signer, 32);

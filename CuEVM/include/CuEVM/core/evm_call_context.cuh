@@ -49,10 +49,7 @@ struct evm_call_context_t {
                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
                                     uint32_t byte_code_size, evm_call_context_t* parent = nullptr,
                                     bool static_env = false, gas_t gas_refund = 0
-#ifdef EIP_3155
-                                    ,
-                                    uint32_t trace_idx
-#endif
+
     );
 
     /**
@@ -62,10 +59,7 @@ struct evm_call_context_t {
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
                                     uint32_t byte_code_size, bool static_env = false, gas_t gas_refund = 0
-#ifdef EIP_3155
-                                    ,
-                                    uint32_t trace_idx
-#endif
+
     );
 
     __device__ evm_call_context_t() {};

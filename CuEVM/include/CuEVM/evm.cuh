@@ -86,9 +86,7 @@ struct evm_t {
                               CuEVM::evm_call_context_t* call_context_ptr = nullptr,
                               CuEVM::evm_word_t* shared_stack_ptr = nullptr);
 
-    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr
-    /*               CuEVM::evm_call_context_t* call_context_ptr = nullptr,
-                     CuEVM::evm_word_t* shared_stack_ptr = nullptr*/);
+    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr);
 
     /**
      * @brief Destroy the evm_t object

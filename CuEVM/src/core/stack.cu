@@ -23,16 +23,16 @@ __device__ void evm_stack_t::clear() {
 
 // TODO: reimplement
 __device__ void evm_stack_t::extract_data(evm_word_t *other) const {
-    // if (stack_offset + stack_base_offset < memory_pool_stack_preallocate) {
-    //     memcpy(other, preallocated_stack_base, stack_offset * sizeof(evm_word_t));
-    // } else {
-    //     int32_t left_over = memory_pool_stack_preallocate - stack_base_offset;
-    //     if (left_over > 0) {
-    //         memcpy(other, shared_stack_base, left_over * sizeof(evm_word_t));
-    //         memcpy(other + left_over, global_stack_base, (stack_offset - left_over) * sizeof(evm_word_t));
-    //     } else
-    //         memcpy(other, global_stack_base, stack_offset * sizeof(evm_word_t));
-    // }
+    if (stack_offset + stack_base_offset < memory_pool_stack_preallocate) {
+        memcpy(other, shared_stack_base, stack_offset * sizeof(evm_word_t));
+    } else {
+        int32_t left_over = memory_pool_stack_preallocate - stack_base_offset;
+        if (left_over > 0) {
+            memcpy(other, shared_stack_base, left_over * sizeof(evm_word_t));
+            memcpy(other + left_over, global_stack_base, (stack_offset - left_over) * sizeof(evm_word_t));
+        } else
+            memcpy(other, global_stack_base, stack_offset * sizeof(evm_word_t));
+    }
 }
 
 __device__ uint32_t evm_stack_t::size() const { return stack_offset; }

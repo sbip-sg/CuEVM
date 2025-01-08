@@ -7,15 +7,12 @@ __device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used) {
     return (gas_limit < gas_used) ? ERROR_GAS_LIMIT_EXCEEDED : ERROR_SUCCESS;
 }
 
-__device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const gas_t &gas_used) {
+__device__ gas_t max_gas_call(const gas_t &gas_limit, const gas_t &gas_used) {
     // compute the remaining gas
-    gas_t gas_left;
-    gas_left = gas_limit - gas_used;
     // cap to uint64_t in case overflow following go-ethereum
     // gas_left = gas_left & 0xFFFFFFFFFFFFFFFF;
     // gas capped = (63/64) * gas_left
-    gas_capped = gas_left / 64;
-    gas_capped = gas_left - gas_capped;
+    return (gas_limit - gas_used) * 63 / 64;
 }
 
 __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word) {
@@ -210,12 +207,13 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::
     // printf("original value %p\n", original_value);
     // printf("current value %p\n", current_value);
     // printf("new value %p\n", new_value);
+    new_value->print();
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
     } else {
         if (uint256_cmp(current_value, original_value) == 0) {
-            if (original_value == nullptr || uint256_is_zero(original_value)) {
+            if (uint256_is_zero(original_value)) {
                 gas_used += GAS_STORAGE_SET;
             } else {
                 gas_used += GAS_SSTORE_RESET;

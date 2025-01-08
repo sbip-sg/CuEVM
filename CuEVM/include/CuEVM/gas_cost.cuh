@@ -73,7 +73,6 @@ namespace CuEVM {
 namespace gas_cost {
 /**
  * Verify if is enough gas for the operation.
- * @param[in] arith The arithmetic environment
  * @param[in] gas_limit The gas limit
  * @param[in] gas_used The gas used
  * @return 0 for enough gas, 1 for not enough gas or error
@@ -81,16 +80,14 @@ namespace gas_cost {
 __device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used);
 /**
  * Compute the max gas call.
- * @param[in] arith The arithmetic environment
- * @param[out] gas_capped The gas capped
  * @param[in] gas_limit The gas limit
  * @param[in] gas_used The gas used
+ * @return the gas capped
  */
-__device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const gas_t &gas_used);
+__device__ gas_t max_gas_call(const gas_t &gas_limit, const gas_t &gas_used);
 /**
  * Add the gas cost for the given length of bytes, but considering
  * evm words.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the bytes
  * @param[in] gas_per_word The gas per evm word
@@ -98,7 +95,6 @@ __device__ void max_gas_call(gas_t &gas_capped, const gas_t &gas_limit, const ga
 __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word);
 /**
  * Add the gas cost for the given length of bytes.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the bytes
  * @param[in] gas_per_byte The gas per byte
@@ -107,7 +103,6 @@ __device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length, const u
 
 /**
  * Add the gas cost for the number of bytes in the exponent.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] exponent The exponent
  * @return the most significant non-zero bit position
@@ -116,7 +111,6 @@ __device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const gas_t &exponent);
 /**
  * Add the cost for initiliasation code.
  * EIP-3860: https://eips.ethereum.org/EIPS/eip-3860
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] initcode_length The length of the initcode
  */
@@ -124,49 +118,42 @@ __device__ void initcode_cost(gas_t &gas_used, const gas_t &initcode_length);
 
 /**
  * Add the cost for code storage.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] code_length The length of the code
  */
 __device__ void code_cost(gas_t &gas_used, const gas_t &code_length);
 /**
  * Add the cost for keccak hashing.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
 __device__ void keccak_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the cost for memory operation on call data/return data.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
 __device__ void memory_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the cost for log operation on record data.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the record in bytes
  */
 __device__ void log_record_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the cost for log operation on topic.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] no_topics The number of topics
  */
 __device__ void log_topics_cost(gas_t &gas_used, const uint32_t &no_topics);
 /**
  * Add the cost for sha256 hashing.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
 __device__ void sha256_cost(gas_t &gas_used, const gas_t &length);
 /**
  * Add the dynamic cost for ripemd160 hashing.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] length The length of the data in bytes
  */
@@ -174,7 +161,6 @@ __device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length);
 
 /**
  * Add the dynamics cost for blake2 hashing.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] rounds Number of rounds (big-endian unsigned integer)
  */
@@ -185,7 +171,6 @@ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
 
 /**
  * Add the pairing cost to the gas used.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] data_size The size of the data in bytes
  */
@@ -194,7 +179,6 @@ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size);
 /**
  * Add the cost for accessing account information
  * as balance, nonce, code
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] address The address of the account
  * @return 0 for success, 1 for failure
@@ -203,7 +187,6 @@ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db
 
 /**
  * Add the cost for the SLOAD operation.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[in] address The address of the account
  * @param[in] key The key of the storage
@@ -214,7 +197,6 @@ __device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::StateDb *state_db, c
 
 /**
  * Add the cost and refund for the SSTORE operation.
- * @param[in] arith The arithmetic environment
  * @param[inout] gas_used The gas used
  * @param[inout] gas_refund The refund
  * @param[in] state_db The state db
@@ -228,7 +210,6 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::
 
 /**
  * Get the transaction intrinsic gas.
- * @param[in] arith The arithmetic environment
  * @param[in] transaction The transaction
  * @param[out] gas_intrinsic The intrinsic gas
  * @return 0 for success, 1 for failure
@@ -238,7 +219,6 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
 
 /**
  * Get the memory grow cost.
- * @param[in] arith The arithmetic environment
  * @param[inout] memory The memory
  * @param[in] index The index of the memory access
  * @param[in] length The length of the memory access

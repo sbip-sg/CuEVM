@@ -67,17 +67,11 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
                                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
                                                     uint32_t byte_code_size, evm_call_context_t* parent,
-                                                    bool static_env, gas_t gas_refund
-#ifdef EIP_3155
-                                                    ,
-                                                    uint32_t trace_idx
-#endif
-) {
-
+                                                    bool static_env, gas_t gas_refund) {
     this->parent = parent;
     this->depth = depth;
     this->pc = pc;
-    this->gas_used = gas_used;
+    this->gas_used = 0;
     this->gas_refund = gas_refund;
     this->gas_limit = gas_limit;
     this->stack_ptr = stack_ptr;
@@ -95,9 +89,6 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->jump_destinations = nullptr;  // jump_destinations;
     this->static_env = static_env;
     this->gas_refund = gas_refund;
-#ifdef EIP_3155
-    this->trace_idx = trace_idx;
-#endif
 }
 
 /**
@@ -108,10 +99,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
                                                     uint32_t call_type, uint8_t* call_data, uint32_t call_data_size,
                                                     uint8_t* byte_code, uint32_t byte_code_size, bool static_env,
                                                     gas_t gas_refund
-#ifdef EIP_3155
-                                                    ,
-                                                    uint32_t trace_idx
-#endif
+
 ) {
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
 
@@ -152,12 +140,9 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
 
     this->memory_ptr = new CuEVM::evm_memory_t();
 
-#ifdef EIP_3155
-    this->trace_idx = 0;
-#endif
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
-    printf("this context\n");
-    this->print();
+    // printf("this context\n");
+    // this->print();
 }
 
 /**

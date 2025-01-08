@@ -84,24 +84,19 @@ struct trace_data_t {
     uint32_t depth;            /**< The depth of the call stack */
     byte_array_t *return_data; /**< The return data */
     gas_t refund;              /**< The gas refund */
-#ifdef EIP_3155_OPTIONAL
-    uint32_t error_code; /**< The error code */
-    uint8_t *memory;     /**< The memory before op*/
-// CuEVM::contract_storage_t storage; /**< The storage */
-#endif
 
     __host__ cJSON *to_json();
 
-    __device__ void print_err(char *hex_string_ptr = nullptr);
+    __device__ void print_err();
 };
 
 struct tracer_t {
-    trace_data_t *data;       /**< The trace data */
-    byte_array_t return_data; /**< The return data */
-    gas_t gas_used;           /**< The gas used */
-    uint32_t status;          /**< The status of the trace */
-    uint32_t size;            /**< The size of the trace */
-    uint32_t capacity;        /**< The capacity of the trace */
+    trace_data_t *data;        /**< The trace data */
+    byte_array_t *return_data; /**< The return data */
+    gas_t gas_used;            /**< The gas used */
+    uint32_t status;           /**< The status of the trace */
+    uint32_t size;             /**< The size of the trace */
+    uint32_t capacity;         /**< The capacity of the trace */
 
     __device__ tracer_t();
 
@@ -109,23 +104,20 @@ struct tracer_t {
 
     __device__ void grow();
 
-    __device__ uint32_t start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_memory_t &memory,
-                                        const CuEVM::evm_stack_t &stack, const uint32_t depth,
-                                        const CuEVM::evm_return_data_t &return_data, const CuEVM::gas_t &gas_limit,
-                                        const CuEVM::gas_t &gas_used);
+    __device__ void start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_memory_t *memory,
+                                    const CuEVM::evm_stack_t *stack, const uint32_t depth,
+                                    const byte_array_t *return_data, const CuEVM::gas_t &gas_limit,
+                                    const CuEVM::gas_t &gas_used);
 
-    __device__ void finish_operation(const uint32_t idx, const gas_t &gas_used, const gas_t &gas_refund);
+    __device__ void finish_operation(const gas_t &gas_used, const gas_t &gas_refund);
 
-    __device__ void finish_transaction(const CuEVM::byte_array_t &return_data, const gas_t &gas_used,
-                                       uint32_t error_code);
+    __device__ void finish_transaction(const byte_array_t *return_data, const gas_t &gas_used, uint32_t error_code);
 
     __device__ void print();
 
     __device__ void print_err();
 
     __device__ void print_device_err();
-
-    __host__ cJSON *to_json();
 };
 __device__ void print_device_data(tracer_t *device_tracer);
 

@@ -40,7 +40,7 @@ namespace CuEVM::operations {
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t ADD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t ADD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The MUL operation implementation.
@@ -51,7 +51,7 @@ __device__ int32_t ADD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t MUL(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t MUL(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SUB operation implementation.
@@ -62,7 +62,7 @@ __device__ int32_t MUL(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t SUB(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SUB(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The DIV operation implementation.
@@ -75,7 +75,7 @@ __device__ int32_t SUB(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t DIV(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t DIV(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SDIV operation implementation.
@@ -89,7 +89,7 @@ __device__ int32_t DIV(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t SDIV(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SDIV(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 /**
  * The MOD operation implementation.
  * Takes two values from the stack, calculates the remainder
@@ -102,7 +102,7 @@ __device__ int32_t SDIV(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stac
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t MOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t MOD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SMOD operation implementation.
@@ -116,7 +116,7 @@ __device__ int32_t MOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t SMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SMOD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The ADDMOD operation implementation.
@@ -130,7 +130,7 @@ __device__ int32_t SMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stac
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t ADDMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t ADDMOD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The MULMOD operation implementation.
@@ -146,7 +146,7 @@ __device__ int32_t ADDMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t MULMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t MULMOD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 /**
  * The EXP operation implementation.
  * Takes two values from the stack, calculates the first value
@@ -159,7 +159,7 @@ __device__ int32_t MULMOD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t EXP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t EXP(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SIGNEXTEND operation implementation.
@@ -177,7 +177,7 @@ __device__ int32_t EXP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t SIGNEXTEND(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SIGNEXTEND(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 /**
  * The AND operation implementation.
  * Takes two values from the stack, performs a bitwise AND operation
@@ -186,7 +186,7 @@ __device__ int32_t SIGNEXTEND(const gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t AND(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t AND(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The OR operation implementation.
@@ -196,7 +196,7 @@ __device__ int32_t AND(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t OR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t OR(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The XOR operation implementation.
@@ -207,7 +207,7 @@ __device__ int32_t OR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t XOR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t XOR(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The NOT operation implementation.
@@ -218,7 +218,7 @@ __device__ int32_t XOR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t NOT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t NOT(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The BYTE operation implementation.
@@ -232,7 +232,7 @@ __device__ int32_t NOT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t BYTE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t BYTE(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SHL operation implementation.
@@ -244,7 +244,7 @@ __device__ int32_t BYTE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stac
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t SHL(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SHL(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SHR operation implementation.
@@ -256,7 +256,7 @@ __device__ int32_t SHL(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t SHR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SHR(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SAR operation implementation.
@@ -271,7 +271,7 @@ __device__ int32_t SHR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t SAR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SAR(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The LT operation implementation.
@@ -284,7 +284,7 @@ __device__ int32_t SAR(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t LT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t LT(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The GT operation implementation.
@@ -297,7 +297,7 @@ __device__ int32_t LT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t GT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t GT(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SLT operation implementation.
@@ -310,7 +310,7 @@ __device__ int32_t GT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t SLT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SLT(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The SGT operation implementation.
@@ -323,7 +323,7 @@ __device__ int32_t SLT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t SGT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t SGT(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The EQ operation implementation.
@@ -335,7 +335,7 @@ __device__ int32_t SGT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t EQ(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t EQ(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 /**
  * The ISZERO operation implementation.
@@ -347,6 +347,6 @@ __device__ int32_t EQ(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  */
-__device__ int32_t ISZERO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t ISZERO(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
 
 }  // namespace CuEVM::operations

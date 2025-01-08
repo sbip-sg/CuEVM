@@ -18,113 +18,20 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
     // printf("printing transaction list\n");
     // transaction_list_ptr->print();
 
-#ifdef EIP_3155
-    if (instance == 0) {
-        printf("instance %d\n", instance);
-        printf("world state\n");
-        instances[instance].world_state_data_ptr->print();
-        printf("touch state\n");
-        instances[instance].touch_state_data_ptr->print();
-        printf("instance %d\n", instance);
-        printf("transaction\n");
-        instances[instance].transaction_ptr->print();
-    }
-#endif
-
-    // __SHARED_MEMORY__ CuEVM::evm_message_call_t shared_message_call[CGBN_IBP];
-    // __SHARED_MEMORY__ CuEVM::evm_word_t shared_stack[CGBN_IBP][CuEVM::shared_stack_size];
     CuEVM::evm_t evm = CuEVM::evm_t(state_db_ptr, transaction_list_ptr);
 
-    // parent_call_state_ptr->print();
-    // printf("constructing message call\n");
-    // if (threadIdx.x == 0) {
-    //     printf("evm stack pointer %p instance %d\n", evm.call_state_ptr->stack_ptr, instance);
-    // }
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
-    // shared_message_call[threadIdx.x] = CuEVM::evm_message_call_t(state_db_ptr, transaction_list_ptr);
-    // shared_message_call[threadIdx.x].print();
-
-    // evm.call_state_ptr = new CuEVM::evm_call_state_t(parent_call_state_ptr,
-    // &shared_message_call[threadIdx.x], nullptr,
-    //                                                  shared_stack[threadIdx.x]);
-    // evm.call_state_ptr->gas_limit = evm.call_state_ptr->gas_limit;
-    // printf("shared stack pointer %p\n", shared_stack[threadIdx.x]);
-    // printf("evm call state stack pointer %p\n", evm.call_state_ptr->stack_ptr);
-    // printf("evm call state stack pointer shared_stack_base %p\n", evm.call_state_ptr->stack_ptr->shared_stack_base);
 
     evm.run(cached_call_state);
 
-    /*
-        if (evm->status == ERROR_SUCCESS) {
-            CuEVM::cached_evm_call_state cached_state(evm->call_state_ptr);
-
-            // printf("\n\n evm cached call state\n");
-            // evm->call_state_ptr->print();
-
-            evm->run(cached_state);
-
-    #ifdef EIP_3155
-            if (instance == 0) {
-                __ONE_GPU_THREAD_BEGIN__
-                // instances[0].tracer_ptr->print(arith);
-                instances[0].tracer_ptr->print_err();
-                __ONE_GPU_THREAD_WOSYNC_END__
-            }
-    #endif
-        }
-        */
-}
-
-__device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::block_info_t *block_info_ptr,
-                        CuEVM::transaction::TransactionList *transaction_list_ptr,
-                        CuEVM::EccConstants *ecc_constants_ptr, CuEVM::evm_call_context_t *call_context_ptr,
-                        CuEVM::evm_word_t *shared_stack_ptr
 #ifdef EIP_3155
-                        ,
-                        CuEVM::utils::tracer_t *tracer_ptr
-#endif
-                        ,
-                        CuEVM::serialized_worldstate_data *serialized_worldstate_data_ptr,
-                        CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr)
-    : state_db_ptr(state_db_ptr),
-      block_info_ptr(block_info_ptr),
-      transaction_list_ptr(transaction_list_ptr),
-      //   serialized_worldstate_data_ptr(serialized_worldstate_data_ptr),
-      //   simplified_trace_data_ptr(simplified_trace_data_ptr),
-      ecc_constants_ptr(ecc_constants_ptr) {
-    // TODO: store in local/shared memory
-    // call_state_ptr = new CuEVM::evm_call_state_t(state_db_ptr, nullptr, nullptr, log_state_ptr, return_data_ptr);
-    // call_state_ptr = new CuEVM::evm_call_context_t(state_db_ptr, nullptr, nullptr, nullptr);
-
-    int32_t error_code = ERROR_SUCCESS;
-    //  transaction_ptr->validate(call_state_ptr->touch_state_ptr, *block_info_ptr,
-    //                                                call_state_ptr->gas_used, gas_price, gas_priority_fee);
-
-    if (error_code == ERROR_SUCCESS) {
-        // CuEVM::evm_message_call_t_shadow *transaction_call_message_ptr = nullptr;
-        // TODO: fix this
-        // error_code = transaction_list_ptr->get_message_call(call_state_ptr->state_db_ptr,
-        // transaction_call_message_ptr);
-
-        // shared_message_call_ptr->copy_from(transaction_call_message_ptr);
-
-        // printf("\n\n message call copied %d\n", THREADIDX);
-        // shared_message_call_ptr->print();
-
-        // TODO: fix this
-        // CuEVM::evm_call_context_t *child_call_state_ptr = new CuEVM::evm_call_context_t(
-        //     call_state_ptr, shared_message_call_ptr, transaction_call_message_ptr, shared_stack_ptr);
-        // child_call_state_ptr->gas_limit = child_call_state_ptr->gas_limit - call_state_ptr->gas_used;
-        // call_state_ptr = child_call_state_ptr;
+    if (instance == 0) {
+        evm.tracer_ptr->print_err();
     }
-#ifdef EIP_3155
-    this->tracer_ptr = tracer_ptr;
 #endif
-    status = error_code;
 }
 
-__device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::TransactionList *transaction_list_ptr/*,
-                        CuEVM::evm_word_t *shared_stack_ptr*/)
+__device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::TransactionList *transaction_list_ptr)
     : state_db_ptr(state_db_ptr), transaction_list_ptr(transaction_list_ptr) {
     // printf("evm_t constructor\n");
     call_state_ptr = memory_pool::get_call_context(0);
@@ -146,8 +53,16 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
                                     transaction_list_ptr->sender, transaction_list_ptr->to, transaction_list_ptr->to,
                                     transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CALL, call_data,
                                     call_data_size, byte_code, byte_code_size);
+
+    // charge gas and validate balance
+    CuEVM::gas_t gas_intrinsic;
+    CuEVM::gas_cost::transaction_intrinsic_gas(transaction_list_ptr, gas_intrinsic);
+    call_state_ptr->gas_used = gas_intrinsic;
     // printf("\n\ncall state ptr created %p\n\n", call_state_ptr);
     // call_state_ptr->print();
+#ifdef EIP_3155
+    this->tracer_ptr = new CuEVM::utils::tracer_t();
+#endif
 }
 
 __device__ evm_t::~evm_t() {
@@ -326,11 +241,10 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 
         // printf("before start_operation mem ptr %p memsize %d threadidx %d\n", call_state_ptr->memory_ptr,
         //        call_state_ptr->memory_ptr->size, THREADIDX);
-        uint32_t trace_idx = tracer_ptr->start_operation(arith, cached_call_state.pc, opcode,
-                                                         *call_state_ptr->memory_ptr, *cached_call_state.stack_ptr,
-                                                         call_state_ptr->depth, *call_state_ptr->last_return_data_ptr,
-                                                         cached_call_state.gas_limit, cached_call_state.gas_used);
-        call_state_ptr->trace_idx = trace_idx;
+        tracer_ptr->start_operation(cached_call_state.pc, opcode, call_state_ptr->memory_ptr,
+                                    cached_call_state.stack_ptr, call_state_ptr->depth, nullptr,
+                                    cached_call_state.gas_limit, cached_call_state.gas_used);
+        // call_state_ptr->trace_idx = trace_idx;
 
         // printf("\npc: %d opcode: %d, depth %d, thread %d  gas_limit %lu, gas_used %lu\n", cached_call_state.pc,
         //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
@@ -342,7 +256,6 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 
             printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
             cached_call_state.stack_ptr->print();
-            if (cached_call_state.pc > 32) break;
         }
         // if (THREADIDX == 1) {
         //     printf("print Stack 2, size %u\n", cached_call_state.stack_ptr->stack_offset);
@@ -377,118 +290,118 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                     break;
                 case OP_ADD:
                     error_code = CuEVM::operations::ADD(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_MUL:
                     error_code = CuEVM::operations::MUL(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SUB:
                     error_code = CuEVM::operations::SUB(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_DIV:
                     error_code = CuEVM::operations::DIV(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SDIV:
                     error_code = CuEVM::operations::SDIV(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                         *cached_call_state.stack_ptr);
+                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_MOD:
                     error_code = CuEVM::operations::MOD(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SMOD:
                     error_code = CuEVM::operations::SMOD(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                         *cached_call_state.stack_ptr);
+                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_ADDMOD:
                     error_code = CuEVM::operations::ADDMOD(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                           *cached_call_state.stack_ptr);
+                                                           cached_call_state.stack_ptr);
                     break;
                 case OP_MULMOD:
                     error_code = CuEVM::operations::MULMOD(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                           *cached_call_state.stack_ptr);
+                                                           cached_call_state.stack_ptr);
                     break;
                 case OP_EXP:
                     error_code = CuEVM::operations::EXP(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SIGNEXTEND:
                     error_code = CuEVM::operations::SIGNEXTEND(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                               *cached_call_state.stack_ptr);
+                                                               cached_call_state.stack_ptr);
                     break;
                 case OP_LT:
 #ifdef BUILD_LIBRARY
                     simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::LT(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                       *cached_call_state.stack_ptr);
+                                                       cached_call_state.stack_ptr);
                     break;
                 case OP_GT:
 #ifdef BUILD_LIBRARY
                     simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::GT(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                       *cached_call_state.stack_ptr);
+                                                       cached_call_state.stack_ptr);
                     break;
                 case OP_SLT:
 #ifdef BUILD_LIBRARY
                     simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SLT(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SGT:
 #ifdef BUILD_LIBRARY
                     simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SGT(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_EQ:
 #ifdef BUILD_LIBRARY
                     simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::EQ(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                       *cached_call_state.stack_ptr);
+                                                       cached_call_state.stack_ptr);
                     break;
                 case OP_ISZERO:
                     error_code = CuEVM::operations::ISZERO(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                           *cached_call_state.stack_ptr);
+                                                           cached_call_state.stack_ptr);
                     break;
                 case OP_AND:
                     error_code = CuEVM::operations::AND(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_OR:
                     error_code = CuEVM::operations::OR(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                       *cached_call_state.stack_ptr);
+                                                       cached_call_state.stack_ptr);
                     break;
                 case OP_XOR:
                     error_code = CuEVM::operations::XOR(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_NOT:
                     error_code = CuEVM::operations::NOT(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_BYTE:
                     error_code = CuEVM::operations::BYTE(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                         *cached_call_state.stack_ptr);
+                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_SHL:
                     error_code = CuEVM::operations::SHL(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SHR:
                     error_code = CuEVM::operations::SHR(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SAR:
                     error_code = CuEVM::operations::SAR(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr);
+                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SHA3:
                     error_code = CuEVM::operations::SHA3(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -751,15 +664,11 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         cached_call_state.pc++;
 
 #ifdef EIP_3155
-        if (call_state_ptr->trace_idx > 0 || (call_state_ptr->trace_idx == 0 && call_state_ptr->depth == 1)) {
-            tracer_ptr->finish_operation(call_state_ptr->trace_idx, cached_call_state.gas_used,
-                                         call_state_ptr->gas_refund
-#ifdef EIP_3155_OPTIONAL
-                                         ,
-                                         error_code
-#endif
-            );
-        }
+        tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
+// if (call_state_ptr->trace_idx > 0 || call_state_ptr->depth == 1) {
+//     tracer_ptr->finish_operation(call_state_ptr->trace_idx, cached_call_state.gas_used,
+//                                  call_state_ptr->gas_refund);
+// }
 #endif
 #ifdef BUILD_LIBRARY
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
@@ -835,9 +744,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
     gas_t gas_value;
     const evm_word_t *beneficiary = &(block_info_ptr->coin_base);
     // block_info_ptr->get_coin_base(arith, beneficiary);
-#ifdef EIP_3155
-    __ONE_THREAD_PER_INSTANCE(printf("finish_TRANSACTION %d error_code: %d\n", THREADIDX, error_code););
-#endif
+
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         gas_t gas_left;
         // \f$T_{g} - g\f$
@@ -910,7 +817,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
     //  call_state_ptr = parent_call_state_ptr;
 
 #ifdef EIP_3155
-    tracer_ptr->finish_transaction(arith, *call_state_ptr->last_return_data_ptr, call_state_ptr->gas_used, status);
+    tracer_ptr->finish_transaction(nullptr, call_state_ptr->gas_used, status);
 #endif
 
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
@@ -921,19 +828,15 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
 
 __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
-    printf("evm_t::finish_CALL %d error_code: %d\n", THREADIDX, error_code);
-    // if the child call return from normal halting
-    // no errors
-    // #ifdef EIP_3155
-    // printf(" finish_CALL error_code: %d %d\n", error_code, THREADIDX);
-    // #endif
+
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
-        gas_t gas_left;
-        gas_left = call_state_ptr->gas_limit - call_state_ptr->gas_used;
-
-        // call_state_ptr->parent->gas_used -= gas_left;
+        gas_t gas_left = call_state_ptr->gas_limit - call_state_ptr->gas_used;
+        printf("gas_left %lx\n", gas_left);
+        if (call_state_ptr->parent != nullptr) {
+            call_state_ptr->parent->gas_used -= gas_left;
+        }
 
         // if is a succesfull call
         if (error_code == ERROR_RETURN) {

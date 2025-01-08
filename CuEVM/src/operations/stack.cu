@@ -4,6 +4,7 @@
 
 namespace CuEVM::operations {
 __device__ int32_t POP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
+    gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         evm_word_t y;
@@ -14,6 +15,7 @@ __device__ int32_t POP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
 }
 
 __device__ int32_t PUSH0(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
+    gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         evm_word_t r;
@@ -26,6 +28,7 @@ __device__ int32_t PUSH0(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 
 __device__ int32_t PUSHX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t *stack,
                          uint8_t *byte_code, uint32_t byte_code_size, const uint8_t &opcode) {
+    gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
@@ -42,6 +45,7 @@ __device__ int32_t PUSHX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 
 __device__ int32_t DUPX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                         const uint8_t &opcode) {
+    gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         uint8_t dup_index = (opcode & 0x0F) + 1;
@@ -53,6 +57,7 @@ __device__ int32_t DUPX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
 
 __device__ int32_t SWAPX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                          const uint8_t &opcode) {
+    gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         uint8_t swap_index = (opcode & 0x0F) + 1;
