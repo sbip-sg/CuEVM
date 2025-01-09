@@ -4,7 +4,7 @@
 namespace CuEVM::operations {
 __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
                         evm_call_context_t *call_context) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    gas_used += GAS_MID;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
@@ -38,7 +38,7 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
                          CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
 #endif
 ) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    gas_used += GAS_HIGH;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         if (stack.size() < 2) return ERROR_STACK_UNDERFLOW;
@@ -77,7 +77,7 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 
 __device__ int32_t PC(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, const uint32_t &pc,
                       CuEVM::evm_stack_t &stack) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     evm_word_t pc_bn;
     uint256_from_word(&pc_bn, pc);
@@ -86,7 +86,7 @@ __device__ int32_t PC(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, con
 }
 
 __device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     gas_t gas_left;
     gas_left = gas_limit - gas_used;
@@ -95,7 +95,7 @@ __device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
 }
 
 __device__ int32_t JUMPDEST(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    gas_used += GAS_JUMP_DEST;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     return error_code;
 }

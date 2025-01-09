@@ -10,7 +10,7 @@ namespace CuEVM {
 constexpr uint32_t worldstate_addresses_size = 32;
 constexpr uint32_t worldstate_storage_values_size = 1024;
 
-constexpr uint32_t account_prealloc_keys_size = 4;  // configurable 4 keys per account
+constexpr uint32_t account_prealloc_keys_size = 256;  // configurable 4 keys per account
 constexpr uint32_t value_page_size = 32;
 constexpr uint32_t account_page_size = 16;
 // heuristic size for the bytecode hex string to keep everything within 1MB
