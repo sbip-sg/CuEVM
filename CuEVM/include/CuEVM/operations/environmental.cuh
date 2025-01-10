@@ -1,6 +1,4 @@
-#ifndef _CUEVM_ENV_OP_H_
-#define _CUEVM_ENV_OP_H_
-
+#pragma once
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
@@ -8,8 +6,8 @@
 #include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/core/transaction.cuh>
+#include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/state_db.cuh>
-
 /**
  * The environmental operations class.
  * Contains the environmental operations
@@ -332,5 +330,3 @@ __device__ int32_t EXTCODEHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::e
 __device__ int32_t SELFBALANCE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                CuEVM::StateDb *state_db, const CuEVM::evm_call_context_t *call_context);
 }  // namespace CuEVM::operations
-
-#endif

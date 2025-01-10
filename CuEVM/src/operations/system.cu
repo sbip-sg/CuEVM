@@ -26,15 +26,25 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     // memory call data
     gas_t memory_expansion_cost_args;
 
-    error_code |= CuEVM::gas_cost::memory_grow_cost(*parent_memory_ptr, *args_offset, *args_size,
+    uint32_t args_offset_ui32 = uint256_get_uint32_t(args_offset);
+    uint32_t args_size_ui32 = uint256_get_uint32_t(args_size);
+    if (uint256_cmp_word(args_offset, args_offset_ui32) != 0 || uint256_cmp_word(args_size, args_size_ui32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
+    error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, args_offset_ui32, args_size_ui32,
                                                     memory_expansion_cost_args, temp_memory_gas_used);
     // printf("temp memory gas used %d\n", temp_memory_gas_used);
     // memory return data
     evm_word_t ret_offset = new_context_ptr->return_data_offset;
     evm_word_t ret_size = new_context_ptr->return_data_size;
     gas_t memory_expansion_cost_ret;
-    error_code |= CuEVM::gas_cost::memory_grow_cost(*parent_memory_ptr, ret_offset, ret_size, memory_expansion_cost_ret,
-                                                    temp_memory_gas_used);
+    uint32_t ret_offset_ui32 = uint256_get_uint32_t(&ret_offset);
+    uint32_t ret_size_ui32 = uint256_get_uint32_t(&ret_size);
+    if (uint256_cmp_word(&ret_offset, ret_offset_ui32) != 0 || uint256_cmp_word(&ret_size, ret_size_ui32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
+    error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, ret_offset_ui32, ret_size_ui32,
+                                                    memory_expansion_cost_ret, temp_memory_gas_used);
 
     // printf("temp memory gas used %d\n", temp_memory_gas_used);
     // compute the total memory expansion cost
@@ -91,10 +101,10 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
         // printf("byte code data %p\n", new_context_ptr->byte_code);
         // printf("contract address \n");
         // contract_address_ptr->print();
-        byte_array_t *call_data = new byte_array_t();
-        if (args_size > 0) error_code |= parent_memory_ptr->get(*args_offset, *args_size, *call_data);
-        new_context_ptr->call_data = call_data->data;
-        new_context_ptr->call_data_size = call_data->size;
+        byte_array_t call_data(args_size_ui32);
+        if (args_size > 0) error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data.data);
+        new_context_ptr->call_data = call_data.data;
+        new_context_ptr->call_data_size = call_data.size;
     }
 
     // printf("generic_CALL error_code: %d idx %d\n", error_code, THREADIDX);
@@ -122,7 +132,12 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
 
     // compute the memory cost
     gas_t memory_expansion_cost;
-    int32_t error_code = CuEVM::gas_cost::memory_grow_cost(*current_context->memory_ptr, *memory_offset, *length,
+    uint32_t memory_offset_ui32 = uint256_get_uint32_t(memory_offset);
+    uint32_t length_ui32 = uint256_get_uint32_t(length);
+    if (uint256_cmp_word(memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(length, length_ui32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
+    int32_t error_code = CuEVM::gas_cost::memory_grow_cost(current_context->memory_ptr, memory_offset_ui32, length_ui32,
                                                            memory_expansion_cost, cached_state.gas_used);
 
     // compute the initcode gas cost
@@ -142,8 +157,8 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         current_context->memory_ptr->increase_memory_cost(memory_expansion_cost);
 
         // get the initialisation code
-        CuEVM::byte_array_t initialisation_code;
-        current_context->memory_ptr->get(*memory_offset, *length, initialisation_code);
+        CuEVM::byte_array_t initialisation_code(length_ui32);
+        current_context->memory_ptr->get(memory_offset_ui32, length_ui32, initialisation_code.data);
 
         evm_word_t contract_address;
 
@@ -340,14 +355,20 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= stack.pop(length);
 
     CuEVM::gas_t memory_expansion_cost;
-    error_code |= CuEVM::gas_cost::memory_grow_cost(memory, memory_offset, length, memory_expansion_cost, gas_used);
+    uint32_t memory_offset_ui32 = uint256_get_uint32_t(&memory_offset);
+    uint32_t length_ui32 = uint256_get_uint32_t(&length);
+    if (uint256_cmp_word(&memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(&length, length_ui32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
+    error_code |=
+        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_ui32, length_ui32, memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
 
-        error_code |= memory.get(memory_offset, length, return_data) | ERROR_RETURN;
+        error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data);
     }
 
     return error_code;
@@ -454,15 +475,20 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= stack.pop(length);
 
     CuEVM::gas_t memory_expansion_cost;
-
-    error_code |= CuEVM::gas_cost::memory_grow_cost(memory, memory_offset, length, memory_expansion_cost, gas_used);
+    uint32_t memory_offset_ui32 = uint256_get_uint32_t(&memory_offset);
+    uint32_t length_ui32 = uint256_get_uint32_t(&length);
+    if (uint256_cmp_word(&memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(&length, length_ui32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
+    error_code |=
+        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_ui32, length_ui32, memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
 
-        error_code |= memory.get(memory_offset, length, return_data) | ERROR_REVERT;
+        error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
     }
     return error_code;
 }

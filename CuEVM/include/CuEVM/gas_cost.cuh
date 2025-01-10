@@ -69,8 +69,7 @@
 #define GAS_PRECOMPILE_ECPAIRING_PAIR 34000
 #define GAS_PRECOMPILE_BLAKE2_ROUND 1
 
-namespace CuEVM {
-namespace gas_cost {
+namespace CuEVM::gas_cost {
 /**
  * Verify if is enough gas for the operation.
  * @param[in] gas_limit The gas limit
@@ -226,8 +225,7 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
  * @param[out] gas_used The gas used
  * @return 0 for success, 1 for failure
  */
-__device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, const evm_word_t &index,
-                                    const evm_word_t &length, gas_t &memory_expansion_cost, gas_t &gas_used);
+__device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t *memory, const uint32_t index, const uint32_t length,
+                                    gas_t &memory_expansion_cost, gas_t &gas_used);
 
-}  // namespace gas_cost
-}  // namespace CuEVM
+}  // namespace CuEVM::gas_cost

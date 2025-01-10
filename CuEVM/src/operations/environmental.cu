@@ -1,7 +1,6 @@
 
 #include <CuCrypto/keccak.cuh>
 #include <CuEVM/core/byte_array.cuh>
-#include <CuEVM/gas_cost.cuh>
 #include <CuEVM/operations/environmental.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
@@ -20,14 +19,22 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
 
         CuEVM::gas_t memory_expansion_cost;
         // Get the memory expansion gas cost
-        error_code |= CuEVM::gas_cost::memory_grow_cost(memory, offset, length, memory_expansion_cost, gas_used);
+
+        uint32_t offset_u32 = uint256_get_uint32_t(&offset);
+        uint32_t length_u32 = uint256_get_uint32_t(&length);
+        if (uint256_cmp_word(&length, length_u32) != 0 || uint256_cmp_word(&offset, offset_u32) != 0) {
+            return ERR_MEMORY_INVALID_OFFSET;
+        }
+        error_code |=
+            CuEVM::gas_cost::memory_grow_cost(&memory, offset_u32, length_u32, memory_expansion_cost, gas_used);
 
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
         if (error_code == ERROR_SUCCESS) {
             memory.increase_memory_cost(memory_expansion_cost);
-            CuEVM::byte_array_t memory_input;
-            error_code |= memory.get(offset, length, memory_input);
+
+            CuEVM::byte_array_t memory_input(length_u32);
+            error_code |= memory.get(offset_u32, length_u32, memory_input.data);
             if (error_code == ERROR_SUCCESS) {
                 // CuEVM::byte_array_t *hash;
                 // hash = new CuEVM::byte_array_t(CuEVM::hash_size);
@@ -152,10 +159,15 @@ __device__ int32_t CALLDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
 
     // compute the dynamic gas cost
     CuEVM::gas_cost::memory_cost(gas_used, uint256_get_uint32_t(&length));
-
+    uint32_t memory_offset_u32 = uint256_get_uint32_t(&memory_offset);
+    uint32_t length_u32 = uint256_get_uint32_t(&length);
+    if (uint256_cmp_word(&memory_offset, memory_offset_u32) != 0 || uint256_cmp_word(&length, length_u32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
     // get the memory expansion gas cost
     gas_t memory_expansion_cost;
-    error_code |= CuEVM::gas_cost::memory_grow_cost(memory, memory_offset, length, memory_expansion_cost, gas_used);
+    error_code |=
+        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_u32, length_u32, memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -199,8 +211,14 @@ __device__ int32_t CODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_use
     CuEVM::gas_cost::memory_cost(gas_used, uint256_get_uint32_t(&length));
 
     // get the memory expansion gas cost
+    uint32_t memory_offset_u32 = uint256_get_uint32_t(&memory_offset);
+    uint32_t length_u32 = uint256_get_uint32_t(&length);
+    if (uint256_cmp_word(&memory_offset, memory_offset_u32) != 0 || uint256_cmp_word(&length, length_u32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
     gas_t memory_expansion_cost;
-    error_code |= CuEVM::gas_cost::memory_grow_cost(memory, memory_offset, length, memory_expansion_cost, gas_used);
+    error_code |=
+        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_u32, length_u32, memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -262,10 +280,17 @@ __device__ int32_t EXTCODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
 
     // compute the dynamic gas cost
     CuEVM::gas_cost::memory_cost(gas_used, uint256_get_uint32_t(&length));
-
+    uint32_t memory_offset_ui32 = uint256_get_uint32_t(&memory_offset);
+    uint32_t length_ui32 = uint256_get_uint32_t(&length);
+    if (uint256_cmp_word(&memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(&length, length_ui32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
     // get the memory expansion gas cost
     gas_t memory_expansion_cost;
-    error_code |= CuEVM::gas_cost::memory_grow_cost(memory, memory_offset, length, memory_expansion_cost, gas_used);
+
+    error_code |=
+        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_ui32, length_ui32, memory_expansion_cost, gas_used);
+
     CuEVM::gas_cost::access_account_cost(gas_used, state_db, &address);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -284,7 +309,7 @@ __device__ int32_t EXTCODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
         if (uint256_cmp_word(&length, length_ui32) != 0) length_ui32 = UINT32_MAX;
         CuEVM::byte_array_t data(byte_code, data_offset_ui32, length_ui32);
 
-        error_code |= memory.set(data, memory_offset, length);
+        error_code |= memory.set(data.data, memory_offset_ui32, length_ui32);
     }
     return error_code;
 }
@@ -315,9 +340,15 @@ __device__ int32_t RETURNDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     // compute the dynamic gas cost
     CuEVM::gas_cost::memory_cost(gas_used, uint256_get_uint32_t(&length));
 
+    uint32_t memory_offset_ui32 = uint256_get_uint32_t(&memory_offset);
+    uint32_t length_ui32 = uint256_get_uint32_t(&length);
+    if (uint256_cmp_word(&memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(&length, length_ui32) != 0) {
+        return ERR_MEMORY_INVALID_OFFSET;
+    }
     // get the memory expansion gas cost
     gas_t memory_expansion_cost;
-    error_code |= CuEVM::gas_cost::memory_grow_cost(memory, memory_offset, length, memory_expansion_cost, gas_used);
+    error_code |=
+        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_ui32, length_ui32, memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -336,15 +367,16 @@ __device__ int32_t RETURNDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
 
-        uint32_t data_offset_ui32, length_ui32;
+        // uint32_t data_offset_ui32, length_ui32;
         // get values saturated to uint32_max, in overflow case
-        data_offset_ui32 = uint256_get_uint32_t(&data_offset);
-        if (uint256_cmp_word(&data_offset, data_offset_ui32) != 0) data_offset_ui32 = UINT32_MAX;
-        length_ui32 = uint256_get_uint32_t(&length);
-        if (uint256_cmp_word(&length, length_ui32) != 0) length_ui32 = UINT32_MAX;
-        CuEVM::byte_array_t data(return_data, data_offset_ui32, length_ui32);
+        // data_offset_ui32 = uint256_get_uint32_t(&data_offset);
+        // if (uint256_cmp_word(&data_offset, data_offset_ui32) != 0) data_offset_ui32 = UINT32_MAX;
+        // length_ui32 = uint256_get_uint32_t(&length);
+        // if (uint256_cmp_word(&length, length_ui32) != 0) length_ui32 = UINT32_MAX;
+        // CuEVM::byte_array_t data(return_data, memory_offset_ui32, length_ui32);
+        byte_array_t data(length_ui32);
 
-        error_code |= memory.set(data, memory_offset, length);
+        error_code |= memory.set(data.data, memory_offset_ui32, length_ui32);
     }
     return error_code;
 }

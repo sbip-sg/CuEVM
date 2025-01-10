@@ -868,6 +868,12 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     // in the parent memory
     evm_word_t ret_offset = call_state_ptr->return_data_offset;
     evm_word_t ret_size = call_state_ptr->return_data_size;
+    // check overflow
+    uint32_t ret_size_u32 = uint256_get_uint32_t(&ret_size);
+    uint32_t ret_offset_u32 = uint256_get_uint32_t(&ret_offset);
+    // if (ret_size_u32 + ret_offset_u32 > call_state_ptr->parent->memory_ptr->size) {
+    //     return ERR_MEMORY_INVALID_OFFSET;
+    // }
     // reset the error code for the parent
     error_code = ERROR_SUCCESS;
 
@@ -876,7 +882,8 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         error_code |= call_state_ptr->parent->stack_ptr->push(child_success);
 
         // write the return data in the memory
-        error_code |= call_state_ptr->parent->memory_ptr->set(call_state_ptr->memory_ptr->data, ret_offset, ret_size);
+        error_code |=
+            call_state_ptr->parent->memory_ptr->set(call_state_ptr->memory_ptr->data, ret_offset_u32, ret_size_u32);
 
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;

@@ -280,66 +280,18 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
     return ERROR_SUCCESS;
 }
 
-__device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t &memory, const evm_word_t &index,
-                                    const evm_word_t &length, gas_t &memory_expansion_cost, gas_t &gas_used) {
+__device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t *memory, const uint32_t index, const uint32_t length,
+                                    gas_t &memory_expansion_cost, gas_t &gas_used) {
     // reset to 0;
     memory_expansion_cost = 0;
-    /*
-    do {
-        if (uint256_is_zero(&length)) {
-            return ERROR_SUCCESS;
-        }
-        evm_word_t offset;
-        evm_word_t offset_ui32;
-        if (uint256_add(index, length, offset)) {
-            break;
-        }
-        if (uint256_get_uint32_t(offset, offset_ui32) == ERROR_VALUE_OVERFLOW) {
-            break;
-        }
-        bn_t old_memory_cost;
-        memory.get_memory_cost(arith, old_memory_cost);
-        // memort_size_word = (offset + 31) / 32
-        bn_t memory_size_word;
-        if (cgbn_add_ui32(arith.env, memory_size_word, offset, 31) != 0) {
-            break;
-        }
-        cgbn_div_ui32(arith.env, memory_size_word, memory_size_word, 32);
-        // memory_cost = (memory_size_word * memory_size_word) / 512 + 3 *
-        // memory_size_word
-        bn_t memory_cost;
-        bn_wide_t memory_size_word_wide;
-        cgbn_mul_wide(arith.env, memory_size_word_wide, memory_size_word, memory_size_word);
-        if (cgbn_compare_ui32(arith.env, memory_size_word_wide._high, 0) != 0) {
-            break;
-        }
-        cgbn_set(arith.env, memory_cost, memory_size_word_wide._low);
-        cgbn_div_ui32(arith.env, memory_cost, memory_cost, 512);
-        bn_t tmp;
-        // TODO: verify overflow in another way
-        // LOOK ok from CGBN documentation
-        if (cgbn_mul_ui32(arith.env, tmp, memory_size_word, GAS_MEMORY) != 0) {
-            break;
-        }
-        if (cgbn_add(arith.env, memory_cost, memory_cost, tmp) != 0) {
-            break;
-        }
-        //  gas_used = gas_used + memory_cost - old_memory_cost
-        if (cgbn_sub(arith.env, memory_expansion_cost, memory_cost, old_memory_cost) != 0) {
-            cgbn_set_ui32(arith.env, memory_expansion_cost, 0);
-        }
-        if (cgbn_add(arith.env, gas_used, gas_used, memory_expansion_cost) != 0) {
-            break;
-        }
-        // size is always a multiple of 32
-        if (cgbn_mul_ui32(arith.env, offset, memory_size_word, 32) != 0) {
-            break;
-        }
-        return ERROR_SUCCESS;
-    } while (0);
-    */ // TODO: reimplement this
-
-    // return ERR_MEMORY_INVALID_OFFSET;
+    uint32_t new_size = index + length;
+    uint32_t new_size_words = (new_size + 31) / 32;
+    // gas_cost = (new_mem_size_words ^ 2 // 512) + (3 * new_mem_size_words) - Cmem(old_state
+    uint32_t new_cost = (new_size_words * new_size_words / 512) + (3 * new_size_words);
+    if (new_cost > memory->memory_cost) {
+        memory_expansion_cost = new_cost - memory->memory_cost;
+        gas_used += memory_expansion_cost;
+    }
     return ERROR_SUCCESS;
 }
 }  // namespace gas_cost
