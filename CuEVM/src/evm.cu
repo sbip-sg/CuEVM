@@ -254,8 +254,8 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
             printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
                    opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
-            printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
-            cached_call_state.stack_ptr->print();
+            // printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
+            // cached_call_state.stack_ptr->print();
         }
         // if (THREADIDX == 1) {
         //     printf("print Stack 2, size %u\n", cached_call_state.stack_ptr->stack_offset);

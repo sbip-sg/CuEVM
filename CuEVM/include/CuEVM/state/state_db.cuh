@@ -10,11 +10,14 @@ namespace CuEVM {
 constexpr uint32_t worldstate_addresses_size = 32;
 constexpr uint32_t worldstate_storage_values_size = 1024;
 
-constexpr uint32_t account_prealloc_keys_size = 256;  // configurable 4 keys per account
+constexpr uint32_t account_prealloc_keys_size = 4;  // configurable keys per account
 constexpr uint32_t value_page_size = 32;
 constexpr uint32_t account_page_size = 16;
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
+
+constexpr uint32_t dynamic_pool_base_size = 16;  // multiply by 2 every time
+
 struct serialized_worldstate_data {
     uint32_t no_accounts;
     uint32_t no_storage_elements;
@@ -34,6 +37,32 @@ struct KeyOffset {
     uint32_t offset;
 };
 
+// store both the value and the status of the key
+struct ValueStatus {
+    evm_word_t value;
+    bool is_warm = false;
+
+    __host__ __device__ ValueStatus() {}
+    // Constructor to initialize with a value and default is_warm to false
+    __device__ void set_value(const evm_word_t *val, bool warm_status) {
+        value = *val;
+        is_warm = warm_status;
+    }
+    __host__ __device__ void from_hex(const char *hex_str) {
+        value.from_hex(hex_str);
+        is_warm = false;
+    }
+    // Assignment operator to assign value and reset is_warm to false
+    __host__ __device__ ValueStatus &operator=(const evm_word_t &val) {
+        value = val;
+        is_warm = false;
+        return *this;
+    }
+    __host__ __device__ void print() {
+        value.print();
+        printf(" is_warm: %d\n", is_warm);
+    }
+};
 class StateDb {
    public:
     uint32_t num_states;
@@ -48,6 +77,7 @@ class StateDb {
     uint32_t *account_storage_size;
     uint32_t *account_codes_offset;
     uint32_t *account_codes_size;
+    bool *account_is_warm;
     // constraints: code are the same accross instances; keep 1 version
     // pointers [A1's code, A2's code,...]
     uint8_t *all_account_codes;
@@ -61,9 +91,13 @@ class StateDb {
     uint32_t *keys_list_offset;  // offset in the keys_list of ith account
 
     // uint32_t *keys_list_offset;
-    // flattened value pool, allocate new page when full;
+    // flattened value pool, prealloc fixed size;
     // [A1K1S1'V , A1K1S2'V , ... , A1K1SN'V ]
-    evm_word_t *values_pool;
+    ValueStatus *prealloc_values_pool;
+    // dynamic values pool, allocate new page when full. no pattern
+    evm_word_t **dynamic_keys_pool;     // size equals number of accounts
+    ValueStatus **dynamic_values_pool;  // size equals number of accounts
+    uint32_t *dynamic_pool_capacity;    // size equals number of accounts
     /**
      * The default constructor
      */
@@ -72,14 +106,17 @@ class StateDb {
                        uint32_t storage_capacity, uint8_t *all_account_codes, evm_word_t *address_list,
                        evm_word_t *account_balances, uint32_t *account_nonces, uint32_t *account_storage_size,
                        uint32_t *account_codes_size, uint32_t *account_codes_offset, KeyOffset *all_keys,
-                       uint32_t *keys_list_offset, uint32_t *keys_list_size, evm_word_t *values_pool);
+                       uint32_t *keys_list_offset, uint32_t *keys_list_size, ValueStatus *prealloc_values_pool,
+                       evm_word_t **dynamic_keys_pool, ValueStatus **dynamic_values_pool,
+                       uint32_t *dynamic_pool_capacity);
     /**
      * Get the index of the address in the address list
      * @param[in] address The address to get the index of
      * @return The index of the address, -1 if not found
      */
     __device__ int32_t get_address_index(const evm_word_t *address) const;
-    __device__ int32_t get_value_offset(const evm_word_t *address, const evm_word_t *key) const;
+    __device__ int32_t get_value_offset(int32_t address_index, const evm_word_t *key) const;
+    __device__ int32_t get_dynamic_value_offset(int32_t address_index, const evm_word_t *key) const;
     __device__ void new_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
     __device__ void update_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
     __device__ void update_balance(const evm_word_t *address, const evm_word_t *balance);
@@ -91,18 +128,19 @@ class StateDb {
     __device__ uint8_t *get_code(uint32_t &code_size, const evm_word_t *address);
     __device__ uint32_t get_nonce(const evm_word_t *address);
 
-    __device__ void grow_storage();
+    __device__ void grow_storage(int32_t address_index);
     __device__ void write_storage(const evm_word_t *address, const evm_word_t *key, const evm_word_t *value,
                                   uint16_t call_depth);
     // return the pointer to the storage value
-    __device__ evm_word_t *get_storage(const evm_word_t *address, const evm_word_t *key) const;
+    __device__ evm_word_t *get_storage(const evm_word_t *address, const evm_word_t *key, bool set_warm);
+    __device__ ValueStatus *get_value_status(const evm_word_t *address, const evm_word_t *key) const;
     __device__ bool is_warm_account(const evm_word_t *address) const;
     __device__ bool is_warm_key(const evm_word_t *address, const evm_word_t *key) const;
     __device__ void set_warm_account(const evm_word_t *address);
     __device__ void set_warm_key(const evm_word_t *address, const evm_word_t *key);
 
-    __device__ evm_word_t *get_original_value(const evm_word_t *address, const evm_word_t *key) const;
-    __device__ evm_word_t *get_value(const evm_word_t *address, const evm_word_t *key) const;
+    __device__ evm_word_t *get_original_value(const evm_word_t *address, const evm_word_t *key);
+    __device__ evm_word_t *get_value(const evm_word_t *address, const evm_word_t *key, bool set_warm = false);
 
     __device__ bool is_empty_account(const evm_word_t *address) const;
     __device__ bool is_deleted_account(const evm_word_t *address) const;

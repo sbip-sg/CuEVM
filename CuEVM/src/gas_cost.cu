@@ -177,7 +177,7 @@ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db
     return ERROR_SUCCESS;
 }
 
-__device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::StateDb *state_db, const evm_word_t *address,
+__device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
                               const evm_word_t *key) {
     // get the key warm
     if (state_db->is_warm_key(address, key)) {
@@ -188,8 +188,8 @@ __device__ int32_t sload_cost(gas_t &gas_used, const CuEVM::StateDb *state_db, c
 
     return ERROR_SUCCESS;
 }
-__device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, const CuEVM::StateDb *state_db,
-                               const evm_word_t *address, const evm_word_t *key, const evm_word_t *new_value) {
+__device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
+                               const evm_word_t *key, const evm_word_t *new_value) {
     // printf("address %p\n");
     // address->print();
     // printf("key %p\n");
