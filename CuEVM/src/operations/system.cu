@@ -33,7 +33,8 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     }
     error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, args_offset_ui32, args_size_ui32,
                                                     memory_expansion_cost_args, temp_memory_gas_used);
-    // printf("temp memory gas used %d\n", temp_memory_gas_used);
+    printf("temp memory gas used %u, memory_expansion_cost_args %u\n", temp_memory_gas_used,
+           memory_expansion_cost_args);
     // memory return data
     evm_word_t ret_offset = new_context_ptr->return_data_offset;
     evm_word_t ret_size = new_context_ptr->return_data_size;
@@ -46,7 +47,7 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, ret_offset_ui32, ret_size_ui32,
                                                     memory_expansion_cost_ret, temp_memory_gas_used);
 
-    // printf("temp memory gas used %d\n", temp_memory_gas_used);
+    printf("temp memory gas used %u, memory_expansion_cost_ret %u\n", temp_memory_gas_used, memory_expansion_cost_ret);
     // compute the total memory expansion cost
     gas_t memory_expansion_cost;
     if (memory_expansion_cost_args > memory_expansion_cost_ret) {
@@ -54,7 +55,7 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     } else {
         memory_expansion_cost = memory_expansion_cost_ret;
     }
-    // printf("memory expansion cost %d\n", memory_expansion_cost);
+    printf("memory expansion cost %u\n", memory_expansion_cost);
     cached_state.gas_used += memory_expansion_cost;
 
     // adress warm call
@@ -284,7 +285,8 @@ __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_c
     //                                  code, ret_offset, ret_size, current_context->static_env);
 
     new_context_ptr->initiate_values(current_context, gas, current_context->to, address, address, *value, OP_CALL,
-                                     nullptr, 0, nullptr, 0, current_context->static_env);
+                                     nullptr, 0, nullptr, 0, uint256_get_uint32_t(ret_offset),
+                                     uint256_get_uint32_t(ret_size), current_context->static_env);
     // printf("new context ptr\n");
     // new_context_ptr->print();
 
@@ -330,6 +332,7 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
 
     new_context_ptr->initiate_values(current_context, gas, current_context->to, current_context->to,
                                      current_context->to, *value, OP_CALLCODE, nullptr, 0, byte_code, byte_code_size,
+                                     uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
                                      current_context->static_env);
     // printf("new context ptr\n");
     // new_context_ptr->print();
@@ -349,7 +352,7 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
  * code.
  */
 __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data) {
+                          CuEVM::evm_call_context_t *call_state_ptr) {
     evm_word_t memory_offset, length;
     int32_t error_code = stack.pop(memory_offset);
     error_code |= stack.pop(length);
@@ -360,15 +363,15 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (uint256_cmp_word(&memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(&length, length_ui32) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
     }
-    error_code |=
-        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_ui32, length_ui32, memory_expansion_cost, gas_used);
+    error_code |= CuEVM::gas_cost::memory_grow_cost(call_state_ptr->memory_ptr, memory_offset_ui32, length_ui32,
+                                                    memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        memory.increase_memory_cost(memory_expansion_cost);
-
-        error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data);
+        // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
+        call_state_ptr->set_return_data(memory_offset_ui32, length_ui32);
+        error_code = ERROR_RETURN;
     }
 
     return error_code;
@@ -406,6 +409,7 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
     new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr->initiate_values(current_context, gas, current_context->from, current_context->to,
                                      current_context->to, value, OP_DELEGATECALL, nullptr, 0, byte_code, byte_code_size,
+                                     uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
                                      current_context->static_env);
     // printf("new context ptr\n");
     // new_context_ptr->print();
@@ -453,7 +457,8 @@ __device__ int32_t STATICCALL(CuEVM::evm_call_context_t *current_context, CuEVM:
 
     new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr->initiate_values(current_context, gas, current_context->to, address, address, value, OP_STATICCALL,
-                                     nullptr, 0, nullptr, 0, true);
+                                     nullptr, 0, nullptr, 0, uint256_get_uint32_t(ret_offset),
+                                     uint256_get_uint32_t(ret_size), true);
     // printf("new context ptr\n");
     // new_context_ptr->print();
 
@@ -469,7 +474,7 @@ __device__ int32_t STATICCALL(CuEVM::evm_call_context_t *current_context, CuEVM:
  * @param[out] return_data The return data.
  */
 __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data) {
+                          CuEVM::evm_call_context_t *call_state_ptr) {
     evm_word_t memory_offset, length;
     int32_t error_code = stack.pop(memory_offset);
     error_code |= stack.pop(length);
@@ -480,15 +485,16 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (uint256_cmp_word(&memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(&length, length_ui32) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
     }
-    error_code |=
-        CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_ui32, length_ui32, memory_expansion_cost, gas_used);
+    error_code |= CuEVM::gas_cost::memory_grow_cost(call_state_ptr->memory_ptr, memory_offset_ui32, length_ui32,
+                                                    memory_expansion_cost, gas_used);
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        memory.increase_memory_cost(memory_expansion_cost);
-
-        error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
+        // memory.increase_memory_cost(memory_expansion_cost);
+        call_state_ptr->set_return_data(memory_offset_ui32, length_ui32);
+        // error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
+        error_code = ERROR_REVERT;
     }
     return error_code;
 }
@@ -511,7 +517,7 @@ __device__ int32_t INVALID() { return ERROR_NOT_IMPLEMENTED; }
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                CuEVM::evm_call_context_t *call_context, CuEVM::evm_return_data_t &return_data) {
+                                CuEVM::evm_call_context_t *call_context) {
     int32_t error_code = ERROR_SUCCESS;
     if (call_context->static_env) {
         error_code = ERROR_STATIC_CALL_CONTEXT_SELFDESTRUCT;
@@ -537,7 +543,7 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
             global_state_db_ptr->update_balance(&recipient, recipient_balance);
             global_state_db_ptr->update_balance(&call_context->to, sender_balance);
             // receiver = self => 0 balance
-            return_data = CuEVM::evm_return_data_t();
+            call_context->parent->return_data_size = 0;
             error_code |= ERROR_RETURN;
         }
     }

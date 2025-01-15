@@ -5,8 +5,7 @@
 namespace CuEVM::operations {
 __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                          CuEVM::evm_memory_t &memory) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    int32_t error_code = ERROR_SUCCESS;
 
     evm_word_t memory_offset, length;
     error_code |= stack.pop(memory_offset);
@@ -15,6 +14,7 @@ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     if (uint256_cmp_word(&memory_offset, memory_offset_u32) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
     }
+    gas_used += GAS_MEMORY;
     // get the memory expansion gas cost
     gas_t memory_expansion_cost;
     error_code |=
@@ -33,10 +33,8 @@ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 
 __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                           CuEVM::evm_memory_t &memory) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-
     evm_word_t memory_offset;
+    int32_t error_code = ERROR_SUCCESS;
     error_code |= stack.pop(memory_offset);
     evm_word_t value;
     error_code |= stack.pop(value);
@@ -44,8 +42,9 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (uint256_cmp_word(&memory_offset, memory_offset_u32) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
     }
+    gas_used += GAS_MEMORY;
     // get the memory expansion gas cost
-    gas_t memory_expansion_cost;
+    gas_t memory_expansion_cost = 0;
     error_code |=
         CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_u32, UINT256_BYTES, memory_expansion_cost, gas_used);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -62,11 +61,7 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
 __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                            CuEVM::evm_memory_t &memory) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    // #ifdef __CUDA_ARCH__
-    //     printf("MSTORE8 %d\n", threadIdx.x);
-    // #endif
+    int32_t error_code = ERROR_SUCCESS;
     evm_word_t memory_offset;
     error_code |= stack.pop(memory_offset);
     evm_word_t value;
@@ -75,6 +70,7 @@ __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
     if (uint256_cmp_word(&memory_offset, memory_offset_u32) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
     }
+    gas_used += GAS_MEMORY;
     // get the memory expansion gas cost
     gas_t memory_expansion_cost;
     error_code |= CuEVM::gas_cost::memory_grow_cost(&memory, memory_offset_u32, 1, memory_expansion_cost, gas_used);
@@ -93,14 +89,9 @@ __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
 
 __device__ int32_t MSIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                          const CuEVM::evm_memory_t &memory) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    if (error_code == ERROR_SUCCESS) {
-        evm_word_t size;
-        size = memory.size;
-
-        error_code |= stack.push(size);
-    }
+    if (error_code == ERROR_SUCCESS) error_code |= stack.push_uint32(memory.size);
     return error_code;
 }
 }  // namespace CuEVM::operations

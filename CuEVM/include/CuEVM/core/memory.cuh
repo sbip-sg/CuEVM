@@ -70,6 +70,14 @@ struct evm_memory_t {
      * @return 0 if success, otherwise the error code.
      */
     __host__ __device__ int32_t set(uint8_t *data, const uint32_t index, const uint32_t length);
+
+    /**
+     * Set the given memory data to zero.
+     * @param[in] index The index of the memory access.
+     * @param[in] length The length of the memory access.
+     * @return 0 if success, otherwise the error code.
+     */
+    __host__ __device__ int32_t set_zero(const uint32_t index, const uint32_t length);
 };
 
 }  // namespace memory

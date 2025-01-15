@@ -61,8 +61,13 @@ __device__ int32_t StateDb::get_value_offset(int32_t address_index, const evm_wo
         return -1;
     }
     uint32_t key_list_idx = keys_list_offset[address_index];
-
+    // printf("search for key\n");
+    // key->print();
+    // printf("account storage size %d \n", account_storage_size[address_index]);
+    // printf("account prealloc keys size %d \n", account_prealloc_keys_size);
     for (uint32_t i = 0; i < min(account_storage_size[address_index], account_prealloc_keys_size); i++) {
+        // printf("compare with key %p\n", all_keys[key_list_idx + i].key);
+        // all_keys[key_list_idx + i].key.print();
         if (all_keys[key_list_idx + i].key == *key) {
             return all_keys[key_list_idx + i].offset;
         }
@@ -150,6 +155,9 @@ __device__ void StateDb::write_storage(const evm_word_t *address, const evm_word
             printf("key list start %d key list size %d\n", key_list_start, key_list_size);
             printf("new key offset %p\n", new_key_offset);
             prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].set_value(value, true);
+
+            account_storage_size[address_index]++;
+            num_storage_elements++;
         } else {
             printf(" not found in prealloc_values_pool, create dynamic storage\n");
             // find in dynamic_keys_pool
@@ -160,20 +168,20 @@ __device__ void StateDb::write_storage(const evm_word_t *address, const evm_word
                 dynamic_keys_pool[address_index][storage_size - account_prealloc_keys_size] = *key;
                 dynamic_values_pool[address_index][storage_size - account_prealloc_keys_size].set_value(value, true);
 
+                account_storage_size[address_index]++;
+                num_storage_elements++;
             } else {
                 // write to exsiting slot
                 dynamic_values_pool[address_index][key_offset].set_value(value, true);
             }
         }
+
     } else {
         printf("found in prealloc_values_pool\n");
         prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].set_value(value, true);
     }
 
     account_is_warm[address_index] = true;
-
-    account_storage_size[address_index]++;
-    num_storage_elements++;
 
     // todo : write snapshot for potential future revert
 }

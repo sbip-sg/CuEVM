@@ -41,27 +41,6 @@ __device__ void cached_evm_call_context::print() const {
     printf("\n");
 }
 
-// __device__ evm_call_context_t::evm_call_context_t(CuEVM::evm_call_context_t* parent, uint32_t depth, uint32_t pc,
-//                                                   gas_t gas_used, gas_t gas_refund, CuEVM::evm_stack_t* stack_ptr,
-//                                                   CuEVM::evm_memory_t* memory_ptr,
-//                                                   CuEVM::log_state_data_t* log_state_ptr) {
-//     this->parent = parent;
-//     this->depth = depth;
-//     this->pc = pc;
-//     this->gas_used = gas_used;
-//     this->gas_refund = gas_refund;
-//     this->stack_ptr = stack_ptr;
-//     this->memory_ptr = memory_ptr;
-
-//     // this->log_state_ptr = log_state_ptr;
-//     // this->last_return_data_size = 0;
-//     // this->last_return_data_offset = 0;
-// #ifdef EIP_3155
-//     this->trace_idx = 0;
-//     // printf("evm_call_state_t constructor no parent %d\n", THREADIDX);
-// #endif
-// }
-
 __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_limit, CuEVM::evm_stack_t* stack_ptr,
                                                     CuEVM::evm_memory_t* memory_ptr, evm_word_t from, evm_word_t to,
                                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
@@ -97,10 +76,9 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
 __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, gas_t gas_limit, evm_word_t from,
                                                     evm_word_t to, evm_word_t storage_address, evm_word_t value,
                                                     uint32_t call_type, uint8_t* call_data, uint32_t call_data_size,
-                                                    uint8_t* byte_code, uint32_t byte_code_size, bool static_env,
-                                                    gas_t gas_refund
-
-) {
+                                                    uint8_t* byte_code, uint32_t byte_code_size,
+                                                    uint32_t return_data_offset, uint32_t return_data_size,
+                                                    bool static_env, gas_t gas_refund) {
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
 
     if (parent == nullptr) {
@@ -125,6 +103,8 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     this->to = to;
     this->storage_address = storage_address;
     this->value = value;
+    this->return_data_offset = return_data_offset;
+    this->return_data_size = return_data_size;
 
     if (parent->stack_ptr != nullptr) {
         this->stack_ptr =
@@ -143,6 +123,52 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
     // printf("this context\n");
     // this->print();
+}
+
+__device__ void evm_call_context_t::copy_return_data(uint8_t* dest, uint32_t offset, uint32_t size) {
+    printf("dest %p, offset %d , size %d\n", dest, offset, size);
+    if (return_data_size == 0) {
+        memset(dest, 0, size);
+    } else {
+        uint8_t* preallocated_base =
+            CuEVM::memory_pool::preallocated_return_data_base + THREADIDX * memory_pool_return_data_preallocate;
+
+        if (return_data_size <= memory_pool_return_data_preallocate) {
+            memcpy(dest, preallocated_base, return_data_size);
+        } else {
+            memcpy(dest, preallocated_base, memory_pool_return_data_preallocate);
+            memcpy(dest + memory_pool_return_data_preallocate, return_data,
+                   return_data_size - memory_pool_return_data_preallocate);
+        }
+    }
+}
+
+__device__ void evm_call_context_t::set_return_data(uint32_t offset, uint32_t size) {
+    if (size == 0 || parent == nullptr) return;
+
+    parent->return_data_size = size;
+    uint8_t* source_data;
+    memory_ptr->get(offset, size, source_data);
+
+    uint8_t* preallocated_base =
+        CuEVM::memory_pool::preallocated_return_data_base + THREADIDX * memory_pool_return_data_preallocate;
+
+    if (size <= memory_pool_return_data_preallocate) {
+        memcpy(preallocated_base, source_data, size);
+    } else {
+        // Copy what fits in preallocated space
+        memcpy(preallocated_base, source_data, memory_pool_return_data_preallocate);
+
+        // Allocate and copy remaining data
+        uint32_t remaining_size = size - memory_pool_return_data_preallocate;
+        uint8_t* new_return_data = parent->return_data;
+        if (new_return_data != nullptr) {
+            delete[] new_return_data;
+        }
+        new_return_data = new uint8_t[remaining_size];
+        memcpy(new_return_data, source_data + memory_pool_return_data_preallocate, remaining_size);
+        parent->return_data = new_return_data;
+    }
 }
 
 /**

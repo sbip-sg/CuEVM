@@ -32,7 +32,7 @@ struct evm_call_context_t {
 
     uint32_t return_data_size = 0;
     uint32_t return_data_offset = 0;
-
+    uint8_t* return_data = nullptr;                // == nullptr if return data size < preallocated global pool
     CuEVM::jump_destinations_t* jump_destinations; /**< The jump destinations */
 
     evm_call_context_t* parent;
@@ -58,9 +58,11 @@ struct evm_call_context_t {
     __device__ void initiate_values(evm_call_context_t* parent, gas_t gas_limit, evm_word_t from, evm_word_t to,
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
-                                    uint32_t byte_code_size, bool static_env = false, gas_t gas_refund = 0
+                                    uint32_t byte_code_size, uint32_t return_data_offset = 0,
+                                    uint32_t return_data_size = 0, bool static_env = false, gas_t gas_refund = 0);
 
-    );
+    __device__ void copy_return_data(uint8_t* dest, uint32_t offset, uint32_t size);
+    __device__ void set_return_data(uint32_t offset, uint32_t size);
 
     __device__ evm_call_context_t() {};
 

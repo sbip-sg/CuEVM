@@ -36,10 +36,7 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (error_code != ERROR_SUCCESS) {
         return error_code;
     }
-    // evm_word_t key;
-    // error_code |= stack.pop(key);
-    // evm_word_t value;
-    // error_code |= stack.pop(value);
+
     if (stack.size() < 2) {
         return ERROR_STACK_UNDERFLOW;
     }
@@ -50,7 +47,12 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     // bn_t storage_address;
     // message.get_storage_address(arith, storage_address);
-
+    // printf("key \n");
+    // key->print();
+    // printf("value \n");
+    // value->print();
+    // printf("storage address \n");
+    // call_context->storage_address.print();
     error_code |=
         CuEVM::gas_cost::sstore_cost(gas_used, gas_refund, state_db, &call_context->storage_address, key, value);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);

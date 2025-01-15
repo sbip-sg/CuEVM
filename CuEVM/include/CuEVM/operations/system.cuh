@@ -69,7 +69,7 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __device__ int32_t RETURN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data);
+                          CuEVM::evm_call_context_t *call_context);
 /**
  * The DELEGATECALL operation. gives the new evm call state
  * @param[in] current_state The current state.
@@ -106,7 +106,7 @@ __device__ int32_t STATICCALL(CuEVM::evm_call_context_t *current_context, CuEVM:
  * @param[out] return_data The return data.
  */
 __device__ int32_t REVERT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          CuEVM::evm_memory_t &memory, CuEVM::evm_return_data_t &return_data);
+                          CuEVM::evm_call_context_t *call_state_ptr);
 
 /**
  * The INVALID operation.
@@ -125,7 +125,7 @@ __device__ int32_t INVALID();
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __device__ int32_t SELFDESTRUCT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                CuEVM::evm_call_context_t &call_context, CuEVM::evm_return_data_t &return_data);
+                                CuEVM::evm_call_context_t *call_state_ptr);
 }  // namespace CuEVM::operations
 
 #endif

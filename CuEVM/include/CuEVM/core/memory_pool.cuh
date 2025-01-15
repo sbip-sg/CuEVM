@@ -6,6 +6,7 @@ namespace CuEVM::memory_pool {
 struct memory_pool_t {
     evm_call_context_t* call_context;
     evm_word_t* stack_base;
+    uint8_t* return_data_base;
     uint32_t num_instances;
     uint32_t count_words;
     uint32_t count_call_context;
@@ -14,6 +15,7 @@ struct memory_pool_t {
 };
 extern __device__ memory_pool_t* global_memory_pool;
 extern __device__ evm_word_t* preallocated_stack_base;
+extern __device__ uint8_t* preallocated_return_data_base;
 __host__ void create_memory_pool(uint32_t num_instances);
 __host__ evm_word_t* preallocate_stack(uint32_t num_instances);
 __device__ void expand_call_context(uint32_t num_instances);

@@ -12,7 +12,8 @@ __device__ gas_t max_gas_call(const gas_t &gas_limit, const gas_t &gas_used) {
     // cap to uint64_t in case overflow following go-ethereum
     // gas_left = gas_left & 0xFFFFFFFFFFFFFFFF;
     // gas capped = (63/64) * gas_left
-    return (gas_limit - gas_used) * 63 / 64;
+    gas_t available_gas = gas_limit - gas_used;
+    return available_gas - available_gas / 64;
 }
 
 __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_word) {
@@ -190,12 +191,6 @@ __device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const e
 }
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
                                const evm_word_t *key, const evm_word_t *new_value) {
-    // printf("address %p\n");
-    // address->print();
-    // printf("key %p\n");
-    // key->print();
-    // printf("new_value %p\n");
-    // new_value->print();
     // get the key warm
     if (state_db->is_warm_key(address, key) == false) {
         gas_used += GAS_COLD_SLOAD;
@@ -204,18 +199,21 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
     evm_word_t *original_value, *current_value;
     original_value = state_db->get_original_value(address, key);
     current_value = state_db->get_value(address, key);
-    // printf("original value %p\n", original_value);
-    // printf("current value %p\n", current_value);
-    // printf("new value %p\n", new_value);
+    printf("original value %p\n", original_value);
+    printf("current value %p\n", current_value);
+    printf("new value %p\n", new_value);
     new_value->print();
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
     } else {
         if (uint256_cmp(current_value, original_value) == 0) {
+            printf("current value is equal to original value\n");
             if (uint256_is_zero(original_value)) {
+                printf("original value is zero\n");
                 gas_used += GAS_STORAGE_SET;
             } else {
+                printf("original value is not zero\n");
                 gas_used += GAS_SSTORE_RESET;
                 if (uint256_is_zero(new_value)) {
                     gas_refund += GAS_SSTORE_CLEARS_SCHEDULE;
@@ -284,10 +282,10 @@ __device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t *memory, const uin
                                     gas_t &memory_expansion_cost, gas_t &gas_used) {
     // reset to 0;
     memory_expansion_cost = 0;
-    uint32_t new_size = index + length;
-    uint32_t new_size_words = (new_size + 31) / 32;
+    gas_t new_size = index + length;
+    gas_t new_size_words = (new_size + 31) / 32;
     // gas_cost = (new_mem_size_words ^ 2 // 512) + (3 * new_mem_size_words) - Cmem(old_state
-    uint32_t new_cost = (new_size_words * new_size_words / 512) + (3 * new_size_words);
+    gas_t new_cost = (new_size_words * new_size_words / 512) + (3 * new_size_words);
     if (new_cost > memory->memory_cost) {
         memory_expansion_cost = new_cost - memory->memory_cost;
         gas_used += memory_expansion_cost;

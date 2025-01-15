@@ -448,8 +448,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                     break;
                 case OP_CODECOPY:
                     error_code = CuEVM::operations::CODECOPY(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                             *cached_call_state.stack_ptr, call_state_ptr,
-                                                             *call_state_ptr->memory_ptr);
+                                                             *cached_call_state.stack_ptr, call_state_ptr);
                     break;
                 case OP_GASPRICE:
                     error_code = CuEVM::operations::GASPRICE(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -466,16 +465,14 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                                                                 *call_state_ptr->memory_ptr);
                     break;
                 case OP_RETURNDATASIZE:
-                    // TODO: fix this
-                    // error_code = CuEVM::operations::RETURNDATASIZE(
-                    //     cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr,
-                    //     *call_state_ptr->last_return_data_ptr);
+                    error_code =
+                        CuEVM::operations::RETURNDATASIZE(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                          *cached_call_state.stack_ptr, call_state_ptr);
                     break;
                 case OP_RETURNDATACOPY:
-                    // TODO: fix this
-                    // error_code = CuEVM::operations::RETURNDATACOPY(
-                    //     cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr,
-                    //     *call_state_ptr->memory_ptr, *call_state_ptr->last_return_data_ptr);
+                    error_code =
+                        CuEVM::operations::RETURNDATACOPY(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                          *cached_call_state.stack_ptr, call_state_ptr);
                     break;
                 case OP_EXTCODEHASH:
                     error_code = CuEVM::operations::EXTCODEHASH(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -602,12 +599,9 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 
                 case OP_RETURN:
                     // TODO: fix this
-                    // error_code = CuEVM::operations::RETURN(cached_call_state.gas_limit,
-                    // cached_call_state.gas_used,
-                    //                                        *cached_call_state.stack_ptr,
-                    //                                        *call_state_ptr->memory_ptr,
-                    //                                        *call_state_ptr->parent->last_return_data_ptr);
-                    error_code = ERROR_RETURN;
+                    error_code = CuEVM::operations::RETURN(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                           *cached_call_state.stack_ptr, call_state_ptr);
+
                     break;
 
                 case OP_DELEGATECALL:
@@ -628,19 +622,15 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 
                 case OP_REVERT:
                     // TODO: fix this
-                    // error_code = CuEVM::operations::REVERT(cached_call_state.gas_limit,
-                    // cached_call_state.gas_used,
-                    //                                        *cached_call_state.stack_ptr,
-                    //                                        *call_state_ptr->memory_ptr,
-                    //                                        *call_state_ptr->parent->last_return_data_ptr);
+                    error_code = CuEVM::operations::REVERT(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                           *cached_call_state.stack_ptr, call_state_ptr);
                     break;
 
                 case OP_SELFDESTRUCT:
                     // TODO: fix this
-                    // error_code = CuEVM::operations::SELFDESTRUCT(
-                    //     cached_call_state.gas_limit, cached_call_state.gas_used, *cached_call_state.stack_ptr,
-                    //     *call_state_ptr->message_ptr, call_state_ptr->state_db_ptr,
-                    //     *call_state_ptr->parent->last_return_data_ptr);
+                    error_code =
+                        CuEVM::operations::SELFDESTRUCT(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                        *cached_call_state.stack_ptr, call_state_ptr);
                     break;
 
                 default:
@@ -662,13 +652,9 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         // TODO: to see after calls
         // increase program counter
         cached_call_state.pc++;
-
+        printf("Error code %d\n", error_code);
 #ifdef EIP_3155
         tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
-// if (call_state_ptr->trace_idx > 0 || call_state_ptr->depth == 1) {
-//     tracer_ptr->finish_operation(call_state_ptr->trace_idx, cached_call_state.gas_used,
-//                                  call_state_ptr->gas_refund);
-// }
 #endif
 #ifdef BUILD_LIBRARY
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {

@@ -3,6 +3,7 @@
 namespace CuEVM::memory_pool {
 __device__ memory_pool_t* global_memory_pool;
 __device__ evm_word_t* preallocated_stack_base;
+__device__ uint8_t* preallocated_return_data_base;
 __host__ void create_memory_pool(uint32_t num_instances) {
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
@@ -17,6 +18,9 @@ __host__ void create_memory_pool(uint32_t num_instances) {
            num_instances * memory_pool_stack_preallocate);
     cudaMalloc(&memory_pool->call_context,
                num_instances * memory_pool_call_context_preallocate * sizeof(evm_call_context_t));
+    cudaMalloc(&memory_pool->return_data_base, num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t));
+    printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base,
+           num_instances * memory_pool_return_data_preallocate);
     memory_pool_t* d_memory_pool;
     cudaMalloc(&d_memory_pool, sizeof(memory_pool_t));
     cudaMemcpy(d_memory_pool, memory_pool, sizeof(memory_pool_t), cudaMemcpyHostToDevice);
@@ -24,6 +28,7 @@ __host__ void create_memory_pool(uint32_t num_instances) {
 
     // copy pointer to preallocated stack base
     cudaMemcpyToSymbol(preallocated_stack_base, &memory_pool->stack_base, sizeof(evm_word_t*));
+    cudaMemcpyToSymbol(preallocated_return_data_base, &memory_pool->return_data_base, sizeof(uint8_t*));
     delete memory_pool;
 }
 

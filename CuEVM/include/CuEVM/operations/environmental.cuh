@@ -203,7 +203,7 @@ __device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::evm_call_context_t *call_context, CuEVM::evm_memory_t &memory);
+                            const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The GASPRICE operation implementation.
@@ -272,7 +272,7 @@ __device__ int32_t EXTCODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::e
  * @return The error code. 0 if no error.
  */
 __device__ int32_t RETURNDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  const CuEVM::evm_return_data_t &return_data);
+                                  const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The RETURNDATACOPY operation implementation.
@@ -294,7 +294,7 @@ __device__ int32_t RETURNDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM
  * @return The error code. 0 if no error.
  */
 __device__ int32_t RETURNDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  CuEVM::evm_memory_t &memory, const CuEVM::evm_return_data_t &return_data);
+                                  CuEVM::evm_call_context_t *call_context);
 
 /**
  * The EXTCODEHASH operation implementation.
