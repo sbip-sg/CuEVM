@@ -57,7 +57,8 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
         CuEVM::gas_cost::sstore_cost(gas_used, gas_refund, state_db, &call_context->storage_address, key, value);
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        state_db->write_storage(&call_context->storage_address, key, value, call_context->depth);
+        Snapshot *snapshot = call_context->current_snapshot;
+        state_db->write_storage(&call_context->storage_address, key, value, snapshot);
     }
 
     return error_code;

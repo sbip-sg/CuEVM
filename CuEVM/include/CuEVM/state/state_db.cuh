@@ -58,10 +58,43 @@ struct ValueStatus {
         is_warm = false;
         return *this;
     }
+    __host__ __device__ ValueStatus &operator=(const ValueStatus &val) {
+        value = val.value;
+        is_warm = val.is_warm;
+        return *this;
+    }
     __host__ __device__ void print() {
         value.print();
         printf(" is_warm: %d\n", is_warm);
     }
+};
+
+struct SnapshotAccount {
+    // store only the modified fields
+    evm_word_t balance;
+    uint32_t nonce = 0;
+    uint32_t storage_size = 0;
+    uint32_t code_size = 0;
+    uint8_t *code = nullptr;
+    evm_word_t *storage_keys = nullptr;
+    ValueStatus *storage_values = nullptr;
+
+    bool is_warm = false;
+    __host__ __device__ SnapshotAccount() {}
+    __device__ int32_t find_storage_key(const evm_word_t *key) const;
+    __device__ void grow_storage(const evm_word_t *key);
+};
+
+struct Snapshot {
+    uint32_t num_accounts = 0;
+    evm_word_t *address_list = nullptr;
+    SnapshotAccount *accounts = nullptr;
+    __device__ int32_t get_address_index(const evm_word_t *address) const;
+    __device__ void grow_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
+    __device__ void set_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
+    __device__ void set_code(const evm_word_t *address, const uint32_t code_size, const uint8_t *code);
+    __device__ void set_storage(const evm_word_t *address, const evm_word_t *key, const ValueStatus *value);
+    __device__ ValueStatus *get_storage(const evm_word_t *address, const evm_word_t *key) const;
 };
 class StateDb {
    public:
@@ -77,6 +110,8 @@ class StateDb {
     uint32_t *account_storage_size;
     uint32_t *account_codes_offset;
     uint32_t *account_codes_size;
+
+    Snapshot *original_snapshot;
     bool *account_is_warm;
     // constraints: code are the same accross instances; keep 1 version
     // pointers [A1's code, A2's code,...]
@@ -108,7 +143,7 @@ class StateDb {
                        uint32_t *account_codes_size, uint32_t *account_codes_offset, KeyOffset *all_keys,
                        uint32_t *keys_list_offset, uint32_t *keys_list_size, ValueStatus *prealloc_values_pool,
                        evm_word_t **dynamic_keys_pool, ValueStatus **dynamic_values_pool,
-                       uint32_t *dynamic_pool_capacity);
+                       uint32_t *dynamic_pool_capacity, Snapshot *original_snapshot);
     /**
      * Get the index of the address in the address list
      * @param[in] address The address to get the index of
@@ -130,7 +165,7 @@ class StateDb {
 
     __device__ void grow_storage(int32_t address_index);
     __device__ void write_storage(const evm_word_t *address, const evm_word_t *key, const evm_word_t *value,
-                                  uint16_t call_depth);
+                                  Snapshot *snapshot = nullptr, bool is_warm = true);
     // return the pointer to the storage value
     __device__ evm_word_t *get_storage(const evm_word_t *address, const evm_word_t *key, bool set_warm);
     __device__ ValueStatus *get_value_status(const evm_word_t *address, const evm_word_t *key) const;
@@ -146,8 +181,15 @@ class StateDb {
     __device__ bool is_deleted_account(const evm_word_t *address) const;
     __device__ bool is_contract(const evm_word_t *address) const;
     __device__ bool is_empty_create(const evm_word_t *address) const;
+
     // __device__ void clear_account(const evm_word_t *address);
-    // __device__ void revert_to_snapshot(uint16_t call_depth);
+    __device__ void snapshot_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce,
+                                     Snapshot *snapshot = nullptr);
+    __device__ void snapshot_storage(const evm_word_t *address, evm_word_t *key, ValueStatus *value,
+                                     Snapshot *snapshot = nullptr);
+    __device__ void snapshot_code(const evm_word_t *address, Snapshot *snapshot = nullptr);
+    __device__ void revert_to_snapshot(Snapshot *snapshot = nullptr);
+
     __device__ void serialize_data(serialized_worldstate_data *data);
 
     __host__ __device__ void print();
