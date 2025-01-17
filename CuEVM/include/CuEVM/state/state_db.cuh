@@ -39,6 +39,7 @@ struct KeyOffset {
 
 // store both the value and the status of the key
 struct ValueStatus {
+    evm_word_t original_value;
     evm_word_t value;
     bool is_warm = false;
 
@@ -48,8 +49,11 @@ struct ValueStatus {
         value = *val;
         is_warm = warm_status;
     }
+
+    // the only time we set the original value is when we read from the pre-state db
     __host__ __device__ void from_hex(const char *hex_str) {
         value.from_hex(hex_str);
+        original_value = value;
         is_warm = false;
     }
     // Assignment operator to assign value and reset is_warm to false
@@ -69,6 +73,11 @@ struct ValueStatus {
     }
 };
 
+struct SnapshotValue {
+    evm_word_t value;
+    bool is_warm = false;
+};
+
 struct SnapshotAccount {
     // store only the modified fields
     evm_word_t balance;
@@ -77,7 +86,7 @@ struct SnapshotAccount {
     uint32_t code_size = 0;
     uint8_t *code = nullptr;
     evm_word_t *storage_keys = nullptr;
-    ValueStatus *storage_values = nullptr;
+    SnapshotValue *storage_values = nullptr;
 
     bool is_warm = false;
     __host__ __device__ SnapshotAccount() {}
@@ -89,12 +98,13 @@ struct Snapshot {
     uint32_t num_accounts = 0;
     evm_word_t *address_list = nullptr;
     SnapshotAccount *accounts = nullptr;
+    __host__ __device__ Snapshot();
     __device__ int32_t get_address_index(const evm_word_t *address) const;
     __device__ void grow_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
     __device__ void set_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
     __device__ void set_code(const evm_word_t *address, const uint32_t code_size, const uint8_t *code);
     __device__ void set_storage(const evm_word_t *address, const evm_word_t *key, const ValueStatus *value);
-    __device__ ValueStatus *get_storage(const evm_word_t *address, const evm_word_t *key) const;
+    __device__ SnapshotValue *get_storage(const evm_word_t *address, const evm_word_t *key) const;
 };
 class StateDb {
    public:
@@ -174,8 +184,8 @@ class StateDb {
     __device__ void set_warm_account(const evm_word_t *address);
     __device__ void set_warm_key(const evm_word_t *address, const evm_word_t *key);
 
-    __device__ evm_word_t *get_original_value(const evm_word_t *address, const evm_word_t *key);
-    __device__ evm_word_t *get_value(const evm_word_t *address, const evm_word_t *key, bool set_warm = false);
+    // __device__ evm_word_t *get_original_value(const evm_word_t *address, const evm_word_t *key);
+    // __device__ evm_word_t *get_value(const evm_word_t *address, const evm_word_t *key, bool set_warm = false);
 
     __device__ bool is_empty_account(const evm_word_t *address) const;
     __device__ bool is_deleted_account(const evm_word_t *address) const;

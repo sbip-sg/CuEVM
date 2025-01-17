@@ -52,7 +52,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     const cJSON *test_json = nullptr;
     test_json = cJSON_GetArrayItem(read_root, 0);
     if (test_json != nullptr) {
-        CuEVM::get_evm_instances(instances_data, test_json, num_instances, clones, managed);
+        CuEVM::get_evm_instances(instances_data, test_json, num_instances, clones);
         CuEVM::memory_pool::create_memory_pool(num_instances);
         // CuEVM::memory_pool::preallocate_stack(num_instances);
         uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
@@ -78,7 +78,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     }
 
     printf("Freeing the memory ...\n");
-    CuEVM::free_evm_instances(instances_data, num_instances, managed);
+    CuEVM::free_evm_instances(instances_data, num_instances);
 
     CUDA_CHECK(cudaDeviceReset());
 

@@ -21,8 +21,10 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
     if (new_size > size) {
         new_size = (new_size + 31) / 32 * 32;
         uint8_t *new_data = new uint8_t[new_size];
-        memcpy(new_data, data, size);
-        if (data) {
+        if (size > 0) {
+            memcpy(new_data, data, size);
+        }
+        if (data != nullptr) {
             delete[] data;
         }
         data = new_data;
@@ -32,22 +34,40 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
             return ERR_MEMORY_INVALID_ALLOCATION;
         }
     }
+
     return ERROR_SUCCESS;
 }
 
-__device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&data) {
+__device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&data_) {
     int32_t error_code = ERROR_SUCCESS;
     if (length == 0) {
-        data = nullptr;
+        data_ = nullptr;
         return error_code;
     }
 
     error_code |= grow(index + length);
     if (error_code == ERROR_SUCCESS) {
-        data = this->data + index;
+        data_ = this->data + index;
     } else {
-        data = nullptr;
+        data_ = nullptr;
     }
+    return error_code;
+}
+
+__device__ int32_t evm_memory_t::copy(uint32_t index, uint32_t length, uint8_t *&data_) {
+    int32_t error_code = ERROR_SUCCESS;
+    if (length == 0) {
+        data_ = nullptr;
+        return error_code;
+    }
+    if (data_ == nullptr) {
+        data_ = new uint8_t[length];
+    }
+    error_code |= grow(index + length);
+    if (error_code == ERROR_SUCCESS) {
+        memcpy(data_, this->data + index, length);
+    }
+
     return error_code;
 }
 
@@ -63,17 +83,23 @@ __device__ int32_t evm_memory_t::set_zero(const uint32_t index, const uint32_t l
     return error_code;
 }
 
-__device__ int32_t evm_memory_t::set(uint8_t *data, const uint32_t index, const uint32_t length) {
+__device__ int32_t evm_memory_t::set(uint8_t *data_, uint32_t data_size, const uint32_t index, const uint32_t length) {
     int32_t error_code = ERROR_SUCCESS;
     if (length == 0) {
         return error_code;
     }
     error_code |= grow(index + length);
     if (error_code == ERROR_SUCCESS) {
-        if (data != nullptr) {
-            memcpy(this->data + index, data, length);
+        if (data_ != nullptr) {
+            if (data_size >= length) {
+                memcpy(this->data + index, data_, length);
+            } else {
+                memcpy(this->data + index, data_, data_size);
+                memset(this->data + index + data_size, 0, length - data_size);
+            }
         }
     }
+
     return error_code;
 }
 

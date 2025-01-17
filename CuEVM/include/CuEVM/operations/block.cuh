@@ -29,11 +29,9 @@ namespace CuEVM::operations {
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                             const CuEVM::block_info_t &block);
+__device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The COINBASE operation implementation.
@@ -41,11 +39,9 @@ __device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::block_info_t &block);
+__device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The TIMESTAMP operation implementation.
@@ -53,11 +49,9 @@ __device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                             const CuEVM::block_info_t &block);
+__device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The NUMBER operation implementation.
@@ -65,11 +59,9 @@ __device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          const CuEVM::block_info_t &block);
+__device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The DIFFICULTY/PREVRANDAO operation implementation.
@@ -77,11 +69,9 @@ __device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t PREVRANDAO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                              const CuEVM::block_info_t &block);
+__device__ int32_t PREVRANDAO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The GASLIMIT operation implementation.
@@ -89,11 +79,9 @@ __device__ int32_t PREVRANDAO(const gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t GASLIMIT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::block_info_t &block);
+__device__ int32_t GASLIMIT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The CHAINID operation implementation.
@@ -101,11 +89,9 @@ __device__ int32_t GASLIMIT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CHAINID(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                           const CuEVM::block_info_t &block);
+__device__ int32_t CHAINID(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 
 /**
  * The BASEFEE operation implementation.
@@ -113,9 +99,7 @@ __device__ int32_t CHAINID(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_s
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t BASEFEE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                           const CuEVM::block_info_t &block);
+__device__ int32_t BASEFEE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
 }  // namespace CuEVM::operations

@@ -7,6 +7,7 @@
 #include <CuEVM/core/evm_word.cuh>
 
 namespace CuEVM {
+
 /**
  * The previous block hash information.
  *  (YP: \f$P(h, n, a)\f$)
@@ -63,62 +64,6 @@ struct block_info_t {
     __host__ int32_t from_json(const cJSON *json);
 
     /**
-     * Get the coin base of the block.
-     * @param[in] arith The arithmetical environment
-     * @param[out] coin_base The coin base of the block
-     */
-    __host__ __device__ void get_coin_base(evm_word_t &coin_base) const;
-
-    /**
-     * Get the time stamp of the block.
-     * @param[in] arith The arithmetical environment
-     * @param[out] time_stamp The time stamp of the block
-     */
-    __host__ __device__ void get_time_stamp(evm_word_t &time_stamp) const;
-
-    /**
-     * Get the number of the block.
-     * @param[in] arith The arithmetical environment
-     * @param[out] number The number of the block
-     */
-    __host__ __device__ void get_number(evm_word_t &number) const;
-
-    /**
-     * Get the difficulty of the block.
-     * @param[in] arith The arithmetical environment
-     * @param[out] difficulty The difficulty of the block
-     */
-    __host__ __device__ void get_difficulty(evm_word_t &difficulty) const;
-
-    /**
-     * Get the prevrandao of the block.
-     * @param[in] arith The arithmetical environment
-     * @param[out] prevrandao The prevrandao of the block
-     */
-    __host__ __device__ void get_prevrandao(evm_word_t &prevrandao) const;
-
-    /**
-     * Get the gas limit of the block.
-     * @param[in] arith The arithmetical environment
-     * @param[out] gas_limit The gas limit of the block
-     */
-    __host__ __device__ void get_gas_limit(evm_word_t &gas_limit) const;
-
-    /**
-     * Get the base fee of the block
-     * @param[in] arith The arithmetical environment
-     * @param[out] base_fee The base fee of the block
-     */
-    __host__ __device__ void get_base_fee(evm_word_t &base_fee) const;
-
-    /**
-     * Get the chain id of the block.
-     * @param[in] arith The arithmetical environment
-     * @param[out] chain_id The chain id of the block
-     */
-    __host__ __device__ void get_chain_id(evm_word_t &chain_id) const;
-
-    /**
      * Get the previous block hash.
      * @param[in] arith The arithmetical environment
      * @param[out] previous_hash The previous block hash
@@ -146,14 +91,6 @@ struct block_info_t {
  * @param[in] managed 1 if the memory is managed, 0 otherwise
  * @return 1 if the operation is succesfull, 0 otherwise
  */
-__host__ int32_t get_block_info(block_info_t *&block_info_ptr, const cJSON *json, int32_t managed = 0);
-
-/**
- * Free the block information.
- * @param[in] block_info_ptr The block information
- * @param[in] managed 1 if the memory is managed, 0 otherwise
- * @return 1 if the operation is succesfull, 0 otherwise
- */
-__host__ int32_t free_block_info(block_info_t *&block_info_ptr, int32_t managed = 0);
-
+__host__ int32_t get_block_info(const cJSON *json);
+extern __device__ block_info_t *global_block_info;
 }  // namespace CuEVM

@@ -25,7 +25,6 @@
 namespace CuEVM {
 struct evm_instance_t {
     CuEVM::StateDb* state_db_ptr;                              /**< The world state pointer*/
-    CuEVM::block_info_t* block_info_ptr;                       /**< The block info pointer*/
     CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer*/
     CuEVM::log_state_data_t* log_state_ptr;                    /**< The log state pointer*/
     CuEVM::evm_return_data_t* return_data_ptr;                 /**< The return data pointer*/
@@ -40,7 +39,6 @@ struct evm_instance_t {
 
 struct evm_t {
     CuEVM::StateDb* state_db_ptr;                                    /**< The world state pointer*/
-    const CuEVM::block_info_t* block_info_ptr;                       /**< The block info pointer */
     const CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer */
     CuEVM::evm_call_context_t* call_state_ptr;                       /**< The call state pointer store in global mem*/
     CuEVM::EccConstants* ecc_constants_ptr;                          /**< The ecc constants pointer*/
@@ -57,16 +55,15 @@ struct evm_t {
      * Construct a new evm_t object
      * @param[in] arith The arithmetic environment
      * @param[in] world_state_data_ptr The world state pointer
-     * @param[in] block_info_ptr The block info pointer
      * @param[in] transaction_ptr The transaction pointer
      * @param[in] touch_state_data_ptr The touch state pointer
      * @param[in] log_state_ptr The log state pointer
      * @param[in] return_data_ptr The return data pointer
      * @param[in] tracer_ptr The tracer pointer
      */
-    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::block_info_t* block_info_ptr,
-                     CuEVM::transaction::TransactionList* transaction_list_ptr, CuEVM::EccConstants* ecc_constants_ptr,
-                     CuEVM::evm_call_context_t* call_context_ptr, CuEVM::evm_word_t* shared_stack_ptr
+    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr,
+                     CuEVM::EccConstants* ecc_constants_ptr, CuEVM::evm_call_context_t* call_context_ptr,
+                     CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
                      ,
                      CuEVM::utils::tracer_t* tracer_ptr
@@ -79,7 +76,6 @@ struct evm_t {
     /**
      * @brief Construct a new evm_t object
      * Construct a new evm_t object
-     * @param[in] arith The arithmetic environment
      * @param[in] evm_instance The evm instance
      */
     __host__ __device__ evm_t(CuEVM::evm_instance_t& evm_instance,
@@ -157,7 +153,7 @@ struct evm_t {
  * @return int32_t The error code, 0 if successful
  */
 __host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* test_json, uint32_t& num_instances,
-                                   uint32_t clones = 1, int32_t managed = 0);
+                                   uint32_t clones = 1);
 
 /**
  * @brief Free the EVM instances object
@@ -166,7 +162,7 @@ __host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* 
  * @param[in] num_instances The number of instances
  * @param[in] managed Whether the memory is managed
  */
-__host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances, int32_t managed = 0);
+__host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances);
 
 __global__ void kernel_evm_multiple_instances(StateDb* state_db_ptr, transaction::TransactionList* transaction_list_ptr,
                                               uint32_t count);

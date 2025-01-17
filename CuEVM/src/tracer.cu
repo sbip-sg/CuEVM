@@ -152,8 +152,6 @@ __device__ void tracer_t::start_operation(const uint32_t pc, const uint8_t op, c
         grow();
     }
 
-    // printf("tracer op %d idx %d size %d after grow\n", op, THREADIDX, size);
-
     data[size].pc = pc;
     data[size].op = op;
     data[size].mem_size = memory->size;
@@ -165,6 +163,7 @@ __device__ void tracer_t::start_operation(const uint32_t pc, const uint8_t op, c
     data[size].stack_size = stack->size();
     if (data[size].stack_size > 0) {
         data[size].stack = new evm_word_t[data[size].stack_size];
+
         stack->extract_data(data[size].stack);
 
         for (int i = 0; i < data[size].stack_size; i++) {
@@ -172,9 +171,13 @@ __device__ void tracer_t::start_operation(const uint32_t pc, const uint8_t op, c
         }
     }
 
+    for (int i = 0; i < data[size].stack_size; i++) {
+        data[size].stack[i].print();
+    }
+
     data[size].depth = depth;
     // TODO: fix this
-    data[size].return_data = new byte_array_t();
+    // data[size].return_data = new byte_array_t();
     // data[size].return_data = return_data;
     size++;
 }
@@ -205,8 +208,8 @@ __device__ void tracer_t::print() {
         }
         printf("Depth: %d\n", data[i].depth);
         printf("Memory size: %d\n", data[i].mem_size);
-        printf("Return data: ");
-        data[i].return_data->print();
+        // printf("Return data: ");
+        // data[i].return_data->print();
         printf("Refund: %d\n", data[i].refund);
 #ifdef EIP_3155_OPTIONAL
         printf("Error code: %d\n", data[i].error_code);

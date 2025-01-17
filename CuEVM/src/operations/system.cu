@@ -36,8 +36,8 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     printf("temp memory gas used %u, memory_expansion_cost_args %u\n", temp_memory_gas_used,
            memory_expansion_cost_args);
     // memory return data
-    evm_word_t ret_offset = new_context_ptr->return_data_offset;
-    evm_word_t ret_size = new_context_ptr->return_data_size;
+    evm_word_t ret_offset = new_context_ptr->fixed_ret_offset;
+    evm_word_t ret_size = new_context_ptr->fixed_ret_size;
     gas_t memory_expansion_cost_ret;
     uint32_t ret_offset_ui32 = uint256_get_uint32_t(&ret_offset);
     uint32_t ret_size_ui32 = uint256_get_uint32_t(&ret_size);
@@ -102,10 +102,10 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
         // printf("byte code data %p\n", new_context_ptr->byte_code);
         // printf("contract address \n");
         // contract_address_ptr->print();
-        byte_array_t call_data(args_size_ui32);
-        if (args_size > 0) error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data.data);
-        new_context_ptr->call_data = call_data.data;
-        new_context_ptr->call_data_size = call_data.size;
+        uint8_t *call_data = nullptr;
+        if (args_size > 0) error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data);
+        new_context_ptr->call_data = call_data;
+        new_context_ptr->call_data_size = args_size_ui32;
     }
 
     // printf("generic_CALL error_code: %d idx %d\n", error_code, THREADIDX);
@@ -223,8 +223,7 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
  */
 __device__ int32_t STOP(CuEVM::evm_call_context_t *call_state_ptr) {
     // TODO: fix this
-    call_state_ptr->return_data_size = 0;
-    call_state_ptr->return_data_offset = 0;
+    call_state_ptr->dynamic_ret_size = 0;
     return ERROR_RETURN;
 }
 
@@ -369,6 +368,7 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
+        printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
         // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
         call_state_ptr->set_return_data(memory_offset_ui32, length_ui32);
         error_code = ERROR_RETURN;
@@ -538,12 +538,16 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
             evm_word_t *recipient_balance = global_state_db_ptr->get_balance(&recipient);
-            uint256_add(recipient_balance, recipient_balance, sender_balance);
+            if (recipient_balance != nullptr) {
+                uint256_add(recipient_balance, recipient_balance, sender_balance);
+                global_state_db_ptr->update_balance(&recipient, recipient_balance);
+            } else {
+                global_state_db_ptr->update_balance(&recipient, sender_balance);
+            }
             sender_balance->set_zero();
-            global_state_db_ptr->update_balance(&recipient, recipient_balance);
             global_state_db_ptr->update_balance(&call_context->to, sender_balance);
             // receiver = self => 0 balance
-            call_context->parent->return_data_size = 0;
+            call_context->parent->dynamic_ret_size = 0;
             error_code |= ERROR_RETURN;
         }
     }

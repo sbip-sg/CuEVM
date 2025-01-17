@@ -125,7 +125,7 @@ struct evm_stack_t {
     /**
      * Print the stack
      */
-    __host__ __device__ void print();
+    __host__ __device__ void print() const;
 
     /**
      * Get the JSON object from the stack

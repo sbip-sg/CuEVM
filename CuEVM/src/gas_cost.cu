@@ -196,9 +196,15 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
         gas_used += GAS_COLD_SLOAD;
     }
 
-    evm_word_t *original_value, *current_value;
-    original_value = state_db->get_original_value(address, key);
-    current_value = state_db->get_value(address, key);
+    evm_word_t *original_value = nullptr, *current_value = nullptr;
+    ValueStatus *value_status = state_db->get_value_status(address, key);
+    bool blank_storage = false;
+    if (value_status == nullptr)
+        blank_storage = true;
+    else {
+        original_value = &value_status->original_value;
+        current_value = &value_status->value;
+    }
     printf("original value %p\n", original_value);
     printf("current value %p\n", current_value);
     printf("new value %p\n", new_value);
@@ -209,7 +215,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
     } else {
         if (uint256_cmp(current_value, original_value) == 0) {
             printf("current value is equal to original value\n");
-            if (uint256_is_zero(original_value)) {
+            if (uint256_is_zero(current_value)) {
                 printf("original value is zero\n");
                 gas_used += GAS_STORAGE_SET;
             } else {
@@ -221,15 +227,16 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
             }
         } else {
             gas_used += GAS_SLOAD;
-            if (original_value == nullptr || uint256_is_zero(original_value)) {
-                if (current_value == nullptr || uint256_is_zero(current_value)) {
+            if (uint256_is_zero(original_value)) {
+                if (uint256_is_zero(current_value)) {
                     gas_refund -= GAS_STORAGE_CLEAR_REFUND;
                 } else if (uint256_is_zero(new_value)) {
                     gas_refund += GAS_STORAGE_CLEAR_REFUND;
                 }
             }
-            if (uint256_cmp(original_value, new_value) == 0) {
-                if (original_value == nullptr || uint256_is_zero(original_value)) {
+            if (uint256_cmp(original_value, new_value) == 0 ||
+                (blank_storage && uint256_cmp(new_value, current_value) == 0)) {
+                if (uint256_is_zero(original_value)) {
                     gas_refund += GAS_STORAGE_SET - GAS_SLOAD;
                 } else {
                     gas_refund += GAS_STORAGE_RESET - GAS_SLOAD;

@@ -42,6 +42,7 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (uint256_cmp_word(&memory_offset, memory_offset_u32) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
     }
+
     gas_used += GAS_MEMORY;
     // get the memory expansion gas cost
     gas_t memory_expansion_cost = 0;
@@ -51,10 +52,10 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
-        uint8_t *data = new uint8_t[UINT256_BYTES];
+        uint8_t data[UINT256_BYTES];
         uint256_to_bytes(data, &value, UINT256_BYTES);
-        error_code |= memory.set(data, memory_offset_u32, UINT256_BYTES);
-        delete[] data;
+
+        error_code |= memory.set(data, UINT256_BYTES, memory_offset_u32, UINT256_BYTES);
     }
     return error_code;
 }
@@ -81,7 +82,7 @@ __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
         memory.increase_memory_cost(memory_expansion_cost);
         uint8_t *data = new uint8_t[1];
         data[0] = value.words[0] & 0xFF;
-        error_code |= memory.set(data, memory_offset_u32, 1);
+        error_code |= memory.set(data, 1, memory_offset_u32, 1);
         delete[] data;
     }
     return error_code;

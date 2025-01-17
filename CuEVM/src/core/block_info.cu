@@ -2,6 +2,7 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
+__device__ block_info_t *global_block_info;
 __device__ block_info_t::block_info_t() {
     coin_base.from_uint32_t(0);
     difficulty.from_uint32_t(0);
@@ -90,22 +91,6 @@ __host__ int32_t block_info_t::from_json(const cJSON *json) {
     }
     return ERROR_SUCCESS;
 }
-
-__device__ void block_info_t::get_coin_base(evm_word_t &coin_base) const { coin_base = this->coin_base; }
-
-__device__ void block_info_t::get_time_stamp(evm_word_t &time_stamp) const { time_stamp = this->time_stamp; }
-
-__device__ void block_info_t::get_number(evm_word_t &number) const { number = this->number; }
-
-__device__ void block_info_t::get_difficulty(evm_word_t &difficulty) const { difficulty = this->difficulty; }
-
-__device__ void block_info_t::get_prevrandao(evm_word_t &val) const { val = this->prevrandao; }
-
-__device__ void block_info_t::get_gas_limit(evm_word_t &gas_limit) const { gas_limit = this->gas_limit; }
-
-__device__ void block_info_t::get_chain_id(evm_word_t &chain_id) const { chain_id = this->chain_id; }
-
-__device__ void block_info_t::get_base_fee(evm_word_t &base_fee) const { base_fee = this->base_fee; }
 
 __device__ int32_t block_info_t::get_previous_hash(evm_word_t &previous_hash, const evm_word_t &previous_number) const {
     uint32_t idx = 0;
@@ -212,22 +197,21 @@ __host__ cJSON *block_info_t::to_json() const {
     return block_json;
 }
 
-__host__ int32_t get_block_info(block_info_t *&block_info_ptr, const cJSON *json, int32_t managed) {
-    if (managed == 1) {
-        CUDA_CHECK(cudaMallocManaged(&block_info_ptr, sizeof(block_info_t)));
-        block_info_ptr->from_json(json);
-    } else {
-        block_info_ptr = new block_info_t(json);
-    }
-    return 1;
+__host__ int32_t get_block_info(const cJSON *json) {
+    // Create block info on host
+    block_info_t *block_info_ptr = new block_info_t(json);
+
+    // Allocate device memory for block info
+    block_info_t *d_block_info;
+    cudaMalloc(&d_block_info, sizeof(block_info_t));
+
+    // Copy block info to device
+    cudaMemcpy(d_block_info, block_info_ptr, sizeof(block_info_t), cudaMemcpyHostToDevice);
+
+    // Copy pointer to symbol
+    cudaMemcpyToSymbol(global_block_info, &d_block_info, sizeof(block_info_t *));
+
+    return ERROR_SUCCESS;
 }
 
-__host__ int32_t free_block_info(block_info_t *&block_info_ptr, int32_t managed) {
-    if (managed == 1) {
-        CUDA_CHECK(cudaFree(block_info_ptr));
-    } else {
-        delete block_info_ptr;
-    }
-    return 1;
-}
 }  // namespace CuEVM

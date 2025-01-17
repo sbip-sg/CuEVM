@@ -175,7 +175,7 @@ __device__ int32_t evm_stack_t::swapx(uint32_t x) {
     return ERROR_SUCCESS;
 }
 
-__device__ void evm_stack_t::print() {
+__device__ void evm_stack_t::print() const {
     printf("Stack size: %d, data:\n", size());
     for (uint32_t idx = 1; idx <= size(); idx++) {
         evm_word_t *elem = get_address_at_index(idx);
