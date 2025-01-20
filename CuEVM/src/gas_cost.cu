@@ -26,10 +26,7 @@ __device__ void evm_words_gas_cost(gas_t &gas_used, const gas_t &length, const u
 }
 
 __device__ void evm_bytes_gas_cost(gas_t &gas_used, const gas_t &length, const uint32_t gas_per_byte) {
-    // gas_used += gas_per_byte * bytes count of length
-    gas_t evm_bytes_gas;
-    evm_bytes_gas = length * gas_per_byte;
-    gas_used += evm_bytes_gas;
+    gas_used += length * gas_per_byte;
 }
 
 __device__ int32_t exp_bytes_gas_cost(gas_t &gas_used, const evm_word_t &exponent) {
@@ -205,21 +202,21 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
         original_value = &value_status->original_value;
         current_value = &value_status->value;
     }
-    printf("original value %p\n", original_value);
-    printf("current value %p\n", current_value);
-    printf("new value %p\n", new_value);
-    new_value->print();
+    // printf("original value %p\n", original_value);
+    // printf("current value %p\n", current_value);
+    // printf("new value %p\n", new_value);
+    // new_value->print();
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
     } else {
         if (uint256_cmp(current_value, original_value) == 0) {
-            printf("current value is equal to original value\n");
+            // printf("current value is equal to original value\n");
             if (uint256_is_zero(current_value)) {
-                printf("original value is zero\n");
+                // printf("original value is zero\n");
                 gas_used += GAS_STORAGE_SET;
             } else {
-                printf("original value is not zero\n");
+                // printf("original value is not zero\n");
                 gas_used += GAS_SSTORE_RESET;
                 if (uint256_is_zero(new_value)) {
                     gas_refund += GAS_SSTORE_CLEARS_SCHEDULE;
@@ -289,6 +286,7 @@ __device__ int32_t memory_grow_cost(const CuEVM::evm_memory_t *memory, const uin
                                     gas_t &memory_expansion_cost, gas_t &gas_used) {
     // reset to 0;
     memory_expansion_cost = 0;
+    if (length == 0) return ERROR_SUCCESS;
     gas_t new_size = index + length;
     gas_t new_size_words = (new_size + 31) / 32;
     // gas_cost = (new_mem_size_words ^ 2 // 512) + (3 * new_mem_size_words) - Cmem(old_state

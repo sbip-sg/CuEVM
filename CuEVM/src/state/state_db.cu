@@ -81,21 +81,21 @@ __device__ void Snapshot::set_storage(const evm_word_t *address, const evm_word_
         grow_account(address, nullptr, 0);
         address_index = num_accounts - 1;
     }
-    printf("set storage\n");
-    printf("address \n");
-    address->print();
-    printf("key \n");
-    key->print();
-    printf("value \n");
-    value->value.print();
+    // printf("set storage\n");
+    // printf("address \n");
+    // address->print();
+    // printf("key \n");
+    // key->print();
+    // printf("value \n");
+    // value->value.print();
     int32_t key_offset = accounts[address_index].find_storage_key(key);
     if (key_offset == -1) {
-        printf("key not found, grow storage\n");
+        // printf("key not found, grow storage\n");
         accounts[address_index].grow_storage(key);
         key_offset = accounts[address_index].storage_size - 1;
         accounts[address_index].storage_values[key_offset].value = value->value;
         accounts[address_index].storage_values[key_offset].is_warm = value->is_warm;
-        printf("key offset %d storage size %d\n", key_offset, accounts[address_index].storage_size);
+        // printf("key offset %d storage size %d\n", key_offset, accounts[address_index].storage_size);
     }
 }
 
@@ -244,19 +244,19 @@ __device__ int32_t StateDb::get_dynamic_value_offset(int32_t address_index, cons
 
 __device__ void StateDb::write_storage(const evm_word_t *address, const evm_word_t *key, const evm_word_t *value,
                                        Snapshot *snapshot, bool is_warm) {
-    printf("Write storage \n");
+    // printf("Write storage \n");
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
-        printf("address not found\n");
+        // printf("address not found\n");
         return;  // should never write directly to storage before creating account
     }
     // find in prealloc_values_pool
     int32_t key_offset = get_value_offset(address_index, key);
     if (key_offset == -1) {
-        printf("key not found\n");
+        // printf("key not found\n");
         if (account_storage_size[address_index] < account_prealloc_keys_size) {
-            printf(" not found in prealloc_values_pool, account storage size: %d\n",
-                   account_storage_size[address_index]);
+            // printf(" not found in prealloc_values_pool, account storage size: %d\n",
+            //    account_storage_size[address_index]);
             // create new key val pair on prealloc_values_pool
             uint32_t key_list_start = keys_list_offset[address_index];
             uint32_t key_list_size = account_storage_size[address_index];
@@ -264,15 +264,15 @@ __device__ void StateDb::write_storage(const evm_word_t *address, const evm_word
             key_offset = num_storage_elements * num_states;
             new_key_offset->key = *key;
             new_key_offset->offset = key_offset;
-            printf("new key offset: %d\n", key_offset);
-            printf("key list start %d key list size %d\n", key_list_start, key_list_size);
-            printf("new key offset %p\n", new_key_offset);
+            // printf("new key offset: %d\n", key_offset);
+            // printf("key list start %d key list size %d\n", key_list_start, key_list_size);
+            // printf("new key offset %p\n", new_key_offset);
             prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].set_value(value, is_warm);
 
             account_storage_size[address_index]++;
             num_storage_elements++;
         } else {
-            printf(" not found in prealloc_values_pool, create dynamic storage\n");
+            // printf(" not found in prealloc_values_pool, create dynamic storage\n");
             // find in dynamic_keys_pool
             key_offset = get_dynamic_value_offset(address_index, key);
             if (key_offset == -1) {
@@ -294,9 +294,9 @@ __device__ void StateDb::write_storage(const evm_word_t *address, const evm_word
         }
 
     } else {
-        printf("found in prealloc_values_pool\n");
+        // printf("found in prealloc_values_pool\n");
         if (snapshot != nullptr) {
-            printf("set snapshot\n");
+            // printf("set snapshot\n");
             snapshot->set_storage(address, key, &prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX]);
         }
         prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].set_value(value, is_warm);
@@ -346,25 +346,25 @@ __device__ evm_word_t *StateDb::get_storage(const evm_word_t *address, const evm
     }
     int32_t key_offset = get_value_offset(address_index, key);
     if (key_offset == -1) {
-        printf(" not found in prealloc_values_pool, search dynamic storage\n");
+        // printf(" not found in prealloc_values_pool, search dynamic storage\n");
         // find in dynamic_keys_pool
         key_offset = get_dynamic_value_offset(address_index, key);
         if (key_offset == -1) {
-            printf("not found at all\n");
+            // printf("not found at all\n");
             if (set_warm) {
-                printf("set warm, reading nonexistent blank storage\n");
+                // printf("set warm, reading nonexistent blank storage\n");
                 evm_word_t zero = 0;
                 write_storage(address, key, &zero, 0);
             }
             return nullptr;
         } else {
-            printf("found in dynamic storage\n");
+            // printf("found in dynamic storage\n");
             dynamic_values_pool[address_index][key_offset].is_warm = set_warm;
             account_is_warm[address_index] |= set_warm;
             return &dynamic_values_pool[address_index][key_offset].value;
         }
     } else {
-        printf("found in prealloc_values_pool\n");
+        // printf("found in prealloc_values_pool\n");
         prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].is_warm = set_warm;
         account_is_warm[address_index] |= set_warm;
         return &prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].value;
@@ -378,18 +378,18 @@ __device__ ValueStatus *StateDb::get_value_status(const evm_word_t *address, con
     }
     int32_t key_offset = get_value_offset(address_index, key);
     if (key_offset == -1) {
-        printf(" not found in prealloc_values_pool, search dynamic storage\n");
+        // printf(" not found in prealloc_values_pool, search dynamic storage\n");
         // find in dynamic_keys_pool
         key_offset = get_dynamic_value_offset(address_index, key);
         if (key_offset == -1) {
-            printf("not found at all\n");
+            // printf("not found at all\n");
             return nullptr;
         } else {
-            printf("found in dynamic storage\n");
+            // printf("found in dynamic storage\n");
             return &dynamic_values_pool[address_index][key_offset];
         }
     } else {
-        printf("found in prealloc_values_pool\n");
+        // printf("found in prealloc_values_pool\n");
         return &prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX];
     }
 }
@@ -398,17 +398,17 @@ __device__ void StateDb::grow_storage(int32_t address_index) {
     // grow individual thread storage.
     uint32_t pool_capacity = dynamic_pool_capacity[address_index];
     uint32_t storage_size = account_storage_size[address_index];
-    printf("storage size: %d\n", storage_size);
-    printf("pool capacity: %d\n", pool_capacity);
+    // printf("storage size: %d\n", storage_size);
+    // printf("pool capacity: %d\n", pool_capacity);
     if (storage_size >= account_prealloc_keys_size) {
-        printf("grow storage\n");
+        // printf("grow storage\n");
         if (pool_capacity == 0) {
             dynamic_pool_capacity[address_index] = dynamic_pool_base_size;
             dynamic_keys_pool[address_index] = new evm_word_t[dynamic_pool_base_size];
             dynamic_values_pool[address_index] = new ValueStatus[dynamic_pool_base_size];
-            printf("new dynamic pool capacity: %d\n", dynamic_pool_capacity[address_index]);
-            printf("new dynamic keys pool: %p\n", dynamic_keys_pool[address_index]);
-            printf("new dynamic values pool: %p\n", dynamic_values_pool[address_index]);
+            // printf("new dynamic pool capacity: %d\n", dynamic_pool_capacity[address_index]);
+            // printf("new dynamic keys pool: %p\n", dynamic_keys_pool[address_index]);
+            // printf("new dynamic values pool: %p\n", dynamic_values_pool[address_index]);
         } else if (storage_size == pool_capacity - account_prealloc_keys_size) {
             uint32_t new_pool_capacity = pool_capacity * 2;
             evm_word_t *new_keys_pool = new evm_word_t[new_pool_capacity];

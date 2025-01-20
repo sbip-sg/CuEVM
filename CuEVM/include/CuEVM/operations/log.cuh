@@ -28,9 +28,8 @@ namespace CuEVM::operations {
  * @param[in] opcode The opcode.
  * @return 0 if the operation was successful, an error code otherwise.
  */
-__device__ int32_t LOGX(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, CuEVM::evm_memory_t &memory,
-                        const CuEVM::evm_call_context_t &call_context, CuEVM::log_state_data_t &log_state,
-                        const uint8_t &opcode);
+__device__ int32_t LOGX(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+                        const CuEVM::evm_call_context_t *call_context, const uint8_t &opcode);
 }  // namespace CuEVM::operations
 
 #endif

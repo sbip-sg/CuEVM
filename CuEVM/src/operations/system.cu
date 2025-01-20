@@ -33,8 +33,8 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     }
     error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, args_offset_ui32, args_size_ui32,
                                                     memory_expansion_cost_args, temp_memory_gas_used);
-    printf("temp memory gas used %u, memory_expansion_cost_args %u\n", temp_memory_gas_used,
-           memory_expansion_cost_args);
+    // printf("temp memory gas used %u, memory_expansion_cost_args %u\n", temp_memory_gas_used,
+    //        memory_expansion_cost_args);
     // memory return data
     evm_word_t ret_offset = new_context_ptr->fixed_ret_offset;
     evm_word_t ret_size = new_context_ptr->fixed_ret_size;
@@ -47,15 +47,15 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, ret_offset_ui32, ret_size_ui32,
                                                     memory_expansion_cost_ret, temp_memory_gas_used);
 
-    printf("temp memory gas used %u, memory_expansion_cost_ret %u\n", temp_memory_gas_used, memory_expansion_cost_ret);
-    // compute the total memory expansion cost
+    // printf("temp memory gas used %u, memory_expansion_cost_ret %u\n", temp_memory_gas_used,
+    // memory_expansion_cost_ret); compute the total memory expansion cost
     gas_t memory_expansion_cost;
     if (memory_expansion_cost_args > memory_expansion_cost_ret) {
         memory_expansion_cost = memory_expansion_cost_args;
     } else {
         memory_expansion_cost = memory_expansion_cost_ret;
     }
-    printf("memory expansion cost %u\n", memory_expansion_cost);
+    // printf("memory expansion cost %u\n", memory_expansion_cost);
     cached_state.gas_used += memory_expansion_cost;
 
     // adress warm call
@@ -98,10 +98,7 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
             new_context_ptr->call_type != OP_DELEGATECALL)  // special case: the code is set outside
             new_context_ptr->byte_code =
                 CuEVM::global_state_db_ptr->get_code(new_context_ptr->byte_code_size, contract_address_ptr);
-        // printf("byte code size %d\n", new_context_ptr->byte_code_size);
-        // printf("byte code data %p\n", new_context_ptr->byte_code);
-        // printf("contract address \n");
-        // contract_address_ptr->print();
+
         uint8_t *call_data = nullptr;
         if (args_size > 0) error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data);
         new_context_ptr->call_data = call_data;
@@ -260,34 +257,15 @@ __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_c
     cached_state.stack_ptr->reduce_size(7);
     gas_t gas = uint256_get_uint32_t(gas_word);
 
-    // printf("opcode CALL parameters\n");
-    // gas_word->print();
-    // original_address->print();
-    // value->print();
-    // args_offset->print();
-    // args_size->print();
-    // ret_offset->print();
-    // ret_size->print();
-
     evm_word_t address = *original_address;
     // clean the address
     CuEVM::utils::evm_address_conversion(address);
 
-    // evm_call_context_t *new_context_ptr = new CuEVM::evm_call_context_t(
-    //     &current_context->to, &address, &address, gas, &value, current_context->depth + 1, OP_CALL, &address,
-    //     call_data, code, ret_offset, ret_size, current_context->static_env);
-
-    // current_context->message_ptr->copy_from(message_call_ptr);
-    // TODO: fix this
     new_context_ptr = new CuEVM::evm_call_context_t();
-    // new_context_ptr->initiate_values(current_context, gas, current_context->to, address, value, OP_CALL, call_data,
-    //                                  code, ret_offset, ret_size, current_context->static_env);
 
     new_context_ptr->initiate_values(current_context, gas, current_context->to, address, address, *value, OP_CALL,
                                      nullptr, 0, nullptr, 0, uint256_get_uint32_t(ret_offset),
                                      uint256_get_uint32_t(ret_size), current_context->static_env);
-    // printf("new context ptr\n");
-    // new_context_ptr->print();
 
     return generic_CALL(args_offset, args_size, current_context->memory_ptr, new_context_ptr, cached_state);
 }
@@ -318,23 +296,15 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
     evm_word_t address = *original_address;
     CuEVM::utils::evm_address_conversion(address);
 
-    // evm_message_call_t_shadow *message_call_ptr = new CuEVM::evm_message_call_t_shadow(
-    //     &current_context->to, &current_context->to, &address, gas, &value, current_context->depth + 1,
-    //     OP_CALLCODE, &current_context->to, call_data, code, ret_offset, ret_size,
-    //     current_context->static_env);
     uint32_t byte_code_size = 0;
     uint8_t *byte_code = CuEVM::global_state_db_ptr->get_code(byte_code_size, &address);
-    // current_context->message_ptr->copy_from(message_call_ptr);
-    // TODO: fix this
-    // new_context_ptr = new CuEVM::evm_call_context_t(&current_context, message_call_ptr);
+
     new_context_ptr = new CuEVM::evm_call_context_t();
 
     new_context_ptr->initiate_values(current_context, gas, current_context->to, current_context->to,
                                      current_context->to, *value, OP_CALLCODE, nullptr, 0, byte_code, byte_code_size,
                                      uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
                                      current_context->static_env);
-    // printf("new context ptr\n");
-    // new_context_ptr->print();
 
     return generic_CALL(args_offset, args_size, current_context->memory_ptr, new_context_ptr, cached_state);
 }
@@ -368,7 +338,7 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
+        // printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
         // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
         call_state_ptr->set_return_data(memory_offset_ui32, length_ui32);
         error_code = ERROR_RETURN;

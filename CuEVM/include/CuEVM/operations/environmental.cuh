@@ -259,7 +259,7 @@ __device__ int32_t EXTCODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::e
  * @return The error code. 0 if no error.
  */
 __device__ int32_t EXTCODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                               CuEVM::StateDb *state_db, CuEVM::evm_memory_t &memory);
+                               const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The RETURNDATASIZE operation implementation.

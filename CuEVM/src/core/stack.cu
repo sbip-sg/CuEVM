@@ -45,28 +45,9 @@ __device__ void evm_stack_t::reduce_size(uint32_t num_items) {
 
 __device__ evm_word_t *evm_stack_t::top() {
     if (stack_base_offset + stack_offset < memory_pool_stack_preallocate) {
-        // if (THREADIDX == 0) {
-        //     printf("shared stack base %p stack offset %d, num instances %d instance idx %d \n", shared_stack_base,
-        //            stack_offset, CuEVM::memory_pool::global_memory_pool->num_instances, INSTANCE_GLOBAL_IDX);
-        //     printf("real address %p\n", shared_stack_base +
-        //                                     (stack_offset - 1) *
-        //                                     CuEVM::memory_pool::global_memory_pool->num_instances +
-        //                                     INSTANCE_GLOBAL_IDX);
-        // }
-        // return shared_stack_base + stack_offset;
         return shared_stack_base + stack_offset * CuEVM::memory_pool::global_memory_pool->num_instances +
                INSTANCE_GLOBAL_IDX;
     } else {
-        // page size is max stack size
-        // if ((stack_base_offset + stack_offset - memory_pool_stack_preallocate) % max_stack_size == 0) {
-        //     evm_word_t *new_stack_base = new evm_word_t[max_stack_size];
-        //     if (global_stack_base != nullptr) {
-        //         delete[] global_stack_base;
-        //     }
-
-        //     global_stack_base = new_stack_base;
-        // }
-        // allocate once
         if (global_stack_base == nullptr) {
             global_stack_base = new evm_word_t[max_stack_size];
         }  // TODO reuse global stack allocation for child calls

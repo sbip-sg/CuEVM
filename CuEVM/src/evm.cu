@@ -28,6 +28,11 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
     if (instance == 0) {
         evm.tracer_ptr->print_err();
     }
+    __syncthreads();
+    if (instance == 1) {
+        printf("\n\ninstance 1\n\n");
+        evm.tracer_ptr->print_err();
+    }
 #endif
 }
 
@@ -217,9 +222,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
     simplified_trace_data_ptr->start_call(0, call_state_ptr->message_ptr);
 #endif
     int32_t error_code = start_CALL(cached_call_state);
-    // printf("\n\n evm start_CALL error_code %d\n", error_code);
-    // printf("cached call state after start_CALL %p\n", cached_call_state.stack_ptr);
-    // cached_call_state.print();
+
     if (error_code != ERROR_SUCCESS) {
 #ifdef BUILD_LIBRARY
         simplified_trace_data_ptr->finish_call(0);
@@ -238,28 +241,19 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 
 #ifdef EIP_3155
 
-        // printf("before start_operation mem ptr %p memsize %d threadidx %d\n", call_state_ptr->memory_ptr,
-        //        call_state_ptr->memory_ptr->size, THREADIDX);
         tracer_ptr->start_operation(cached_call_state.pc, opcode, call_state_ptr->memory_ptr,
                                     cached_call_state.stack_ptr, call_state_ptr->depth, nullptr,
                                     cached_call_state.gas_limit, cached_call_state.gas_used);
-        // call_state_ptr->trace_idx = trace_idx;
-
-        // printf("\npc: %d opcode: %d, depth %d, thread %d  gas_limit %lu, gas_used %lu\n", cached_call_state.pc,
-        //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
         if (INSTANCE_GLOBAL_IDX == 0) {
-            printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
-                   opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
+            // printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
+            //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit,
+            //        cached_call_state.gas_used);
 
             // printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
             // cached_call_state.stack_ptr->print();
         }
-        // if (THREADIDX == 1) {
-        //     printf("print Stack 2, size %u\n", cached_call_state.stack_ptr->stack_offset);
-        //     cached_call_state.stack_ptr->print();
-        // }
 
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -460,8 +454,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                     break;
                 case OP_EXTCODECOPY:
                     error_code = CuEVM::operations::EXTCODECOPY(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                                *cached_call_state.stack_ptr, global_state_db_ptr,
-                                                                *call_state_ptr->memory_ptr);
+                                                                *cached_call_state.stack_ptr, call_state_ptr);
                     break;
                 case OP_RETURNDATASIZE:
                     error_code =
@@ -635,13 +628,8 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                 default:
                     if ((opcode >= 0xA0) && (opcode <= 0xA4))  // LOGX // not common
                     {
-                        // TODO: fix this
-                        // error_code = CuEVM::operations::LOGX(cached_call_state.gas_limit,
-                        // cached_call_state.gas_used,
-                        //                                      *cached_call_state.stack_ptr,
-                        //                                      *call_state_ptr->memory_ptr,
-                        //                                      *call_state_ptr->message_ptr,
-                        //                                      *call_state_ptr->log_state_ptr, opcode);
+                        error_code = CuEVM::operations::LOGX(cached_call_state.gas_limit, cached_call_state.gas_used,
+                                                             *cached_call_state.stack_ptr, call_state_ptr, opcode);
                     } else
                         error_code = CuEVM::operations::INVALID();
                     break;
@@ -651,7 +639,6 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         // TODO: to see after calls
         // increase program counter
         cached_call_state.pc++;
-        printf("Error code %d\n", error_code);
 #ifdef EIP_3155
         tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
 
@@ -690,11 +677,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                 }
             }
         }
-        // #ifdef __CUDA_ARCH__
-        //         printf("after checking elseif create CREATE %d error_code: %d , depth %d\n", threadIdx.x,
-        //         error_code,
-        //                call_state_ptr->depth);
-        // #endif
+
         if (error_code != ERROR_SUCCESS) {
             if ((error_code == ERROR_RETURN) &&
                 (call_state_ptr->call_type == OP_CREATE || call_state_ptr->call_type == OP_CREATE2)) {
@@ -704,12 +687,6 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
             }
 
             if (call_state_ptr->depth == 1) {
-                // TODO: finish transaction
-                // printf("Finish transaction\n");
-                // #ifdef __CUDA_ARCH__
-                //                 printf(" call_state_ptr->depth == 1 finish call %d error_code: %d\n",
-                //                 threadIdx.x, error_code);
-                // #endif
                 cached_call_state.write_cache_to_state(call_state_ptr);
                 finish_CALL(error_code);
                 finish_TRANSACTION(error_code);
@@ -819,7 +796,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
         gas_t gas_left = call_state_ptr->gas_limit - call_state_ptr->gas_used;
-        printf("gas_left %lx\n", gas_left);
+        // printf("gas_left %lx\n", gas_left);
         if (call_state_ptr->parent != nullptr) {
             call_state_ptr->parent->gas_used -= gas_left;
         }
@@ -852,7 +829,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     // check overflow
     uint32_t ret_size_u32 = uint256_get_uint32_t(&ret_size);
     uint32_t ret_offset_u32 = uint256_get_uint32_t(&ret_offset);
-    printf("ret_size_u32 %u, ret_offset_u32 %u\n", ret_size_u32, ret_offset_u32);
+    // printf("ret_size_u32 %u, ret_offset_u32 %u\n", ret_size_u32, ret_offset_u32);
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
     // if (ret_size_u32 + ret_offset_u32 > call_state_ptr->parent->memory_ptr->size) {
     //     return ERR_MEMORY_INVALID_OFFSET;
@@ -869,7 +846,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         call_state_ptr->copy_return_data(call_state_ptr->parent->memory_ptr->data + ret_offset_u32, 0, ret_size_u32);
         // error_code |= call_state_ptr->parent->memory_ptr->set(call_state_ptr->parent->return_data, ret_dynamic_size,
         //                                                       ret_offset_u32, ret_size_u32);
-        call_state_ptr->parent->memory_ptr->print();
+        // call_state_ptr->parent->memory_ptr->print();
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
         delete call_state_ptr;

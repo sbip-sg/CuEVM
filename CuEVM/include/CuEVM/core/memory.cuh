@@ -80,6 +80,9 @@ struct evm_memory_t {
      */
     __host__ __device__ int32_t set(uint8_t *data_, uint32_t data_size, const uint32_t index, const uint32_t length);
 
+    __host__ __device__ int32_t set_buffer_data(uint8_t *data_, uint64_t data_offset, uint32_t data_size,
+                                                const uint32_t index, const uint32_t length);
+
     /**
      * Set the given memory data to zero.
      * @param[in] index The index of the memory access.

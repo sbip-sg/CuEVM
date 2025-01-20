@@ -163,17 +163,15 @@ __device__ void tracer_t::start_operation(const uint32_t pc, const uint8_t op, c
     data[size].stack_size = stack->size();
     if (data[size].stack_size > 0) {
         data[size].stack = new evm_word_t[data[size].stack_size];
-
         stack->extract_data(data[size].stack);
-
-        for (int i = 0; i < data[size].stack_size; i++) {
-            data[size].stack[i].print();
-        }
+        // for (int i = 0; i < data[size].stack_size; i++) {
+        //     data[size].stack[i].print();
+        // }
     }
 
-    for (int i = 0; i < data[size].stack_size; i++) {
-        data[size].stack[i].print();
-    }
+    // for (int i = 0; i < data[size].stack_size; i++) {
+    //     data[size].stack[i].print();
+    // }
 
     data[size].depth = depth;
     // TODO: fix this

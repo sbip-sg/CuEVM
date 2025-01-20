@@ -103,4 +103,33 @@ __device__ int32_t evm_memory_t::set(uint8_t *data_, uint32_t data_size, const u
     return error_code;
 }
 
+__device__ int32_t evm_memory_t::set_buffer_data(uint8_t *data_, uint64_t data_offset, uint32_t data_size,
+                                                 const uint32_t index, const uint32_t length) {
+    int32_t error_code = ERROR_SUCCESS;
+    if (length == 0) {
+        return error_code;
+    }
+    error_code |= grow(index + length);
+    if (error_code == ERROR_SUCCESS) {
+        if (data_ != nullptr) {
+            if (data_offset > data_size) {
+                memset(this->data + index, 0, length);
+                return error_code;
+            }
+            if (data_offset + length > data_size) {
+                if (data_size > data_offset) {
+                    memcpy(this->data + index, data_ + data_offset, data_size - data_offset);
+                    memset(this->data + index + data_size - data_offset, 0, length + data_offset - data_size);
+                } else {
+                    memset(this->data + index, 0, length);
+                }
+            } else {
+                memcpy(this->data + index, data_ + data_offset, length);
+            }
+        }
+    }
+
+    return error_code;
+}
+
 }  // namespace CuEVM::memory
