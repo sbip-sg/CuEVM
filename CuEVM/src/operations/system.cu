@@ -338,7 +338,7 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        // printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
+        printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
         // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
         call_state_ptr->set_return_data(memory_offset_ui32, length_ui32);
         error_code = ERROR_RETURN;

@@ -89,22 +89,30 @@ struct SnapshotAccount {
     SnapshotValue *storage_values = nullptr;
 
     bool is_warm = false;
-    __host__ __device__ SnapshotAccount() {}
+    __host__ __device__ SnapshotAccount()
+        : nonce(0),
+          storage_size(0),
+          code_size(0),
+          code(nullptr),
+          storage_keys(nullptr),
+          storage_values(nullptr),
+          is_warm(false) {}
     __device__ int32_t find_storage_key(const evm_word_t *key) const;
     __device__ void grow_storage(const evm_word_t *key);
 };
 
 struct Snapshot {
     uint32_t num_accounts = 0;
-    evm_word_t *address_list = nullptr;
+    uint32_t *address_index_list = nullptr;
     SnapshotAccount *accounts = nullptr;
-    __host__ __device__ Snapshot();
-    __device__ int32_t get_address_index(const evm_word_t *address) const;
-    __device__ void grow_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
-    __device__ void set_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
-    __device__ void set_code(const evm_word_t *address, const uint32_t code_size, const uint8_t *code);
-    __device__ void set_storage(const evm_word_t *address, const evm_word_t *key, const ValueStatus *value);
-    __device__ SnapshotValue *get_storage(const evm_word_t *address, const evm_word_t *key) const;
+    __host__ __device__ Snapshot() : num_accounts(0), address_index_list(nullptr), accounts(nullptr) {}
+    __host__ __device__ ~Snapshot();
+    __device__ int32_t get_snapshot_index(const uint32_t address_index) const;
+    __device__ void grow_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t nonce);
+    __device__ void set_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t nonce);
+    __device__ void set_code(const uint32_t address_index, const uint32_t code_size, const uint8_t *code);
+    __device__ void set_storage(const uint32_t address_index, const evm_word_t *key, const ValueStatus *value);
+    __device__ SnapshotValue *get_storage(const uint32_t address_index, const evm_word_t *key) const;
 };
 class StateDb {
    public:
@@ -173,7 +181,7 @@ class StateDb {
     __device__ uint8_t *get_code(uint32_t &code_size, const evm_word_t *address);
     __device__ uint32_t get_nonce(const evm_word_t *address);
 
-    __device__ void grow_storage(int32_t address_index);
+    __device__ void grow_storage(int32_t instance_idx);
     __device__ void write_storage(const evm_word_t *address, const evm_word_t *key, const evm_word_t *value,
                                   Snapshot *snapshot = nullptr, bool is_warm = true);
     // return the pointer to the storage value
@@ -193,11 +201,11 @@ class StateDb {
     __device__ bool is_empty_create(const evm_word_t *address) const;
 
     // __device__ void clear_account(const evm_word_t *address);
-    __device__ void snapshot_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce,
+    __device__ void snapshot_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t nonce,
                                      Snapshot *snapshot = nullptr);
-    __device__ void snapshot_storage(const evm_word_t *address, evm_word_t *key, ValueStatus *value,
+    __device__ void snapshot_storage(const uint32_t address_index, evm_word_t *key, ValueStatus *value,
                                      Snapshot *snapshot = nullptr);
-    __device__ void snapshot_code(const evm_word_t *address, Snapshot *snapshot = nullptr);
+    __device__ void snapshot_code(const uint32_t address_index, Snapshot *snapshot = nullptr);
     __device__ void revert_to_snapshot(Snapshot *snapshot = nullptr);
 
     __device__ void serialize_data(serialized_worldstate_data *data);

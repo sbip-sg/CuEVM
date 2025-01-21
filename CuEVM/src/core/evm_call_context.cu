@@ -47,9 +47,11 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
                                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
                                                     uint32_t byte_code_size, evm_call_context_t* parent,
                                                     bool static_env, gas_t gas_refund) {
+    // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
+    //        INSTANCE_GLOBAL_IDX, parent, this);
     this->parent = parent;
     if (parent == nullptr) {
-        this->current_snapshot = &global_state_db_ptr->original_snapshot[THREADIDX];
+        this->current_snapshot = &global_state_db_ptr->original_snapshot[INSTANCE_GLOBAL_IDX];
     }
     this->depth = depth;
     this->pc = pc;
@@ -82,8 +84,8 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
                                                     uint8_t* byte_code, uint32_t byte_code_size,
                                                     uint32_t return_data_offset, uint32_t return_data_size,
                                                     bool static_env, gas_t gas_refund) {
-    // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
-
+    // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
+    //        INSTANCE_GLOBAL_IDX, parent, this);
     if (parent == nullptr) {
         printf("parent is nullptr\n");
         return;
@@ -168,7 +170,7 @@ __device__ void evm_call_context_t::set_return_data(uint32_t offset, uint32_t si
     memory_ptr->get(offset, size, source_data);
 
     uint8_t* preallocated_base =
-        CuEVM::memory_pool::preallocated_return_data_base + THREADIDX * memory_pool_return_data_preallocate;
+        CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
 
     if (size <= memory_pool_return_data_preallocate) {
         memcpy(preallocated_base, source_data, size);
@@ -204,11 +206,14 @@ __device__ void evm_call_context_t::print_return_data() const {
  * The destructor of the evm_call_state_t
  */
 __device__ evm_call_context_t::~evm_call_context_t() {
+    // printf("evm_call_context_t destructor thread %d, call state ptr %p, parent call state ptr %p\n",
+    //        INSTANCE_GLOBAL_IDX, this, parent);
     if (parent != nullptr) {
-        // delete stack_ptr;
-        // delete memory_ptr;
-        // delete last_return_data_ptr;
-        // TODO delete touch_state_ptr;
+        delete stack_ptr;
+        delete memory_ptr;
+        if (current_snapshot != &global_state_db_ptr->original_snapshot[INSTANCE_GLOBAL_IDX]) {
+            delete current_snapshot;
+        }
     }
 }
 __device__ void evm_call_context_t::print() const {

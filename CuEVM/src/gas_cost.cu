@@ -256,8 +256,8 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
 
     // gas_intrinsic += GAS_TX_DATA_ZERO/GAS_TX_DATA_NONZERO for each byte in
     // transaction.data
-    for (uint32_t idx = 0; idx < transaction_list->call_data_size[THREADIDX]; idx++) {
-        if (transaction_list->call_data[transaction_list->call_data_offset[THREADIDX] + idx] == 0) {
+    for (uint32_t idx = 0; idx < transaction_list->call_data_size[INSTANCE_GLOBAL_IDX]; idx++) {
+        if (transaction_list->call_data[transaction_list->call_data_offset[INSTANCE_GLOBAL_IDX] + idx] == 0) {
             gas_intrinsic += GAS_TX_DATA_ZERO;
         } else {
             gas_intrinsic += GAS_TX_DATA_NONZERO;

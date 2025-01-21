@@ -247,9 +247,8 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 
 #endif
         if (INSTANCE_GLOBAL_IDX == 0) {
-            // printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
-            //        opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit,
-            //        cached_call_state.gas_used);
+            printf("\npc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n", cached_call_state.pc,
+                   opcode, call_state_ptr->depth, THREADIDX, cached_call_state.gas_limit, cached_call_state.gas_used);
 
             // printf("print Stack 1, size %u\n", cached_call_state.stack_ptr->stack_offset);
             // cached_call_state.stack_ptr->print();
@@ -849,6 +848,8 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         // call_state_ptr->parent->memory_ptr->print();
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
+        // printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,
+        //        call_state_ptr, parent_call_state_ptr);
         delete call_state_ptr;
 
         call_state_ptr = parent_call_state_ptr;
