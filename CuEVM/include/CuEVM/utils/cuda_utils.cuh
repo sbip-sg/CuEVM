@@ -4,7 +4,7 @@
 // #ifndef CGBN_TPI
 // #define CGBN_TPI 1
 // #endif
-#define INSTANCES_PER_BLOCK 64
+#define INSTANCES_PER_BLOCK 128
 // #define SHARED_STACK_SIZE 12
 
 #include <cuda.h>

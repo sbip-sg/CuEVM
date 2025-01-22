@@ -3,10 +3,11 @@
 
 namespace CuEVM {
 __host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) {
-#pragma unroll
-    for (int32_t index = 0; index < 8; index++) {
-        words[index] = src.words[index];
-    }
+    // #pragma unroll
+    //     for (int32_t index = 0; index < 8; index++) {
+    //         words[index] = src.words[index];
+    //     }
+    memcpy(words, src.words, sizeof(uint32_t) * uint256_limbs);
 }
 
 __host__ __device__ evm_word_t::evm_word_t(uint32_t value) : evm_word_t() { this->from_uint32_t(value); }
@@ -26,16 +27,6 @@ __host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) { uint2
 
 __device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {
     uint256_from_bytes(this, byte_array.data, byte_array.size);
-}
-
-__host__ __device__ int32_t evm_word_t::from_size_t(size_t value) {
-    if (sizeof(size_t) == sizeof(uint64_t)) {
-        return from_uint64_t(value);
-    } else if (sizeof(size_t) == sizeof(uint32_t)) {
-        return from_uint32_t(value);
-    } else {
-        return ERROR_NOT_IMPLEMENTED;
-    }
 }
 
 __host__ __device__ void evm_word_t::set_zero() { uint256_set_zero(this); }

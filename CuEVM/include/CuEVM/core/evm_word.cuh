@@ -62,12 +62,6 @@ struct evm_word_t : uint256 {
     __host__ __device__ int32_t from_byte_array_t(byte_array_t &byte_array, int32_t endian = LITTLE_ENDIAN);
 
     /**
-     * Set the evm_word_t from a size_t.
-     * @param[in] value The source size_t
-     * @return 0 for success, 1 otherwise
-     */
-    __host__ __device__ int32_t from_size_t(size_t value);
-    /**
      * Set the evm_word_t from a uint64_t.
      * @param[in] value The source uint64_t
      * @return 0 for success, 1 otherwise

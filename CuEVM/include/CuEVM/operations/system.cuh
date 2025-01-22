@@ -3,6 +3,7 @@
 
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
+#include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/core/message.cuh>
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/state/state_db.cuh>

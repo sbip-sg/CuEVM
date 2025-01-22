@@ -93,7 +93,7 @@ struct evm_stack_t {
      * @param[in] src_byte_size The size of the source byte data
      * @return 0 if the value is pushed, error code otherwise
      */
-    __host__ __device__ int32_t pushx(uint8_t x, uint8_t *src_byte_data, uint8_t src_byte_size);
+    __host__ __device__ int32_t pushx(uint8_t x, const uint8_t __restrict__ *src_byte_data, uint8_t src_byte_size);
 
     /**
      * Get the value from the stack at the given index

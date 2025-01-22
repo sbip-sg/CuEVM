@@ -692,7 +692,7 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
             memset(&state_db->account_storage_size[idx * num_states], 0, num_states * sizeof(uint32_t));
 
         uint32_t pre_alloc_keys_idx = idx * account_prealloc_keys_size;
-        for (uint32_t i = 0; i < state_db->account_storage_size[idx]; i++) {
+        for (uint32_t i = 0; i < state_db->account_storage_size[idx * num_states]; i++) {
             cJSON *storage_element_json = cJSON_GetArrayItem(storage_json, i);
 
             state_db->all_keys[pre_alloc_keys_idx + i].key.from_hex(storage_element_json->string);
@@ -709,9 +709,10 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
             // printf("offset: %d\n", state_db->all_keys[pre_alloc_keys_idx + i].offset);
         }
         state_db->keys_list_offset[idx] = pre_alloc_keys_idx;
-        key_offset_wo_states += state_db->account_storage_size[idx];
+        key_offset_wo_states += state_db->account_storage_size[idx * num_states];
         idx++;
     }
+    state_db->print();
 }
 __host__ StateDb *StateDb::GPUFromCPU(StateDb *&state_db) {
     StateDb *state_db_gpu = (StateDb *)malloc(sizeof(StateDb));

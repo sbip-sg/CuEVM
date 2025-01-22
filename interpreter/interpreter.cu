@@ -52,8 +52,14 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     const cJSON *test_json = nullptr;
     test_json = cJSON_GetArrayItem(read_root, 0);
     if (test_json != nullptr) {
+        auto start_cpu = std::chrono::high_resolution_clock::now();
+
         CuEVM::get_evm_instances(instances_data, test_json, num_instances, clones);
         CuEVM::memory_pool::create_memory_pool(num_instances);
+
+        auto end_cpu = std::chrono::high_resolution_clock::now();
+        auto duration_cpu = std::chrono::duration_cast<std::chrono::milliseconds>(end_cpu - start_cpu);
+        printf("CPU setup time: %lld milliseconds\n", duration_cpu.count());
         // CuEVM::memory_pool::preallocate_stack(num_instances);
         uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
         printf("\n\n ----------\n\n");

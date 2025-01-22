@@ -106,11 +106,9 @@ __device__ int32_t evm_stack_t::pop_evm_word(evm_word_t *&y) {
     return ERROR_SUCCESS;
 }
 
-__device__ int32_t evm_stack_t::pushx(uint8_t x, uint8_t *src_byte_data, uint8_t src_byte_size) {
+__device__ int32_t evm_stack_t::pushx(uint8_t x, const uint8_t __restrict__ *src_byte_data, uint8_t src_byte_size) {
     if (stack_offset < max_stack_size) {
-        evm_word_t *top_ = top();
-        // if (THREADIDX == 0) printf("pushx top %p, thread %d\n", top_, INSTANCE_GLOBAL_IDX);
-        uint256_from_bytes(top_, src_byte_data, src_byte_size);
+        uint256_from_bytes(top(), src_byte_data, src_byte_size);
         stack_offset++;
 
         return ERROR_SUCCESS;

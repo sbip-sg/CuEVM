@@ -302,8 +302,7 @@ __device__ int32_t SHR(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         if (uint256_cmp_word(&shift, CuEVM::word_bits - 1) == 1) {
             r = 0;
         } else {
-            uint32_t shift_right = uint256_get_uint32_t(&shift);
-            uint256_shift_right(&r, &value, shift_right);
+            uint256_shift_right(&r, &value, shift.words[0]);
         }
 
         error_code |= stack->push(r);

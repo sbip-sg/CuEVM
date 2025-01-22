@@ -3,7 +3,6 @@
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/opcodes.cuh>
-
 namespace CuEVM::operations {
 /**
  * Make a generic call.
@@ -338,7 +337,7 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
+        // printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
         // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
         call_state_ptr->set_return_data(memory_offset_ui32, length_ui32);
         error_code = ERROR_RETURN;
@@ -376,6 +375,11 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
 
     uint32_t byte_code_size = 0;
     uint8_t *byte_code = CuEVM::global_state_db_ptr->get_code(byte_code_size, &address);
+    // if (current_context->depth < memory_pool_call_context_preallocate) {
+    //     new_context_ptr = memory_pool::get_call_context(current_context->depth);
+    // } else {
+    //     new_context_ptr = new CuEVM::evm_call_context_t();
+    // }
     new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr->initiate_values(current_context, gas, current_context->from, current_context->to,
                                      current_context->to, value, OP_DELEGATECALL, nullptr, 0, byte_code, byte_code_size,
