@@ -37,7 +37,6 @@ __device__ int32_t PUSHX(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
         uint32_t available_size = (pc + push_size >= byte_code_size) ? byte_code_size - pc - 1 : push_size;
         // TODO: maybe make it a byte array for better transmission
         error_code |= stack->pushx(push_size, byte_data, available_size);
-
         pc = pc + push_size;
     }
     return error_code;

@@ -175,32 +175,34 @@ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db
     return ERROR_SUCCESS;
 }
 
-__device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
-                              const evm_word_t *key) {
-    // get the key warm
-    if (state_db->is_warm_key(address, key)) {
-        gas_used += GAS_WARM_ACCESS;
-    } else {
-        gas_used += GAS_COLD_SLOAD;
-    }
+// __device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
+//                               const evm_word_t *key) {
+//     // get the key warm
+//     if (state_db->is_warm_key(address, key)) {
+//         gas_used += GAS_WARM_ACCESS;
+//     } else {
+//         gas_used += GAS_COLD_SLOAD;
+//     }
 
-    return ERROR_SUCCESS;
-}
+//     return ERROR_SUCCESS;
+// }
+
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
-                               const evm_word_t *key, const evm_word_t *new_value) {
+                               const evm_word_t *key, const evm_word_t *new_value, uint32_t &address_index,
+                               ValueStatus *&found_value) {
     // get the key warm
-    if (state_db->is_warm_key(address, key) == false) {
+    if (state_db->is_warm_key_with_offset(address, key, address_index, found_value) == false) {
         gas_used += GAS_COLD_SLOAD;
     }
 
     evm_word_t *original_value = nullptr, *current_value = nullptr;
-    ValueStatus *value_status = state_db->get_value_status(address, key);
+    // ValueStatus *value_status = state_db->get_value_status(address, key);
     bool blank_storage = false;
-    if (value_status == nullptr)
+    if (found_value == nullptr)
         blank_storage = true;
     else {
-        original_value = &value_status->original_value;
-        current_value = &value_status->value;
+        original_value = &found_value->original_value;
+        current_value = &found_value->value;
     }
     // printf("original value %p\n", original_value);
     // printf("current value %p\n", current_value);

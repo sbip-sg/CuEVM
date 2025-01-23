@@ -482,7 +482,7 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     transaction_list_ptr->value = new evm_word_t[transactions_count];
 
     uint32_t index, gas_limit_index, value_index, call_data_offset = 0;
-    for (uint32_t idx = 0; idx < transactions_count; idx++) {
+    for (uint32_t idx = 0; idx < data_counts; idx++) {
         // simplified logic, the host is responsible for constructing the simple test tx list
         index = idx % data_counts;
         // if (access_list_counts > 0) {
@@ -516,6 +516,18 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         // printf("gas limit uint64_t %lu\n", transaction_list_ptr->gas_limit[idx]);
 
         transaction_list_ptr->value[idx].from_hex(cJSON_GetArrayItem(value_json, value_index)->valuestring);
+    }
+    // multiply the data
+    uint32_t multiplier = transactions_count / data_counts;
+    for (uint32_t idx = 1; idx < multiplier; idx++) {
+        memcpy(&transaction_list_ptr->call_data_offset[idx * data_counts], transaction_list_ptr->call_data_offset,
+               data_counts * sizeof(uint32_t));
+        memcpy(&transaction_list_ptr->call_data_size[idx * data_counts], transaction_list_ptr->call_data_size,
+               data_counts * sizeof(uint32_t));
+        memcpy(&transaction_list_ptr->gas_limit[idx * data_counts], transaction_list_ptr->gas_limit,
+               data_counts * sizeof(uint64_t));
+        memcpy(&transaction_list_ptr->value[idx * data_counts], transaction_list_ptr->value,
+               data_counts * sizeof(evm_word_t));
     }
     uint32_t call_data_size = transaction_list_ptr->call_data_offset[transactions_count - 1] +
                               transaction_list_ptr->call_data_size[transactions_count - 1];

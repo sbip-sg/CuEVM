@@ -205,7 +205,8 @@ __device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const e
  * @return 0 for success, 1 for failure
  */
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
-                               const evm_word_t *key, const evm_word_t *value);
+                               const evm_word_t *key, const evm_word_t *value, uint32_t &address_index,
+                               ValueStatus *&found_value);
 
 /**
  * Get the transaction intrinsic gas.

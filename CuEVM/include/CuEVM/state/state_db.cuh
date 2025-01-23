@@ -184,11 +184,21 @@ class StateDb {
     __device__ void grow_storage(int32_t instance_idx);
     __device__ void write_storage(const evm_word_t *address, const evm_word_t *key, const evm_word_t *value,
                                   Snapshot *snapshot = nullptr, bool is_warm = true);
+    __device__ void write_storage_with_known_index(const evm_word_t *address, const evm_word_t *key,
+                                                   const evm_word_t *value, uint32_t address_index,
+                                                   ValueStatus *found_value, Snapshot *snapshot = nullptr,
+                                                   bool is_warm = true);
     // return the pointer to the storage value
     __device__ evm_word_t *get_storage(const evm_word_t *address, const evm_word_t *key, bool set_warm);
+    __device__ evm_word_t *get_storage_with_known_index(const evm_word_t *address, const evm_word_t *key,
+                                                        uint32_t address_index, ValueStatus *found_value,
+                                                        bool set_warm);
     __device__ ValueStatus *get_value_status(const evm_word_t *address, const evm_word_t *key) const;
+    __device__ ValueStatus *get_value_status(const uint32_t address_index, const evm_word_t *key) const;
     __device__ bool is_warm_account(const evm_word_t *address) const;
     __device__ bool is_warm_key(const evm_word_t *address, const evm_word_t *key) const;
+    __device__ bool is_warm_key_with_offset(const evm_word_t *address, const evm_word_t *key, uint32_t &address_index,
+                                            ValueStatus *&found_value);
     __device__ void set_warm_account(const evm_word_t *address);
     __device__ void set_warm_key(const evm_word_t *address, const evm_word_t *key);
 

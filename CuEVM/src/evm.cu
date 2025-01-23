@@ -246,21 +246,21 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                                     cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        if (INSTANCE_GLOBAL_IDX == 0) {
-            // printf("\nInstance %d, pc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
-            //        INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
-            //        cached_call_state.gas_limit, cached_call_state.gas_used);
+        // if (INSTANCE_GLOBAL_IDX == 0) {
+        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
+        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
+        //            cached_call_state.gas_limit, cached_call_state.gas_used);
 
-            // printf("\n\n");
-            // cached_call_state.stack_ptr->print();
-        }
-        if (INSTANCE_GLOBAL_IDX == 0) {
-            // printf("instance %d, pc: %d, opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
-            //        INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
-            //        cached_call_state.gas_limit, cached_call_state.gas_used);
-            // printf("\n\n");
-            // cached_call_state.stack_ptr->print();
-        }
+        //     // printf("\n\n");
+        //     // cached_call_state.stack_ptr->print();
+        // }
+        // if (INSTANCE_GLOBAL_IDX == 1) {
+        //     printf("instance %d, pc: %d, opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
+        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
+        //            cached_call_state.gas_limit, cached_call_state.gas_used);
+        //     printf("\n\n");
+        //     cached_call_state.stack_ptr->print();
+        // }
 
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -933,8 +933,6 @@ __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *
 
     // CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
     printf("num_transactions %d\n", num_transactions);
-    printf("transactions %p\n", transaction_list_ptr);
-    // transaction_list_ptr->print();
 
     evm_instances = new evm_instance_t[num_transactions];
 
