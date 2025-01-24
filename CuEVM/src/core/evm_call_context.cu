@@ -50,9 +50,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, parent, this);
     this->parent = parent;
-    if (parent == nullptr) {
-        this->current_snapshot = &global_state_db_ptr->original_snapshot[INSTANCE_GLOBAL_IDX];
-    }
+
     this->depth = depth;
     this->pc = pc;
     this->gas_used = 0;
@@ -124,7 +122,6 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     }
 
     this->memory_ptr = new CuEVM::evm_memory_t();
-    this->current_snapshot = new Snapshot();
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
     // printf("this context\n");
     // this->print();
@@ -211,9 +208,6 @@ __device__ evm_call_context_t::~evm_call_context_t() {
     if (parent != nullptr) {
         delete stack_ptr;
         delete memory_ptr;
-        if (current_snapshot != &global_state_db_ptr->original_snapshot[INSTANCE_GLOBAL_IDX]) {
-            delete current_snapshot;
-        }
     }
 }
 __device__ void evm_call_context_t::print() const {

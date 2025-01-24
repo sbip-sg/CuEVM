@@ -35,7 +35,6 @@ struct evm_call_context_t {
     uint32_t dynamic_ret_size = 0;
     uint8_t* return_data = nullptr;                // == nullptr if return data size < preallocated global pool
     CuEVM::jump_destinations_t* jump_destinations; /**< The jump destinations */
-    Snapshot* current_snapshot;
     evm_call_context_t* parent;
 #ifdef EIP_3155
     uint32_t trace_idx; /**< The index in the trace */

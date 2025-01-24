@@ -197,6 +197,9 @@ namespace CuEVM {
 constexpr CONSTANT uint32_t memory_pool_stack_preallocate = 16;        // 16 elements times num_instances
 constexpr CONSTANT uint32_t memory_pool_call_context_preallocate = 2;  // 2 call contexts times num_instances
 constexpr CONSTANT uint32_t memory_pool_return_data_preallocate = 32;  // 32 bytes times num_instances
+constexpr CONSTANT uint32_t memory_pool_snapshot_preallocate = 4;  // 2 elements for each account times num_instances
+constexpr CONSTANT uint32_t snapshot_page_size = 4;
+
 constexpr CONSTANT uint32_t uint256_limbs = 8;
 constexpr CONSTANT uint32_t bits_per_byte = 8;
 

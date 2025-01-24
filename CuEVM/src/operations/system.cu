@@ -203,7 +203,7 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         );
         // printf("generic_CREATE error_code: %d\n", error_code);
         if (CuEVM::global_state_db_ptr->is_contract(&current_context->to)) {
-            CuEVM::global_state_db_ptr->update_nonce(&current_context->to,
+            CuEVM::global_state_db_ptr->update_nonce(current_context->depth, &current_context->to,
                                                      CuEVM::global_state_db_ptr->get_nonce(&current_context->to) + 1);
         }
     }
@@ -514,12 +514,12 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
             evm_word_t *recipient_balance = global_state_db_ptr->get_balance(&recipient);
             if (recipient_balance != nullptr) {
                 uint256_add(recipient_balance, recipient_balance, sender_balance);
-                global_state_db_ptr->update_balance(&recipient, recipient_balance);
+                global_state_db_ptr->update_balance(call_context->depth, &recipient, recipient_balance);
             } else {
-                global_state_db_ptr->update_balance(&recipient, sender_balance);
+                global_state_db_ptr->update_balance(call_context->depth, &recipient, sender_balance);
             }
             sender_balance->set_zero();
-            global_state_db_ptr->update_balance(&call_context->to, sender_balance);
+            global_state_db_ptr->update_balance(call_context->depth, &call_context->to, sender_balance);
             // receiver = self => 0 balance
             call_context->parent->dynamic_ret_size = 0;
             error_code |= ERROR_RETURN;

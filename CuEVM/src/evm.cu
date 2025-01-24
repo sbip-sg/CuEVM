@@ -94,7 +94,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     int32_t error_code = (((uint256_cmp_word(&value, 0) > 0) &&
                            // (cgbn_compare(arith.env, sender, recipient) != 0) &&
                            (call_state_ptr->call_type != OP_DELEGATECALL))
-                              ? global_state_db_ptr->transfer(sender, recipient, &value)
+                              ? global_state_db_ptr->transfer(call_state_ptr->depth, sender, recipient, &value)
                               : ERROR_SUCCESS);
     if (error_code != ERROR_SUCCESS) {
         // avoid complication in the subsequent code
@@ -124,7 +124,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
             global_state_db_ptr->is_empty_create(recipient) ? ERROR_SUCCESS : ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
         // printf("start_CALL contract ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS\n");
 
-        global_state_db_ptr->update_nonce(recipient, 1);
+        global_state_db_ptr->update_nonce(call_state_ptr->depth, recipient, 1);
         uint32_t sender_nonce = global_state_db_ptr->get_nonce(sender);
 
         // evm_word_t nonce;
@@ -133,7 +133,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
         //                   ? ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED
         //                   : ERROR_SUCCESS;
         // uint256_add_word(&sender_nonce, &sender_nonce, 1);
-        global_state_db_ptr->update_nonce(sender, sender_nonce + 1);
+        global_state_db_ptr->update_nonce(call_state_ptr->depth, sender, sender_nonce + 1);
     } else {
         // Go-ethereum: check depth > 1024 before increase
         // -> depth > 1025 after increase
@@ -907,7 +907,7 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
 }
 
 __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *test_json, uint32_t &num_instances,
-                                   uint32_t clones) {
+                                   uint32_t &num_accounts, uint32_t clones) {
     // get the world state
 
     CuEVM::StateDb *state_db_ptr = nullptr;
@@ -936,7 +936,7 @@ __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *
 
     evm_instances = new evm_instance_t[num_transactions];
 
-    CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions);
+    CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts);
     // state_db_ptr->print();
     for (uint32_t index = 0; index < num_transactions; index++) {
         evm_instances[index].state_db_ptr = state_db_ptr;

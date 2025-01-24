@@ -153,7 +153,7 @@ struct evm_t {
  * @return int32_t The error code, 0 if successful
  */
 __host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* test_json, uint32_t& num_instances,
-                                   uint32_t clones = 1);
+                                   uint32_t& num_account, uint32_t clones = 1);
 
 /**
  * @brief Free the EVM instances object

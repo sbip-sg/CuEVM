@@ -4,7 +4,9 @@ namespace CuEVM::memory_pool {
 __device__ memory_pool_t* global_memory_pool;
 __device__ evm_word_t* preallocated_stack_base;
 __device__ uint8_t* preallocated_return_data_base;
-__host__ void create_memory_pool(uint32_t num_instances) {
+__device__ SnapshotValue* preallocated_snapshot_values;
+__device__ ValueStatus** preallocated_snapshot_restore_ptr;
+__host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) {
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
     memory_pool->current_stack_page_size = memory_pool_stack_preallocate;
@@ -21,14 +23,28 @@ __host__ void create_memory_pool(uint32_t num_instances) {
     cudaMalloc(&memory_pool->return_data_base, num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t));
     printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base,
            num_instances * memory_pool_return_data_preallocate);
+
     memory_pool_t* d_memory_pool;
     cudaMalloc(&d_memory_pool, sizeof(memory_pool_t));
     cudaMemcpy(d_memory_pool, memory_pool, sizeof(memory_pool_t), cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(global_memory_pool, &d_memory_pool, sizeof(memory_pool_t*));
 
+    SnapshotValue* d_preallocated_snapshot_values;
+    cudaMalloc(&d_preallocated_snapshot_values,
+               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(SnapshotValue));
+    cudaMemset(d_preallocated_snapshot_values, 0,
+               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(SnapshotValue));
+    SnapshotValue** d_preallocated_snapshot_restore_ptr;
+    cudaMalloc(&d_preallocated_snapshot_restore_ptr,
+               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(ValueStatus*));
+    cudaMemset(d_preallocated_snapshot_restore_ptr, 0,
+               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(ValueStatus*));
+
     // copy pointer to preallocated stack base
     cudaMemcpyToSymbol(preallocated_stack_base, &memory_pool->stack_base, sizeof(evm_word_t*));
     cudaMemcpyToSymbol(preallocated_return_data_base, &memory_pool->return_data_base, sizeof(uint8_t*));
+    cudaMemcpyToSymbol(preallocated_snapshot_values, &d_preallocated_snapshot_values, sizeof(SnapshotValue*));
+    cudaMemcpyToSymbol(preallocated_snapshot_restore_ptr, &d_preallocated_snapshot_restore_ptr, sizeof(ValueStatus**));
     delete memory_pool;
 }
 

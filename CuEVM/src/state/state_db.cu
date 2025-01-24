@@ -3,45 +3,35 @@
 
 namespace CuEVM {
 
-__device__ int32_t SnapshotAccount::find_storage_key(const evm_word_t *key) const {
-    for (uint32_t i = 0; i < storage_size; i++) {
-        if (storage_keys[i] == *key) {
-            return i;
-        }
+// __device__ int32_t SnapshotAccount::find_storage_key(const evm_word_t *key) const {
+//     // compare keys by pointer.. ensure that the key and location in the main statedb is not changed
+//     for (uint32_t i = 0; i < storage_size; i++) {
+//         if (storage_keys[i] == key) {
+//             return i;
+//         }
+//     }
+//     return -1;
+// }
+__device__ void SnapshotAccount::set_storage(const uint16_t depth, const uint32_t contract_index,
+                                             const uint32_t account_total_storage_size, const evm_word_t *key,
+                                             ValueStatus *src_value) {
+    if (account_total_storage_size > memory_pool_snapshot_preallocate) {
+        printf("TODO allocate dynamic storage page %d \n", account_total_storage_size);
+        return;
+    } else {
+        // TODO: save storage space, skip non-contract accounts
+        // N contract x mempool__snapshot_preallocate x num_states
+        uint32_t offset = (memory_pool_snapshot_preallocate * contract_index + account_total_storage_size) *
+                              global_state_db_ptr->num_states +
+                          +INSTANCE_GLOBAL_IDX;
+        CuEVM::memory_pool::preallocated_snapshot_restore_ptr[offset] = src_value;
+        CuEVM::memory_pool::preallocated_snapshot_values[offset].value = src_value->value;
+        CuEVM::memory_pool::preallocated_snapshot_values[offset].is_warm = src_value->is_warm;
     }
-    return -1;
-}
-__device__ void SnapshotAccount::grow_storage(const evm_word_t *key) {
-    // printf("before grow storage thread %d account %p, storage size %d storage key %p storage values %p\n",
-    //        INSTANCE_GLOBAL_IDX, this, storage_size, storage_keys, storage_values);
-    evm_word_t *tmp_storage_keys = new evm_word_t[storage_size + 1];
-    SnapshotValue *tmp_storage_values = new SnapshotValue[storage_size + 1];
-    if (storage_size > 0) {
-        memcpy(tmp_storage_keys, storage_keys, storage_size * sizeof(evm_word_t));
-        memcpy(tmp_storage_values, storage_values, storage_size * sizeof(SnapshotValue));
-    }
-    // printf("after grow storage thread %d account %p, storage size %d storage key %p storage values %p\n",
-    //        INSTANCE_GLOBAL_IDX, this, storage_size, storage_keys, storage_values);
-    if (storage_keys != nullptr) {
-        delete[] storage_keys;
-    }
-    if (storage_values != nullptr) {
-        delete[] storage_values;
-    }
-    storage_keys = tmp_storage_keys;
-    storage_values = tmp_storage_values;
-    storage_keys[storage_size] = *key;
-    storage_size++;
 }
 
-__host__ __device__ Snapshot::~Snapshot() {
-    if (address_index_list != nullptr) {
-        delete[] address_index_list;
-    }
-    if (accounts != nullptr) {
-        delete[] accounts;
-    }
-}
+/*
+__host__ __device__ Snapshot::~Snapshot() {}
 __device__ int32_t Snapshot::get_snapshot_index(const uint32_t address_index) const {
     for (uint32_t i = 0; i < num_accounts; i++) {
         if (address_index_list[i] == address_index) {
@@ -51,7 +41,8 @@ __device__ int32_t Snapshot::get_snapshot_index(const uint32_t address_index) co
     return -1;
 }
 
-__device__ void Snapshot::grow_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t nonce) {
+__device__ void Snapshot::grow_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t
+nonce) {
     // printf("grow account thread %d, num_accounts %d\n", INSTANCE_GLOBAL_IDX, num_accounts);
     uint32_t *tmp_address_index_list = new uint32_t[num_accounts + 1];
     SnapshotAccount *tmp_accounts = new SnapshotAccount[num_accounts + 1];
@@ -59,7 +50,8 @@ __device__ void Snapshot::grow_account(const uint32_t address_index, const evm_w
         memcpy(tmp_address_index_list, address_index_list, num_accounts * sizeof(uint32_t));
         memcpy(tmp_accounts, accounts, num_accounts * sizeof(SnapshotAccount));
     }
-    // printf("grow account thread %d, num_accounts %d, tmp address %p address %p\n", INSTANCE_GLOBAL_IDX, num_accounts,
+    // printf("grow account thread %d, num_accounts %d, tmp address %p address %p\n", INSTANCE_GLOBAL_IDX,
+num_accounts,
     //        &tmp_address_index_list[num_accounts], address_index_list);
     // tmp_address_list[num_accounts] = *address;
     tmp_address_index_list[num_accounts] = address_index;
@@ -76,7 +68,8 @@ __device__ void Snapshot::grow_account(const uint32_t address_index, const evm_w
     accounts = tmp_accounts;
 }
 
-__device__ void Snapshot::set_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t nonce) {
+__device__ void Snapshot::set_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t nonce)
+{
     // only snapshot first time
     if (get_snapshot_index(address_index) == -1) {
         grow_account(address_index, balance, nonce);
@@ -96,21 +89,20 @@ __device__ void Snapshot::set_code(const uint32_t address_index, const uint32_t 
     // accounts[address_index].code_modified = true;
 }
 
-__device__ void Snapshot::set_storage(const uint32_t address_index, const evm_word_t *key, const ValueStatus *value) {
-    int32_t snapshot_index = get_snapshot_index(address_index);
-    if (snapshot_index == -1) {
+__device__ void Snapshot::set_storage(const uint32_t address_index, const evm_word_t *key, const ValueStatus *value)
+{ int32_t snapshot_index = get_snapshot_index(address_index); if (snapshot_index == -1) {
         grow_account(address_index, nullptr, 0);
         snapshot_index = num_accounts - 1;
     }
 
-    // printf("find storage key thread %d, key %p accounts %p address_index %d\n", INSTANCE_GLOBAL_IDX, key, accounts,
+    // printf("find storage key thread %d, key %p accounts %p address_index %d\n", INSTANCE_GLOBAL_IDX, key,
+accounts,
     //        address_index);
     int32_t key_offset = accounts[snapshot_index].find_storage_key(key);
     if (key_offset == -1) {
-        // printf("key not found, grow storage thread %d account %p\n", INSTANCE_GLOBAL_IDX, &accounts[snapshot_index]);
-        accounts[snapshot_index].grow_storage(key);
-        key_offset = accounts[snapshot_index].storage_size - 1;
-        accounts[snapshot_index].storage_values[key_offset].value = value->value;
+        // printf("key not found, grow storage thread %d account %p\n", INSTANCE_GLOBAL_IDX,
+&accounts[snapshot_index]); accounts[snapshot_index].grow_storage(key); key_offset =
+accounts[snapshot_index].storage_size - 1; accounts[snapshot_index].storage_values[key_offset].value = value->value;
         accounts[snapshot_index].storage_values[key_offset].is_warm = value->is_warm;
         // printf("key offset %d storage size %d\n", key_offset, accounts[address_index].storage_size);
     }
@@ -127,6 +119,7 @@ __device__ SnapshotValue *Snapshot::get_storage(const uint32_t address_index, co
     }
     return &accounts[snapshot_index].storage_values[key_offset];
 }
+*/
 
 __host__ __device__ StateDb::StateDb(uint32_t num_states) {
     num_states = num_states;
@@ -153,7 +146,7 @@ __device__ StateDb::StateDb(uint32_t num_states, uint32_t num_accounts, uint32_t
                             uint32_t *account_codes_size, uint32_t *account_codes_offset, KeyOffset *all_keys,
                             uint32_t *keys_list_offset, uint32_t *keys_list_size, ValueStatus *prealloc_values_pool,
                             evm_word_t **dynamic_keys_pool, ValueStatus **dynamic_values_pool,
-                            uint32_t *dynamic_pool_size, Snapshot *original_snapshot)
+                            uint32_t *dynamic_pool_size, SnapshotAccount *snapshot_accounts)
     : num_states(num_states),
       num_accounts(num_accounts),
       num_storage_elements(num_storage_elements),
@@ -171,7 +164,7 @@ __device__ StateDb::StateDb(uint32_t num_states, uint32_t num_accounts, uint32_t
       dynamic_keys_pool(dynamic_keys_pool),
       dynamic_values_pool(dynamic_values_pool),
       dynamic_pool_capacity(dynamic_pool_capacity),
-      original_snapshot(original_snapshot) {}
+      snapshot_accounts(snapshot_accounts) {}
 
 __device__ int32_t StateDb::get_address_index(const evm_word_t *address) const {
     // printf("get address index thread %d, num_accounts %d\n", INSTANCE_GLOBAL_IDX, num_accounts);
@@ -204,14 +197,16 @@ __device__ int32_t StateDb::get_value_offset(int32_t address_index, const evm_wo
     return -1;
 }
 
-__device__ void StateDb::new_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce) {
+__device__ void StateDb::new_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                     const uint32_t nonce) {
     address_list[num_accounts] = *address;
     account_balances[num_accounts * num_states + INSTANCE_GLOBAL_IDX] = *balance;
     account_nonces[num_accounts * num_states + INSTANCE_GLOBAL_IDX] = nonce;
     num_accounts++;
 }
 
-__device__ void StateDb::update_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce) {
+__device__ void StateDb::update_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                        const uint32_t nonce) {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
         return;
@@ -221,7 +216,7 @@ __device__ void StateDb::update_account(const evm_word_t *address, const evm_wor
     account_nonces[instance_idx] = nonce;
 }
 
-__device__ void StateDb::update_balance(const evm_word_t *address, const evm_word_t *balance) {
+__device__ void StateDb::update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance) {
     // printf("update balance thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
@@ -230,7 +225,7 @@ __device__ void StateDb::update_balance(const evm_word_t *address, const evm_wor
     account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX] = *balance;
 }
 
-__device__ void StateDb::update_nonce(const evm_word_t *address, const uint32_t nonce) {
+__device__ void StateDb::update_nonce(const uint16_t depth, const evm_word_t *address, const uint32_t nonce) {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
         return;
@@ -238,7 +233,20 @@ __device__ void StateDb::update_nonce(const evm_word_t *address, const uint32_t 
     account_nonces[address_index * num_states + INSTANCE_GLOBAL_IDX] = nonce;
 }
 
-__device__ void StateDb::update_code(const evm_word_t *address, const byte_array_t *code) {
+__device__ int32_t StateDb::transfer(const uint16_t depth, const evm_word_t *sender, const evm_word_t *recipient,
+                                     const evm_word_t *value) {
+    int32_t sender_index = get_address_index(sender);
+    int32_t recipient_index = get_address_index(recipient);
+    if (sender_index == -1 || recipient_index == -1) {
+        return ERROR_INSUFFICIENT_FUNDS;
+    }
+    uint32_t sender_instance_idx = sender_index * num_states + INSTANCE_GLOBAL_IDX;
+    uint32_t recipient_instance_idx = recipient_index * num_states + INSTANCE_GLOBAL_IDX;
+    // TODO: implement
+    return ERROR_SUCCESS;
+}
+
+__device__ void StateDb::update_code(const uint16_t depth, const evm_word_t *address, const byte_array_t *code) {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
         return;
@@ -246,13 +254,7 @@ __device__ void StateDb::update_code(const evm_word_t *address, const byte_array
     // todo : implement
 }
 
-__device__ int32_t StateDb::transfer(const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *value) {
-    // todo : implement
-    return ERROR_SUCCESS;
-}
-
 __device__ int32_t StateDb::get_dynamic_value_offset(int32_t instance_idx, const evm_word_t *key) const {
-    // printf("get dynamic value offset thread %d, instance_idx %d\n", INSTANCE_GLOBAL_IDX, instance_idx);
     if (dynamic_keys_pool[instance_idx] == nullptr) {
         // printf("dynamic keys pool is nullptr\n");
         return -1;
@@ -266,9 +268,10 @@ __device__ int32_t StateDb::get_dynamic_value_offset(int32_t instance_idx, const
     }
     return -1;
 }
-__device__ void StateDb::write_storage_with_known_index(const evm_word_t *address, const evm_word_t *key,
-                                                        const evm_word_t *value, uint32_t address_index,
-                                                        ValueStatus *found_value, Snapshot *snapshot, bool is_warm) {
+__device__ void StateDb::write_storage_with_known_index(const uint16_t depth, const evm_word_t *address,
+                                                        const evm_word_t *key, const evm_word_t *value,
+                                                        uint32_t address_index, ValueStatus *found_value,
+                                                        bool is_warm) {
     if (address_index == -1) {
         // printf("address not found\n");
         return;  // should never write directly to storage before creating account
@@ -302,16 +305,16 @@ __device__ void StateDb::write_storage_with_known_index(const evm_word_t *addres
 
     } else {
         // write to exsiting slot
-        if (snapshot != nullptr) {
-            snapshot->set_storage(address_index, key, found_value);
-        }
+        snapshot_total_storage_size[instance_idx]++;
+        snapshot_accounts[address_index].set_storage(depth, contract_index[address_index],
+                                                     snapshot_total_storage_size[instance_idx], key, found_value);
         found_value->set_value(value, is_warm);
     }
     account_is_warm[instance_idx] = true;
 }
 
-__device__ void StateDb::write_storage(const evm_word_t *address, const evm_word_t *key, const evm_word_t *value,
-                                       Snapshot *snapshot, bool is_warm) {
+__device__ void StateDb::write_storage(const uint16_t depth, const evm_word_t *address, const evm_word_t *key,
+                                       const evm_word_t *value, bool is_warm) {
     // printf("Write storage \n");
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
@@ -354,9 +357,9 @@ __device__ void StateDb::write_storage(const evm_word_t *address, const evm_word
                 // num_storage_elements++;
             } else {
                 // write to exsiting slot
-                if (snapshot != nullptr) {
-                    snapshot->set_storage(address_index, key, &dynamic_values_pool[instance_idx][key_offset]);
-                }
+                snapshot_accounts[address_index].set_storage(depth, contract_index[address_index],
+                                                             snapshot_total_storage_size[instance_idx], key,
+                                                             &dynamic_values_pool[instance_idx][key_offset]);
 
                 dynamic_values_pool[instance_idx][key_offset].set_value(value, is_warm);
             }
@@ -364,51 +367,51 @@ __device__ void StateDb::write_storage(const evm_word_t *address, const evm_word
 
     } else {
         // printf("found in prealloc_values_pool\n");
-        if (snapshot != nullptr) {
-            // printf("set snapshot\n");
-            snapshot->set_storage(address_index, key, &prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX]);
-        }
-        prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].set_value(value, is_warm);
+        snapshot_accounts[address_index].set_storage(depth, contract_index[address_index],
+                                                     snapshot_total_storage_size[instance_idx], key,
+                                                     &prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX]);
     }
+    prealloc_values_pool[key_offset + INSTANCE_GLOBAL_IDX].set_value(value, is_warm);
 
     account_is_warm[instance_idx] = true;
 
     // todo : write snapshot for potential future revert
 }
-__device__ void StateDb::snapshot_account(const uint32_t address_index, const evm_word_t *balance, const uint32_t nonce,
-                                          Snapshot *snapshot) {
-    if (snapshot == nullptr) snapshot = original_snapshot;
-    snapshot->set_account(address_index, balance, nonce);
+__device__ void StateDb::snapshot_account(const uint16_t depth, const uint32_t address_index, const evm_word_t *balance,
+                                          const uint32_t nonce) {
+    snapshot_accounts[address_index].set_account(depth, balance, nonce);
 }
-__device__ void StateDb::snapshot_storage(const uint32_t address_index, evm_word_t *key, ValueStatus *value,
-                                          Snapshot *snapshot) {
-    if (snapshot == nullptr) snapshot = original_snapshot;
-    snapshot->set_storage(address_index, key, value);
-    // todo : implement
+__device__ void StateDb::snapshot_storage(const uint16_t depth, const uint32_t address_index, evm_word_t *key,
+                                          ValueStatus *value) {
+    uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    snapshot_accounts[address_index].set_storage(depth, contract_index[address_index],
+                                                 snapshot_total_storage_size[instance_idx], key, value);
 }
-__device__ void StateDb::snapshot_code(const uint32_t address_index, Snapshot *snapshot) {
-    // todo : implement
+__device__ void StateDb::snapshot_code(const uint16_t depth, const uint32_t address_index) {
+    // snapshot_accounts[address_index].set_code(depth, code_size);
 }
-__device__ void StateDb::revert_to_snapshot(Snapshot *snapshot) {
-    if (snapshot == nullptr) snapshot = original_snapshot;
-    for (uint32_t i = 0; i < snapshot->num_accounts; i++) {
-        int32_t address_index = snapshot->address_index_list[i];
-        if (address_index == -1) {
-            continue;
-        }
-        uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-        account_balances[instance_idx] = snapshot->accounts[i].balance;
-        account_nonces[instance_idx] = snapshot->accounts[i].nonce;
-        for (uint32_t j = 0; j < snapshot->accounts[i].storage_size; j++) {
-            write_storage(&address_list[address_index], &snapshot->accounts[i].storage_keys[j],
-                          &snapshot->accounts[i].storage_values[j].value, nullptr,
-                          snapshot->accounts[i].storage_values[j].is_warm);
-        }
-    }
+
+__device__ void StateDb::revert_to_snapshot(const uint16_t depth) {
+    // TODO: implement
+    // if (snapshot == nullptr) snapshot = original_snapshot;
+    // for (uint32_t i = 0; i < snapshot->num_accounts; i++) {
+    //     int32_t address_index = snapshot->address_index_list[i];
+    //     if (address_index == -1) {
+    //         continue;
+    //     }
+    //     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    //     account_balances[instance_idx] = snapshot->accounts[i].balance;
+    //     account_nonces[instance_idx] = snapshot->accounts[i].nonce;
+    //     for (uint32_t j = 0; j < snapshot->accounts[i].storage_size; j++) {
+    //         write_storage(&address_list[address_index], &snapshot->accounts[i].storage_keys[j],
+    //                       &snapshot->accounts[i].storage_values[j].value, nullptr,
+    //                       snapshot->accounts[i].storage_values[j].is_warm);
+    //     }
+    // }
 }
-__device__ evm_word_t *StateDb::get_storage_with_known_index(const evm_word_t *address, const evm_word_t *key,
-                                                             uint32_t address_index, ValueStatus *found_value,
-                                                             bool set_warm) {
+__device__ evm_word_t *StateDb::get_storage_with_known_index(const uint16_t depth, const evm_word_t *address,
+                                                             const evm_word_t *key, uint32_t address_index,
+                                                             ValueStatus *found_value, bool set_warm) {
     // printf("get_storage_with_known_index thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
 
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
@@ -441,7 +444,8 @@ __device__ evm_word_t *StateDb::get_storage_with_known_index(const evm_word_t *a
     }
 }
 
-__device__ evm_word_t *StateDb::get_storage(const evm_word_t *address, const evm_word_t *key, bool set_warm) {
+__device__ evm_word_t *StateDb::get_storage(const uint16_t depth, const evm_word_t *address, const evm_word_t *key,
+                                            bool set_warm) {
     // printf("get storage thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
@@ -656,7 +660,8 @@ __device__ bool StateDb::is_contract(const evm_word_t *address) const {
     // todo :implement
     return true;
 }
-__host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states) {
+__host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states,
+                                   uint32_t &num_accounts) {
     StateDb *state_db_cpu = new StateDb(num_states);
     StateDb::CPUfromJson(state_db_cpu, state_json, num_states);
     StateDb *tmp_state_db = new StateDb(num_states);
@@ -664,13 +669,15 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
     tmp_state_db->num_states = state_db_cpu->num_states;
     tmp_state_db->num_storage_elements = state_db_cpu->num_storage_elements;
     tmp_state_db->storage_capacity = state_db_cpu->storage_capacity;
+    tmp_state_db->num_contracts = state_db_cpu->num_contracts;
 
-    uint32_t num_accounts = state_db_cpu->num_accounts;
+    num_accounts = state_db_cpu->num_accounts;
     uint32_t code_size =
         state_db_cpu->account_codes_size[num_accounts - 1] + state_db_cpu->account_codes_offset[num_accounts - 1];
 
     // Grouped memory allocation
     CUDA_CHECK(cudaMalloc(&tmp_state_db->address_list, num_accounts * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->contract_index, num_accounts * sizeof(int16_t)));
 
     CUDA_CHECK(cudaMalloc(&tmp_state_db->account_balances, num_states * num_accounts * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&tmp_state_db->account_nonces, num_states * num_accounts * sizeof(uint32_t)));
@@ -689,10 +696,14 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
     CUDA_CHECK(cudaMalloc(&tmp_state_db->dynamic_pool_capacity, num_states * num_accounts * sizeof(uint32_t)));
     CUDA_CHECK(cudaMalloc(&tmp_state_db->account_is_warm, num_states * num_accounts * sizeof(bool)));
 
-    CUDA_CHECK(cudaMalloc(&tmp_state_db->original_snapshot, num_states * sizeof(Snapshot)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->snapshot_accounts, num_states * num_accounts * sizeof(SnapshotAccount)));
+    CUDA_CHECK(cudaMalloc(&tmp_state_db->snapshot_total_storage_size, num_states * num_accounts * sizeof(uint32_t)));
     // Grouped memory copy
     CUDA_CHECK(cudaMemcpy(tmp_state_db->address_list, state_db_cpu->address_list, num_accounts * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->contract_index, state_db_cpu->contract_index, num_accounts * sizeof(int16_t),
+                          cudaMemcpyHostToDevice));
+
     CUDA_CHECK(cudaMemcpy(tmp_state_db->account_balances, state_db_cpu->account_balances,
                           num_states * num_accounts * sizeof(evm_word_t), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(tmp_state_db->account_nonces, state_db_cpu->account_nonces,
@@ -711,13 +722,15 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
                           state_db_cpu->storage_capacity * num_states * sizeof(evm_word_t), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(tmp_state_db->all_account_codes, state_db_cpu->all_account_codes, code_size * sizeof(uint8_t),
                           cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(tmp_state_db->original_snapshot, state_db_cpu->original_snapshot,
-                          num_states * sizeof(Snapshot), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->snapshot_accounts, state_db_cpu->snapshot_accounts,
+                          num_states * num_accounts * sizeof(SnapshotAccount), cudaMemcpyHostToDevice));
     // dynamic storage
     CUDA_CHECK(cudaMemcpy(tmp_state_db->dynamic_pool_capacity, state_db_cpu->dynamic_pool_capacity,
                           num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(tmp_state_db->account_is_warm, state_db_cpu->account_is_warm,
                           num_states * num_accounts * sizeof(bool), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->snapshot_total_storage_size, state_db_cpu->snapshot_total_storage_size,
+                          num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     // printf("state db cpu\n");
     // state_db_cpu->print();
@@ -740,11 +753,13 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
 
     // StateDb *state_db = new StateDb(num_states);
     state_db->num_accounts = num_accounts;
+    state_db->num_contracts = 0;
     state_db->num_states = num_states;
     state_db->num_storage_elements = 0;
     state_db->storage_capacity = account_prealloc_keys_size * num_accounts;
     state_db->all_account_codes = nullptr;
     state_db->address_list = new evm_word_t[num_accounts];
+    state_db->contract_index = new int16_t[num_accounts];
 
     state_db->account_nonces = new uint32_t[num_accounts * num_states];
     state_db->account_storage_size = new uint32_t[num_accounts * num_states];
@@ -760,7 +775,8 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
     state_db->dynamic_keys_pool = new evm_word_t *[num_states * num_accounts];
     state_db->dynamic_values_pool = new ValueStatus *[num_states * num_accounts];
     state_db->dynamic_pool_capacity = new uint32_t[num_states * num_accounts];
-    state_db->original_snapshot = new Snapshot[num_states];
+    state_db->snapshot_accounts = new SnapshotAccount[num_states * num_accounts];
+    state_db->snapshot_total_storage_size = new uint32_t[num_states * num_accounts];
     uint32_t idx = 0;
     cJSON *account_json;
     uint32_t bytecode_offset = 0;
@@ -770,12 +786,13 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
     memset(state_db->dynamic_pool_capacity, 0, num_states * num_accounts * sizeof(uint32_t));
     memset(state_db->dynamic_keys_pool, 0, num_states * num_accounts * sizeof(evm_word_t *));
     memset(state_db->dynamic_values_pool, 0, num_states * num_accounts * sizeof(ValueStatus *));
+    memset(state_db->snapshot_total_storage_size, 0, num_states * num_accounts * sizeof(uint32_t));
 
     cJSON_ArrayForEach(account_json, state_json) {
         cJSON *balance_json, *nonce_json;
 
         state_db->address_list[idx].from_hex(account_json->string);
-
+        state_db->contract_index[idx] = -1;
         // set the balance
         balance_json = cJSON_GetObjectItemCaseSensitive(account_json, "balance");
         state_db->account_balances[idx].from_hex(balance_json->valuestring);
@@ -802,6 +819,10 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
         cJSON *storage_json = cJSON_GetObjectItemCaseSensitive(account_json, "storage");
         if (storage_json != nullptr) {
             uint32_t storage_size = cJSON_GetArraySize(storage_json);
+            if ((byte_code.size > 0) || (storage_size > 0)) {
+                state_db->contract_index[idx] = state_db->num_contracts;
+                state_db->num_contracts++;
+            }
             for (uint32_t i = 0; i < num_states; i++) {
                 state_db->account_storage_size[idx * num_states + i] = storage_size;
             }
