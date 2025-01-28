@@ -147,7 +147,7 @@ __device__ void evm_call_context_t::copy_return_data(uint8_t* dest, uint32_t dat
         } else {
             // printf("copy_return_data size > memory_pool_return_data_preallocate\n");
             memcpy(dest, preallocated_base + data_offset, memory_pool_return_data_preallocate);
-            memcpy(dest + memory_pool_return_data_preallocate, parent->return_data,
+            memcpy(dest + memory_pool_return_data_preallocate, return_data,
                    size + data_offset - memory_pool_return_data_preallocate);
         }
     }

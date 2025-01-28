@@ -188,7 +188,7 @@ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db
 // }
 
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
-                               const evm_word_t *key, const evm_word_t *new_value, uint32_t &address_index,
+                               const evm_word_t *key, const evm_word_t *new_value, int32_t &address_index,
                                ValueStatus *&found_value) {
     // get the key warm
     if (state_db->is_warm_key_with_offset(address, key, address_index, found_value) == false) {

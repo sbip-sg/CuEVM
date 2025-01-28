@@ -850,10 +850,9 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
 
         // write the return data in the memory
         call_state_ptr->parent->memory_ptr->grow(ret_offset_u32 + ret_size_u32);
-        call_state_ptr->copy_return_data(call_state_ptr->parent->memory_ptr->data + ret_offset_u32, 0, ret_size_u32);
-        // error_code |= call_state_ptr->parent->memory_ptr->set(call_state_ptr->parent->return_data, ret_dynamic_size,
-        //                                                       ret_offset_u32, ret_size_u32);
-        // call_state_ptr->parent->memory_ptr->print();
+        call_state_ptr->parent->copy_return_data(call_state_ptr->parent->memory_ptr->data + ret_offset_u32, 0,
+                                                 ret_size_u32);
+
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
         // printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,

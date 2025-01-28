@@ -5,7 +5,7 @@ constexpr uint32_t worldstate_addresses_size = 32;
 constexpr uint32_t worldstate_storage_values_size = 1024;
 
 constexpr uint32_t account_prealloc_keys_size = 4;  // configurable keys per account
-constexpr uint32_t value_page_size = 32;
+constexpr uint32_t value_page_size = 16;
 constexpr uint32_t account_page_size = 16;
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
@@ -58,14 +58,18 @@ struct SnapshotValue {
 };
 
 struct SnapshotStoragePage {
-    evm_word_t *keys[snapshot_page_size];
-    SnapshotValue *values[snapshot_page_size];
+    // contiguous
+    // size snapshot_page_size
+    ValueStatus *restore_ptr[snapshot_page_size];
+    SnapshotValue values[snapshot_page_size];
     SnapshotStoragePage *next_page = nullptr;
 };
 
 struct StateDbStoragePage {
-    evm_word_t *keys[value_page_size];
-    ValueStatus *values[value_page_size];
+    // contiguous
+    // size value_page_size
+    evm_word_t keys[value_page_size];
+    ValueStatus values[value_page_size];
     StateDbStoragePage *next_page = nullptr;
 };
 
