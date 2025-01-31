@@ -21,29 +21,24 @@ struct serialized_worldstate_data {
     void print();
 };
 
-struct SnapshotAccount {
-    // store only the modified fields
-    uint16_t depth = 0;
+struct DynamicAccount {
+    evm_word_t address;
     evm_word_t balance;
     uint32_t nonce = 0;
     uint32_t storage_size = 0;
     uint32_t dynamic_storage_capacity = 0;
     uint32_t code_size = 0;
     uint8_t *code = nullptr;
-    SnapshotStoragePage *storage_page = nullptr;
-    SnapshotAccount *next_account = nullptr;
+    StateDbStoragePage *storage_page = nullptr;
+    DynamicAccount *next_account = nullptr;
+    DynamicSnapshotAccount *snapshot_account = nullptr;
     bool is_warm = false;
-    __host__ __device__ SnapshotAccount() : nonce(0), storage_size(0), code_size(0), code(nullptr), is_warm(false) {}
-    // __device__ int32_t find_storage_key(const evm_word_t *key) const;
-    __device__ void grow_storage(const evm_word_t *key);
-    __host__ __device__ ~SnapshotAccount();
-    __device__ void revert_to_depth(const uint16_t depth);
-    __device__ void set_account(const uint16_t depth, const evm_word_t *balance, const uint32_t nonce);
-    __device__ void set_code(const uint16_t depth, const uint32_t code_size, const uint8_t *code);
-    // __device__ void set_storage(const uint16_t depth, const evm_word_t *key, const ValueStatus *value);
-    __device__ int32_t find_dynamic_offset(ValueStatus *value);
-    __device__ void set_storage(const uint16_t depth, const uint32_t contract_index, const evm_word_t *key,
-                                ValueStatus *value);
+    __device__ void set_code(const uint32_t code_size, const uint8_t *code);
+    __device__ DynamicAccount(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce,
+                              const uint32_t storage_size, const uint32_t code_size, const uint8_t *code);
+    __device__ ValueStatus *get_value_status(const evm_word_t *key);
+    __device__ void set_storage(const uint16_t depth, const evm_word_t *key, const evm_word_t *value,
+                                bool is_warm = true);
 };
 
 class StateDb {
@@ -63,6 +58,8 @@ class StateDb {
     uint32_t *account_codes_offset;
     uint32_t *account_codes_size;
 
+    // for acccounts created during execution
+    DynamicAccount **dynamic_accounts = nullptr;
     SnapshotAccount *snapshot_accounts;
 
     bool *account_is_warm;
@@ -104,15 +101,21 @@ class StateDb {
     __device__ int32_t get_value_offset(uint32_t storage_size, uint32_t contract_idx, const evm_word_t *key) const;
     __device__ ValueStatus *get_dynamic_value_location(uint32_t storage_size, uint32_t instance_idx,
                                                        const evm_word_t *key) const;
-    __device__ void new_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
-                                const uint32_t nonce);
+    __device__ DynamicAccount *new_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                           const uint32_t nonce, const uint32_t code_size, uint8_t *code);
     __device__ void update_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
                                    const uint32_t nonce);
+    __device__ int32_t deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount);
     __device__ void update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance);
     __device__ void update_nonce(const uint16_t depth, const evm_word_t *address, const uint32_t nonce);
-    __device__ void update_code(const uint16_t depth, const evm_word_t *address, const byte_array_t *code);
+    __device__ void update_code(const uint16_t depth, const evm_word_t *address, const uint32_t code_size,
+                                uint8_t *code);
+    __device__ int32_t create_contract(const uint16_t depth, const evm_word_t *address, const uint32_t code_size,
+                                       uint8_t *code);
     __device__ int32_t transfer(const uint16_t depth, const evm_word_t *sender, const evm_word_t *recipient,
                                 const evm_word_t *value);
+
+    __device__ DynamicAccount *get_dynamic_account(const evm_word_t *address) const;
 
     __device__ evm_word_t *get_balance(const evm_word_t *address);
     __device__ uint8_t *get_code(uint32_t &code_size, const evm_word_t *address);

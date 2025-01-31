@@ -39,7 +39,7 @@ __host__ __device__ int32_t get_contract_address_create_word(evm_word_t *contrac
  * @param[in] init_code The init code
  */
 __host__ __device__ int32_t get_contract_address_create2(evm_word_t *contract_address, evm_word_t *sender_address,
-                                                         evm_word_t *salt, const CuEVM::byte_array_t &init_code);
+                                                         evm_word_t *salt, uint8_t *init_code, uint32_t init_code_size);
 
 /**
  * If it is a hex character.

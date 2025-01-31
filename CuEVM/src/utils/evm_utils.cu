@@ -148,11 +148,6 @@ __host__ __device__ int32_t get_contract_address_create(evm_word_t *contract_add
     CuEVM::byte_array_t hash_address_bytes(CuEVM::hash_size);
     CuCrypto::keccak::sha3(&(rlp_list[0]), rlp_list_length + 1, hash_address_bytes.data, CuEVM::hash_size);
 
-    // cgbn_set_byte_array_t(arith.env, contract_address, hash_address_bytes);
-    // cgbn_bitwise_mask_and(arith.env, contract_address, contract_address, CuEVM::address_bits);
-    // todo check replacement
-    // __ONE_THREAD_PER_INSTANCE(printf("\n\nhash_address_bytes\n"););
-    // hash_address_bytes.print();
     contract_address->from_byte_array_t(hash_address_bytes, BIG_ENDIAN);
     evm_address_conversion(*contract_address);
 
@@ -160,15 +155,16 @@ __host__ __device__ int32_t get_contract_address_create(evm_word_t *contract_add
 }
 
 __host__ __device__ int32_t get_contract_address_create2(evm_word_t *contract_address, evm_word_t *sender_address,
-                                                         evm_word_t *salt, const CuEVM::byte_array_t &init_code) {
+                                                         evm_word_t *salt, uint8_t *init_code,
+                                                         uint32_t init_code_size) {
     CuEVM::byte_array_t sender_address_bytes, salt_bytes;
 
-    uint256_to_bytes(sender_address_bytes.data, sender_address, sender_address_bytes.size);
-    uint256_to_bytes(salt_bytes.data, salt, salt_bytes.size);
+    sender_address->to_byte_array_t(sender_address_bytes);
+    salt->to_byte_array_t(salt_bytes);
     uint32_t total_bytes = 1 + CuEVM::address_size + CuEVM::word_size + CuEVM::hash_size;
 
     CuEVM::byte_array_t hash_code(CuEVM::hash_size);
-    CuCrypto::keccak::sha3(init_code.data, init_code.size, hash_code.data, CuEVM::hash_size);
+    CuCrypto::keccak::sha3(init_code, init_code_size, hash_code.data, CuEVM::hash_size);
 
     CuEVM::byte_array_t input_data(total_bytes);
     input_data.data[0] = 0xff;

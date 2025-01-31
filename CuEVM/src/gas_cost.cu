@@ -192,6 +192,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
                                ValueStatus *&found_value) {
     // get the key warm
     if (state_db->is_warm_key_with_offset(address, key, address_index, found_value) == false) {
+        printf("cold sstore\n");
         gas_used += GAS_COLD_SLOAD;
     }
 
@@ -201,13 +202,24 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
     if (found_value == nullptr)
         blank_storage = true;
     else {
+        printf("found value %p\n", found_value);
         original_value = &found_value->original_value;
         current_value = &found_value->value;
     }
-    // printf("original value %p\n", original_value);
-    // printf("current value %p\n", current_value);
-    // printf("new value %p\n", new_value);
-    // new_value->print();
+    printf("original value %p\n", original_value);
+    if (original_value != nullptr) {
+        original_value->print();
+    }
+    printf("current value %p\n", current_value);
+    if (current_value != nullptr) {
+        current_value->print();
+    }
+    printf("new value %p\n", new_value);
+    if (new_value != nullptr) {
+        new_value->print();
+    }
+
+    new_value->print();
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
@@ -252,14 +264,13 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
     gas_intrinsic = GAS_TRANSACTION;
 
     // gas_intrinsic += GAS_TRANSACTION_CREATE if transaction.create
-    // if (transaction_list->is_create) {
-    //     gas_intrinsic += GAS_TX_CREATE;
-    // }
 
     // gas_intrinsic += GAS_TX_DATA_ZERO/GAS_TX_DATA_NONZERO for each byte in
     // transaction.data
-    for (uint32_t idx = 0; idx < transaction_list->call_data_size[INSTANCE_GLOBAL_IDX]; idx++) {
-        if (transaction_list->call_data[transaction_list->call_data_offset[INSTANCE_GLOBAL_IDX] + idx] == 0) {
+    uint32_t call_data_size = transaction_list->call_data_size[INSTANCE_GLOBAL_IDX];
+    uint32_t call_data_offset = transaction_list->call_data_offset[INSTANCE_GLOBAL_IDX];
+    for (uint32_t idx = 0; idx < call_data_size; idx++) {
+        if (transaction_list->call_data[call_data_offset + idx] == 0) {
             gas_intrinsic += GAS_TX_DATA_ZERO;
         } else {
             gas_intrinsic += GAS_TX_DATA_NONZERO;
@@ -276,10 +287,11 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
 
 #ifdef EIP_3860
     // gas_intrinsic += GAS_INITCODE_COST if create transaction
-    // if (transaction.is_create) {
-    //     if (transaction.data_init.size > max_initcode_size > 0) return ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
-    //     initcode_cost(gas_intrinsic, transaction.data_init.size);
-    // }
+    if (transaction_list->type == SPECIAL_CREATE_TRANSACTION_TYPE) {
+        gas_intrinsic += GAS_TX_CREATE;
+        if (call_data_size > max_initcode_size > 0) return ERROR_CREATE_INIT_CODE_SIZE_EXCEEDED;
+        initcode_cost(gas_intrinsic, call_data_size);
+    }
 #endif
     return ERROR_SUCCESS;
 }

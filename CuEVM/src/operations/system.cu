@@ -154,8 +154,8 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         current_context->memory_ptr->increase_memory_cost(memory_expansion_cost);
 
         // get the initialisation code
-        CuEVM::byte_array_t initialisation_code(length_ui32);
-        current_context->memory_ptr->get(memory_offset_ui32, length_ui32, initialisation_code.data);
+        uint8_t *initialisation_code = nullptr;
+        current_context->memory_ptr->get(memory_offset_ui32, length_ui32, initialisation_code);
 
         evm_word_t contract_address;
 
@@ -163,13 +163,15 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         evm_word_t sender_nonce(sender_nonce_uint);
         // Do not get_account after this to reuse sender_account
         if (opcode == OP_CREATE2) {
+            printf("create2 %p %p %p init code size %d\n", &contract_address, &current_context->to, &salt, length_ui32);
             CuEVM::utils::get_contract_address_create2(&contract_address, &current_context->to, &salt,
-                                                       initialisation_code);
+                                                       initialisation_code, length_ui32);
+
         } else {
             CuEVM::utils::get_contract_address_create(&contract_address, &current_context->to, &sender_nonce);
         }
 
-        if (!CuEVM::global_state_db_ptr->is_empty_account(&contract_address)) {
+        if (!CuEVM::global_state_db_ptr->is_empty_create(&contract_address)) {
             // corner collision case: must set warm for the contract address
             CuEVM::global_state_db_ptr->set_warm_account(&contract_address);
             error_code |= ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
@@ -187,10 +189,10 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         new_context_ptr = new CuEVM::evm_call_context_t();
 
         new_context_ptr->initiate_values(current_context, gas_capped, current_context->to, contract_address,
-                                         contract_address, *value, opcode, nullptr, 0, initialisation_code.data,
-                                         initialisation_code.size, current_context->static_env);
-        // printf("new context ptr\n");
-        // new_context_ptr->print();
+                                         contract_address, *value, opcode, nullptr, 0, initialisation_code, length_ui32,
+                                         current_context->static_env);
+        printf("new context ptr\n");
+        new_context_ptr->print();
 
         error_code |= (current_context->static_env ? ERROR_STATIC_CALL_CONTEXT_CREATE :
 #ifdef EIP_3860
@@ -202,10 +204,14 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
 #endif
         );
         // printf("generic_CREATE error_code: %d\n", error_code);
+        // todo update nonce
         if (CuEVM::global_state_db_ptr->is_contract(&current_context->to)) {
             CuEVM::global_state_db_ptr->update_nonce(current_context->depth, &current_context->to,
                                                      CuEVM::global_state_db_ptr->get_nonce(&current_context->to) + 1);
         }
+        printf("contract address\n");
+        contract_address.print();
+        CuEVM::global_state_db_ptr->update_nonce(current_context->depth, &contract_address, 1);
     }
 
     // printf("generic_CREATE error_code: %d\n", error_code);

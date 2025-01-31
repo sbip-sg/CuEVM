@@ -76,7 +76,7 @@ class TransactionList {
     evm_word_t max_fee_per_gas;
     evm_word_t max_priority_fee_per_gas;
     evm_word_t gas_price;
-    uint32_t type;
+    uint16_t type;
     // different for each transaction (eth-tests)
     evm_word_t *value;
     gas_t *gas_limit;

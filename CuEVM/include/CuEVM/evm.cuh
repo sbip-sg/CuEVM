@@ -20,8 +20,8 @@
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/ecc_constants.cuh>
 #include <CuEVM/utils/error_codes.cuh>
+#include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/opcodes.cuh>
-
 namespace CuEVM {
 struct evm_instance_t {
     CuEVM::StateDb* state_db_ptr;                              /**< The world state pointer*/

@@ -47,18 +47,29 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
     uint32_t call_data_size = transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
 
     transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
-    byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
-    // printf("\n evm call state \n");
-    // CuEVM::evm_stack_t *stack_ptr = new CuEVM::evm_stack_t(memory_pool::get_stack_base(threadIdx.x));
     CuEVM::evm_stack_t *stack_ptr = new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
     CuEVM::evm_memory_t *memory_ptr =
         new CuEVM::evm_memory_t();  // memory_pool::global_memory_pool->get_memory(threadIdx.x);
-    // printf("instance %d gas limit %lu\n", INSTANCE_GLOBAL_IDX, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX]);
-    call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
-                                    transaction_list_ptr->sender, transaction_list_ptr->to, transaction_list_ptr->to,
-                                    transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CALL, call_data,
-                                    call_data_size, byte_code, byte_code_size);
+    if (transaction_list_ptr->type == SPECIAL_CREATE_TRANSACTION_TYPE) {
+        uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(&transaction_list_ptr->sender);
+        evm_word_t sender_nonce(sender_nonce_uint);
+        CuEVM::utils::get_contract_address_create(&transaction_list_ptr->to, &transaction_list_ptr->sender,
+                                                  &sender_nonce);
+        printf("Create contract address \n");
+        transaction_list_ptr->to.print();
 
+        call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
+                                        transaction_list_ptr->sender, transaction_list_ptr->to,
+                                        transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
+                                        OP_CREATE, call_data, call_data_size, call_data, call_data_size);
+    } else {
+        byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
+
+        call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
+                                        transaction_list_ptr->sender, transaction_list_ptr->to,
+                                        transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
+                                        OP_CALL, call_data, call_data_size, byte_code, byte_code_size);
+    }
     // charge gas and validate balance
     CuEVM::gas_t gas_intrinsic;
     CuEVM::gas_cost::transaction_intrinsic_gas(transaction_list_ptr, gas_intrinsic);
@@ -81,128 +92,98 @@ __host__ evm_t::evm_t(CuEVM::evm_instance_t &evm_instance, CuEVM::evm_call_conte
                       CuEVM::evm_word_t *shared_stack_ptr) {}
 
 __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state) {
-    // printf("Start call sender receipient contract address %d\n", THREADIDX);
-    // call_state_ptr->message_ptr->sender.print();
-    // call_state_ptr->message_ptr->recipient.print();
-    // call_state_ptr->message_ptr->contract_address.print();
-    evm_word_t value;
+    printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
+    call_state_ptr->from.print();
+    call_state_ptr->to.print();
+
     const evm_word_t *sender = &call_state_ptr->from;
     const evm_word_t *recipient = &call_state_ptr->to;
-    call_state_ptr->value;
-    // printf("start call value \n");
-    // value.print();
-    int32_t error_code = (((uint256_cmp_word(&value, 0) > 0) &&
-                           // (cgbn_compare(arith.env, sender, recipient) != 0) &&
-                           (call_state_ptr->call_type != OP_DELEGATECALL))
-                              ? global_state_db_ptr->transfer(call_state_ptr->depth, sender, recipient, &value)
-                              : ERROR_SUCCESS);
-    if (error_code != ERROR_SUCCESS) {
-        // avoid complication in the subsequent code
-        // call failed = account never warmed up
-        return error_code;
-    }
 
-    if (call_state_ptr->call_type == OP_CALL || call_state_ptr->call_type == OP_CALLCODE ||
-        call_state_ptr->call_type == OP_DELEGATECALL || call_state_ptr->call_type == OP_STATICCALL) {
-        uint8_t *byte_code = nullptr;
-        uint32_t byte_code_size = 0;
-        global_state_db_ptr->get_code(byte_code_size, &call_state_ptr->to);
+    int32_t error_code =
+        (((uint256_cmp_word(&call_state_ptr->value, 0) > 0) && (call_state_ptr->call_type != OP_DELEGATECALL))
+             ? global_state_db_ptr->transfer(call_state_ptr->depth, sender, recipient, &call_state_ptr->value)
+             : ERROR_SUCCESS);
 
-        // TODO: fix this
-        // call_state_ptr->set_byte_code(byte_code, byte_code_size);
-    }
-
+    if (error_code != ERROR_SUCCESS) return error_code;
+    printf("After transfer\n");
     // warmup the accounts
-    global_state_db_ptr->set_warm_account(sender);
-    global_state_db_ptr->set_warm_account(recipient);
+    // redundant, in the transfer we already warmed up the accounts
+    // global_state_db_ptr->set_warm_account(sender);
+    // global_state_db_ptr->set_warm_account(recipient);
+    /*
+        if ((call_state_ptr->call_type == OP_CREATE) || (call_state_ptr->call_type == OP_CREATE2)) {
+            error_code |=
+                global_state_db_ptr->is_empty_create(recipient) ? ERROR_SUCCESS :
+       ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
 
-    // TODO: fix this
-    // cached_call_state.set_byte_code(call_state_ptr->message_ptr->byte_code);
+            global_state_db_ptr->update_nonce(call_state_ptr->depth, recipient, 1);
+            uint32_t sender_nonce = global_state_db_ptr->get_nonce(sender);
+            global_state_db_ptr->update_nonce(call_state_ptr->depth, sender, sender_nonce + 1);
+        } else {
+    */
+    // Go-ethereum: check depth > 1024 before increase -> depth > 1025 after increase
+    // test: stSelfBalance/diffPlaces.json
+    error_code |= call_state_ptr->depth > CuEVM::max_depth + 1 ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
+    // Dont use account ptr here, byte_code already set
+    if (call_state_ptr->byte_code_size == 0) {
+        if (uint256_cmp_word(&call_state_ptr->to, CuEVM::no_precompile_contracts) == -1) {
+            // TODO: fix this
+            /*
+            switch (uint256_get_uint32_t(&call_state_ptr->to)) {
 
-    if ((call_state_ptr->call_type == OP_CREATE) || (call_state_ptr->call_type == OP_CREATE2)) {
-        error_code |=
-            global_state_db_ptr->is_empty_create(recipient) ? ERROR_SUCCESS : ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
-        // printf("start_CALL contract ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS\n");
-
-        global_state_db_ptr->update_nonce(call_state_ptr->depth, recipient, 1);
-        uint32_t sender_nonce = global_state_db_ptr->get_nonce(sender);
-
-        // evm_word_t nonce;
-        // TODO check overflow
-        // error_code |= uint256_get_uint32_t(sender_nonce, nonce) == ERROR_VALUE_OVERFLOW
-        //                   ? ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED
-        //                   : ERROR_SUCCESS;
-        // uint256_add_word(&sender_nonce, &sender_nonce, 1);
-        global_state_db_ptr->update_nonce(call_state_ptr->depth, sender, sender_nonce + 1);
-    } else {
-        // Go-ethereum: check depth > 1024 before increase
-        // -> depth > 1025 after increase
-        // test: stSelfBalance/diffPlaces.json
-        error_code |= call_state_ptr->depth > CuEVM::max_depth + 1 ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
-        // #ifdef __CUDA_ARCH__
-        //         printf("else code size 0 code %d idx %d \n", error_code, threadIdx.x);
-        // #endif
-        // Dont use account ptr here, byte_code already set
-        if (call_state_ptr->byte_code_size == 0) {
-            if (uint256_cmp_word(&call_state_ptr->to, CuEVM::no_precompile_contracts) == -1) {
-                // TODO: fix this
-                /*
-                switch (uint256_get_uint32_t(&call_state_ptr->to)) {
-
-                    case 0x01:
-                        return CuEVM::precompile_operations::operation_ecRecover(
-                            this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                        break;
-                    case 0x02:
-                        return CuEVM::precompile_operations::operation_SHA256(
-                            cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x03:
-                        return CuEVM::precompile_operations::operation_RIPEMD160(
-                            cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x04:
-                        return CuEVM::precompile_operations::operation_IDENTITY(
-                            cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x05:
-                        return CuEVM::precompile_operations::operation_MODEXP(
-                            cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x06:
-                        return CuEVM::precompile_operations::operation_ecAdd(
-                            this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x07:
-                        return CuEVM::precompile_operations::operation_ecMul(
-                            this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x08:
-                        return CuEVM::precompile_operations::operation_ecPairing(
-                            this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x09:
-                        return CuEVM::precompile_operations::operation_BLAKE2(
-                            cached_call_state.gas_limit, cached_call_state.gas_used,
-                            call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
-                    case 0x0a:
-                        return ERROR_RETURN;
-                    default:
-                        return ERROR_RETURN;
-                        break;
-            }*/
-            } else {
-                // operation stop
-                // TODO: fix this
-                // CuEVM::byte_array_t::reset_return_data(call_state_ptr->return_data_ptr);
-                return ERROR_RETURN;
-            }
+                case 0x01:
+                    return CuEVM::precompile_operations::operation_ecRecover(
+                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                    break;
+                case 0x02:
+                    return CuEVM::precompile_operations::operation_SHA256(
+                        cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x03:
+                    return CuEVM::precompile_operations::operation_RIPEMD160(
+                        cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x04:
+                    return CuEVM::precompile_operations::operation_IDENTITY(
+                        cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x05:
+                    return CuEVM::precompile_operations::operation_MODEXP(
+                        cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x06:
+                    return CuEVM::precompile_operations::operation_ecAdd(
+                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x07:
+                    return CuEVM::precompile_operations::operation_ecMul(
+                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x08:
+                    return CuEVM::precompile_operations::operation_ecPairing(
+                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x09:
+                    return CuEVM::precompile_operations::operation_BLAKE2(
+                        cached_call_state.gas_limit, cached_call_state.gas_used,
+                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                case 0x0a:
+                    return ERROR_RETURN;
+                default:
+                    return ERROR_RETURN;
+                    break;
+        }*/
+        } else {
+            // operation stop
+            // TODO: fix this
+            // CuEVM::byte_array_t::reset_return_data(call_state_ptr->return_data_ptr);
+            return ERROR_RETURN;
         }
     }
-    // #ifdef __CUDA_ARCH__
-    //     printf("start_CALL end error code %d idx %d\n", error_code, threadIdx.x);
-    // #endif
+
+    //    }
+
     return error_code;
 }
 __device__ void evm_t::run() {
@@ -246,14 +227,14 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                                     cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
-        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
-        //            cached_call_state.gas_limit, cached_call_state.gas_used);
+        if (INSTANCE_GLOBAL_IDX == 0) {
+            printf("\nInstance %d, pc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
+                   INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
+                   cached_call_state.gas_limit, cached_call_state.gas_used);
 
-        //     // printf("\n\n");
-        //     // cached_call_state.stack_ptr->print();
-        // }
+            // printf("\n\n");
+            // cached_call_state.stack_ptr->print();
+        }
         // if (INSTANCE_GLOBAL_IDX == 1) {
         //     printf("instance %d, pc: %d, opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
@@ -819,7 +800,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
             // if CREATEX operation, set the address of the contract
             if ((call_state_ptr->call_type == OP_CREATE) || (call_state_ptr->call_type == OP_CREATE2)) {
                 // TODO: fix this
-                // call_state_ptr->message_ptr->get_recipient(child_success);
+                child_success = call_state_ptr->to;
             }
         } else {
             // perform revert mechanism
@@ -831,11 +812,11 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
 
     // get the memory offset and size of the return data
     // in the parent memory
-    evm_word_t ret_offset = call_state_ptr->fixed_ret_offset;
-    evm_word_t ret_size = call_state_ptr->fixed_ret_size;
-    // check overflow
-    uint32_t ret_size_u32 = uint256_get_uint32_t(&ret_size);
-    uint32_t ret_offset_u32 = uint256_get_uint32_t(&ret_offset);
+    // evm_word_t ret_offset = call_state_ptr->fixed_ret_offset;
+    // evm_word_t ret_size = call_state_ptr->fixed_ret_size;
+    // // check overflow
+    // uint32_t ret_size_u32 = uint256_get_uint32_t(&ret_size);
+    // uint32_t ret_offset_u32 = uint256_get_uint32_t(&ret_offset);
     // printf("ret_size_u32 %u, ret_offset_u32 %u\n", ret_size_u32, ret_offset_u32);
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
     // if (ret_size_u32 + ret_offset_u32 > call_state_ptr->parent->memory_ptr->size) {
@@ -849,9 +830,10 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         error_code |= call_state_ptr->parent->stack_ptr->push(child_success);
 
         // write the return data in the memory
-        call_state_ptr->parent->memory_ptr->grow(ret_offset_u32 + ret_size_u32);
-        call_state_ptr->parent->copy_return_data(call_state_ptr->parent->memory_ptr->data + ret_offset_u32, 0,
-                                                 ret_size_u32);
+        call_state_ptr->parent->memory_ptr->grow(call_state_ptr->fixed_ret_offset + call_state_ptr->fixed_ret_size);
+        call_state_ptr->parent->copy_return_data(
+            call_state_ptr->parent->memory_ptr->data + call_state_ptr->fixed_ret_offset, 0,
+            call_state_ptr->fixed_ret_size);
 
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
@@ -873,35 +855,32 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     // call_state_ptr->message_ptr->get_sender(arith, sender_address);
 
     // TODO: fix this
-    /*
-        CuEVM::gas_cost::code_cost(cached_call_state.gas_used, call_state_ptr->parent->last_return_data_ptr->size);
-        int32_t error_code = ERROR_SUCCESS;
-        error_code |= CuEVM::gas_cost::has_gas(cached_call_state.gas_limit, cached_call_state.gas_used);
-        if (error_code == ERROR_SUCCESS) {
-            // compute the address of the contract
-            // bn_t contract_address;
-            // call_state_ptr->message_ptr->get_recipient(arith, contract_address);
-    #ifdef EIP_3541
-            uint8_t *code = call_state_ptr->parent->last_return_data_ptr->data;
-    #endif
-            uint32_t code_size = call_state_ptr->parent->last_return_data_ptr->size;
+    printf("finish_CREATE thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
 
-            if (code_size <= CuEVM::max_code_size) {
-    #ifdef EIP_3541
-                if ((code_size > 0) && (code[0] == 0xef)) {
-                    error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
-                }
-    #endif
-                call_state_ptr->state_db_ptr->update_code(&call_state_ptr->message_ptr->recipient,
-                                                          call_state_ptr->parent->last_return_data_ptr);
-            } else {
-                error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
+    CuEVM::gas_cost::code_cost(cached_call_state.gas_used, call_state_ptr->dynamic_ret_size);
+    int32_t error_code = ERROR_SUCCESS;
+    error_code |= CuEVM::gas_cost::has_gas(cached_call_state.gas_limit, cached_call_state.gas_used);
+    if (error_code == ERROR_SUCCESS) {
+#ifdef EIP_3541
+        uint8_t *code = call_state_ptr->return_data;
+#endif
+        uint32_t code_size = call_state_ptr->dynamic_ret_size;
+
+        if (code_size <= CuEVM::max_code_size) {
+#ifdef EIP_3541
+            if ((code_size > 0) && (code[0] == 0xef)) {
+                error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
             }
-            CuEVM::byte_array_t::reset_return_data(call_state_ptr->parent->last_return_data_ptr);
+#endif
+            global_state_db_ptr->update_code(call_state_ptr->depth, &call_state_ptr->to, code_size, code);
+        } else {
+            error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
         }
-        // if success, return ERROR_RETURN to continue finish call
-        return error_code ? error_code : ERROR_RETURN;
-        */
+        call_state_ptr->dynamic_ret_size = 0;
+    }
+    // if success, return ERROR_RETURN to continue finish call
+    return error_code ? error_code : ERROR_RETURN;
+
     return ERROR_SUCCESS;
 }
 

@@ -73,6 +73,50 @@ struct StateDbStoragePage {
     StateDbStoragePage *next_page = nullptr;
 };
 
+struct SnapshotAccount {
+    // store only the modified fields
+    uint16_t depth = 0;
+    evm_word_t balance;
+    uint32_t nonce = 0;
+    uint32_t storage_size = 0;
+    uint32_t dynamic_storage_capacity = 0;
+    uint32_t code_size = 0;
+    uint8_t *code = nullptr;
+    SnapshotStoragePage *storage_page = nullptr;
+    SnapshotAccount *next_account = nullptr;
+    bool is_warm = false;
+    __host__ __device__ SnapshotAccount() : nonce(0), storage_size(0), code_size(0), code(nullptr), is_warm(false) {}
+
+    __host__ __device__ ~SnapshotAccount();
+    __device__ void revert_to_depth(const uint16_t depth);
+    __device__ void set_account(const uint16_t depth, const evm_word_t *balance, const uint32_t nonce);
+
+    // __device__ void set_storage(const uint16_t depth, const evm_word_t *key, const ValueStatus *value);
+    __device__ int32_t find_dynamic_offset(ValueStatus *value);
+    __device__ void set_storage(const uint16_t depth, const uint32_t contract_index, const evm_word_t *key,
+                                ValueStatus *value);
+};
+
+struct DynamicSnapshotAccount {
+    // store only the modified fields
+    uint16_t depth = 0;
+    evm_word_t balance;
+    uint32_t nonce = 0;
+    uint32_t storage_size = 0;
+    uint32_t dynamic_storage_capacity = 0;
+    uint32_t code_size = 0;
+    uint8_t *code = nullptr;
+    SnapshotStoragePage *storage_page = nullptr;
+    DynamicSnapshotAccount *next_account = nullptr;
+    bool is_warm = false;
+    __host__ __device__ DynamicSnapshotAccount()
+        : nonce(0), storage_size(0), code_size(0), code(nullptr), is_warm(false) {}
+    __host__ __device__ ~DynamicSnapshotAccount();
+    __device__ void revert_to_depth(const uint16_t depth);
+    __device__ void set_account(const uint16_t depth, const evm_word_t *balance, const uint32_t nonce);
+    __device__ void set_storage(const uint16_t depth, const evm_word_t *key, ValueStatus *value);
+};
+
 namespace memory_pool {
 
 extern __device__ evm_word_t *preallocated_stack_base;

@@ -418,22 +418,6 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
 
     const cJSON *gas_price_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasPrice");
 
-    // CREATE transaction
-    if (strlen(to_json->valuestring) == 0) {
-        printf(" CREATE transaction\n");
-
-        // uint32_t uint_nonce = state_db_ptr->get_nonce(&template_transaction_ptr->sender);
-        // CuEVM::evm_word_t nonce(uint_nonce);
-        // CuEVM::utils::get_contract_address_create_word(&template_transaction_ptr->to,
-        // &template_transaction_ptr->sender,
-        //                                                &nonce);
-        // printf("contract address\n");
-        // template_transaction_ptr->to.print();
-        // template_transaction_ptr->is_create = true;
-    } else {
-        // template_transaction_ptr->to.from_hex(to_json->valuestring);
-    }
-
     const cJSON *value_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "value");
     uint32_t value_counts = cJSON_GetArraySize(value_json);
 
@@ -472,6 +456,10 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     } else {
         printf("ERROR_TRANSACTION_TYPE\n");
         return ERROR_TRANSACTION_TYPE;
+    }
+    // CREATE transaction
+    if (strlen(to_json->valuestring) == 0) {
+        type = SPECIAL_CREATE_TRANSACTION_TYPE;
     }
 
     transaction_list_ptr->type = type;
