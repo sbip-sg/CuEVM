@@ -335,7 +335,8 @@ __device__ void StateDb::update_code(const uint16_t depth, const evm_word_t *add
     dynamic_account->code_size = code_size;
     dynamic_account->code = code;
 }
-__device__ void StateDb::update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance) {
+__device__ void StateDb::update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                        bool is_warm) {
     // printf("update balance thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
@@ -344,9 +345,11 @@ __device__ void StateDb::update_balance(const uint16_t depth, const evm_word_t *
             dynamic_account = StateDb::new_account(depth, address, balance, 0, 0, nullptr);
         }
         dynamic_account->balance = *balance;
+        dynamic_account->is_warm = is_warm;
         return;
     }
     account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX] = *balance;
+    account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
 }
 // shortcut for deducting balance
 __device__ int32_t StateDb::deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount) {
@@ -451,6 +454,7 @@ __device__ void StateDb::write_storage_with_known_index(const uint16_t depth, co
         if (storage_size < account_prealloc_keys_size) {
             uint32_t new_offset =
                 (contract_idx * account_prealloc_keys_size + storage_size) * num_states + INSTANCE_GLOBAL_IDX;
+            printf("storage size %d, new offset %d\n", storage_size, new_offset);
             prealloc_keys_pool[new_offset] = *key;
             prealloc_values_pool[new_offset].set_value(value, is_warm);
 
@@ -608,6 +612,7 @@ __device__ ValueStatus *StateDb::get_value_status(const int32_t address_index, c
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
     uint32_t contract_idx = contract_index[address_index];
     uint32_t storage_size = account_storage_size[instance_idx];
+    printf("get_value_status address_index %d, storage_size %d\n", address_index, storage_size);
     int32_t key_offset = get_value_offset(storage_size, contract_idx, key);
     if (key_offset == -1) {
         // printf(" not found in prealloc_values_pool, search dynamic storage\n");
@@ -709,12 +714,17 @@ __device__ void StateDb::set_warm_key(const evm_word_t *address, const evm_word_
 }
 
 __device__ bool StateDb::is_warm_account(const evm_word_t *address) const {
-    // todo :implement
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
-        return false;
+        DynamicAccount *dynamic_account = get_dynamic_account(address);
+        if (dynamic_account == nullptr) {
+            return false;
+        } else {
+            return dynamic_account->is_warm;
+        }
     }
-    return account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX];
+    uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    return account_is_warm[instance_idx];
 }
 
 // __device__ bool StateDb::is_warm_key(const evm_word_t *address, const evm_word_t *key) const {
@@ -750,16 +760,6 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
 }
 
 __device__ bool StateDb::is_empty_account(const evm_word_t *address) const {
-    // todo :implement
-    return false;
-}
-
-__device__ bool StateDb::is_deleted_account(const evm_word_t *address) const {
-    // todo :implement
-    return false;
-}
-
-__device__ bool StateDb::is_empty_create(const evm_word_t *address) const {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
         DynamicAccount *dynamic_account = get_dynamic_account(address);
@@ -767,12 +767,52 @@ __device__ bool StateDb::is_empty_create(const evm_word_t *address) const {
             return true;
         } else {
             return dynamic_account->code_size == 0 && dynamic_account->nonce == 0 &&
-                   dynamic_account->storage_page == nullptr;
+                   uint256_is_zero(&dynamic_account->balance);
         }
     }
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
     return (account_nonces[instance_idx] == 0 && account_storage_size[instance_idx] == 0 &&
-            account_codes_size[address_index] == 0);
+            uint256_is_zero(&account_balances[instance_idx]));
+}
+
+__device__ bool StateDb::is_deleted_account(const evm_word_t *address) const {
+    // todo :implement
+    return false;
+}
+
+__device__ bool StateDb::is_empty_create(const evm_word_t *address) {
+    // Todo : This definition changes overtime, need to be refactored
+    // Either check storage size == 0 or not
+    int32_t address_index = get_address_index(address);
+
+    if (address_index == -1) {
+        DynamicAccount *dynamic_account = get_dynamic_account(address);
+        if (dynamic_account == nullptr) {
+            printf("dynamic account is null, create new account\n");
+            DynamicAccount *new_acc = new_account(0, address, 0, 0, 0, nullptr);
+            return true;
+        } else {
+            if (dynamic_account->code_size == 0 && dynamic_account->nonce == 0) {
+                // reset storage size to 0, TODO: free
+                dynamic_account->storage_size = 0;
+                return true;
+            }
+            return false;
+        }
+    }
+    uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+
+    if (account_nonces[instance_idx] == 0 && account_codes_size[address_index] == 0) {
+        // reset storage size to 0, TODO: free
+        account_storage_size[instance_idx] = 0;
+        address_list[address_index] = 1;  // non-collision address, precompiled
+        // create a new dynamic account
+        // TODO: pass the depth and revert
+        DynamicAccount *new_acc = new_account(0, address, &account_balances[instance_idx], 0, 0, nullptr);
+
+        return true;
+    }
+    return false;
 }
 __device__ bool StateDb::is_contract(const evm_word_t *address) const {
     // todo :implement

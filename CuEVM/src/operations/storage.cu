@@ -47,7 +47,7 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     int32_t error_code = (call_context->static_env ? ERROR_STATIC_CALL_CONTEXT_SSTORE : ERROR_SUCCESS);
 
     gas_t gas_left = gas_limit - gas_used;
-    error_code |= (gas_left < GAS_STIPEND ? ERROR_OUT_OF_GAS : error_code);
+    error_code |= (gas_left <= GAS_STIPEND ? ERROR_OUT_OF_GAS : error_code);
     if (error_code != ERROR_SUCCESS) {
         return error_code;
     }

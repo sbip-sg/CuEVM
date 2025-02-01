@@ -106,7 +106,8 @@ class StateDb {
     __device__ void update_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
                                    const uint32_t nonce);
     __device__ int32_t deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount);
-    __device__ void update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance);
+    __device__ void update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                   bool is_warm = true);
     __device__ void update_nonce(const uint16_t depth, const evm_word_t *address, const uint32_t nonce);
     __device__ void update_code(const uint16_t depth, const evm_word_t *address, const uint32_t code_size,
                                 uint8_t *code);
@@ -151,7 +152,7 @@ class StateDb {
     __device__ bool is_empty_account(const evm_word_t *address) const;
     __device__ bool is_deleted_account(const evm_word_t *address) const;
     __device__ bool is_contract(const evm_word_t *address) const;
-    __device__ bool is_empty_create(const evm_word_t *address) const;
+    __device__ bool is_empty_create(const evm_word_t *address);
 
     // __device__ void clear_account(const evm_word_t *address);
     __device__ void snapshot_account(const uint16_t depth, const uint32_t address_index, const evm_word_t *balance,

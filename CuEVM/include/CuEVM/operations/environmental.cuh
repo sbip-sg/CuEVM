@@ -315,6 +315,16 @@ __device__ int32_t EXTCODEHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::e
                                CuEVM::StateDb *state_db);
 
 /**
+ * The GAS operation implementation.
+ * Pushes the gas left to the stack after this operation.
+ * @param[in] gas_limit The gas limit.
+ * @param[inout] gas_used The gas used.
+ * @param[out] stack The stack.
+ * @return 0 if the operation was successful, an error code otherwise.
+ */
+__device__ int32_t GAS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+
+/**
  * The SELFBALANCE operation implementation.
  * Pushes on the stack the balance of the current contract.
  * The current contract is consider the contract that owns the

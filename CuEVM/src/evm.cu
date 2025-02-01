@@ -53,10 +53,17 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
     if (transaction_list_ptr->type == SPECIAL_CREATE_TRANSACTION_TYPE) {
         uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(&transaction_list_ptr->sender);
         evm_word_t sender_nonce(sender_nonce_uint);
+
         CuEVM::utils::get_contract_address_create(&transaction_list_ptr->to, &transaction_list_ptr->sender,
                                                   &sender_nonce);
-        printf("Create contract address \n");
+        // special case ? Tests allow create to acc with storage
+        // TODO: simplify this
+
         transaction_list_ptr->to.print();
+        if (!CuEVM::global_state_db_ptr->is_empty_create(&transaction_list_ptr->to)) {
+            // todo: return error code
+            return;
+        }
 
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                         transaction_list_ptr->sender, transaction_list_ptr->to,
@@ -628,6 +635,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         // increase program counter
         cached_call_state.pc++;
 #ifdef EIP_3155
+        printf("finish operation, gas used %lu\n", cached_call_state.gas_used);
         tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
 
 #endif
@@ -641,6 +649,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         if (opcode >= OP_CREATE && opcode <= OP_STATICCALL && opcode != OP_RETURN) {
             if (error_code == ERROR_SUCCESS) {
                 cached_call_state.write_cache_to_state(call_state_ptr);
+
                 call_state_ptr = child_call_state_ptr;
                 cached_call_state = cached_evm_call_context(call_state_ptr);
                 error_code = start_CALL(cached_call_state);
@@ -673,16 +682,15 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                 // printf("Create call\n");
                 error_code = finish_CREATE(cached_call_state);
             }
-
+            // TODO: remove this, read cached state inside finish_CALL
+            cached_call_state.write_cache_to_state(call_state_ptr);
             if (call_state_ptr->depth == 1) {
-                cached_call_state.write_cache_to_state(call_state_ptr);
                 finish_CALL(error_code);
                 finish_TRANSACTION(error_code);
                 return;
             } else {
                 // TODO: finish call
                 // printf("Finish call\n");
-                cached_call_state.write_cache_to_state(call_state_ptr);
                 error_code |= finish_CALL(error_code);
                 cached_call_state = cached_evm_call_context(call_state_ptr);
             }
@@ -779,12 +787,15 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
 
 __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
-
+    printf("finish_CALL thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
         gas_t gas_left = call_state_ptr->gas_limit - call_state_ptr->gas_used;
-        // printf("gas_left %lx\n", gas_left);
+        printf("gas left %lu\n", gas_left);
+        printf("gas used %lu\n", call_state_ptr->gas_used);
+        printf("gas limit %lu\n", call_state_ptr->gas_limit);
+        if (call_state_ptr->parent != nullptr) printf("parent gas used %lu\n", call_state_ptr->parent->gas_used);
         if (call_state_ptr->parent != nullptr) {
             call_state_ptr->parent->gas_used -= gas_left;
         }
@@ -823,6 +834,11 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     //     return ERR_MEMORY_INVALID_OFFSET;
     // }
     // reset the error code for the parent
+
+    if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
+        call_state_ptr->parent->dynamic_ret_size = 0;
+        call_state_ptr->fixed_ret_size = 0;
+    }
     error_code = ERROR_SUCCESS;
 
     if (call_state_ptr->depth > 1) {
@@ -860,11 +876,12 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     CuEVM::gas_cost::code_cost(cached_call_state.gas_used, call_state_ptr->dynamic_ret_size);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(cached_call_state.gas_limit, cached_call_state.gas_used);
-    if (error_code == ERROR_SUCCESS) {
+    uint32_t code_size = call_state_ptr->dynamic_ret_size;
+    if (error_code == ERROR_SUCCESS && code_size > 0) {
 #ifdef EIP_3541
-        uint8_t *code = call_state_ptr->return_data;
+        uint8_t *code = new uint8_t[code_size];
+        call_state_ptr->parent->copy_return_data(code, 0, code_size);
 #endif
-        uint32_t code_size = call_state_ptr->dynamic_ret_size;
 
         if (code_size <= CuEVM::max_code_size) {
 #ifdef EIP_3541
@@ -876,8 +893,14 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
         } else {
             error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
         }
+
+        // TODO check if neccessary
         call_state_ptr->dynamic_ret_size = 0;
+        call_state_ptr->parent->dynamic_ret_size = 0;
+
+        delete[] code;
     }
+
     // if success, return ERROR_RETURN to continue finish call
     return error_code ? error_code : ERROR_RETURN;
 

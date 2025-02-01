@@ -5,6 +5,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 namespace CuEVM {
 __device__ cached_evm_call_context::cached_evm_call_context(evm_call_context_t* state) {  // copy from state to cache
+
     pc = state->pc;
     gas_used = state->gas_used;
     gas_limit = state->gas_limit;
@@ -160,16 +161,17 @@ __device__ void evm_call_context_t::copy_return_data(uint8_t* dest, uint32_t dat
 
 __device__ void evm_call_context_t::set_return_data(uint32_t offset, uint32_t size) {
     if (size == 0 || parent == nullptr) return;
-    // printf("set_return_data %u %u\n", offset, size);
+    printf("set_return_data %u %u\n", offset, size);
     parent->dynamic_ret_size = size;
     dynamic_ret_size = size;
     uint8_t* source_data;
     memory_ptr->get(offset, size, source_data);
-
+    printf("source_data %p\n", source_data);
     uint8_t* preallocated_base =
         CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
 
     if (size <= memory_pool_return_data_preallocate) {
+        printf("size <= memory_pool_return_data_preallocate\n");
         memcpy(preallocated_base, source_data, size);
     } else {
         // Copy what fits in preallocated space

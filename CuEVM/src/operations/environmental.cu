@@ -127,7 +127,14 @@ __device__ int32_t CALLDATALOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         if (data_offset_ui32 > call_context->call_data_size) {
             error_code |= stack.push(evm_word_t(0));
         } else {
-            error_code |= stack.pushx(CuEVM::word_size, call_context->call_data + data_offset_ui32, CuEVM::word_size);
+            uint32_t remaining_call_data_size = call_context->call_data_size - data_offset_ui32;
+            if (remaining_call_data_size >= CuEVM::word_size) {
+                error_code |=
+                    stack.pushx(CuEVM::word_size, call_context->call_data + data_offset_ui32, CuEVM::word_size);
+            } else {
+                error_code |= stack.pushx(remaining_call_data_size, call_context->call_data + data_offset_ui32,
+                                          remaining_call_data_size);
+            }
         }
     }
     return error_code;
@@ -370,6 +377,13 @@ __device__ int32_t EXTCODEHASH(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
     }
     // result is in address_shared[INSTANCE_IDX_PER_BLOCK]
     error_code |= stack.push(address);
+    return error_code;
+}
+
+__device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
+    gas_used += GAS_BASE;
+    int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    error_code |= stack.push_uint64(gas_limit - gas_used);
     return error_code;
 }
 

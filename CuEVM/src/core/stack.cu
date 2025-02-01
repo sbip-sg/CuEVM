@@ -57,6 +57,18 @@ __device__ int32_t evm_stack_t::push_uint32(uint32_t value) {
     }
 }
 
+__device__ int32_t evm_stack_t::push_uint64(uint64_t value) {
+    if (stack_offset < max_stack_size) {
+        evm_word_t *dest = top();
+        dest->words[0] = value;
+        dest->words[1] = value >> 32;
+        stack_offset++;
+        return ERROR_SUCCESS;
+    } else {
+        return ERROR_STACK_OVERFLOW;
+    }
+}
+
 __device__ int32_t evm_stack_t::push(const evm_word_t &value) {
     if (stack_offset < max_stack_size) {
         *top() = value;

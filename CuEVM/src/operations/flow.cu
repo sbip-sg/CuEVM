@@ -85,15 +85,6 @@ __device__ int32_t PC(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, con
     return error_code;
 }
 
-__device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack) {
-    gas_used += GAS_BASE;
-    int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    gas_t gas_left;
-    gas_left = gas_limit - gas_used;
-    error_code |= stack.push(gas_left);
-    return error_code;
-}
-
 __device__ int32_t JUMPDEST(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used) {
     gas_used += GAS_JUMP_DEST;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);

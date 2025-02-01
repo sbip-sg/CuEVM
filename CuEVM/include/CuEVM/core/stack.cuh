@@ -76,6 +76,7 @@ struct evm_stack_t {
      */
     __host__ __device__ int32_t push(const evm_word_t &value);
     __host__ __device__ int32_t push_uint32(uint32_t value);
+    __host__ __device__ int32_t push_uint64(uint64_t value);
     __host__ __device__ int32_t push_evm_word_t(const evm_word_t *value);
     /**
      * Pop a value from the stack
