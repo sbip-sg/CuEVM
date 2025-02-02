@@ -716,6 +716,8 @@ __device__ void StateDb::set_warm_key(const evm_word_t *address, const evm_word_
 __device__ bool StateDb::is_warm_account(const evm_word_t *address) const {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
+        if (uint256_cmp_word(address, CuEVM::no_precompile_contracts) == -1)
+            return true;  // precompile contracts are warm
         DynamicAccount *dynamic_account = get_dynamic_account(address);
         if (dynamic_account == nullptr) {
             return false;

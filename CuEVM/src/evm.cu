@@ -134,57 +134,51 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     // Dont use account ptr here, byte_code already set
     if (call_state_ptr->byte_code_size == 0) {
         if (uint256_cmp_word(&call_state_ptr->to, CuEVM::no_precompile_contracts) == -1) {
-            // TODO: fix this
-            /*
-            switch (uint256_get_uint32_t(&call_state_ptr->to)) {
-
+            switch (call_state_ptr->to.words[0]) {
                 case 0x01:
                     return CuEVM::precompile_operations::operation_ecRecover(
                         this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                        call_state_ptr);
                     break;
                 case 0x02:
-                    return CuEVM::precompile_operations::operation_SHA256(
-                        cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                    return CuEVM::precompile_operations::operation_SHA256(cached_call_state.gas_limit,
+                                                                          cached_call_state.gas_used, call_state_ptr);
                 case 0x03:
                     return CuEVM::precompile_operations::operation_RIPEMD160(
-                        cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                        cached_call_state.gas_limit, cached_call_state.gas_used, call_state_ptr);
                 case 0x04:
-                    return CuEVM::precompile_operations::operation_IDENTITY(
-                        cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                    return CuEVM::precompile_operations::operation_IDENTITY(cached_call_state.gas_limit,
+                                                                            cached_call_state.gas_used, call_state_ptr);
                 case 0x05:
-                    return CuEVM::precompile_operations::operation_MODEXP(
-                        cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                    return CuEVM::precompile_operations::operation_MODEXP(cached_call_state.gas_limit,
+                                                                          cached_call_state.gas_used, call_state_ptr);
                 case 0x06:
-                    return CuEVM::precompile_operations::operation_ecAdd(
-                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                    return CuEVM::precompile_operations::operation_ecAdd(this->ecc_constants_ptr,
+                                                                         cached_call_state.gas_limit,
+                                                                         cached_call_state.gas_used, call_state_ptr);
                 case 0x07:
-                    return CuEVM::precompile_operations::operation_ecMul(
-                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                    return CuEVM::precompile_operations::operation_ecMul(this->ecc_constants_ptr,
+                                                                         cached_call_state.gas_limit,
+                                                                         cached_call_state.gas_used, call_state_ptr);
                 case 0x08:
                     return CuEVM::precompile_operations::operation_ecPairing(
                         this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                        call_state_ptr);
                 case 0x09:
-                    return CuEVM::precompile_operations::operation_BLAKE2(
-                        cached_call_state.gas_limit, cached_call_state.gas_used,
-                        call_state_ptr->parent->last_return_data_ptr, call_state_ptr->message_ptr);
+                    return CuEVM::precompile_operations::operation_BLAKE2(cached_call_state.gas_limit,
+                                                                          cached_call_state.gas_used, call_state_ptr);
                 case 0x0a:
                     return ERROR_RETURN;
                 default:
                     return ERROR_RETURN;
                     break;
-        }*/
+            }
         } else {
             // operation stop
             // TODO: fix this
             // CuEVM::byte_array_t::reset_return_data(call_state_ptr->return_data_ptr);
+            call_state_ptr->dynamic_ret_size = 0;
+
             return ERROR_RETURN;
         }
     }

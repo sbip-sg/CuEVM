@@ -73,8 +73,11 @@ __device__ int32_t BALANCE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
     if (error_code == ERROR_SUCCESS) {
         evm_word_t *balance;
         balance = state_db->get_balance(&address);
-
-        error_code |= stack.push(*balance);
+        if (balance != nullptr) {
+            error_code |= stack.push(*balance);
+        } else {
+            error_code |= stack.push_uint32(0);
+        }
     }
     return error_code;
 }

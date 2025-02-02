@@ -3,36 +3,46 @@
 /// The secp256k1 field prime number (P) and order
 
 namespace ecc {
+__device__ void uint256_modular_inverse(uint256 *res, uint256 *a, uint256 *mod) {
+    // TODO : check this implementation
+    // Optional: check that 'a' is not zero.
+    if (uint256_is_zero(a)) {
+        // Inverse does not exist; here we choose to set the result to 0.
+        uint256_set_zero(res);
+        return;
+    }
 
-#ifdef ENABLE_ECC
-__host__ __device__ void cgbn_mul_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
-    env_t::cgbn_wide_t temp;
-    cgbn_mul_wide(env, temp, a, b);
-    cgbn_rem_wide(env, res, temp, mod);
+    uint256 exponent;
+    // Copy mod into exponent, then subtract 2,
+    // so that exponent = mod - 2.
+    uint256_cpy(&exponent, mod);
+    uint256_sub_word(&exponent, &exponent, 2);
+
+    // Using Fermat's little theorem: a^(mod-2) mod mod is the
+    // modular inverse of a (provided mod is prime).
+    uint256_powmod(res, a, &exponent, mod);
 }
-__host__ __device__ void cgbn_add_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
-    int32_t carry = cgbn_add(env, res, a, b);
-    env_t::cgbn_wide_t d;
-    if (carry == 1) {
-        cgbn_set_ui32(env, d._high, 1);
-        cgbn_set(env, d._low, res);
-        cgbn_rem_wide(env, res, d, mod);
-    } else {
-        cgbn_rem(env, res, res, mod);
-    }
-}
-__host__ __device__ void cgbn_sub_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
+__device__ void uint256_pow_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) { uint256_powmod(res, a, b, mod); }
+__device__ void uint256_mul_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) { uint256_mulmod(res, a, b, mod); }
+__device__ void uint256_add_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) { uint256_addmod(res, a, b, mod); }
+__device__ void uint256_sub_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) {
     // if b > a then a - b + mod
-    if (cgbn_compare(env, a, b) < 0) {
-        env_t::cgbn_accumulator_t acc;
-        cgbn_set(env, acc, a);
-        cgbn_add(env, acc, mod);
-        cgbn_sub(env, acc, b);
-        cgbn_resolve(env, res, acc);
-        cgbn_rem(env, res, res, mod);
+    if (uint256_cmp(a, b) < 0) {
+        uint256_addmod(res, a, mod, mod);
+        uint256_sub(res, res, b);
     } else {
-        cgbn_sub(env, res, a, b);
+        uint256_sub(res, a, b);
     }
+    // if (cgbn_compare(env, a, b) < 0) {
+    //     env_t::cgbn_accumulator_t acc;
+    //     cgbn_set(env, acc, a);
+    //     cgbn_add(env, acc, mod);
+    //     cgbn_sub(env, acc, b);
+    //     cgbn_resolve(env, res, acc);
+    //     cgbn_rem(env, res, res, mod);
+    // } else {
+    //     cgbn_sub(env, res, a, b);
+    // }
 }
 
 /**
@@ -44,10 +54,13 @@ __host__ __device__ void cgbn_sub_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn
  * @param b
  * @param mod
  */
-__host__ __device__ void cgbn_div_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn_t &mod) {
-    cgbn_modular_inverse(env, res, b, mod);
-    cgbn_mul_mod(env, res, a, res, mod);
-}
+// __device__ void uint256_div_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) {
+//     uint256 temp;
+//     uint256_div(res, a, b);  // modular inverse
+//     uint256_mod(res, res, mod);
+//     // cgbn_modular_inverse(env, res, b, mod);
+//     // cgbn_mul_mod(env, res, a, res, mod);
+// }
 
 /**
  * @brief Check if a basic point P(x, y) is on the curve y^2 = x^3 + B
@@ -59,172 +72,140 @@ __host__ __device__ void cgbn_div_mod(env_t env, bn_t &res, bn_t &a, bn_t &b, bn
  * @param B
  * @return true if on curve
  */
-__host__ __device__ bool is_on_cuve_simple(env_t env, bn_t &Px, bn_t &Py, bn_t &mod, uint32_t B) {
-    if (cgbn_equals_ui32(env, Px, 0) && cgbn_equals_ui32(env, Py, 0)) return true;
-    bn_t temp, temp2;
-    cgbn_mul_mod(env, temp, Px, Px, mod);    // temp = Px^2
-    cgbn_mul_mod(env, temp, temp, Px, mod);  // temp = Px^3
-    cgbn_add_ui32(env, temp, temp, B);
-    cgbn_rem(env, temp, temp, mod);
-    cgbn_mul_mod(env, temp2, Py, Py, mod);  // temp2 = Py^2
-    return cgbn_equals(env, temp, temp2);
+__device__ bool is_on_cuve_simple(uint256 *Px, uint256 *Py, uint256 *mod, uint32_t B) {
+    if (uint256_is_zero(Px) && uint256_is_zero(Py)) return true;
+    uint256 temp, temp2;
+    uint256_mul_mod(&temp, Px, Px, mod);     // temp = Px^2
+    uint256_mul_mod(&temp, &temp, Px, mod);  // temp = Px^3
+    uint256_add_word(&temp, &temp, B);
+    uint256_mod(&temp, &temp, mod);
+    uint256_mul_mod(&temp2, Py, Py, mod);  // temp2 = Py^2
+    return uint256_cmp(&temp, &temp2) == 0;
 }
 
 // Add two point on the curve P and Q
-__host__ __device__ int ec_add(ArithEnv &arith, Curve curve, bn_t &ResX, bn_t &ResY, bn_t &Px, bn_t &Py, bn_t &Qx,
-                               bn_t &Qy) {
-    bn_t mod_fp;
-    bn_t lambda, numerator, denominator, temp, x_r, y_r;
-    __SHARED_MEMORY__ evm_word_t scratch_pad;
-    cgbn_load(arith.env, mod_fp, &curve.FieldPrime);
+__device__ int ec_add(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_t *Px, evm_word_t *Py, evm_word_t *Qx,
+                      evm_word_t *Qy) {
+    evm_word_t mod_fp;
+    evm_word_t lambda, numerator, denominator, temp, x_r, y_r;
+    mod_fp = curve.FieldPrime;
     // point at infinity
-    if (cgbn_equals_ui32(arith.env, Px, 0) && cgbn_equals_ui32(arith.env, Py, 0)) {
-        if (is_on_cuve_simple(arith.env, Qx, Qy, mod_fp, curve.B)) {
-            cgbn_set(arith.env, ResX, Qx);
-            cgbn_set(arith.env, ResY, Qy);
+    if (uint256_is_zero(Px) && uint256_is_zero(Py)) {
+        if (is_on_cuve_simple(Qx, Qy, &mod_fp, curve.B)) {
+            *ResX = *Qx;
+            *ResY = *Qy;
             return 0;
         } else
             return -1;
-    } else if (cgbn_equals_ui32(arith.env, Qx, 0) && cgbn_equals_ui32(arith.env, Qy, 0)) {
-        if (is_on_cuve_simple(arith.env, Px, Py, mod_fp, curve.B)) {
-            cgbn_set(arith.env, ResX, Px);
-            cgbn_set(arith.env, ResY, Py);
+    } else if (uint256_is_zero(Qx) && uint256_is_zero(Qy)) {
+        if (is_on_cuve_simple(Px, Py, &mod_fp, curve.B)) {
+            *ResX = *Px;
+            *ResY = *Py;
             return 0;
         } else
             return -1;
     }
-    if (!is_on_cuve_simple(arith.env, Px, Py, mod_fp, curve.B) ||
-        !is_on_cuve_simple(arith.env, Qx, Qy, mod_fp, curve.B)) {
+    if (!is_on_cuve_simple(Px, Py, &mod_fp, curve.B) || !is_on_cuve_simple(Qx, Qy, &mod_fp, curve.B)) {
         return -1;
     }
-    if (cgbn_equals(arith.env, Px, Qx) && cgbn_equals(arith.env, Py, Qy)) {
+    if (uint256_cmp(Px, Qx) == 0 && uint256_cmp(Py, Qy) == 0) {
         // Special case for doubling P == Q
         // printf("Doubling\n");
         // lambda = (3*Px^2) / (2*Py)
-        cgbn_mul_mod(arith.env, temp, Px, Px, mod_fp);  // temp = Px^2
-        cgbn_set_ui32(arith.env, numerator, 3);
-        cgbn_mul_mod(arith.env, numerator, numerator, temp,
-                     mod_fp);  // numerator = 3*Px^2
+        uint256_mul_mod(&temp, Px, Px, &mod_fp);  // temp = Px^2
+        numerator = 3;
+        uint256_mul_mod(&numerator, &numerator, &temp, &mod_fp);  // numerator = 3*Px^2
 
-        cgbn_set_ui32(arith.env, denominator, 2);
-        cgbn_mul_mod(arith.env, denominator, denominator, Py,
-                     mod_fp);  // denominator = 2*Py
-        cgbn_modular_inverse(arith.env, denominator, denominator, mod_fp);
+        denominator = 2;
+        uint256_mul_mod(&denominator, &denominator, Py, &mod_fp);     // denominator = 2*Py
+        uint256_div_mod(&lambda, &numerator, &denominator, &mod_fp);  // lambda = (3*Px^2) / (2*Py)
 
-        cgbn_mul_mod(arith.env, lambda, numerator, denominator,
-                     mod_fp);  // lambda = (3*Px^2) / (2*Py)
-        // print lambda
-        cgbn_store(arith.env, &scratch_pad, lambda);
-
-    } else if (cgbn_equals(arith.env, Px, Qx)) {
+    } else if (uint256_cmp(Px, Qx) == 0) {
         // printf("Doubling\n");
         // Special case for P != Q and Px == Qx
         // The result is the point at infinity
-        cgbn_set_ui32(arith.env, ResX, 0);
-        cgbn_set_ui32(arith.env, ResY, 0);
+        *ResX = 0;
+        *ResY = 0;
         return 0;
     } else {
         // printf("Adding\n");
         // General case for P != Q
         // lambda = (Qy - Py) / (Qx - Px)
-        cgbn_sub_mod(arith.env, temp, Qy, Py, mod_fp);  // temp = Qy - Py
-        cgbn_sub_mod(arith.env, numerator, Qx, Px,
-                     mod_fp);  // numerator = Qx - Px
-        cgbn_modular_inverse(arith.env, numerator, numerator, mod_fp);
-        cgbn_mul_mod(arith.env, lambda, temp, numerator,
-                     mod_fp);  // lambda = (Qy - Py) / (Qx - Px)
+        uint256_sub_mod(&temp, Qy, Py, &mod_fp);               // temp = Qy - Py
+        uint256_sub_mod(&numerator, Qx, Px, &mod_fp);          // numerator = Qx - Px
+        uint256_div_mod(&lambda, &numerator, &temp, &mod_fp);  // lambda = (Qy - Py) / (Qx - Px)
     }
 
-    cgbn_mul_mod(arith.env, x_r, lambda, lambda, mod_fp);  // x_r = lambda^2
-    cgbn_add_mod(arith.env, temp, Px, Qx, mod_fp);         // temp = Px + Qx
-    cgbn_sub_mod(arith.env, x_r, x_r, temp,
-                 mod_fp);  // x_r = lambda^2 - (Px + Qx)
+    uint256_mul_mod(&x_r, &lambda, &lambda, &mod_fp);  // x_r = lambda^2
+    uint256_add_mod(&temp, Px, Qx, &mod_fp);           // temp = Px + Qx
+    uint256_sub_mod(&x_r, &x_r, &temp, &mod_fp);       // x_r = lambda^2 - (Px + Qx)
     // y_r = lambda * (Px - x_r) - Py
-    cgbn_sub_mod(arith.env, temp, Px, x_r, mod_fp);  // temp = Px - x_r
-    cgbn_mul_mod(arith.env, y_r, lambda, temp,
-                 mod_fp);  // y_r = lambda * (Px - x_r)
-    cgbn_sub_mod(arith.env, y_r, y_r, Py,
-                 mod_fp);  // y_r = lambda * (Px - x_r) - Py
+    uint256_sub_mod(&temp, Px, &x_r, &mod_fp);       // temp = Px - x_r
+    uint256_mul_mod(&y_r, &lambda, &temp, &mod_fp);  // y_r = lambda * (Px - x_r)
+    uint256_sub_mod(&y_r, &y_r, Py, &mod_fp);        // y_r = lambda * (Px - x_r) - Py
     // Set the result
-    cgbn_set(arith.env, ResX, x_r);
-    cgbn_set(arith.env, ResY, y_r);
+    *ResX = x_r;
+    *ResY = y_r;
     return 0;
 }
 // Multiply a point on the curve G by a scalar n, store result in Res
-__host__ __device__ int ec_mul(ArithEnv &arith, Curve curve, bn_t &ResX, bn_t &ResY, bn_t &Gx, bn_t &Gy, bn_t &n) {
-    bn_t mod_fp;
-    __SHARED_MEMORY__ evm_word_t scratch_pad;
-    cgbn_load(arith.env, mod_fp, &curve.FieldPrime);
-    // #ifdef __CUDA_ARCH__
-    //     printf("Mod_fp thread %d\n", threadIdx.x);
-    //     print_bnt(arith, mod_fp);
-    // #endif
+__device__ int ec_mul(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_t *Gx, evm_word_t *Gy, evm_word_t *n) {
+    evm_word_t mod_fp;
 
-    if (!is_on_cuve_simple(arith.env, Gx, Gy, mod_fp, curve.B)) {
+    mod_fp = curve.FieldPrime;
+
+    if (!is_on_cuve_simple(Gx, Gy, &mod_fp, curve.B)) {
         printf("Point not on curve\n");
         return -1;
     }
     // check point at infinity
-    if (cgbn_equals_ui32(arith.env, Gx, 0) && cgbn_equals_ui32(arith.env, Gy, 0) || cgbn_equals_ui32(arith.env, n, 0)) {
-        cgbn_set_ui32(arith.env, ResX, 0);
-        cgbn_set_ui32(arith.env, ResY, 0);
+    if (uint256_is_zero(Gx) && uint256_is_zero(Gy) || uint256_is_zero(n)) {
+        *ResX = 0;
+        *ResY = 0;
         return 0;
     }
 
     uint8_t bitArray[CuEVM::word_bits];
     uint32_t bit_array_length = 0;
-    cgbn_store(arith.env, &scratch_pad, n);
-    get_bit_array(bitArray, bit_array_length, scratch_pad);
+
+    n->to_bit_array_t(bitArray, bit_array_length);
     // // there is a bug if calling The result RES == G, need to copy to temps
-    bn_t temp_ResX, temp_ResY;
+    evm_word_t temp_ResX, temp_ResY;
 
     // Double-and-add algorithm
-    cgbn_set(arith.env, temp_ResX, Gx);
-    cgbn_set(arith.env, temp_ResY, Gy);
+    temp_ResX = *Gx;
+    temp_ResY = *Gy;
 
     for (int i = bit_array_length - 2; i >= 0; --i) {
         // Gz = 2 * Gz
-        ec_add(arith, curve, temp_ResX, temp_ResY, temp_ResX, temp_ResY, temp_ResX, temp_ResY);
+        ec_add(curve, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY);
 
         if (bitArray[CuEVM::word_bits - 1 - i]) {
-            ec_add(arith, curve, temp_ResX, temp_ResY, temp_ResX, temp_ResY, Gx, Gy);
+            ec_add(curve, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY, Gx, Gy);
         }
     }
-    cgbn_set(arith.env, ResX, temp_ResX);
-    cgbn_set(arith.env, ResY, temp_ResY);
+    *ResX = temp_ResX;
+    *ResY = temp_ResY;
     return 0;
 }
 
-__host__ __device__ void convert_point_to_address(ArithEnv &arith, bn_t &address, bn_t &X, bn_t &Y) {
-    __SHARED_MEMORY__ evm_word_t scratch_pad;
-    // #ifdef __CUDA_ARCH__
-    //     printf("Converting point to address thread %d\n", threadIdx.x);
-    //     print_bnt(arith, X);
-    //     print_bnt(arith, Y);
-    // #endif
+__host__ __device__ void convert_point_to_address(evm_word_t *address, evm_word_t *X, evm_word_t *Y) {
     uint8_t input[64];
-    __SHARED_MEMORY__ uint8_t temp_array[32];
-    size_t array_length = 0;
-    cgbn_store(arith.env, &scratch_pad, X);
-    byte_array_from_cgbn_memory(temp_array, array_length, scratch_pad);
-    for (int i = 0; i < 32; i++) {
-        input[i] = temp_array[i];
-    }
 
-    cgbn_store(arith.env, &scratch_pad, Y);
-    byte_array_from_cgbn_memory(temp_array, array_length, scratch_pad);
-    for (int i = 0; i < 32; i++) {
-        input[i + 32] = temp_array[i];
-    }
+    uint32_t array_length = 0;
+    X->to_byte_array_t(input, array_length);
+
+    Y->to_byte_array_t(input + 32, array_length);
+
     // print the entire byte array
     // print_byte_array_as_hex(input, 64);
     uint32_t in_length = 64, out_length = 32;
-    __ONE_GPU_THREAD_WOSYNC_BEGIN__
-    CuCrypto::keccak::sha3(input, in_length, (uint8_t *)temp_array, out_length);
-    __ONE_GPU_THREAD_END__
-    cgbn_set_memory(arith.env, address, temp_array, 32);
+    uint8_t output[32];
+    CuCrypto::keccak::sha3(input, in_length, output, out_length);
+    // cgbn_set_memory(arith.env, address, temp_array, 32);
     // cgbn_bitwise_mask_and(arith.env, address, address, 160);
-    evm_address_conversion(arith, address);
+    uint256_from_bytes(address, output, 32);
+    CuEVM::utils::evm_address_conversion(*address);
 }
 
 /**
@@ -235,88 +216,88 @@ __host__ __device__ void convert_point_to_address(ArithEnv &arith, bn_t &address
  * @param sig
  * @param signer
  */
-__host__ __device__ int ec_recover(ArithEnv &arith, CuEVM::EccConstants *ecc_constants_ptr, signature_t &sig,
-                                   bn_t &signer) {
+__device__ int ec_recover(CuEVM::EccConstants *ecc_constants_ptr, signature_t *sig, evm_word_t *signer) {
     // curve = ecc_constants_ptr->secp256k1;
 
-    if (sig.v < 27 || sig.v > 28) {
+    if (sig->v < 27 || sig->v > 28) {
         return -1;
     }
 
-    bn_t r, r_y, r_inv, temp_cgbn, mod_order, mod_fp, temp_compare;
-    bn_t Gx, Gy, ResX, ResY, XY_x, XY_y;  // for the point multiplication
+    evm_word_t r, r_y, r_inv, temp_cgbn, mod_order, mod_fp, temp_compare;
+    evm_word_t Gx, Gy, ResX, ResY, XY_x, XY_y;  // for the point multiplication
 
     // calculate R_invert
-    cgbn_load(arith.env, r, &sig.r);
+    r = sig->r;
     // cgbn_load(arith.env, mod_order, &curve.Order);
-    cgbn_load(arith.env, mod_order, &ecc_constants_ptr->secp256k1.Order);
+    mod_order = ecc_constants_ptr->secp256k1.Order;
     // cgbn_load(arith.env, mod_fp, &curve.FP);
-    cgbn_load(arith.env, mod_fp, &ecc_constants_ptr->secp256k1.FieldPrime);
+    mod_fp = ecc_constants_ptr->secp256k1.FieldPrime;
 
-    cgbn_rem(arith.env, temp_compare, r, mod_order);
-    if (cgbn_equals_ui32(arith.env, temp_compare, 0) || cgbn_compare(arith.env, r, mod_order) >= 0) return -1;
+    uint256_mod(&temp_compare, &r, &mod_order);
+    if (uint256_is_zero(&temp_compare) || uint256_cmp(&r, &mod_order) >= 0) return -1;
 
     // calculate r_y
-    cgbn_mul_mod(arith.env, temp_cgbn, r, r, mod_fp);
-    cgbn_mul_mod(arith.env, temp_cgbn, temp_cgbn, r, mod_fp);
+    uint256_mul_mod(&temp_cgbn, &r, &r, &mod_fp);
+    uint256_mul_mod(&temp_cgbn, &temp_cgbn, &temp_cgbn, &mod_fp);
 
     // cgbn_add_ui32(arith.env, r_y, temp_cgbn, curve.B);
-    cgbn_add_ui32(arith.env, r_y, temp_cgbn, ecc_constants_ptr->secp256k1.B);
-    cgbn_rem(arith.env, r_y, r_y, mod_fp);
+    uint256_add_word(&r_y, &temp_cgbn, ecc_constants_ptr->secp256k1.B);
+    uint256_mod(&r_y, &r_y, &mod_fp);
 
     // find r_y using Tonelli–Shanks algorithm
     // beta = pow(xcubedaxb, (P+1)//4, P)
     // cgbn_load(arith.env, temp_cgbn, &curve.FP);
-    cgbn_load(arith.env, temp_cgbn, &ecc_constants_ptr->secp256k1.FieldPrime);
-    cgbn_add_ui32(arith.env, temp_cgbn, temp_cgbn, 1);
-    cgbn_div_ui32(arith.env, temp_cgbn, temp_cgbn, 4);
-    cgbn_modular_power(arith.env, r_y, r_y, temp_cgbn, mod_fp);
+    evm_word_t four = 4;
+    temp_cgbn = ecc_constants_ptr->secp256k1.FieldPrime;
+    uint256_add_word(&temp_cgbn, &temp_cgbn, 1);
+    uint256_div(&temp_cgbn, &temp_cgbn, &four);
+
+    uint256_pow_mod(&r_y, &r_y, &temp_cgbn, &mod_fp);
 
     // y = beta if v % 2 ^ beta % 2 else (P - beta)
-    uint32_t beta_mod2 = cgbn_extract_bits_ui32(arith.env, r_y, 0, 1);
-    uint32_t v_mod2 = sig.v % 2;
-    if (beta_mod2 == v_mod2) cgbn_sub(arith.env, r_y, mod_fp, r_y);
+    uint32_t beta_mod2 = r_y.words[0] % 2;
+    uint32_t v_mod2 = sig->v % 2;
+    if (beta_mod2 == v_mod2) uint256_sub(&r_y, &mod_fp, &r_y);
 
     // invalid point check
     // if (!is_on_cuve_simple(arith.env, r, r_y, mod_fp, curve.B)) return -1;
-    if (!is_on_cuve_simple(arith.env, r, r_y, mod_fp, ecc_constants_ptr->secp256k1.B)) return -1;
+    if (!is_on_cuve_simple(&r, &r_y, &mod_fp, ecc_constants_ptr->secp256k1.B)) return -1;
 
     // calculate n_z = (N-msg_hash) mod N
-    cgbn_load(arith.env, temp_cgbn, &sig.msg_hash);
-    cgbn_sub(arith.env, temp_cgbn, mod_order, temp_cgbn);
+    temp_cgbn = sig->msg_hash;
+    uint256_sub(&temp_cgbn, &mod_order, &temp_cgbn);
 
     // cgbn_load(arith.env, Gx, &curve.GX);
-    cgbn_load(arith.env, Gx, &ecc_constants_ptr->secp256k1.GX);
+    Gx = ecc_constants_ptr->secp256k1.GX;
 
     // cgbn_load(arith.env, Gy, &curve.GY);
-    cgbn_load(arith.env, Gy, &ecc_constants_ptr->secp256k1.GY);
+    Gy = ecc_constants_ptr->secp256k1.GY;
 
-    ec_mul(arith, ecc_constants_ptr->secp256k1, ResX, ResY, Gx, Gy, temp_cgbn);
+    ec_mul(ecc_constants_ptr->secp256k1, &ResX, &ResY, &Gx, &Gy, &temp_cgbn);
 
     // calculate XY = (r, r_y) * s
-    cgbn_load(arith.env, temp_cgbn, &sig.s);
+    temp_cgbn = sig->s;
     // check invalid s
-    cgbn_rem(arith.env, temp_compare, temp_cgbn, mod_order);
-    if (cgbn_equals_ui32(arith.env, temp_compare, 0) || cgbn_compare(arith.env, temp_cgbn, mod_order) >= 0) return -1;
+    uint256_mod(&temp_compare, &temp_cgbn, &mod_order);
+    if (uint256_is_zero(&temp_compare) || uint256_cmp(&temp_cgbn, &mod_order) >= 0) return -1;
 
-    ec_mul(arith, ecc_constants_ptr->secp256k1, XY_x, XY_y, r, r_y, temp_cgbn);
+    ec_mul(ecc_constants_ptr->secp256k1, &XY_x, &XY_y, &r, &r_y, &temp_cgbn);
 
     // calculate QR = (ResX, ResY) + (XY_x, XY_y)
-    ec_add(arith, ecc_constants_ptr->secp256k1, ResX, ResY, ResX, ResY, XY_x, XY_y);
-    cgbn_modular_inverse(arith.env, r_inv, r, mod_order);
+    ec_add(ecc_constants_ptr->secp256k1, &ResX, &ResY, &ResX, &ResY, &XY_x, &XY_y);
+    uint256_modular_inverse(&r_inv, &r, &mod_order);
 
     // env_t::cgbn_t Q_x, Q_y;
     // calculate Q = Qr * r_inv %N
-    ec_mul(arith, ecc_constants_ptr->secp256k1, ResX, ResY, ResX, ResY, r_inv);
-    if (cgbn_equals_ui32(arith.env, ResX, 0) && cgbn_equals_ui32(arith.env, ResY, 0))
+    ec_mul(ecc_constants_ptr->secp256k1, &ResX, &ResY, &ResX, &ResY, &r_inv);
+    if (uint256_is_zero(&ResX) && uint256_is_zero(&ResY))
         return -1;
     else {
-        convert_point_to_address(arith, signer, ResX, ResY);
+        convert_point_to_address(signer, &ResX, &ResY);
         return 0;
     }
 }
 ///
-#endif
 
 #ifdef ENABLE_PAIRING_CODE
 template <size_t Degree>

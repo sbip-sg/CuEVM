@@ -100,16 +100,24 @@ __host__ __device__ char *evm_word_t::address_to_hex(char *hex_string, uint32_t 
 
     return hex_string;
 }
-
-__host__ __device__ int32_t evm_word_t::to_byte_array_t(byte_array_t &byte_array, int32_t endian) const {
-    byte_array.grow(CuEVM::word_size, 1);
-    uint256_to_bytes(byte_array.data, this, byte_array.size);
+__host__ __device__ int32_t evm_word_t::to_byte_array_t(byte_array_t &byte_array) const {
+    byte_array.grow(CuEVM::word_size);
+    uint256_to_bytes(byte_array.data, this, CuEVM::word_size);
 }
 
-__host__ __device__ int32_t evm_word_t::to_bit_array_t(byte_array_t &bit_array, int32_t endian) const {
-    bit_array.grow(CuEVM::word_bits, 1);
-    uint8_t *bits = nullptr;
+__host__ __device__ int32_t evm_word_t::to_byte_array_t(uint8_t *byte_array, uint32_t &byte_array_length) const {
+    byte_array_length = CuEVM::word_size;
+    uint256_to_bytes(byte_array, this, byte_array_length);
+}
 
+__host__ __device__ int32_t evm_word_t::to_bit_array_t(uint8_t *bit_array, uint32_t &bit_array_length) const {
+    uint8_t *bits = bit_array;
+    for (int32_t idx = uint256_limbs - 1; idx >= 0; idx--) {
+        for (int bit = 31; bit >= 0; bit--) {
+            *(bits++) = (uint8_t)((words[idx] >> bit) & 0x01);
+        }
+    }
+    bit_array_length = CuEVM::word_bits;
     // if (endian == BIG_ENDIAN) {
     //     bits = bit_array.data;
     //     for (int32_t idx = CuEVM::cgbn_limbs - 1; idx >= 0; idx--) {

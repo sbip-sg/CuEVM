@@ -20,15 +20,13 @@ namespace precompile_operations {
 /**
  * The Identity precompile contract
  * MEMCPY through the message data and return data
- * @param[in] arith The arithmetic environment
  * @param[in] gas_limit The gas limit
  * @param[out] gas_used The gas used
  * @param[out] error_code The error code
  * @param[out] return_data The return data
  * @param[in] message The message
  */
-__device__ int32_t operation_IDENTITY(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                      CuEVM::evm_call_context_t *call_context) {
+__device__ int32_t operation_IDENTITY(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context) {
     // static gas
     gas_used += GAS_PRECOMPILE_IDENTITY;
 
@@ -43,7 +41,7 @@ __device__ int32_t operation_IDENTITY(gas_t &gas_limit, gas_t &gas_used, CuEVM::
         return error;
     }
 
-    *return_data = byte_array_t(call_context->call_data, call_context->call_data_size);
+    call_context->set_parent_return_data(call_context->call_data, call_context->call_data_size);
 
     return ERROR_RETURN;
 }
@@ -51,15 +49,13 @@ __device__ int32_t operation_IDENTITY(gas_t &gas_limit, gas_t &gas_used, CuEVM::
 /**
  * The SHA2-256 precompile contract
  * SHA2 through the message data and return data
- * @param[in] arith The arithmetic environment
  * @param[in] gas_limit The gas limit
  * @param[out] gas_used The gas used
  * @param[out] error_code The error code
  * @param[out] return_data The return data
  * @param[in] message The message
  */
-__device__ int32_t operation_SHA256(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                    CuEVM::evm_call_context_t *call_context) {
+__device__ int32_t operation_SHA256(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context) {
     // static gas
     gas_used += GAS_PRECOMPILE_SHA256;
 
@@ -75,12 +71,12 @@ __device__ int32_t operation_SHA256(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 
     uint8_t hash[32] = {0};
     CuCrypto::sha256::sha(call_context->call_data, call_context->call_data_size, &(hash[0]));
-    *return_data = byte_array_t(hash, 32);
+    call_context->set_parent_return_data(hash, 32);
+
     return ERROR_RETURN;
 }
 
-__device__ int32_t operation_RIPEMD160(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                       CuEVM::evm_call_context_t *call_context) {
+__device__ int32_t operation_RIPEMD160(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context) {
     // static gas
     gas_used += GAS_PRECOMPILE_RIPEMD160;
 
@@ -97,239 +93,208 @@ __device__ int32_t operation_RIPEMD160(gas_t &gas_limit, gas_t &gas_used, CuEVM:
     uint8_t *hash;
     hash = output + 12;
     CuCrypto::ripemd160::ripemd160(call_context->call_data, call_context->call_data_size, hash);
-    *return_data = byte_array_t(output, 32);
+    call_context->set_parent_return_data(hash, 32);
 
     return ERROR_RETURN;
 }
 
-__device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                    CuEVM::evm_call_context_t *call_context) {
+__device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context) {
     evm_word_t base_size, exponent_size, modulus_size;
     // TODO: fix this
     // CuEVM::byte_array_t input_data(message->get_data(), 0, 96);
     byte_array_t bsize_array = byte_array_t(call_context->call_data, 32);
     byte_array_t esize_array = byte_array_t(call_context->call_data + 32, 32);
-    // byte_array_t msize_array = byte_array_t(input_data.data + 64, 32);
+    byte_array_t msize_array = byte_array_t(call_context->call_data + 64, 32);
+
+    uint256_from_bytes(&base_size, bsize_array.data, bsize_array.size);
+    uint256_from_bytes(&exponent_size, esize_array.data, esize_array.size);
+    uint256_from_bytes(&modulus_size, msize_array.data, msize_array.size);
+
+    // if (error) {
+    //     return error;
+    // }
     int32_t error = ERROR_SUCCESS;
 
-    /*
-        uint256_from_bytes(&base_size, bsize_array.data, bsize_array.size);
-        uint256_from_bytes(&exponent_size, esize_array.data, esize_array.size);
-        uint256_from_bytes(&modulus_size, msize_array.data, msize_array.size);
+    uint32_t base_len, exp_len, mod_len, data_len;
+    data_len = call_context->call_data_size;
 
-    #ifdef EIP_3155
-        __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        printf("base size\n");
-        print_bnt(arith, base_size);
-        printf("exponent size\n");
-        print_bnt(arith, exponent_size);
-        printf("modulus size\n");
-        print_bnt(arith, modulus_size);
-        __ONE_GPU_THREAD_WOSYNC_END__
-    #endif
+    // Handle a special case when both the base and mod length are zero.
+    if (uint256_is_zero(&base_size) && uint256_is_zero(&modulus_size)) {
+        gas_used += GAS_PRECOMPILE_MODEXP_MAX;
+        error = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+        return error;
+    }
 
-        // if (error) {
-        //     return error;
-        // }
+    evm_word_t max_length = base_size;
+    if (uint256_cmp(&max_length, &modulus_size) < 0) {
+        max_length = modulus_size;
+    }
+    // words = (max_length + 7) / 8
+    // add 7
+    uint256_add_word(&max_length, &max_length, 7);
+    // divide by 8
+    uint256_shift_right(&max_length, &max_length, 3);
+    // multiplication_complexity = words ^ 2
+    evm_word_t multiplication_complexity;
+    uint256_mul(&multiplication_complexity, &max_length, &max_length);
 
-        uint32_t base_len, exp_len, mod_len, data_len;
-        data_len = message->data->size;
+    evm_word_t exponent_bit_length_bn;
 
-        // Handle a special case when both the base and mod length are zero.
-        if (cgbn_compare_ui32(arith.env, base_size, 0) == 0 && cgbn_compare_ui32(arith.env, modulus_size, 0) == 0) {
-            cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_PRECOMPILE_MODEXP_MAX);
-            error = CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
-            return error;
-        }
-        if (error) {
-            // printf("cgbn_get_uint32_t error %d\n", error);
-            return error;
-        }
+    bool exp_is_zero = true;
 
-        bn_t max_length;
-        cgbn_set(arith.env, max_length, base_size);
-        if (cgbn_compare(arith.env, max_length, modulus_size) < 0) {
-            cgbn_set(arith.env, max_length, modulus_size);
-        }
-        // words = (max_length + 7) / 8
-        // add 7
-        cgbn_add_ui32(arith.env, max_length, max_length, 7);
-        // divide by 8
-        cgbn_shift_right(arith.env, max_length, max_length, 3);
-        // multiplication_complexity = words ^ 2
-        bn_t multiplication_complexity;
-        cgbn_mul(arith.env, multiplication_complexity, max_length, max_length);
+    printf("data len %d\n", data_len);
 
-        bn_t exponent_bit_length_bn;
+    // get a pointer to available bytes (call_exponent_size) of exponen
+    // send through call data the remaining bytes are consider
+    // 0 value bytes. The bytes of the call data are the most
+    // significant bytes of the exponent
+    // uint8_t *e_data = new uint8_t[exp_len];
+    byte_array_t e_data = byte_array_t(exp_len);
 
-        bool exp_is_zero = true;
-    #ifdef __CUDA_ARCH__
-
-        __ONE_THREAD_PER_INSTANCE(printf("data len %d\n", data_len););
-        message->data->print();
-    #endif
-        // get a pointer to available bytes (call_exponent_size) of exponen
-        // send through call data the remaining bytes are consider
-        // 0 value bytes. The bytes of the call data are the most
-        // significant bytes of the exponent
-        // uint8_t *e_data = new uint8_t[exp_len];
-        byte_array_t e_data = byte_array_t(exp_len);
-
-        for (uint32_t i = 0; i < exp_len; i++) {
-            auto idx = 96 + base_len + i;
-            __ONE_GPU_THREAD_WOSYNC_BEGIN__
-
-            if (idx < data_len) {
-                e_data.data[i] = message->data->data[idx];
-            } else {
-                e_data.data[i] = 0;
-            }
-            printf("idx %d e_data %d\n", idx, e_data.data[i]);
-            __ONE_GPU_THREAD_END__
-            if (e_data.data[i] != 0) {
-                exp_is_zero = false;
-            }
+    for (uint32_t i = 0; i < exp_len; i++) {
+        auto idx = 96 + base_len + i;
+        if (idx < data_len) {
+            e_data.data[i] = call_context->call_data[idx];
+        } else {
+            e_data.data[i] = 0;
         }
 
-        uint8_t adjusted_exp_data[32] = {0};
-        uint32_t iteration_length = min(32, e_data.size);
-        for (uint32_t i = 0; i < iteration_length; i++) {
-            adjusted_exp_data[32 - iteration_length + i] = e_data.data[i];
+        if (e_data.data[i] != 0) {
+            exp_is_zero = false;
         }
+    }
 
-        int bit_size = 0;
-        int found_non_zero = 0;
+    uint8_t adjusted_exp_data[32] = {0};
+    uint32_t iteration_length = min(32, e_data.size);
+    for (uint32_t i = 0; i < iteration_length; i++) {
+        adjusted_exp_data[32 - iteration_length + i] = e_data.data[i];
+    }
 
-        for (int i = 0; i < 32; i++) {
-            if (adjusted_exp_data[i] != 0) {
-                found_non_zero = 1;
-                // Count significant bits in the most significant byte
-                for (int j = 7; j >= 0; j--) {
-                    if (adjusted_exp_data[i] & (1 << j)) {
-                        bit_size = (32 - i) * 8 - (7 - j);
-                        break;
-                    }
+    int bit_size = 0;
+    int found_non_zero = 0;
+
+    for (int i = 0; i < 32; i++) {
+        if (adjusted_exp_data[i] != 0) {
+            found_non_zero = 1;
+            // Count significant bits in the most significant byte
+            for (int j = 7; j >= 0; j--) {
+                if (adjusted_exp_data[i] & (1 << j)) {
+                    bit_size = (32 - i) * 8 - (7 - j);
+                    break;
                 }
-                break;
             }
+            break;
+        }
+    }
+
+    if (!found_non_zero) {
+        bit_size = 0;  // If all bytes are zero
+    }
+    exponent_bit_length_bn = bit_size;
+
+    error |= CuEVM::gas_cost::modexp_cost(gas_used, exponent_size, exponent_bit_length_bn, multiplication_complexity);
+
+    error |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+
+    if (error) {
+        return error;
+    }
+
+    bool base_is_zero = true;
+    // uint8_t base_data[32] = {0};
+    byte_array_t base_data = byte_array_t(base_len);
+    for (uint32_t i = 0; i < base_len; i++) {
+        auto idx = 96 + i;
+        if (idx < data_len) {
+            base_data.data[i] = call_context->call_data[idx];
+        } else {
+            break;
         }
 
-        if (!found_non_zero) {
-            bit_size = 0;  // If all bytes are zero
+        if (base_data.data[i] != 0) {
+            base_is_zero = false;
         }
-        cgbn_set_ui32(arith.env, exponent_bit_length_bn, bit_size);
+    }
 
-        error |=
-            CuEVM::gas_cost::modexp_cost(arith, gas_used, exponent_size, exponent_bit_length_bn,
-    multiplication_complexity);
+    if (error) {
+        return error;
+    }
 
-        error |= CuEVM::gas_cost::has_gas(arith, gas_limit, gas_used);
-        // #ifdef __CUDA_ARCH__
-        //     printf("modexp cost %d\n", error);
-        //     print_bnt(arith, gas_used);
-        //     printf("exponent bit length\n");
-        //     printf("Thread idx %d error %d\n", threadIdx.x, error);
-        // #endif
-        if (error) {
-            return error;
-        }
+    // uint8_t *mod_data = new uint8_t[mod_len];
+    byte_array_t mod_data = byte_array_t(mod_len);
+    // loop and check for zero, if zero, then return 0
+    bool mod_is_one = true;
+    bool mod_is_zero = true;
+    for (uint32_t i = 0; i < mod_len; i++) {
+        auto idx = 96 + base_len + exp_len + i;
+        mod_data.data[i] = (idx < data_len) ? call_context->call_data[idx] : 0;
 
-        bn_t base;
-        bool base_is_zero = true;
-        // uint8_t base_data[32] = {0};
-        byte_array_t base_data = byte_array_t(base_len);
-        for (uint32_t i = 0; i < base_len; i++) {
-            auto idx = 96 + i;
-            if (idx < data_len) {
-                __ONE_GPU_THREAD_WOSYNC_BEGIN__
-                base_data.data[i] = message->data->data[idx];
-                __ONE_GPU_THREAD_END__
-            } else {
-                break;
-            }
-
-            if (base_data.data[i] != 0) {
-                base_is_zero = false;
-            }
-        }
-
-        if (error) {
-            return error;
-        }
-
-        // uint8_t *mod_data = new uint8_t[mod_len];
-        byte_array_t mod_data = byte_array_t(mod_len);
-        // loop and check for zero, if zero, then return 0
-        bool mod_is_one = true;
-        bool mod_is_zero = true;
-        for (uint32_t i = 0; i < mod_len; i++) {
-            auto idx = 96 + base_len + exp_len + i;
-            __ONE_GPU_THREAD_WOSYNC_BEGIN__
-            mod_data.data[i] = (idx < data_len) ? message->data->data[idx] : 0;
-            __ONE_GPU_THREAD_END__
-            if (mod_data.data[i] != 0) {
-                mod_is_zero = false;
-                if (mod_data.data[i] != 1 || i != mod_len - 1) {
-                    mod_is_one = false;
-                }
-            } else if (i == mod_len - 1) {
+        if (mod_data.data[i] != 0) {
+            mod_is_zero = false;
+            if (mod_data.data[i] != 1 || i != mod_len - 1) {
                 mod_is_one = false;
             }
+        } else if (i == mod_len - 1) {
+            mod_is_one = false;
         }
-        // #ifdef __CUDA_ARCH__
-        //     __ONE_GPU_THREAD_WOSYNC_BEGIN__
-        //     printf("mod data\n");
-        //     for (int i = 0; i < mod_len; i++) {
-        //         printf("%d ", mod_data.data[i]);
-        //     }
-        //     printf("\n");
-        //     printf("base data\n");
-        //     for (int i = 0; i < base_len; i++) {
-        //         printf("%d ", base_data.data[i]);
-        //     }
-        //     printf("\n");
-        //     printf("exp data\n");
-        //     for (int i = 0; i < exp_len; i++) {
-        //         printf("%d ", e_data.data[i]);
-        //     }
-        //     printf("\n");
-        //     __ONE_GPU_THREAD_WOSYNC_END__
-        //     printf("thread idx %d mod_is_zero %d, base_is_zero %d, exp_is_zero %d, mod_is_one %d\n", threadIdx.x,
-        //     mod_is_zero,
-        //            base_is_zero, exp_is_zero, mod_is_one);
-        // #endif
+    }
+    // #ifdef __CUDA_ARCH__
 
-        // early return special cases
-        if (mod_is_zero) {
-            *return_data = byte_array_t(mod_len);  // return 0
-            return ERROR_RETURN;
+    //     printf("mod data\n");
+    //     for (int i = 0; i < mod_len; i++) {
+    //         printf("%d ", mod_data.data[i]);
+    //     }
+    //     printf("\n");
+    //     printf("base data\n");
+    //     for (int i = 0; i < base_len; i++) {
+    //         printf("%d ", base_data.data[i]);
+    //     }
+    //     printf("\n");
+    //     printf("exp data\n");
+    //     for (int i = 0; i < exp_len; i++) {
+    //         printf("%d ", e_data.data[i]);
+    //     }
+    //     printf("\n");
+
+    //     printf("thread idx %d mod_is_zero %d, base_is_zero %d, exp_is_zero %d, mod_is_one %d\n", threadIdx.x,
+    //     mod_is_zero,
+    //            base_is_zero, exp_is_zero, mod_is_one);
+    // #endif
+    // uint8_t result[32] = {0};
+
+    // early return special cases
+    if (mod_is_zero) {
+        call_context->set_parent_return_data(mod_data.data, mod_len);
+        return ERROR_RETURN;
+    }
+
+    if (exp_is_zero) {
+        for (uint32_t i = 0; i < mod_len; i++) {
+            mod_data.data[i] = 0;
         }
-
-        if (exp_is_zero) {
-            *return_data = byte_array_t(mod_len);
-
-            if (!mod_is_one) return_data->data[mod_len - 1] = 1;  // return 1
-            return ERROR_RETURN;
+        if (!mod_is_one) {
+            mod_data.data[mod_len - 1] = 1;  // return 1
         }
+        call_context->set_parent_return_data(mod_data.data, mod_len);
 
-        // convert to bigint values
-        bigint base_bigint = {}, exponent_bigint = {}, result_bigint = {}, modulus_bigint = {};
-        uint8_t result[32] = {0};
+        return ERROR_RETURN;
+    }
 
-        bigint_from_bytes(&base_bigint, base_data.data, base_len);
-        bigint_from_bytes(&exponent_bigint, e_data.data, exp_len);
-        bigint_from_bytes(&modulus_bigint, mod_data.data, mod_len);
+    // convert to bigint values
+    bigint base_bigint = {}, exponent_bigint = {}, result_bigint = {}, modulus_bigint = {};
 
-        // make the pow mod operation
-        bigint_pow_mod(&result_bigint, &base_bigint, &exponent_bigint, &modulus_bigint);
-        bigint_to_bytes(result, &result_bigint, mod_len);
-        *return_data = byte_array_t(result, mod_len);
-    */ // TODO : reimplement
+    bigint_from_bytes(&base_bigint, base_data.data, base_len);
+    bigint_from_bytes(&exponent_bigint, e_data.data, exp_len);
+    bigint_from_bytes(&modulus_bigint, mod_data.data, mod_len);
+
+    // make the pow mod operation
+    bigint_pow_mod(&result_bigint, &base_bigint, &exponent_bigint, &modulus_bigint);
+    bigint_to_bytes(mod_data.data, &result_bigint, mod_len);
+    call_context->set_parent_return_data(mod_data.data, mod_len);
     return ERROR_RETURN;
 }
 
-__device__ int32_t operation_BLAKE2(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_return_data_t *return_data,
-                                    CuEVM::evm_call_context_t *call_context) {
+__device__ int32_t operation_BLAKE2(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context) {
     // expecting 213 bytes inputs
     uint32_t length_size = call_context->call_data_size;
 
@@ -367,13 +332,13 @@ __device__ int32_t operation_BLAKE2(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 
     CuCrypto::blake2::blake2f(rounds, h, m, t, f);
 
-    *return_data = byte_array_t((uint8_t *)h, 64);
+    // *return_data = byte_array_t((uint8_t *)h, 64);
 
     return ERROR_RETURN;
 }
 
 __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                       CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
+                                       CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_PRECOMPILE_ECRECOVER;
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -401,20 +366,18 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
         // TODO: is not 27 and 28, only?
         if (signature->v <= 28) {
             uint8_t *output = new uint8_t[32];
-            size_t res = 0;  // ecc::ec_recover(constants, *signature, signer);
+            size_t res = ecc::ec_recover(constants, signature, &signer);
 
             if (res == ERROR_SUCCESS) {
-                // memory_from_cgbn(arith, output, signer);
                 uint256_to_bytes(output, &signer, 32);
 
-                *return_data = byte_array_t(output, 32);
                 error_code = ERROR_RETURN;
             } else {
                 // TODO: do we consume all gas?
                 // it happens by default because of the error code
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
             }
-            delete output;
+            delete[] output;
         }
         delete signature;
         return ERROR_RETURN;
@@ -423,15 +386,13 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
 }
 
 __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                   CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
+                                   CuEVM::evm_call_context_t *call_context) {
     printf("ecAdd\n");
     int32_t error_code = ERROR_SUCCESS;
     gas_used += GAS_PRECOMPILE_ECADD;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         CuEVM::byte_array_t input(call_context->call_data, 128);
-
-        // ecc::Curve curve = ecc::get_curve(arith, 128);
 
         evm_word_t x1, y1, x2, y2;
         uint256_from_bytes(&x1, input.data, 32);
@@ -449,19 +410,19 @@ __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t 
             uint256_to_bytes(output, &x1, 32);
             uint256_to_bytes(output + 32, &y1, 32);
             // return_data.set(output, 64);
-            *return_data = byte_array_t(output, 64);
+            // *return_data = byte_array_t(output, 64);
             error_code = ERROR_RETURN;
         } else {
             // consume all gas because it is an error
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         }
-        delete output;
+        delete[] output;
     }
     return error_code;
 }
 
 __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                   CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
+                                   CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_PRECOMPILE_ECMUL;
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -486,19 +447,19 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t 
             uint256_to_bytes(output, &x, 32);
             uint256_to_bytes(output + 32, &y, 32);
             // return_data.set(output, 64);
-            *return_data = byte_array_t(output, 64);
+            // *return_data = byte_array_t(output, 64);
             error_code = ERROR_RETURN;
         } else {
             // consume all gas because it is an error
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         }
-        delete output;
+        delete[] output;
     }
     return error_code;
 }
 
 __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                       CuEVM::evm_return_data_t *return_data, CuEVM::evm_call_context_t *call_context) {
+                                       CuEVM::evm_call_context_t *call_context) {
     printf("ecPairing\n");
     printf("input size %d\n", call_context->call_data_size);
     // input = message.get_data(index, length, size);
@@ -522,7 +483,7 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
                 uint8_t output[32];
                 memset(output, 0, 32);
                 output[31] = (res == 1);
-                *return_data = byte_array_t(output, 32);
+                // *return_data = byte_array_t(output, 32);
                 error_code = ERROR_RETURN;
             }
         }

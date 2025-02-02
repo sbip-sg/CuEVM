@@ -111,7 +111,9 @@ struct evm_word_t : uint256 {
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ int32_t to_byte_array_t(byte_array_t &byte_array, int32_t endian = BIG_ENDIAN) const;
+    __host__ __device__ int32_t to_byte_array_t(uint8_t *byte_array, uint32_t &byte_array_length) const;
+
+    __host__ __device__ int32_t to_byte_array_t(byte_array_t &byte_array) const;
     /**
      * Get the bit array from the evm_word_t.
      * The bit array is in Big Endian format.
@@ -121,7 +123,7 @@ struct evm_word_t : uint256 {
      * @param[in] endian The endian format
      * @return 0 for success, 1 otherwise
      */
-    __host__ __device__ int32_t to_bit_array_t(byte_array_t &bit_array, int32_t endian = BIG_ENDIAN) const;
+    __host__ __device__ int32_t to_bit_array_t(uint8_t *bit_array, uint32_t &bit_array_length) const;
 };
 
 }  // namespace CuEVM

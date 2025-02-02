@@ -76,84 +76,45 @@ __device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds) {
     // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
     gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds;
 }
-
-__device__ int32_t modexp_cost(gas_t &gas_used, const uint32_t &exponent_size, const uint32_t &exponent_bit_length_bn,
-                               const uint32_t &multiplication_complexity) {
-    // compute the iteration count depending on the size
-    // of the exponent and its most significant non-zero
-    // bit of the least siginifcant 256 bits
-    /*
-    gas_t iteration_count, adjusted_exponent_bit_length;
-    // cgbn_set_ui32(arith.env, iteration_count, 0);
-    cgbn_set_ui32(adjusted_exponent_bit_length, 0);
-    uint32_t iteration_count_overflow;
-    iteration_count_overflow = 0;
-    // if the size is less than 32 bytes (256 bits) we
-    // just take the position of the most significant non-zero bit
-    // and substract 1
-    if (cgbn_get_ui32(arith.env, exponent_bit_length_bn) != 0) {
-        // exponent.bit_length() - 1
-        cgbn_sub_ui32(arith.env, adjusted_exponent_bit_length, exponent_bit_length_bn, 1);
+__device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
+                               const evm_word_t &exponent_bit_length_bn, const evm_word_t &multiplication_complexity) {
+    // Compute the adjusted exponent length as defined in EIP-198.
+    // extra_exponent = (exponent_size > 32) ? ((exponent_size - 32) * 8) : 0.
+    evm_word_t extra_exponent = 0;
+    evm_word_t temp_word = 8;
+    if (uint256_cmp_word(&exponent_size, 32) > 0) {
+        // extra_exponent = (exponent_size - 32) * 8;
+        uint256_sub_word(&extra_exponent, &exponent_size, 32);
+        uint256_mul(&extra_exponent, &extra_exponent, &temp_word);
     }
-    cgbn_set(arith.env, iteration_count, adjusted_exponent_bit_length);
-    if (cgbn_compare_ui32(arith.env, exponent_size, 32) > 0) {
-        // } else {
-        // elif Esize > 32: iteration_count = (8 * (Esize - 32)) + ((exponent &
-        // (2**256 - 1)).bit_length() - 1)
-        cgbn_sub_ui32(arith.env, iteration_count, exponent_size, 32);
-        // sometimes the iteration count can overflow
-        // for high values of the exponent size
-        iteration_count_overflow = cgbn_mul_ui32(arith.env, iteration_count, iteration_count, 8);
-        iteration_count_overflow = iteration_count_overflow |
-                                   cgbn_add(arith.env, iteration_count, iteration_count, adjusted_exponent_bit_length);
-        // cgbn_sub_ui32(arith.env, iteration_count, iteration_count, 1);
+
+    // Calculate the most significant non-zero bit position from the lower 256 bits:
+    // If exponent_bit_length_bn is non-zero, then msb = exponent_bit_length_bn - 1, else 0.
+    evm_word_t msb = 0;
+    if (uint256_is_zero(&exponent_bit_length_bn) == false) {
+        uint256_sub_word(&msb, &exponent_bit_length_bn, 1);
     }
-    // iteration_count = max(iteration_count, 1)
-    if (cgbn_compare_ui32(arith.env, iteration_count, 1) < 0) {
-        cgbn_set_ui32(arith.env, iteration_count, 1);
+
+    // Adjusted exponent = extra_exponent + msb.
+    // We ensure the effective exponent is at least 1.
+    evm_word_t adjusted_exponent;
+    uint256_add(&adjusted_exponent, &extra_exponent, &msb);
+    if (uint256_is_zero(&adjusted_exponent) == true) {
+        adjusted_exponent = 1;
     }
-#ifdef __CUDA_ARCH__
 
-#endif
-    bn_t dynamic_gas;
-    uint32_t dynamic_gas_overflow;
-    dynamic_gas_overflow = 0;
-    // dynamic_gas = max(200, multiplication_complexity * iteration_count / 3)
-    // The dynamic gas value can overflow from the overflow
-    // of iteration count when the multiplication complexity
-    // is non-zero or from the simple multiplication of
-    // the iteration count and multiplication complexity
-    // in both case the value is way over the gas limit
-    // and we just throw an error which will consume the
-    // entire gas given for the call
-    cgbn_mul_high(arith.env, dynamic_gas, iteration_count, multiplication_complexity);
-    dynamic_gas_overflow = (cgbn_compare_ui32(arith.env, dynamic_gas, 0) != 0);
-
-    // #ifdef __CUDA_ARCH__
-    //     print_bnt(arith, iteration_count);
-    //     print_bnt(arith, multiplication_complexity);
-    //     printf("dynamic_gas_overflow: %d\n", dynamic_gas_overflow);
-    //     printf("dynamic_gas: %d\n", cgbn_get_ui32(arith.env, dynamic_gas));
-
-    //     printf("iteration_count: %d\n", cgbn_get_ui32(arith.env, iteration_count));
-    //     printf("iteration_count_overflow: %d\n", iteration_count_overflow);
-    //     printf("multiplication complexity: %d\n", cgbn_get_ui32(arith.env, multiplication_complexity));
-    // #endif
-
-    cgbn_mul(arith.env, dynamic_gas, iteration_count, multiplication_complexity);
-    dynamic_gas_overflow = dynamic_gas_overflow || (iteration_count_overflow &&
-                                                    (cgbn_compare_ui32(arith.env, multiplication_complexity, 0) != 0));
-
-    if (dynamic_gas_overflow) return ERROR_PRECOMPILE_MODEXP_OVERFLOW;
-    cgbn_div_ui32(arith.env, dynamic_gas, dynamic_gas, 3);
-    if (cgbn_compare_ui32(arith.env, dynamic_gas, 200) < 0) {
-        cgbn_set_ui32(arith.env, dynamic_gas, 200);
+    // Compute the dynamic gas using the EIP-198 formula:
+    // dynamic_gas = (multiplication_complexity * adjusted_exponent) / 20,
+    // with a minimum gas cost of 200.
+    evm_word_t dynamic_gas;
+    temp_word = 20;
+    uint256_mul(&dynamic_gas, &multiplication_complexity, &adjusted_exponent);
+    uint256_div(&dynamic_gas, &dynamic_gas, &temp_word);
+    if (uint256_cmp_word(&dynamic_gas, 200) < 0) {
+        dynamic_gas = 200;
     }
-    // #ifdef __CUDA_ARCH__
-    //     printf("dynamic_gas: %d\n", cgbn_get_ui32(arith.env, dynamic_gas));
-    // #endif
-    cgbn_add(arith.env, gas_used, gas_used, dynamic_gas);
-    */ // TODO: reimplement this
+
+    gas_used += uint256_get_uint64_t(&dynamic_gas);
     return ERROR_SUCCESS;
 }
 __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
@@ -170,22 +131,10 @@ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db
         // set the account warm in case it's cold
         // assuming this function is called only when the account is accessed
         // TODO: remove redundant logic
-        state_db->set_warm_account(address);
+        // state_db->set_warm_account(address);
     }
     return ERROR_SUCCESS;
 }
-
-// __device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
-//                               const evm_word_t *key) {
-//     // get the key warm
-//     if (state_db->is_warm_key(address, key)) {
-//         gas_used += GAS_WARM_ACCESS;
-//     } else {
-//         gas_used += GAS_COLD_SLOAD;
-//     }
-
-//     return ERROR_SUCCESS;
-// }
 
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
                                const evm_word_t *key, const evm_word_t *new_value, int32_t &address_index,
