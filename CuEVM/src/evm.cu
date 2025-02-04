@@ -132,12 +132,16 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     // test: stSelfBalance/diffPlaces.json
     error_code |= call_state_ptr->depth > CuEVM::max_depth + 1 ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
     // Dont use account ptr here, byte_code already set
+    printf("byte code size %d\n", call_state_ptr->byte_code_size);
+    printf("to \n");
+    call_state_ptr->to.print();
     if (call_state_ptr->byte_code_size == 0) {
         if (uint256_cmp_word(&call_state_ptr->to, CuEVM::no_precompile_contracts) == -1) {
+            printf("precompile %d \n", call_state_ptr->to.words[0]);
             switch (call_state_ptr->to.words[0]) {
                 case 0x01:
                     return CuEVM::precompile_operations::operation_ecRecover(
-                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
+                        CuEVM::memory_pool::ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
                         call_state_ptr);
                     break;
                 case 0x02:
@@ -153,16 +157,16 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
                     return CuEVM::precompile_operations::operation_MODEXP(cached_call_state.gas_limit,
                                                                           cached_call_state.gas_used, call_state_ptr);
                 case 0x06:
-                    return CuEVM::precompile_operations::operation_ecAdd(this->ecc_constants_ptr,
+                    return CuEVM::precompile_operations::operation_ecAdd(CuEVM::memory_pool::ecc_constants_ptr,
                                                                          cached_call_state.gas_limit,
                                                                          cached_call_state.gas_used, call_state_ptr);
                 case 0x07:
-                    return CuEVM::precompile_operations::operation_ecMul(this->ecc_constants_ptr,
+                    return CuEVM::precompile_operations::operation_ecMul(CuEVM::memory_pool::ecc_constants_ptr,
                                                                          cached_call_state.gas_limit,
                                                                          cached_call_state.gas_used, call_state_ptr);
                 case 0x08:
                     return CuEVM::precompile_operations::operation_ecPairing(
-                        this->ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
+                        CuEVM::memory_pool::ecc_constants_ptr, cached_call_state.gas_limit, cached_call_state.gas_used,
                         call_state_ptr);
                 case 0x09:
                     return CuEVM::precompile_operations::operation_BLAKE2(cached_call_state.gas_limit,

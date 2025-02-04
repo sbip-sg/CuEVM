@@ -2,7 +2,6 @@
 #pragma once
 
 #include <CuBigInt/bigint.cuh>
-#include <CuBigInt/uint256.cuh>
 #include <CuCrypto/blake2.cuh>
 #include <CuCrypto/keccak.cuh>
 #include <CuCrypto/ripemd160.cuh>
@@ -11,9 +10,8 @@
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/transaction.cuh>
-#include <CuEVM/ecc.cuh>
 #include <CuEVM/gas_cost.cuh>
-#include <CuEVM/utils/ecc_constants.cuh>
+#include <CuEVM/utils/ecc.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 
 namespace CuEVM {

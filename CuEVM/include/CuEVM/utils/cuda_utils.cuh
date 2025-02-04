@@ -9,7 +9,7 @@
 
 #include <cuda.h>
 
-#include <CuBigInt/uint256.cuh>
+#include <CuEVM/utils/uint256.cuh>
 
 #define __SHARED_MEMORY__ __shared__
 

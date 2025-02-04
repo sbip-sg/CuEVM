@@ -6,6 +6,7 @@ __device__ evm_word_t* preallocated_stack_base;
 __device__ uint8_t* preallocated_return_data_base;
 __device__ SnapshotValue* preallocated_snapshot_values;
 __device__ ValueStatus** preallocated_snapshot_restore_ptr;
+__device__ CuEVM::EccConstants* ecc_constants_ptr;
 __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) {
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
@@ -46,6 +47,14 @@ __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_a
     cudaMemcpyToSymbol(preallocated_snapshot_values, &d_preallocated_snapshot_values, sizeof(SnapshotValue*));
     cudaMemcpyToSymbol(preallocated_snapshot_restore_ptr, &d_preallocated_snapshot_restore_ptr, sizeof(ValueStatus**));
     delete memory_pool;
+
+    // ecc constants
+    CuEVM::EccConstants* host_ecc_constants_ptr = new CuEVM::EccConstants();
+    CuEVM::EccConstants* d_ecc_constants_ptr;
+    cudaMalloc(&d_ecc_constants_ptr, sizeof(CuEVM::EccConstants));
+    cudaMemcpy(d_ecc_constants_ptr, host_ecc_constants_ptr, sizeof(CuEVM::EccConstants), cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(ecc_constants_ptr, &d_ecc_constants_ptr, sizeof(CuEVM::EccConstants*));
+    delete host_ecc_constants_ptr;
 }
 
 __device__ void expand_call_context(uint32_t num_instances) {

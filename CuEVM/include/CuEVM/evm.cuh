@@ -18,7 +18,6 @@
 #include <CuEVM/precompile.cuh>
 #include <CuEVM/state/state_db.cuh>
 #include <CuEVM/tracer.cuh>
-#include <CuEVM/utils/ecc_constants.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/opcodes.cuh>
@@ -28,7 +27,7 @@ struct evm_instance_t {
     CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer*/
     CuEVM::log_state_data_t* log_state_ptr;                    /**< The log state pointer*/
     CuEVM::evm_return_data_t* return_data_ptr;                 /**< The return data pointer*/
-    CuEVM::EccConstants* ecc_constants_ptr;                    /**< The ecc constants pointer*/
+
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer*/
 #endif
@@ -41,7 +40,6 @@ struct evm_t {
     CuEVM::StateDb* state_db_ptr;                                    /**< The world state pointer*/
     const CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer */
     CuEVM::evm_call_context_t* call_state_ptr;                       /**< The call state pointer store in global mem*/
-    CuEVM::EccConstants* ecc_constants_ptr;                          /**< The ecc constants pointer*/
     gas_t gas_price;                                                 /**< The gas price */
     gas_t gas_priority_fee;                                          /**< The gas priority fee */
     uint32_t status;                                                 /**< The status */
@@ -62,8 +60,7 @@ struct evm_t {
      * @param[in] tracer_ptr The tracer pointer
      */
     __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr,
-                     CuEVM::EccConstants* ecc_constants_ptr, CuEVM::evm_call_context_t* call_context_ptr,
-                     CuEVM::evm_word_t* shared_stack_ptr
+                     CuEVM::evm_call_context_t* call_context_ptr, CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
                      ,
                      CuEVM::utils::tracer_t* tracer_ptr

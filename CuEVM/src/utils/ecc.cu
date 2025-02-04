@@ -1,49 +1,38 @@
 // Eliptic curve utilities using CGBN
-#include <CuEVM/ecc.cuh>
+#include <CuEVM/utils/ecc.cuh>
 /// The secp256k1 field prime number (P) and order
 
 namespace ecc {
+// only works for prime modulus
 __device__ void uint256_modular_inverse(uint256 *res, uint256 *a, uint256 *mod) {
     // TODO : check this implementation
     // Optional: check that 'a' is not zero.
+    // assume mod is prime without checking
     if (uint256_is_zero(a)) {
         // Inverse does not exist; here we choose to set the result to 0.
         uint256_set_zero(res);
         return;
     }
-
     uint256 exponent;
     // Copy mod into exponent, then subtract 2,
     // so that exponent = mod - 2.
-    uint256_cpy(&exponent, mod);
-    uint256_sub_word(&exponent, &exponent, 2);
-
+    uint256_sub_word(&exponent, mod, 2);
     // Using Fermat's little theorem: a^(mod-2) mod mod is the
     // modular inverse of a (provided mod is prime).
     uint256_powmod(res, a, &exponent, mod);
 }
-__device__ void uint256_pow_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) { uint256_powmod(res, a, b, mod); }
+__device__ void uint256_pow_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) {
+    // printf("powmod\n");
+    // print_uint256(a);
+    // print_uint256(b);
+    // print_uint256(mod);
+    uint256_powmod(res, a, b, mod);
+    // printf("powmod result\n");
+    //  print_uint256(res);
+}
 __device__ void uint256_mul_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) { uint256_mulmod(res, a, b, mod); }
 __device__ void uint256_add_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) { uint256_addmod(res, a, b, mod); }
-__device__ void uint256_sub_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) {
-    // if b > a then a - b + mod
-    if (uint256_cmp(a, b) < 0) {
-        uint256_addmod(res, a, mod, mod);
-        uint256_sub(res, res, b);
-    } else {
-        uint256_sub(res, a, b);
-    }
-    // if (cgbn_compare(env, a, b) < 0) {
-    //     env_t::cgbn_accumulator_t acc;
-    //     cgbn_set(env, acc, a);
-    //     cgbn_add(env, acc, mod);
-    //     cgbn_sub(env, acc, b);
-    //     cgbn_resolve(env, res, acc);
-    //     cgbn_rem(env, res, res, mod);
-    // } else {
-    //     cgbn_sub(env, res, a, b);
-    // }
-}
+__device__ void uint256_sub_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *mod) { uint256_submod(res, a, b, mod); }
 
 /**
  * @brief helper div_mod for bn_t
@@ -73,6 +62,14 @@ __device__ void uint256_sub_mod(uint256 *res, uint256 *a, uint256 *b, uint256 *m
  * @return true if on curve
  */
 __device__ bool is_on_cuve_simple(uint256 *Px, uint256 *Py, uint256 *mod, uint32_t B) {
+    // printf("is_on_cuve_simple\n");
+    // printf("Px\n");
+    // print_uint256(Px);
+    // printf("Py\n");
+    // print_uint256(Py);
+    // printf("mod\n");
+    // print_uint256(mod);
+    // printf("B %d\n", B);
     if (uint256_is_zero(Px) && uint256_is_zero(Py)) return true;
     uint256 temp, temp2;
     uint256_mul_mod(&temp, Px, Px, mod);     // temp = Px^2
@@ -80,12 +77,16 @@ __device__ bool is_on_cuve_simple(uint256 *Px, uint256 *Py, uint256 *mod, uint32
     uint256_add_word(&temp, &temp, B);
     uint256_mod(&temp, &temp, mod);
     uint256_mul_mod(&temp2, Py, Py, mod);  // temp2 = Py^2
+    // printf("temp\n");
+    // print_uint256(&temp);
+    // printf("temp2\n");
+    // print_uint256(&temp2);
     return uint256_cmp(&temp, &temp2) == 0;
 }
 
 // Add two point on the curve P and Q
 __device__ int ec_add(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_t *Px, evm_word_t *Py, evm_word_t *Qx,
-                      evm_word_t *Qy) {
+                      evm_word_t *Qy, bool check_curve) {
     evm_word_t mod_fp;
     evm_word_t lambda, numerator, denominator, temp, x_r, y_r;
     mod_fp = curve.FieldPrime;
@@ -115,10 +116,18 @@ __device__ int ec_add(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_
         uint256_mul_mod(&temp, Px, Px, &mod_fp);  // temp = Px^2
         numerator = 3;
         uint256_mul_mod(&numerator, &numerator, &temp, &mod_fp);  // numerator = 3*Px^2
+        // printf("numerator\n");
+        // numerator.print();
 
         denominator = 2;
-        uint256_mul_mod(&denominator, &denominator, Py, &mod_fp);     // denominator = 2*Py
-        uint256_div_mod(&lambda, &numerator, &denominator, &mod_fp);  // lambda = (3*Px^2) / (2*Py)
+        uint256_mul_mod(&denominator, &denominator, Py, &mod_fp);  // denominator = 2*Py
+
+        uint256_modular_inverse(&lambda, &denominator, &mod_fp);
+        // printf("lambda\n");
+        // lambda.print();
+        uint256_mul_mod(&lambda, &lambda, &numerator, &mod_fp);  // lambda = (3*Px^2) / (2*Py)
+        // printf("lambda * numerator\n");
+        // lambda.print();
 
     } else if (uint256_cmp(Px, Qx) == 0) {
         // printf("Doubling\n");
@@ -131,14 +140,21 @@ __device__ int ec_add(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_
         // printf("Adding\n");
         // General case for P != Q
         // lambda = (Qy - Py) / (Qx - Px)
-        uint256_sub_mod(&temp, Qy, Py, &mod_fp);               // temp = Qy - Py
-        uint256_sub_mod(&numerator, Qx, Px, &mod_fp);          // numerator = Qx - Px
-        uint256_div_mod(&lambda, &numerator, &temp, &mod_fp);  // lambda = (Qy - Py) / (Qx - Px)
+        uint256_sub_mod(&temp, Qy, Py, &mod_fp);                // temp = Qy - Py
+        uint256_sub_mod(&numerator, Qx, Px, &mod_fp);           // numerator = Qx - Px
+        uint256_modular_inverse(&lambda, &numerator, &mod_fp);  // lambda = (Qy - Py) / (Qx - Px)
+        uint256_mul_mod(&lambda, &lambda, &temp, &mod_fp);      // lambda = (Qy - Py) / (Qx - Px)
     }
 
     uint256_mul_mod(&x_r, &lambda, &lambda, &mod_fp);  // x_r = lambda^2
-    uint256_add_mod(&temp, Px, Qx, &mod_fp);           // temp = Px + Qx
-    uint256_sub_mod(&x_r, &x_r, &temp, &mod_fp);       // x_r = lambda^2 - (Px + Qx)
+    // printf("x_r\n");
+    // x_r.print();
+    uint256_add_mod(&temp, Px, Qx, &mod_fp);  // temp = Px + Qx
+    // printf("2x temp\n");
+    // temp.print();
+    uint256_sub_mod(&x_r, &x_r, &temp, &mod_fp);  // x_r = lambda^2 - (Px + Qx)
+    // printf("x_r\n");
+    // x_r.print();
     // y_r = lambda * (Px - x_r) - Py
     uint256_sub_mod(&temp, Px, &x_r, &mod_fp);       // temp = Px - x_r
     uint256_mul_mod(&y_r, &lambda, &temp, &mod_fp);  // y_r = lambda * (Px - x_r)
@@ -153,7 +169,13 @@ __device__ int ec_mul(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_
     evm_word_t mod_fp;
 
     mod_fp = curve.FieldPrime;
-
+    printf("EC_MUL\n");
+    printf("Gx\n");
+    Gx->print();
+    printf("Gy\n");
+    Gy->print();
+    printf("n\n");
+    n->print();
     if (!is_on_cuve_simple(Gx, Gy, &mod_fp, curve.B)) {
         printf("Point not on curve\n");
         return -1;
@@ -169,20 +191,35 @@ __device__ int ec_mul(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_
     uint32_t bit_array_length = 0;
 
     n->to_bit_array_t(bitArray, bit_array_length);
+    // printf("bitArray, length %d\n", bit_array_length);
+    // for (int i = 0; i < bit_array_length; i++) {
+    //     printf("%d", bitArray[i]);
+    // }
+    // printf("\n");
     // // there is a bug if calling The result RES == G, need to copy to temps
     evm_word_t temp_ResX, temp_ResY;
 
     // Double-and-add algorithm
     temp_ResX = *Gx;
     temp_ResY = *Gy;
-
+    // printf("temp_ResX\n");
+    // temp_ResX.print();
+    // printf("temp_ResY\n");
+    // temp_ResY.print();
     for (int i = bit_array_length - 2; i >= 0; --i) {
         // Gz = 2 * Gz
-        ec_add(curve, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY);
 
-        if (bitArray[CuEVM::word_bits - 1 - i]) {
-            ec_add(curve, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY, Gx, Gy);
+        ec_add(curve, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY, false);
+        // printf("point doubling\n");
+        // temp_ResX.print();
+        // temp_ResY.print();
+        if (bitArray[i]) {
+            // printf("Bit 1 Adding %d \n", i);
+            ec_add(curve, &temp_ResX, &temp_ResY, &temp_ResX, &temp_ResY, Gx, Gy, false);
         }
+        // printf("i %d\n", i);
+        // temp_ResX.print();
+        // temp_ResY.print();
     }
     *ResX = temp_ResX;
     *ResY = temp_ResY;
@@ -223,49 +260,55 @@ __device__ int ec_recover(CuEVM::EccConstants *ecc_constants_ptr, signature_t *s
         return -1;
     }
 
-    evm_word_t r, r_y, r_inv, temp_cgbn, mod_order, mod_fp, temp_compare;
+    evm_word_t r, r_y, r_inv, temp_1, temp_2;
     evm_word_t Gx, Gy, ResX, ResY, XY_x, XY_y;  // for the point multiplication
 
     // calculate R_invert
     r = sig->r;
     // cgbn_load(arith.env, mod_order, &curve.Order);
-    mod_order = ecc_constants_ptr->secp256k1.Order;
+    evm_word_t *mod_order = &ecc_constants_ptr->secp256k1.Order;
     // cgbn_load(arith.env, mod_fp, &curve.FP);
-    mod_fp = ecc_constants_ptr->secp256k1.FieldPrime;
+    evm_word_t *mod_fp = &ecc_constants_ptr->secp256k1.FieldPrime;
+    printf("r\n");
+    r.print();
 
-    uint256_mod(&temp_compare, &r, &mod_order);
-    if (uint256_is_zero(&temp_compare) || uint256_cmp(&r, &mod_order) >= 0) return -1;
+    uint256_mod(&r, &r, mod_order);
+    printf("r\n");
+    r.print();
+    if (uint256_is_zero(&r) || uint256_cmp(&r, mod_order) >= 0) return -1;
 
     // calculate r_y
-    uint256_mul_mod(&temp_cgbn, &r, &r, &mod_fp);
-    uint256_mul_mod(&temp_cgbn, &temp_cgbn, &temp_cgbn, &mod_fp);
 
-    // cgbn_add_ui32(arith.env, r_y, temp_cgbn, curve.B);
-    uint256_add_word(&r_y, &temp_cgbn, ecc_constants_ptr->secp256k1.B);
-    uint256_mod(&r_y, &r_y, &mod_fp);
+    uint256_mul_mod(&temp_1, &r, &r, mod_fp);
+
+    uint256_mul_mod(&temp_1, &temp_1, &r, mod_fp);
+
+    temp_2 = ecc_constants_ptr->secp256k1.B;
+    uint256_addmod(&r_y, &temp_1, &temp_2, mod_fp);
 
     // find r_y using Tonelli–Shanks algorithm
     // beta = pow(xcubedaxb, (P+1)//4, P)
-    // cgbn_load(arith.env, temp_cgbn, &curve.FP);
+
     evm_word_t four = 4;
-    temp_cgbn = ecc_constants_ptr->secp256k1.FieldPrime;
-    uint256_add_word(&temp_cgbn, &temp_cgbn, 1);
-    uint256_div(&temp_cgbn, &temp_cgbn, &four);
-
-    uint256_pow_mod(&r_y, &r_y, &temp_cgbn, &mod_fp);
-
+    temp_2 = ecc_constants_ptr->secp256k1.FieldPrime;
+    uint256_add_word(&temp_2, &temp_2, 1);
+    uint256_div(&temp_2, &temp_2, &four);
+    // printf(" (p+1)/4 \n");
+    // temp_2.print();
+    uint256_pow_mod(&r_y, &r_y, &temp_2, mod_fp);
+    // printf(" r_y \n");
+    // r_y.print();
     // y = beta if v % 2 ^ beta % 2 else (P - beta)
     uint32_t beta_mod2 = r_y.words[0] % 2;
     uint32_t v_mod2 = sig->v % 2;
-    if (beta_mod2 == v_mod2) uint256_sub(&r_y, &mod_fp, &r_y);
+    if (beta_mod2 == v_mod2) uint256_sub(&r_y, mod_fp, &r_y);
 
     // invalid point check
     // if (!is_on_cuve_simple(arith.env, r, r_y, mod_fp, curve.B)) return -1;
-    if (!is_on_cuve_simple(&r, &r_y, &mod_fp, ecc_constants_ptr->secp256k1.B)) return -1;
+    if (!is_on_cuve_simple(&r, &r_y, mod_fp, ecc_constants_ptr->secp256k1.B)) return -1;
 
     // calculate n_z = (N-msg_hash) mod N
-    temp_cgbn = sig->msg_hash;
-    uint256_sub(&temp_cgbn, &mod_order, &temp_cgbn);
+    uint256_sub_mod(&temp_1, mod_order, &sig->msg_hash, mod_order);
 
     // cgbn_load(arith.env, Gx, &curve.GX);
     Gx = ecc_constants_ptr->secp256k1.GX;
@@ -273,19 +316,31 @@ __device__ int ec_recover(CuEVM::EccConstants *ecc_constants_ptr, signature_t *s
     // cgbn_load(arith.env, Gy, &curve.GY);
     Gy = ecc_constants_ptr->secp256k1.GY;
 
-    ec_mul(ecc_constants_ptr->secp256k1, &ResX, &ResY, &Gx, &Gy, &temp_cgbn);
+    ec_mul(ecc_constants_ptr->secp256k1, &ResX, &ResY, &Gx, &Gy, &temp_1);
+    // printf("ResX\n");
+    // ResX.print();
+    // printf("ResY\n");
+    // ResY.print();
 
     // calculate XY = (r, r_y) * s
-    temp_cgbn = sig->s;
+
     // check invalid s
-    uint256_mod(&temp_compare, &temp_cgbn, &mod_order);
-    if (uint256_is_zero(&temp_compare) || uint256_cmp(&temp_cgbn, &mod_order) >= 0) return -1;
 
-    ec_mul(ecc_constants_ptr->secp256k1, &XY_x, &XY_y, &r, &r_y, &temp_cgbn);
+    if (uint256_is_zero(&sig->s) || uint256_cmp(&sig->s, mod_order) >= 0) return -1;
 
+    ec_mul(ecc_constants_ptr->secp256k1, &XY_x, &XY_y, &r, &r_y, &sig->s);
+    // printf("XY_x\n");
+    // XY_x.print();
+    // printf("XY_y\n");
+    // XY_y.print();
     // calculate QR = (ResX, ResY) + (XY_x, XY_y)
     ec_add(ecc_constants_ptr->secp256k1, &ResX, &ResY, &ResX, &ResY, &XY_x, &XY_y);
-    uint256_modular_inverse(&r_inv, &r, &mod_order);
+    // printf("QR_x\n");
+    // ResX.print();
+    // printf("QR_y\n");
+    // ResY.print();
+
+    uint256_modular_inverse(&r_inv, &r, mod_order);
 
     // env_t::cgbn_t Q_x, Q_y;
     // calculate Q = Qr * r_inv %N

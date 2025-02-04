@@ -264,7 +264,11 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 
     // early return special cases
     if (mod_is_zero) {
-        call_context->set_parent_return_data(mod_data.data, mod_len);
+        if (mod_len != 0) {
+            call_context->set_parent_return_data(mod_data.data, mod_len);
+        } else if (call_context->parent != nullptr) {
+            call_context->parent->dynamic_ret_size = 0;
+        }
         return ERROR_RETURN;
     }
 
@@ -333,7 +337,7 @@ __device__ int32_t operation_BLAKE2(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     CuCrypto::blake2::blake2f(rounds, h, m, t, f);
 
     // *return_data = byte_array_t((uint8_t *)h, 64);
-
+    call_context->set_parent_return_data((uint8_t *)h, 64);
     return ERROR_RETURN;
 }
 
@@ -342,10 +346,10 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
     gas_used += GAS_PRECOMPILE_ECRECOVER;
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    // printf("has gas %d\n", error_code);
-    // printf("gas limit \n");
-    // print_bnt(arith, gas_limit);
-    // printf("data size %d\n", message->data->size);
+    printf("has gas %d\n", error_code);
+    printf("gas limit %ld\n", gas_limit);
+    printf("gas used %ld\n", gas_used);
+    printf("data size %d\n", call_context->call_data_size);
 
     if (error_code == ERROR_SUCCESS) {
         // complete with zeroes the remaing bytes
@@ -362,6 +366,13 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
         signature->r = r;
         signature->s = s;
         signature->v = uint256_get_uint32_t(&v);
+        printf("Sig.s \n");
+        signature->s.print();
+        printf("Sig.r \n");
+        signature->r.print();
+        printf("v %d\n", signature->v);
+        printf("msg_hash \n");
+        signature->msg_hash.print();
 
         // TODO: is not 27 and 28, only?
         if (signature->v <= 28) {
@@ -370,17 +381,21 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
 
             if (res == ERROR_SUCCESS) {
                 uint256_to_bytes(output, &signer, 32);
-
+                printf("signer \n");
+                signer.print();
                 error_code = ERROR_RETURN;
+                call_context->set_parent_return_data(output, 32);
             } else {
                 // TODO: do we consume all gas?
                 // it happens by default because of the error code
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
             }
+
             delete[] output;
         }
         delete signature;
-        return ERROR_RETURN;
+
+        return error_code;
     }
     return error_code;
 }
@@ -405,13 +420,14 @@ __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t 
         // printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
         // printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
         uint8_t *output = new uint8_t[64];
-        int res = 0;  // ecc::ec_add(constants, x1, y1, x1, y1, x2, y2);
+        int res = ecc::ec_add(constants->alt_BN128, &x1, &y1, &x1, &y1, &x2, &y2);
         if (res == 0) {
             uint256_to_bytes(output, &x1, 32);
             uint256_to_bytes(output + 32, &y1, 32);
             // return_data.set(output, 64);
             // *return_data = byte_array_t(output, 64);
             error_code = ERROR_RETURN;
+            call_context->set_parent_return_data(output, 64);
         } else {
             // consume all gas because it is an error
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
@@ -439,7 +455,7 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t 
         // printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
 
         uint8_t *output = new uint8_t[64];
-        int res = 0;  // ecc::ec_mul(constants, x, y, x, y, k);
+        int res = ecc::ec_mul(constants->alt_BN128, &x, &y, &x, &y, &k);
         // print result
         // printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
         // printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
@@ -449,6 +465,7 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t 
             // return_data.set(output, 64);
             // *return_data = byte_array_t(output, 64);
             error_code = ERROR_RETURN;
+            call_context->set_parent_return_data(output, 64);
         } else {
             // consume all gas because it is an error
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;

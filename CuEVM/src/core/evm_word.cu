@@ -109,30 +109,22 @@ __host__ __device__ int32_t evm_word_t::to_byte_array_t(uint8_t *byte_array, uin
     byte_array_length = CuEVM::word_size;
     uint256_to_bytes(byte_array, this, byte_array_length);
 }
-
+// for ecc, the bit array is flipped
 __host__ __device__ int32_t evm_word_t::to_bit_array_t(uint8_t *bit_array, uint32_t &bit_array_length) const {
     uint8_t *bits = bit_array;
-    for (int32_t idx = uint256_limbs - 1; idx >= 0; idx--) {
-        for (int bit = 31; bit >= 0; bit--) {
+    for (int32_t idx = 0; idx < uint256_limbs; idx++) {
+        for (int bit = 0; bit < 32; bit++) {
             *(bits++) = (uint8_t)((words[idx] >> bit) & 0x01);
         }
     }
     bit_array_length = CuEVM::word_bits;
-    // if (endian == BIG_ENDIAN) {
-    //     bits = bit_array.data;
-    //     for (int32_t idx = CuEVM::cgbn_limbs - 1; idx >= 0; idx--) {
-    //         for (int bit = 31; bit >= 0; bit--) {
-    //             *(bits++) = (uint8_t)((_limbs[idx] >> bit) & 0x01);
-    //         }
-    //     }
-    // } else if (endian == LITTLE_ENDIAN) {
-    //     bits = bit_array.data;
-    //     for (uint32_t idx = 0; idx < CuEVM::cgbn_limbs; idx++) {
-    //         for (int bit = 0; bit < 32; bit++) {
-    //             *(bits++) = (_limbs[idx] >> bit) & 0x01;
-    //         }
-    //     }
-    // }
+    for (int i = CuEVM::word_bits - 1; i >= 0; i--) {
+        if (bit_array[i] == 0)
+            bit_array_length--;
+        else
+            break;
+    }
+
     return ERROR_SUCCESS;
 }
 }  // namespace CuEVM

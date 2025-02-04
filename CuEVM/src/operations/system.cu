@@ -311,11 +311,16 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
     uint8_t *byte_code = CuEVM::global_state_db_ptr->get_code(byte_code_size, &address);
 
     new_context_ptr = new CuEVM::evm_call_context_t();
-
-    new_context_ptr->initiate_values(current_context, gas, current_context->to, current_context->to,
-                                     current_context->to, *value, OP_CALLCODE, nullptr, 0, byte_code, byte_code_size,
-                                     uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
-                                     current_context->static_env);
+    if (uint256_cmp_word(&address, CuEVM::no_precompile_contracts) == -1)
+        new_context_ptr->initiate_values(current_context, gas, current_context->to, address, current_context->to,
+                                         *value, OP_CALLCODE, nullptr, 0, byte_code, byte_code_size,
+                                         uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
+                                         current_context->static_env);
+    else
+        new_context_ptr->initiate_values(current_context, gas, current_context->to, current_context->to,
+                                         current_context->to, *value, OP_CALLCODE, nullptr, 0, byte_code,
+                                         byte_code_size, uint256_get_uint32_t(ret_offset),
+                                         uint256_get_uint32_t(ret_size), current_context->static_env);
 
     CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
 
@@ -395,10 +400,16 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
     //     new_context_ptr = new CuEVM::evm_call_context_t();
     // }
     new_context_ptr = new CuEVM::evm_call_context_t();
-    new_context_ptr->initiate_values(current_context, gas, current_context->from, current_context->to,
-                                     current_context->to, value, OP_DELEGATECALL, nullptr, 0, byte_code, byte_code_size,
-                                     uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
-                                     current_context->static_env);
+    if (uint256_cmp_word(&address, CuEVM::no_precompile_contracts) == -1)
+        new_context_ptr->initiate_values(current_context, gas, current_context->from, address, current_context->to,
+                                         value, OP_DELEGATECALL, nullptr, 0, byte_code, byte_code_size,
+                                         uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
+                                         current_context->static_env);
+    else
+        new_context_ptr->initiate_values(current_context, gas, current_context->from, current_context->to,
+                                         current_context->to, value, OP_DELEGATECALL, nullptr, 0, byte_code,
+                                         byte_code_size, uint256_get_uint32_t(ret_offset),
+                                         uint256_get_uint32_t(ret_size), current_context->static_env);
     // printf("new context ptr\n");
     // new_context_ptr->print();
     CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);

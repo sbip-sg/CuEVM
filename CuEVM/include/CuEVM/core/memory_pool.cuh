@@ -2,6 +2,7 @@
 #include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/evm_word.cuh>
+#include <CuEVM/utils/ecc.cuh>
 namespace CuEVM::memory_pool {
 struct memory_pool_t {
     evm_call_context_t* call_context;
@@ -15,6 +16,7 @@ struct memory_pool_t {
     __host__ memory_pool_t() {};
 };
 extern __device__ memory_pool_t* global_memory_pool;
+extern __device__ CuEVM::EccConstants* ecc_constants_ptr;
 __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts);
 __host__ evm_word_t* preallocate_stack(uint32_t num_instances);
 __device__ void expand_call_context(uint32_t num_instances);
