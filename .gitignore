@@ -27,3 +27,4 @@ geth.out
 
 # fuzzing
 **/__pycache__/
+.aider*
