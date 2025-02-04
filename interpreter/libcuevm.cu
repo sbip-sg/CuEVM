@@ -54,7 +54,7 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     // printf("print simplified trace data host\n");
     // instances_data[0].simplified_trace_data_ptr->print();
 
-    uint32_t num_blocks = (num_instances + CGBN_IBP - 1) / (CGBN_IBP);
+    uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
     // printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
     //        CGBN_TPI * CGBN_IBP);
     // run the evm
@@ -62,7 +62,7 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    CuEVM::kernel_evm_multiple_instances<<<num_blocks, CGBN_TPI * CGBN_IBP>>>(report, instances_data, num_instances);
+    CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(report, instances_data, num_instances);
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -91,7 +91,7 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
         write_root = PyDict_New();
     }
 
-    CuEVM::free_evm_instances(instances_data, num_instances, managed);
+    CuEVM::free_evm_instances(instances_data, num_instances);
 
     CUDA_CHECK(cgbn_error_report_free(report));
     CUDA_CHECK(cudaDeviceReset());

@@ -1284,6 +1284,6 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     return FQP_equals(arith, final_res, one_fq12) ? 1 : 0;
 }
 #else  // dummy delc to avoid compilation error
-__host__ __device__ int pairing_multiple(EccConstants *ecc_constants_ptr, uint8_t *points_data, size_t data_len) {}
+  __host__ __device__ int pairing_multiple(EccConstants *ecc_constants_ptr, uint8_t *points_data, size_t data_len) { return -1;}
 #endif
 }  // namespace ecc
