@@ -256,6 +256,28 @@ __device__ int32_t StateDb::get_value_offset(uint32_t storage_size, uint32_t con
     }
     return -1;
 }
+__device__ DynamicAccount *StateDb::get_dynamic_account_and_set_warm(const evm_word_t *address) const {
+    // TODO: implement
+    DynamicAccount *current_account = dynamic_accounts[INSTANCE_GLOBAL_IDX];
+    printf("get dynamic account thread %d, address %p current_account %p\n", INSTANCE_GLOBAL_IDX, address,
+           current_account);
+    while (current_account != nullptr) {
+        printf("current_account address %p\n", current_account->address);
+        current_account->address.print();
+        if (current_account->address == *address) {
+            current_account->is_warm = true;
+            return current_account;
+        }
+        current_account = current_account->next_account;
+    }
+    printf("End of get dynamic account, failed to find \n");
+    printf("create new dynamic account\n");
+    DynamicAccount *new_acc = new DynamicAccount(address, 0, 0, 0, 0, nullptr);
+    new_acc->is_warm = true;
+    new_acc->next_account = dynamic_accounts[INSTANCE_GLOBAL_IDX];
+    dynamic_accounts[INSTANCE_GLOBAL_IDX] = new_acc;
+    return new_acc;
+}
 
 __device__ DynamicAccount *StateDb::get_dynamic_account(const evm_word_t *address) const {
     // TODO: implement
@@ -656,16 +678,19 @@ __device__ ValueStatus *StateDb::grow_storage_and_set_key(uint32_t storage_size,
     return nullptr;
 }
 
-__device__ evm_word_t *StateDb::get_balance(const evm_word_t *address) {
+__device__ evm_word_t *StateDb::get_balance(const evm_word_t *address, bool set_warm) {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
-        DynamicAccount *dynamic_account = get_dynamic_account(address);
+        DynamicAccount *dynamic_account =
+            set_warm ? get_dynamic_account_and_set_warm(address) : get_dynamic_account(address);
         if (dynamic_account == nullptr) {
             return nullptr;
         }
         return &dynamic_account->balance;
     }
-
+    if (set_warm) {
+        account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = true;
+    }
     return &account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX];
 }
 

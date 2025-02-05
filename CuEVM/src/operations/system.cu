@@ -54,7 +54,7 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     } else {
         memory_expansion_cost = memory_expansion_cost_ret;
     }
-    // printf("memory expansion cost %u\n", memory_expansion_cost);
+    printf("memory expansion cost %u\n", memory_expansion_cost);
     cached_state.gas_used += memory_expansion_cost;
 
     // adress warm call

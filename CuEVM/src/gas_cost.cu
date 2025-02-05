@@ -13,6 +13,7 @@ __device__ gas_t max_gas_call(const gas_t &gas_limit, const gas_t &gas_used) {
     // gas_left = gas_left & 0xFFFFFFFFFFFFFFFF;
     // gas capped = (63/64) * gas_left
     gas_t available_gas = gas_limit - gas_used;
+    printf("available_gas %u\n", available_gas);
     return available_gas - available_gas / 64;
 }
 
@@ -75,48 +76,68 @@ __device__ void ripemd160_cost(gas_t &gas_used, const gas_t &length) {
 __device__ void blake2_cost(gas_t &gas_used, const gas_t &rounds) {
     // gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds
     gas_used += GAS_PRECOMPILE_BLAKE2_ROUND * rounds;
+    // Start of Selection
 }
 __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
                                const evm_word_t &exponent_bit_length_bn, const evm_word_t &multiplication_complexity) {
-    // Compute the adjusted exponent length as defined in EIP-198.
-    // extra_exponent = (exponent_size > 32) ? ((exponent_size - 32) * 8) : 0.
+    // Compute the effective iteration count for dynamic gas cost as defined in EIP-198.
+    // For exponent sizes greater than 32:
+    //      extra_exponent = (exponent_size - 32) * 8
+    // For the lower 256-bit portion of the exponent:
+    //      msb = (exponent_bit_length_bn > 0) ? (exponent_bit_length_bn - 1) : 0
+    // The adjusted exponent (i.e. iteration count) is then:
+    //      adjusted_exponent = max(extra_exponent + msb, 1)
+
+    printf("exponent_size ");
+    print_uint256(&exponent_size);
+    printf("exponent_bit_length_bn ");
+    print_uint256(&exponent_bit_length_bn);
+    printf("multiplication_complexity ");
+    print_uint256(&multiplication_complexity);
+
     evm_word_t extra_exponent = 0;
-    evm_word_t temp_word = 8;
+    const evm_word_t multiplier_for_extra = 8;
     if (uint256_cmp_word(&exponent_size, 32) > 0) {
-        // extra_exponent = (exponent_size - 32) * 8;
+        // extra_exponent = (exponent_size - 32) * 8
         uint256_sub_word(&extra_exponent, &exponent_size, 32);
-        uint256_mul(&extra_exponent, &extra_exponent, &temp_word);
+        uint256_mul(&extra_exponent, &extra_exponent, &multiplier_for_extra);
     }
 
-    // Calculate the most significant non-zero bit position from the lower 256 bits:
-    // If exponent_bit_length_bn is non-zero, then msb = exponent_bit_length_bn - 1, else 0.
+    // Calculate msb = (exponent_bit_length_bn > 0) ? (exponent_bit_length_bn - 1) : 0
     evm_word_t msb = 0;
-    if (uint256_is_zero(&exponent_bit_length_bn) == false) {
+    if (!uint256_is_zero(&exponent_bit_length_bn)) {
         uint256_sub_word(&msb, &exponent_bit_length_bn, 1);
     }
 
-    // Adjusted exponent = extra_exponent + msb.
-    // We ensure the effective exponent is at least 1.
+    // Compute adjusted_exponent = extra_exponent + msb, ensuring a minimum value of 1.
     evm_word_t adjusted_exponent;
     uint256_add(&adjusted_exponent, &extra_exponent, &msb);
-    if (uint256_is_zero(&adjusted_exponent) == true) {
+    if (uint256_is_zero(&adjusted_exponent)) {
         adjusted_exponent = 1;
     }
 
-    // Compute the dynamic gas using the EIP-198 formula:
-    // dynamic_gas = (multiplication_complexity * adjusted_exponent) / 20,
-    // with a minimum gas cost of 200.
+    printf("adjusted_exponent ");
+    print_uint256(&adjusted_exponent);
+
+    // Compute dynamic gas cost using the EIP-198 formula:
+    //      dynamic_gas = floor((multiplication_complexity * adjusted_exponent) / 3)
+    // with a minimum cost of 200.
     evm_word_t dynamic_gas;
-    temp_word = 20;
+    const evm_word_t divisor = 3;
     uint256_mul(&dynamic_gas, &multiplication_complexity, &adjusted_exponent);
-    uint256_div(&dynamic_gas, &dynamic_gas, &temp_word);
+    uint256_div(&dynamic_gas, &dynamic_gas, &divisor);
+
     if (uint256_cmp_word(&dynamic_gas, 200) < 0) {
         dynamic_gas = 200;
     }
 
+    printf("dynamic_gas ");
+    print_uint256(&dynamic_gas);
+
     gas_used += uint256_get_uint64_t(&dynamic_gas);
     return ERROR_SUCCESS;
 }
+// End of Selectio
 __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
     // gas_used += GAS_PRECOMPILE_ECPAIRING + data_size/192 *
     // GAS_PRECOMPILE_ECPAIRING_PAIR
@@ -125,8 +146,10 @@ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
 
 __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address) {
     if (state_db->is_warm_account(address)) {
+        printf("warm account\n");
         gas_used += GAS_WARM_ACCESS;
     } else {
+        printf("cold account\n");
         gas_used += GAS_COLD_ACCOUNT_ACCESS;
         // set the account warm in case it's cold
         // assuming this function is called only when the account is accessed

@@ -110,13 +110,13 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     uint256_from_bytes(&exponent_size, esize_array.data, esize_array.size);
     uint256_from_bytes(&modulus_size, msize_array.data, msize_array.size);
 
-    // if (error) {
-    //     return error;
-    // }
     int32_t error = ERROR_SUCCESS;
 
     uint32_t base_len, exp_len, mod_len, data_len;
     data_len = call_context->call_data_size;
+    base_len = uint256_get_uint32_t(&base_size);
+    exp_len = uint256_get_uint32_t(&exponent_size);
+    mod_len = uint256_get_uint32_t(&modulus_size);
 
     // Handle a special case when both the base and mod length are zero.
     if (uint256_is_zero(&base_size) && uint256_is_zero(&modulus_size)) {
@@ -148,26 +148,28 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     // send through call data the remaining bytes are consider
     // 0 value bytes. The bytes of the call data are the most
     // significant bytes of the exponent
-    // uint8_t *e_data = new uint8_t[exp_len];
-    byte_array_t e_data = byte_array_t(exp_len);
+
+    uint8_t *e_data = new uint8_t[exp_len];
 
     for (uint32_t i = 0; i < exp_len; i++) {
-        auto idx = 96 + base_len + i;
+        uint32_t idx = 96 + base_len + i;
+
         if (idx < data_len) {
-            e_data.data[i] = call_context->call_data[idx];
+            e_data[i] = call_context->call_data[idx];
         } else {
-            e_data.data[i] = 0;
+            e_data[i] = 0;
         }
 
-        if (e_data.data[i] != 0) {
+        if (e_data[i] != 0) {
             exp_is_zero = false;
         }
     }
 
+    // take head 32 bytes of the exponent
     uint8_t adjusted_exp_data[32] = {0};
-    uint32_t iteration_length = min(32, e_data.size);
+    uint32_t iteration_length = min(32, exp_len);
     for (uint32_t i = 0; i < iteration_length; i++) {
-        adjusted_exp_data[32 - iteration_length + i] = e_data.data[i];
+        adjusted_exp_data[32 - iteration_length + i] = e_data[i];
     }
 
     int bit_size = 0;
@@ -280,7 +282,7 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
             mod_data.data[mod_len - 1] = 1;  // return 1
         }
         call_context->set_parent_return_data(mod_data.data, mod_len);
-
+        delete[] e_data;
         return ERROR_RETURN;
     }
 
@@ -288,13 +290,14 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     bigint base_bigint = {}, exponent_bigint = {}, result_bigint = {}, modulus_bigint = {};
 
     bigint_from_bytes(&base_bigint, base_data.data, base_len);
-    bigint_from_bytes(&exponent_bigint, e_data.data, exp_len);
+    bigint_from_bytes(&exponent_bigint, e_data, exp_len);
     bigint_from_bytes(&modulus_bigint, mod_data.data, mod_len);
-
+    printf("call pow mod\n");
     // make the pow mod operation
     bigint_pow_mod(&result_bigint, &base_bigint, &exponent_bigint, &modulus_bigint);
     bigint_to_bytes(mod_data.data, &result_bigint, mod_len);
     call_context->set_parent_return_data(mod_data.data, mod_len);
+    delete[] e_data;
     return ERROR_RETURN;
 }
 
@@ -354,6 +357,11 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
     if (error_code == ERROR_SUCCESS) {
         // complete with zeroes the remaing bytes
         // input = arith.padded_malloc_byte_array(tmp_input, size, 128);
+        printf("call_context->call_data size %d\n", call_context->call_data_size);
+        for (uint32_t i = 0; i < call_context->call_data_size; i++) {
+            printf("%x ", call_context->call_data[i]);
+        }
+        printf("\n");
         CuEVM::byte_array_t input(call_context->call_data, 128);
         ecc::signature_t *signature = new ecc::signature_t();
         evm_word_t msg_hash, v, r, s, signer;
@@ -375,7 +383,7 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
         signature->msg_hash.print();
 
         // TODO: is not 27 and 28, only?
-        if (signature->v <= 28) {
+        if (signature->v == 28 || signature->v == 27) {
             uint8_t *output = new uint8_t[32];
             size_t res = ecc::ec_recover(constants, signature, &signer);
 
@@ -392,6 +400,8 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
             }
 
             delete[] output;
+        } else {
+            error_code = ERROR_RETURN;
         }
         delete signature;
 

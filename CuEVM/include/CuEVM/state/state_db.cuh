@@ -117,8 +117,8 @@ class StateDb {
                                 const evm_word_t *value);
 
     __device__ DynamicAccount *get_dynamic_account(const evm_word_t *address) const;
-
-    __device__ evm_word_t *get_balance(const evm_word_t *address);
+    __device__ DynamicAccount *get_dynamic_account_and_set_warm(const evm_word_t *address) const;
+    __device__ evm_word_t *get_balance(const evm_word_t *address, bool set_warm = false);
     __device__ uint8_t *get_code(uint32_t &code_size, const evm_word_t *address);
     __device__ uint32_t get_nonce(const evm_word_t *address);
 
