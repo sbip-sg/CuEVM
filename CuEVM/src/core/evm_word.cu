@@ -23,10 +23,14 @@ __host__ __device__ int32_t evm_word_t::operator==(const evm_word_t &other) cons
     return uint256_cmp(this, &other) == 0;
 }
 
-__host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) { uint256_from_hex(this, hex_string); }
+__host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) {
+  uint256_from_hex(this, hex_string);
+  return 0;
+}
 
 __device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {
     uint256_from_bytes(this, byte_array.data, byte_array.size);
+    return 0;
 }
 
 __host__ __device__ void evm_word_t::set_zero() { uint256_set_zero(this); }
@@ -43,7 +47,10 @@ __host__ __device__ int32_t evm_word_t::from_uint64_t(uint64_t value) {
     return ERROR_SUCCESS;
 }
 
-__host__ __device__ int32_t evm_word_t::from_uint32_t(uint32_t value) { uint256_from_uint32(this, value); }
+__host__ __device__ int32_t evm_word_t::from_uint32_t(uint32_t value) {
+  uint256_from_uint32(this, value);
+  return 0;
+}
 
 __host__ __device__ int32_t evm_word_t_compare(const evm_word_t *a, const evm_word_t *b, uint16_t num_limbs = 8) {
     return uint256_cmp(a, b);

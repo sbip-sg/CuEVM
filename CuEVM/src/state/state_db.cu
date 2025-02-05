@@ -62,7 +62,7 @@ __device__ void SnapshotAccount::set_storage(const uint16_t depth, const uint32_
         if (CuEVM::memory_pool::preallocated_snapshot_restore_ptr[offset] == src_value) return;
     }
     if (storage_size > memory_pool_snapshot_preallocate) {
-        uint32_t dynamic_offset = find_dynamic_offset(src_value);
+        auto dynamic_offset = find_dynamic_offset(src_value);
         if (dynamic_offset == -1) {
             dynamic_offset = (storage_size - memory_pool_snapshot_preallocate) % snapshot_page_size;
             if (dynamic_offset == 0) {
