@@ -2,7 +2,6 @@
 #include <getopt.h>
 
 #include <CuEVM/core/memory_pool.cuh>
-#include <CuEVM/core/message.cuh>
 #include <CuEVM/evm.cuh>
 #include <CuEVM/tracer.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>

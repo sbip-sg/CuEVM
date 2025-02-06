@@ -2,8 +2,6 @@
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/message.cuh>
-#include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>

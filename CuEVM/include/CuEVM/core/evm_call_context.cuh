@@ -2,7 +2,6 @@
 
 #include <CuEVM/core/jump_destinations.cuh>
 #include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/state/logs.cuh>
 #include <CuEVM/state/state_db.cuh>
@@ -61,12 +60,14 @@ struct evm_call_context_t {
                                     uint32_t byte_code_size, uint32_t return_data_offset = 0,
                                     uint32_t return_data_size = 0, bool static_env = false, gas_t gas_refund = 0);
 
+    __device__ void copy_return_data_to_memory(uint32_t memory_offset, uint32_t data_offset, uint32_t size);
     __device__ void copy_return_data(uint8_t* dest, uint32_t data_offset, uint32_t size);
 
     __device__ void set_parent_return_data(uint8_t* data, uint32_t size);
     __device__ void set_parent_return_data(uint32_t offset, uint32_t size);
     __device__ void print_return_data() const;
     __device__ evm_call_context_t() {};
+    __device__ void clear();
 
     /**
      * The destructor of the evm_call_state_t

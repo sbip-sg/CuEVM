@@ -5,7 +5,11 @@
 #include <CuEVM/utils/ecc.cuh>
 namespace CuEVM::memory_pool {
 struct memory_pool_t {
+    // preallocate data structures for call_depths
     evm_call_context_t* call_context;
+    evm_stack_t* prealloc_stack_instances;
+    evm_memory_t* prealloc_mem_instances;
+    //
     evm_word_t* stack_base;
     SnapshotValue* preallocated_snapshot_values;
     uint8_t* return_data_base;
@@ -17,13 +21,10 @@ struct memory_pool_t {
 };
 extern __device__ memory_pool_t* global_memory_pool;
 extern __device__ CuEVM::EccConstants* ecc_constants_ptr;
+
 __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts);
-__host__ evm_word_t* preallocate_stack(uint32_t num_instances);
-__device__ void expand_call_context(uint32_t num_instances);
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth);
-
+__device__ evm_stack_t* get_stack(uint16_t depth);
 __device__ evm_memory_t* get_memory(uint16_t depth);
-
-__device__ void expand_words(uint32_t num_instances);
 }  // namespace CuEVM::memory_pool

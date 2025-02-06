@@ -11,17 +11,25 @@ struct evm_stack_t {
     evm_word_t *shared_stack_base;  // shared memory for X elements from the top => becomes preallocated stackbase
     uint16_t stack_offset;          // offset of the current stack (its size) from it's base offset in shared memory
     uint32_t stack_base_offset;     // offset of the stack base in shared memory or global memory
-    /**
-     * The default constructor
-     * Stack base offset of the child stack = parent stack offset  + 1
-     */
-    __host__ __device__ evm_stack_t::evm_stack_t(evm_word_t *shared_stack_base, uint32_t stack_base_offset = 0)
+                                    /**
+                                     * The default constructor
+                                     * Stack base offset of the child stack = parent stack offset  + 1
+                                     */
+    __device__ evm_stack_t(evm_word_t *shared_stack_base, uint32_t stack_base_offset = 0)
         : global_stack_base(nullptr),
           shared_stack_base(shared_stack_base),
           stack_base_offset(stack_base_offset),
           stack_offset(0) {
         // printf("stack constructor shared stack base %p, stack base offset %d, stack offset %d\n", shared_stack_base,
         //        stack_base_offset, stack_offset);
+    }
+    __device__ evm_stack_t()
+        : global_stack_base(nullptr), shared_stack_base(nullptr), stack_base_offset(0), stack_offset(0) {}
+    __device__ void init(evm_word_t *shared_stack_base, uint32_t stack_base_offset = 0) {
+        this->global_stack_base = nullptr;
+        this->shared_stack_base = shared_stack_base;
+        this->stack_base_offset = stack_base_offset;
+        this->stack_offset = 0;
     }
     /**
      * The destructor

@@ -41,7 +41,9 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
             remaining_input_length = length_u32;
         else
             remaining_input_length = max(0, remaining_input_length);
-        CuCrypto::keccak::sha3(memory.data + offset_u32, remaining_input_length, hash_data, CuEVM::hash_size);
+        uint8_t *memory_data;
+        memory.get(offset_u32, remaining_input_length, memory_data);
+        CuCrypto::keccak::sha3(memory_data, remaining_input_length, hash_data, CuEVM::hash_size);
         // evm_word_t hash_word;
         // uint256_from_bytes(&hash_word, hash_data, CuEVM::hash_size);
         error_code |= stack.pushx(CuEVM::hash_size, hash_data, CuEVM::hash_size);
@@ -349,8 +351,8 @@ __device__ int32_t RETURNDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     if (error_code == ERROR_SUCCESS) {
         memory_ptr->increase_memory_cost(memory_expansion_cost);
         memory_ptr->grow(memory_offset_ui32 + length_ui32);
-        call_context->copy_return_data(call_context->memory_ptr->data + memory_offset_ui32, data_offset_ui32,
-                                       length_ui32);
+
+        call_context->copy_return_data_to_memory(memory_offset_ui32, data_offset_ui32, length_ui32);
         // error_code |= call_context->memory_ptr->set(data.data, memory_offset_ui32, length_ui32);
     }
     return error_code;

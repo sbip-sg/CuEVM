@@ -29,8 +29,8 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
         evm.tracer_ptr->print_err();
     }
     __syncthreads();
-    if (instance == 1) {
-        printf("\n\ninstance 1\n\n");
+    if (instance == 10) {
+        printf("\n\ninstance 10\n\n");
         evm.tracer_ptr->print_err();
     }
 #endif
@@ -47,9 +47,12 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
     uint32_t call_data_size = transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
 
     transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
-    CuEVM::evm_stack_t *stack_ptr = new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
-    CuEVM::evm_memory_t *memory_ptr =
-        new CuEVM::evm_memory_t();  // memory_pool::global_memory_pool->get_memory(threadIdx.x);
+    CuEVM::evm_stack_t *stack_ptr = memory_pool::get_stack(0);
+    // new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
+
+    CuEVM::evm_memory_t *memory_ptr = memory_pool::get_memory(0);
+
+    // new CuEVM::evm_memory_t();  // memory_pool::global_memory_pool->get_memory(threadIdx.x);
     if (transaction_list_ptr->type == SPECIAL_CREATE_TRANSACTION_TYPE) {
         uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(&transaction_list_ptr->sender);
         evm_word_t sender_nonce(sender_nonce_uint);
@@ -99,9 +102,9 @@ __host__ evm_t::evm_t(CuEVM::evm_instance_t &evm_instance, CuEVM::evm_call_conte
                       CuEVM::evm_word_t *shared_stack_ptr) {}
 
 __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state) {
-    printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
-    call_state_ptr->from.print();
-    call_state_ptr->to.print();
+    // printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
+    // call_state_ptr->from.print();
+    // call_state_ptr->to.print();
 
     const evm_word_t *sender = &call_state_ptr->from;
     const evm_word_t *recipient = &call_state_ptr->to;
@@ -112,29 +115,14 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
              : ERROR_SUCCESS);
 
     if (error_code != ERROR_SUCCESS) return error_code;
-    printf("After transfer\n");
+    // printf("After transfer\n");
     // warmup the accounts
-    // redundant, in the transfer we already warmed up the accounts
-    // global_state_db_ptr->set_warm_account(sender);
-    // global_state_db_ptr->set_warm_account(recipient);
-    /*
-        if ((call_state_ptr->call_type == OP_CREATE) || (call_state_ptr->call_type == OP_CREATE2)) {
-            error_code |=
-                global_state_db_ptr->is_empty_create(recipient) ? ERROR_SUCCESS :
-       ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS;
 
-            global_state_db_ptr->update_nonce(call_state_ptr->depth, recipient, 1);
-            uint32_t sender_nonce = global_state_db_ptr->get_nonce(sender);
-            global_state_db_ptr->update_nonce(call_state_ptr->depth, sender, sender_nonce + 1);
-        } else {
-    */
     // Go-ethereum: check depth > 1024 before increase -> depth > 1025 after increase
     // test: stSelfBalance/diffPlaces.json
     error_code |= call_state_ptr->depth > CuEVM::max_depth + 1 ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
     // Dont use account ptr here, byte_code already set
-    printf("byte code size %d\n", call_state_ptr->byte_code_size);
-    printf("to \n");
-    call_state_ptr->to.print();
+
     if (call_state_ptr->byte_code_size == 0) {
         if (uint256_cmp_word(&call_state_ptr->to, CuEVM::no_precompile_contracts) == -1) {
             printf("precompile %d \n", call_state_ptr->to.words[0]);
@@ -633,7 +621,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         // increase program counter
         cached_call_state.pc++;
 #ifdef EIP_3155
-        printf("finish operation, gas used %lu\n", cached_call_state.gas_used);
+        // printf("finish operation, gas used %lu\n", cached_call_state.gas_used);
         tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
 
 #endif
@@ -785,15 +773,15 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
 
 __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
-    printf("finish_CALL thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
+    // printf("finish_CALL thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
         gas_t gas_left = call_state_ptr->gas_limit - call_state_ptr->gas_used;
-        printf("gas left %lu\n", gas_left);
-        printf("gas used %lu\n", call_state_ptr->gas_used);
-        printf("gas limit %lu\n", call_state_ptr->gas_limit);
-        if (call_state_ptr->parent != nullptr) printf("parent gas used %lu\n", call_state_ptr->parent->gas_used);
+        // printf("gas left %lu\n", gas_left);
+        // printf("gas used %lu\n", call_state_ptr->gas_used);
+        // printf("gas limit %lu\n", call_state_ptr->gas_limit);
+        // if (call_state_ptr->parent != nullptr) printf("parent gas used %lu\n", call_state_ptr->parent->gas_used);
         if (call_state_ptr->parent != nullptr) {
             call_state_ptr->parent->gas_used -= gas_left;
         }
@@ -819,19 +807,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     simplified_trace_data_ptr->finish_call((error_code == ERROR_RETURN));
 #endif
 
-    // get the memory offset and size of the return data
-    // in the parent memory
-    // evm_word_t ret_offset = call_state_ptr->fixed_ret_offset;
-    // evm_word_t ret_size = call_state_ptr->fixed_ret_size;
-    // // check overflow
-    // uint32_t ret_size_u32 = uint256_get_uint32_t(&ret_size);
-    // uint32_t ret_offset_u32 = uint256_get_uint32_t(&ret_offset);
-    // printf("ret_size_u32 %u, ret_offset_u32 %u\n", ret_size_u32, ret_offset_u32);
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
-    // if (ret_size_u32 + ret_offset_u32 > call_state_ptr->parent->memory_ptr->size) {
-    //     return ERR_MEMORY_INVALID_OFFSET;
-    // }
-    // reset the error code for the parent
 
     if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
         call_state_ptr->parent->dynamic_ret_size = 0;
@@ -845,15 +821,18 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
 
         // write the return data in the memory
         call_state_ptr->parent->memory_ptr->grow(call_state_ptr->fixed_ret_offset + call_state_ptr->fixed_ret_size);
-        call_state_ptr->parent->copy_return_data(
-            call_state_ptr->parent->memory_ptr->data + call_state_ptr->fixed_ret_offset, 0,
-            call_state_ptr->fixed_ret_size);
+        call_state_ptr->parent->copy_return_data_to_memory(call_state_ptr->fixed_ret_offset, 0,
+                                                           call_state_ptr->fixed_ret_size);
 
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
         // printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,
         //        call_state_ptr, parent_call_state_ptr);
-        delete call_state_ptr;
+        if (call_state_ptr->depth > memory_pool_call_context_preallocate) {
+            delete call_state_ptr;
+        } else {
+            call_state_ptr->clear();
+        }
 
         call_state_ptr = parent_call_state_ptr;
     }

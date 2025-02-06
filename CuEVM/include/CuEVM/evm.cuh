@@ -3,7 +3,6 @@
 #include <CuEVM/core/block_info.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory_pool.cuh>
-#include <CuEVM/core/message.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/operations/arithmetic.cuh>
@@ -26,7 +25,6 @@ struct evm_instance_t {
     CuEVM::StateDb* state_db_ptr;                              /**< The world state pointer*/
     CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer*/
     CuEVM::log_state_data_t* log_state_ptr;                    /**< The log state pointer*/
-    CuEVM::evm_return_data_t* return_data_ptr;                 /**< The return data pointer*/
 
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer*/

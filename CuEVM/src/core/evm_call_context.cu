@@ -50,6 +50,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
                                                     bool static_env, gas_t gas_refund) {
     // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, parent, this);
+
     this->parent = parent;
 
     this->depth = depth;
@@ -72,6 +73,26 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->jump_destinations = nullptr;  // jump_destinations;
     this->static_env = static_env;
     this->gas_refund = gas_refund;
+    this->stack_ptr->init(CuEVM::memory_pool::global_memory_pool->stack_base);
+    this->memory_ptr->init(0);  // no more prealloc after this point
+}
+
+__device__ void evm_call_context_t::clear() {
+    this->stack_ptr = nullptr;
+    this->memory_ptr = nullptr;
+    this->parent = nullptr;
+    this->depth = 0;
+    this->pc = 0;
+    this->gas_used = 0;
+    this->gas_refund = 0;
+    this->gas_limit = 0;
+    this->call_data = nullptr;
+    this->call_data_size = 0;
+    this->byte_code = nullptr;
+    this->byte_code_size = 0;
+    this->static_env = false;
+    this->gas_refund = 0;
+    this->jump_destinations = nullptr;
 }
 
 /**
@@ -110,22 +131,33 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     this->fixed_ret_offset = return_data_offset;
     this->fixed_ret_size = return_data_size;
     this->dynamic_ret_size = 0;
+    this->stack_ptr = memory_pool::get_stack(parent->depth);
+
     if (parent->stack_ptr != nullptr) {
-        this->stack_ptr =
-            new CuEVM::evm_stack_t(parent->stack_ptr->shared_stack_base +
-                                       (parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset) *
-                                           CuEVM::memory_pool::global_memory_pool->num_instances,
-                                   parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
+        this->stack_ptr->init(parent->stack_ptr->shared_stack_base +
+                                  (parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset) *
+                                      CuEVM::memory_pool::global_memory_pool->num_instances,
+                              parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
         // printf("parent stack found %p thread %d\n", parent->stack_ptr, THREADIDX);
     } else {
-        this->stack_ptr = new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
-        // printf("parent stack not found %p thread %d\n", shared_stack_ptr, THREADIDX);
+        this->stack_ptr->init(CuEVM::memory_pool::global_memory_pool->stack_base);
+        // this->stack_ptr = new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
     }
-
-    this->memory_ptr = new CuEVM::evm_memory_t();
+    this->memory_ptr = memory_pool::get_memory(parent->depth);
+    if (parent->memory_ptr != nullptr) {
+        this->memory_ptr->init(parent->memory_ptr->preallocated_base_offset + parent->memory_ptr->size);
+    } else {
+        this->memory_ptr->init(0);  // no more prealloc after this point
+    }
+    // this->memory_ptr = new CuEVM::evm_memory_t();
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
     // printf("this context\n");
     // this->print();
+}
+
+__device__ void evm_call_context_t::copy_return_data_to_memory(uint32_t memory_offset, uint32_t data_offset,
+                                                               uint32_t size) {
+    memory_ptr->set_buffer_data(return_data, data_offset, size, memory_offset, size);
 }
 
 __device__ void evm_call_context_t::copy_return_data(uint8_t* dest, uint32_t data_offset, uint32_t size) {
@@ -135,8 +167,8 @@ __device__ void evm_call_context_t::copy_return_data(uint8_t* dest, uint32_t dat
         // printf("copy_return_data dynamic_ret_size == 0\n");
         memset(dest, 0, size);
     } else {
-        uint8_t* preallocated_base =
-            CuEVM::memory_pool::preallocated_return_data_base + THREADIDX * memory_pool_return_data_preallocate;
+        uint8_t* preallocated_base = CuEVM::memory_pool::preallocated_return_data_base +
+                                     INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
         if (size + data_offset > dynamic_ret_size) {
             // printf("copy_return_data size > dynamic_ret_size\n");
             memset(dest + dynamic_ret_size, 0, size - dynamic_ret_size);
@@ -160,14 +192,14 @@ __device__ void evm_call_context_t::copy_return_data(uint8_t* dest, uint32_t dat
 }
 __device__ void evm_call_context_t::set_parent_return_data(uint8_t* data, uint32_t size) {
     if (size == 0 || parent == nullptr) return;
-    printf("set_parent_return_data %u %u\n", data, size);
+    // printf("set_parent_return_data %u %u\n", data, size);
     parent->dynamic_ret_size = size;
     dynamic_ret_size = size;
     uint8_t* preallocated_base =
         CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
 
     if (size <= memory_pool_return_data_preallocate) {
-        printf("size <= memory_pool_return_data_preallocate\n");
+        // printf("size <= memory_pool_return_data_preallocate\n");
         memcpy(preallocated_base, data, size);
     } else {
         // Copy what fits in preallocated space
@@ -184,17 +216,17 @@ __device__ void evm_call_context_t::set_parent_return_data(uint8_t* data, uint32
 }
 __device__ void evm_call_context_t::set_parent_return_data(uint32_t offset, uint32_t size) {
     if (size == 0 || parent == nullptr) return;
-    printf("set_parent_return_data %u %u\n", offset, size);
+    // printf("set_parent_return_data %u %u\n", offset, size);
     parent->dynamic_ret_size = size;
     dynamic_ret_size = size;
     uint8_t* source_data;
     memory_ptr->get(offset, size, source_data);
-    printf("source_data %p\n", source_data);
+    // printf("source_data %p\n", source_data);
     uint8_t* preallocated_base =
         CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
 
     if (size <= memory_pool_return_data_preallocate) {
-        printf("size <= memory_pool_return_data_preallocate\n");
+        // printf("size <= memory_pool_return_data_preallocate\n");
         memcpy(preallocated_base, source_data, size);
     } else {
         // Copy what fits in preallocated space
@@ -230,7 +262,7 @@ __device__ void evm_call_context_t::print_return_data() const {
 __device__ evm_call_context_t::~evm_call_context_t() {
     // printf("evm_call_context_t destructor thread %d, call state ptr %p, parent call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, this, parent);
-    if (parent != nullptr) {
+    if (depth > memory_pool_call_context_preallocate) {
         delete stack_ptr;
         delete memory_ptr;
     }

@@ -7,6 +7,8 @@ constexpr uint32_t worldstate_storage_values_size = 1024;
 constexpr uint32_t account_prealloc_keys_size = 4;  // configurable keys per account
 constexpr uint32_t value_page_size = 16;
 constexpr uint32_t account_page_size = 16;
+
+constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
 
@@ -123,5 +125,6 @@ extern __device__ evm_word_t *preallocated_stack_base;
 extern __device__ uint8_t *preallocated_return_data_base;
 extern __device__ SnapshotValue *preallocated_snapshot_values;
 extern __device__ ValueStatus **preallocated_snapshot_restore_ptr;  // store the original value to restore
+extern __device__ uint8_t *preallocated_memory_base;
 }  // namespace memory_pool
 }  // namespace CuEVM

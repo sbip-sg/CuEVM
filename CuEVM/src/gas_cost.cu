@@ -9,11 +9,8 @@ __device__ int32_t has_gas(const gas_t &gas_limit, const gas_t &gas_used) {
 
 __device__ gas_t max_gas_call(const gas_t &gas_limit, const gas_t &gas_used) {
     // compute the remaining gas
-    // cap to uint64_t in case overflow following go-ethereum
-    // gas_left = gas_left & 0xFFFFFFFFFFFFFFFF;
     // gas capped = (63/64) * gas_left
     gas_t available_gas = gas_limit - gas_used;
-    printf("available_gas %u\n", available_gas);
     return available_gas - available_gas / 64;
 }
 
@@ -146,10 +143,10 @@ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
 
 __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address) {
     if (state_db->is_warm_account(address)) {
-        printf("warm account\n");
+        // printf("warm account\n");
         gas_used += GAS_WARM_ACCESS;
     } else {
-        printf("cold account\n");
+        // printf("cold account\n");
         gas_used += GAS_COLD_ACCOUNT_ACCESS;
         // set the account warm in case it's cold
         // assuming this function is called only when the account is accessed
@@ -164,7 +161,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
                                ValueStatus *&found_value) {
     // get the key warm
     if (state_db->is_warm_key_with_offset(address, key, address_index, found_value) == false) {
-        printf("cold sstore\n");
+        // printf("cold sstore\n");
         gas_used += GAS_COLD_SLOAD;
     }
 
@@ -174,24 +171,25 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
     if (found_value == nullptr)
         blank_storage = true;
     else {
-        printf("found value %p\n", found_value);
+        // printf("found value %p\n", found_value);
         original_value = &found_value->original_value;
         current_value = &found_value->value;
     }
-    printf("original value %p\n", original_value);
-    if (original_value != nullptr) {
-        original_value->print();
-    }
-    printf("current value %p\n", current_value);
-    if (current_value != nullptr) {
-        current_value->print();
-    }
-    printf("new value %p\n", new_value);
-    if (new_value != nullptr) {
-        new_value->print();
-    }
 
-    new_value->print();
+    // printf("original value %p\n", original_value);
+    // if (original_value != nullptr) {
+    //     original_value->print();
+    // }
+    // printf("current value %p\n", current_value);
+    // if (current_value != nullptr) {
+    //     current_value->print();
+    // }
+    // printf("new value %p\n", new_value);
+    // if (new_value != nullptr) {
+    //     new_value->print();
+    // }
+    // new_value->print();
+
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;

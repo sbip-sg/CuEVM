@@ -8,7 +8,6 @@
 #include <CuCrypto/sha256.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/return_data.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/utils/ecc.cuh>
