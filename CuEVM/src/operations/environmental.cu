@@ -313,6 +313,8 @@ __device__ int32_t RETURNDATASIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
                                   const CuEVM::evm_call_context_t *call_context) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+    printf("RETURNDATASIZE thread %d, call_context %p, dynamic_ret_size %u\n", INSTANCE_GLOBAL_IDX, call_context,
+           call_context->dynamic_ret_size);
     if (error_code == ERROR_SUCCESS) {
         error_code |= stack.push_uint32(call_context->dynamic_ret_size);
     }
@@ -348,7 +350,7 @@ __device__ int32_t RETURNDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     // TODO: Check EOF format
-    if (length_ui32 > call_context->dynamic_ret_size) {
+    if (length_ui32 + data_offset_ui32 > call_context->dynamic_ret_size) {
         return ERROR_RETURN_DATA_OVERFLOW;
     }
     if (error_code == ERROR_SUCCESS) {

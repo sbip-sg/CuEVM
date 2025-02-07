@@ -24,7 +24,7 @@ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     if (error_code == ERROR_SUCCESS) {
         evm_word_t value_word;
         memory.increase_memory_cost(memory_expansion_cost);
-        uint8_t *data;
+        uint8_t *data = nullptr;
         error_code |= memory.get(memory_offset_u32, UINT256_BYTES, data);
         error_code |= stack.pushx(32, data, UINT256_BYTES);
     }

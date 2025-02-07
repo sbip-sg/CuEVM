@@ -79,7 +79,6 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
 
 __device__ void evm_call_context_t::clear() {
     this->stack_ptr = nullptr;
-    this->memory_ptr = nullptr;
     this->parent = nullptr;
     this->depth = 0;
     this->pc = 0;
@@ -93,6 +92,16 @@ __device__ void evm_call_context_t::clear() {
     this->static_env = false;
     this->gas_refund = 0;
     this->jump_destinations = nullptr;
+    if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
+        // clear the grow memory when return from subcontext
+        printf("clear %d bytes from memory_pool::preallocated_memory_base[%d] + %d\n",
+               memory_prealloc_size - memory_ptr->preallocated_base_offset, INSTANCE_GLOBAL_IDX,
+               memory_ptr->preallocated_base_offset);
+        memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+                                                      memory_ptr->preallocated_base_offset],
+               0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
+    }
+    this->memory_ptr = nullptr;
 }
 
 /**
@@ -160,16 +169,23 @@ __device__ void evm_call_context_t::copy_return_data_to_memory(uint32_t memory_o
     uint8_t* preallocated_base =
         CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
 
+    uint32_t actual_size = min(size, dynamic_ret_size);
+    // printf("size %d dynamic_ret_size %d actual_size %d\n", size, dynamic_ret_size, actual_size);
+    uint32_t remaining_size = size > actual_size ? size - actual_size : 0;
     if (dynamic_ret_size <= memory_pool_return_data_preallocate) {
-        memory_ptr->set_buffer_data(preallocated_base, data_offset, size, memory_offset, size);
+        memory_ptr->set_buffer_data(preallocated_base, data_offset, actual_size, memory_offset, actual_size);
+
     } else {
-        memory_ptr->set_buffer_data(return_data, data_offset, size, memory_offset, size);
+        memory_ptr->set_buffer_data(return_data, data_offset, actual_size, memory_offset, actual_size);
         // memory_ptr->set_buffer_data(preallocated_base, data_offset, memory_pool_return_data_preallocate,
         // memory_offset,
         //                             memory_pool_return_data_preallocate);
         // memory_ptr->set_buffer_data(return_data, 0, dynamic_ret_size - memory_pool_return_data_preallocate,
         //                             memory_offset + memory_pool_return_data_preallocate,
         //                             size + data_offset - memory_pool_return_data_preallocate);
+    }
+    if (remaining_size > 0) {
+        memory_ptr->set_zero(memory_offset + size - remaining_size, remaining_size);
     }
 }
 
@@ -296,6 +312,12 @@ __device__ void evm_call_context_t::print_return_data() const {
 __device__ evm_call_context_t::~evm_call_context_t() {
     // printf("evm_call_context_t destructor thread %d, call state ptr %p, parent call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, this, parent);
+    if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
+        // clear the grow memory
+        memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+                                                      memory_ptr->preallocated_base_offset],
+               0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
+    }
     if (depth > memory_pool_call_context_preallocate) {
         delete stack_ptr;
         delete memory_ptr;

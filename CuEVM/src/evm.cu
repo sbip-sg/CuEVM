@@ -231,15 +231,14 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         //     // printf("\n\n");
         //     // cached_call_state.stack_ptr->print();
         // }
-        // if (INSTANCE_GLOBAL_IDX == 1) {
-        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n
-        //     ",
-        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
-        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
-        //            cached_call_state.gas_limit, cached_call_state.gas_used);
-        //     // printf("\n\n");
-        //     // cached_call_state.stack_ptr->print();
-        // }
+        if (INSTANCE_GLOBAL_IDX == 1) {
+            printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+                   INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+                   call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+                   cached_call_state.gas_limit, cached_call_state.gas_used);
+            // printf("\n\n");
+            // cached_call_state.stack_ptr->print();
+        }
 
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -821,14 +820,8 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     error_code = ERROR_SUCCESS;
 
     if (call_state_ptr->depth > 1) {
-        // push the result in the parent stack
-        error_code |= call_state_ptr->parent->stack_ptr->push(child_success);
-
-        // write the return data in the memory
-        call_state_ptr->parent->memory_ptr->grow(call_state_ptr->fixed_ret_offset + call_state_ptr->fixed_ret_size);
-        call_state_ptr->parent->copy_return_data_to_memory(call_state_ptr->fixed_ret_offset, 0,
-                                                           call_state_ptr->fixed_ret_size);
-
+        uint32_t ret_offset = call_state_ptr->fixed_ret_offset;
+        uint32_t ret_size = call_state_ptr->fixed_ret_size;
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
         // printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,
@@ -839,6 +832,14 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
             call_state_ptr->clear();
         }
 
+        // push the result in the parent stack
+        error_code |= parent_call_state_ptr->stack_ptr->push(child_success);
+
+        // write the return data in the memory
+        parent_call_state_ptr->memory_ptr->grow(ret_offset + ret_size);
+
+        // have to clear memory first before copy return data to memory // due to shared memory between depths
+        parent_call_state_ptr->copy_return_data_to_memory(ret_offset, 0, ret_size);
         call_state_ptr = parent_call_state_ptr;
     }
 
@@ -876,12 +877,11 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
             error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
         }
 
-        // TODO check if neccessary
-        call_state_ptr->dynamic_ret_size = 0;
-        call_state_ptr->parent->dynamic_ret_size = 0;
-
         delete[] code;
     }
+    // TODO check if neccessary
+    call_state_ptr->dynamic_ret_size = 0;
+    call_state_ptr->parent->dynamic_ret_size = 0;
 
     // if success, return ERROR_RETURN to continue finish call
     return error_code ? error_code : ERROR_RETURN;

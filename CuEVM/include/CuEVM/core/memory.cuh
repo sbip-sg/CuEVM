@@ -91,7 +91,7 @@ struct evm_memory_t {
      */
     __device__ int32_t set(uint8_t *data_, uint32_t data_size, const uint32_t index, const uint32_t length);
 
-    __device__ int32_t set_buffer_data(uint8_t *data_, uint64_t data_offset, uint32_t data_size, const uint32_t index,
+    __device__ int32_t set_buffer_data(uint8_t *data_, uint32_t data_offset, uint32_t data_size, const uint32_t index,
                                        const uint32_t length);
 
     /**

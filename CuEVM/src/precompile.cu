@@ -357,18 +357,16 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
     if (error_code == ERROR_SUCCESS) {
         // complete with zeroes the remaing bytes
         // input = arith.padded_malloc_byte_array(tmp_input, size, 128);
-        printf("call_context->call_data size %d\n", call_context->call_data_size);
-        for (uint32_t i = 0; i < call_context->call_data_size; i++) {
-            printf("%x ", call_context->call_data[i]);
+        uint8_t input[128];
+        for (uint32_t i = 0; i < 128; i++) {
+            input[i] = i < call_context->call_data_size ? call_context->call_data[i] : 0;
         }
-        printf("\n");
-        CuEVM::byte_array_t input(call_context->call_data, 128);
         ecc::signature_t *signature = new ecc::signature_t();
         evm_word_t msg_hash, v, r, s, signer;
-        uint256_from_bytes(&msg_hash, input.data, 32);
-        uint256_from_bytes(&v, input.data + 32, 32);
-        uint256_from_bytes(&r, input.data + 64, 32);
-        uint256_from_bytes(&s, input.data + 96, 32);
+        uint256_from_bytes(&msg_hash, input, 32);
+        uint256_from_bytes(&v, input + 32, 32);
+        uint256_from_bytes(&r, input + 64, 32);
+        uint256_from_bytes(&s, input + 96, 32);
 
         signature->msg_hash = msg_hash;
         signature->r = r;

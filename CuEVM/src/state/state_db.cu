@@ -656,10 +656,15 @@ __device__ evm_word_t *StateDb::get_storage(const uint16_t depth, const evm_word
 // }
 __device__ ValueStatus *StateDb::get_value_status(const int32_t address_index, const evm_word_t *key) const {
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    // printf("get_value_status address_index %d, instance_idx %d instance %d\n", address_index, instance_idx,
+    //        INSTANCE_GLOBAL_IDX);
     uint32_t contract_idx = contract_index[address_index];
     uint32_t storage_size = account_storage_size[instance_idx];
-    // printf("get_value_status address_index %d, storage_size %d\n", address_index, storage_size);
+    printf("get_value_status address_index %d, storage_size %d instance %d\n", address_index, storage_size,
+           INSTANCE_GLOBAL_IDX);
     int32_t key_offset = get_value_offset(storage_size, contract_idx, key);
+    printf("get_value_status key_offset %d instance %d\n", key_offset, INSTANCE_GLOBAL_IDX);
+
     if (key_offset == -1) {
         // printf(" not found in prealloc_values_pool, search dynamic storage\n");
         // find in dynamic_keys_pool
@@ -673,6 +678,7 @@ __device__ ValueStatus *StateDb::get_value_status(const int32_t address_index, c
         }
     } else {
         // printf("found in prealloc_values_pool\n");
+        printf("found thread %d key offset %d key %p\n", THREADIDX, key_offset, &prealloc_values_pool[key_offset]);
         return &prealloc_values_pool[key_offset];
     }
 }
@@ -832,10 +838,26 @@ __device__ bool StateDb::is_empty_account(const evm_word_t *address) const {
         }
     }
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    return (account_nonces[instance_idx] == 0 && uint256_is_zero(&account_balances[instance_idx]) &&
+            account_codes_size[address_index] == 0);
+}
+/*
+__device__ bool StateDb::is_empty_account(const evm_word_t *address) const {
+    int32_t address_index = get_address_index(address);
+    if (address_index == -1) {
+        DynamicAccount *dynamic_account = get_dynamic_account(address);
+        if (dynamic_account == nullptr) {
+            return true;
+        } else {
+            return dynamic_account->code_size == 0 && dynamic_account->nonce == 0 &&
+                   uint256_is_zero(&dynamic_account->balance);
+        }
+    }
+    uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
     return (account_nonces[instance_idx] == 0 && account_storage_size[instance_idx] == 0 &&
             uint256_is_zero(&account_balances[instance_idx]));
 }
-
+*/
 __device__ bool StateDb::is_deleted_account(const evm_word_t *address) const {
     // todo :implement
     return false;

@@ -41,11 +41,15 @@ struct ValueStatus {
     }
     __host__ __device__ ValueStatus &operator=(const ValueStatus &val) {
         value = val.value;
+        original_value = val.original_value;
         is_warm = val.is_warm;
         return *this;
     }
     __host__ __device__ void print() {
+        printf("value: ");
         value.print();
+        printf("original value: ");
+        original_value.print();
         printf(" is_warm: %d\n", is_warm);
     }
 };

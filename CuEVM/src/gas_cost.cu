@@ -160,9 +160,10 @@ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
                                const evm_word_t *key, const evm_word_t *new_value, int32_t &address_index,
                                ValueStatus *&found_value) {
+    // printf("gas used before %lu thread %d\n", gas_used, THREADIDX);
     // get the key warm
     if (state_db->is_warm_key_with_offset(address, key, address_index, found_value) == false) {
-        // printf("cold sstore\n");
+        printf("cold sstore\n");
         gas_used += GAS_COLD_SLOAD;
     }
 
@@ -172,25 +173,34 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
     if (found_value == nullptr)
         blank_storage = true;
     else {
-        // printf("found value %p\n", found_value);
         original_value = &found_value->original_value;
         current_value = &found_value->value;
     }
+    // if (THREADIDX == 0) {
+    //     printf("original value %p\n", original_value);
+    //     if (original_value != nullptr) {
+    //         original_value->print();
+    //     }
+    //     printf("current value %p\n", current_value);
+    //     if (current_value != nullptr) {
+    //         current_value->print();
+    //     }
 
-    // printf("original value %p\n", original_value);
-    // if (original_value != nullptr) {
-    //     original_value->print();
-    // }
-    // printf("current value %p\n", current_value);
-    // if (current_value != nullptr) {
-    //     current_value->print();
-    // }
-    // printf("new value %p\n", new_value);
-    // if (new_value != nullptr) {
     //     new_value->print();
     // }
-    // new_value->print();
+    // __syncthreads();
+    // if (THREADIDX == 1) {
+    //     printf("original value %p\n", original_value);
+    //     if (original_value != nullptr) {
+    //         original_value->print();
+    //     }
+    //     printf("current value %p\n", current_value);
+    //     if (current_value != nullptr) {
+    //         current_value->print();
+    //     }
 
+    //     new_value->print();
+    // }
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
@@ -226,6 +236,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
             }
         }
     }
+    printf("gas used after %lu thread %d\n", gas_used, THREADIDX);
     return ERROR_SUCCESS;
 }
 
