@@ -1,9 +1,9 @@
 #pragma once
 
 #include <CuEVM/core/byte_array.cuh>
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
-
 namespace CuEVM {
 namespace memory {
 // to change for making more optimal memory allocation current 1KB
@@ -24,7 +24,9 @@ struct evm_memory_t {
     __host__ __device__ evm_memory_t() : preallocated_base_offset(0), size(0) { memory_cost = 0; }
 
     __device__ void init(uint32_t preallocated_base_offset) {
-        this->preallocated_base_offset = preallocated_base_offset;
+        // printf("init memory preallocated_base_offset %d\n", preallocated_base_offset);
+        // printf("memory pointer %p\n", this);
+        this->preallocated_base_offset = min(preallocated_base_offset, memory_prealloc_size);
         this->size = 0;
         this->memory_cost = 0;
         this->dynamic_data = nullptr;

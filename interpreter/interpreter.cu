@@ -53,6 +53,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     if (test_json != nullptr) {
         auto start_cpu = std::chrono::high_resolution_clock::now();
         uint32_t num_accounts = 0;
+
         CuEVM::get_evm_instances(instances_data, test_json, num_instances, num_accounts, clones);
         CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
         printf("num_accounts: %d\n", num_accounts);
@@ -101,7 +102,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 int main(int argc, char *argv[]) {  // getting the input
     char *read_json_filename = NULL;
     char *write_json_filename = NULL;
-    size_t clones = 1;
+    size_t clones = 2;
     bool verbose = false;  // Verbose flag
     static struct option long_options[] = {{"input", required_argument, 0, 'i'},
                                            {"output", optional_argument, 0, 'o'},

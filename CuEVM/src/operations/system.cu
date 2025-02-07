@@ -73,8 +73,7 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
             cached_state.gas_used += GAS_NEW_ACCOUNT;
         };
     }
-    // printf("gas used %lu\n", cached_state.gas_used);
-    // printf("gas limit %lu\n", cached_state.gas_limit);
+
     // max gas call, gas_sent_with_call
     gas_t gas_capped = CuEVM::gas_cost::max_gas_call(cached_state.gas_limit, cached_state.gas_used);
     // printf("gas capped %lu\n", gas_capped);
@@ -140,11 +139,11 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
     int32_t error_code = CuEVM::gas_cost::memory_grow_cost(current_context->memory_ptr, memory_offset_ui32, length_ui32,
                                                            memory_expansion_cost, cached_state.gas_used);
 
-    printf("memory expansion cost %lu\n", memory_expansion_cost);
-    printf("gas used %lu\n", cached_state.gas_used);
+    // printf("memory expansion cost %lu\n", memory_expansion_cost);
+    // printf("gas used %lu\n", cached_state.gas_used);
     // compute the initcode gas cost
     CuEVM::gas_cost::initcode_cost(cached_state.gas_used, uint256_get_uint32_t(length));
-    printf("gas used %lu, length %u\n", cached_state.gas_used, uint256_get_uint32_t(length));
+    // printf("gas used %lu, length %u\n", cached_state.gas_used, uint256_get_uint32_t(length));
     evm_word_t salt;
     if (opcode == OP_CREATE2) {
         error_code |= cached_state.stack_ptr->pop(salt);
@@ -543,17 +542,9 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         }
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
-            evm_word_t *recipient_balance = global_state_db_ptr->get_balance(&recipient);
-
-            if (recipient_balance != nullptr) {
-                uint256_add(recipient_balance, recipient_balance, sender_balance);
-                global_state_db_ptr->update_balance(call_context->depth, &recipient, recipient_balance);
-            } else {
-                global_state_db_ptr->update_balance(call_context->depth, &recipient, sender_balance);
-            }
-
+            global_state_db_ptr->increase_balance(call_context->depth, &recipient, sender_balance);
             sender_balance->set_zero();
-            global_state_db_ptr->update_balance(call_context->depth, &call_context->to, sender_balance);
+            global_state_db_ptr->set_balance(call_context->depth, &call_context->to, sender_balance);
             // receiver = self => 0 balance
             call_context->parent->dynamic_ret_size = 0;
             error_code |= ERROR_RETURN;

@@ -25,11 +25,11 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
     evm.run(cached_call_state);
 
 #ifdef EIP_3155
-    if (instance == 0) {
-        evm.tracer_ptr->print_err();
-    }
+    // if (instance == 0) {
+    //     evm.tracer_ptr->print_err();
+    // }
     __syncthreads();
-    if (instance == 10) {
+    if (instance == 1) {
         printf("\n\ninstance 10\n\n");
         evm.tracer_ptr->print_err();
     }
@@ -220,20 +220,25 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                                     cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        if (INSTANCE_GLOBAL_IDX == 0) {
-            printf("\nInstance %d, pc: %d opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
-                   INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
-                   cached_call_state.gas_limit, cached_call_state.gas_used);
+        // if (INSTANCE_GLOBAL_IDX == 0) {
+        //     printf(
+        //         "\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n
+        //         ",
+        //         INSTANCE_GLOBAL_IDX,
+        //         cached_call_state.pc, opcode, call_state_ptr->depth, call_state_ptr->memory_ptr->size,
+        //         cached_call_state.stack_ptr->stack_offset, cached_call_state.gas_limit, cached_call_state.gas_used);
 
-            // printf("\n\n");
-            // cached_call_state.stack_ptr->print();
-        }
+        //     // printf("\n\n");
+        //     // cached_call_state.stack_ptr->print();
+        // }
         // if (INSTANCE_GLOBAL_IDX == 1) {
-        //     printf("instance %d, pc: %d, opcode: %d, depth %d, thread %d gas_limit %lu gas_used %lu\n",
-        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth, THREADIDX,
+        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n
+        //     ",
+        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
         //            cached_call_state.gas_limit, cached_call_state.gas_used);
-        //     printf("\n\n");
-        //     cached_call_state.stack_ptr->print();
+        //     // printf("\n\n");
+        //     // cached_call_state.stack_ptr->print();
         // }
 
 #ifdef BUILD_LIBRARY
@@ -621,7 +626,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         // increase program counter
         cached_call_state.pc++;
 #ifdef EIP_3155
-        // printf("finish operation, gas used %lu\n", cached_call_state.gas_used);
+        // printf("finish operation, gas used %lu error_code %d\n", cached_call_state.gas_used, error_code);
         tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
 
 #endif

@@ -105,9 +105,12 @@ class StateDb {
                                            const uint32_t nonce, const uint32_t code_size, uint8_t *code);
     __device__ void update_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
                                    const uint32_t nonce);
+    // shortcuts to avoid search for balance location multiple times
     __device__ int32_t deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount);
-    __device__ void update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
-                                   bool is_warm = true);
+    __device__ void set_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                bool is_warm = true);
+    __device__ void increase_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                     bool is_warm = true);
     __device__ void update_nonce(const uint16_t depth, const evm_word_t *address, const uint32_t nonce);
     __device__ void update_code(const uint16_t depth, const evm_word_t *address, const uint32_t code_size,
                                 uint8_t *code);
@@ -139,7 +142,7 @@ class StateDb {
                                                         ValueStatus *found_value, bool set_warm);
     __device__ ValueStatus *get_value_status(const evm_word_t *address, const evm_word_t *key) const;
     __device__ ValueStatus *get_value_status(const int32_t address_index, const evm_word_t *key) const;
-    __device__ bool is_warm_account(const evm_word_t *address) const;
+    __device__ bool is_warm_account(const evm_word_t *address, bool set_warm = false);
     __device__ bool is_warm_key(const evm_word_t *address, const evm_word_t *key) const;
     __device__ bool is_warm_key_with_offset(const evm_word_t *address, const evm_word_t *key, int32_t &address_index,
                                             ValueStatus *&found_value);

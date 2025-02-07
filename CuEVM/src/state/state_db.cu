@@ -358,8 +358,8 @@ __device__ void StateDb::update_code(const uint16_t depth, const evm_word_t *add
     dynamic_account->code_size = code_size;
     dynamic_account->code = code;
 }
-__device__ void StateDb::update_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
-                                        bool is_warm) {
+__device__ void StateDb::set_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                     bool is_warm) {
     // printf("update balance thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
@@ -374,13 +374,31 @@ __device__ void StateDb::update_balance(const uint16_t depth, const evm_word_t *
     account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX] = *balance;
     account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
 }
+
+__device__ void StateDb::increase_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
+                                          bool is_warm) {
+    // printf("update balance thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
+    int32_t address_index = get_address_index(address);
+    if (address_index == -1) {
+        DynamicAccount *dynamic_account = get_dynamic_account(address);
+        if (dynamic_account == nullptr) {
+            dynamic_account = StateDb::new_account(depth, address, balance, 0, 0, nullptr);
+        }
+        dynamic_account->balance = *balance;
+        dynamic_account->is_warm = is_warm;
+        return;
+    }
+    uint256_add(&account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX],
+                &account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX], balance);
+    account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
+}
 // shortcut for deducting balance
 __device__ int32_t StateDb::deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount) {
     // printf("deduct balance thread %d\n", INSTANCE_GLOBAL_IDX);
-    address->print();
+    // address->print();
 
     int32_t address_index = get_address_index(address);
-    // printf("address index %d\n", address_index);
+    // printf("address index %d instance %d\n", address_index, INSTANCE_GLOBAL_IDX);
     evm_word_t *current_balance;
     if (address_index == -1) {
         DynamicAccount *dynamic_account = get_dynamic_account(address);
@@ -391,11 +409,16 @@ __device__ int32_t StateDb::deduct_balance(const uint16_t depth, const evm_word_
     } else {
         current_balance = &account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX];
     }
-    // printf("current balance\n");
-    // current_balance->print();
-    // printf("amount\n");
-    // amount->print();
+    // if (INSTANCE_GLOBAL_IDX == 0) {
+    //     printf("deduct balance\n");
+    //     address->print();
+    //     printf("current balance\n");
+    //     current_balance->print();
+    //     printf("amount\n");
+    //     amount->print();
+    // }
     if (uint256_cmp(current_balance, amount) < 0) {
+        // printf("deduct balance insufficient funds instance %d\n", INSTANCE_GLOBAL_IDX);
         return ERROR_INSUFFICIENT_FUNDS;
     }
     uint256_sub(current_balance, current_balance, amount);
@@ -420,7 +443,7 @@ __device__ int32_t StateDb::transfer(const uint16_t depth, const evm_word_t *sen
     int32_t error_code = deduct_balance(depth, sender, value);
     // printf("transfer error code %d\n", error_code);
     if (error_code != ERROR_SUCCESS) return error_code;
-    update_balance(depth, recipient, value);
+    increase_balance(depth, recipient, value);
     return ERROR_SUCCESS;
 }
 
@@ -739,7 +762,7 @@ __device__ void StateDb::set_warm_key(const evm_word_t *address, const evm_word_
     // todo :implement
 }
 
-__device__ bool StateDb::is_warm_account(const evm_word_t *address) const {
+__device__ bool StateDb::is_warm_account(const evm_word_t *address, bool set_warm) {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
         if (uint256_cmp_word(address, CuEVM::no_precompile_contracts) == -1)
@@ -748,10 +771,20 @@ __device__ bool StateDb::is_warm_account(const evm_word_t *address) const {
         if (dynamic_account == nullptr) {
             return false;
         } else {
+            if (set_warm) {
+                bool temp = dynamic_account->is_warm;
+                dynamic_account->is_warm = set_warm;
+                return temp;
+            }
             return dynamic_account->is_warm;
         }
     }
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    if (set_warm) {
+        bool temp = account_is_warm[instance_idx];
+        account_is_warm[instance_idx] = set_warm;
+        return temp;
+    }
     return account_is_warm[instance_idx];
 }
 
@@ -995,13 +1028,15 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
         state_db->contract_index[idx] = -1;
         // set the balance
         balance_json = cJSON_GetObjectItemCaseSensitive(account_json, "balance");
-        state_db->account_balances[idx].from_hex(balance_json->valuestring);
 
         // set the nonce
         nonce_json = cJSON_GetObjectItemCaseSensitive(account_json, "nonce");
         evm_word_t nonce;
         nonce.from_hex(nonce_json->valuestring);
-        state_db->account_nonces[idx] = uint256_get_uint32_t(&nonce);
+
+        state_db->account_nonces[idx * num_states] = uint256_get_uint32_t(&nonce);
+        state_db->account_balances[idx * num_states].from_hex(balance_json->valuestring);
+
         byte_array_t byte_code;
         byte_code.from_hex(cJSON_GetObjectItemCaseSensitive(account_json, "code")->valuestring, LITTLE_ENDIAN,
                            NO_PADDING);
@@ -1023,9 +1058,10 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
                 state_db->contract_index[idx] = state_db->num_contracts;
                 state_db->num_contracts++;
             }
-            for (uint32_t i = 0; i < num_states; i++) {
-                state_db->account_storage_size[idx * num_states + i] = storage_size;
-            }
+            state_db->account_storage_size[idx * num_states] = storage_size;
+            // for (uint32_t i = 0; i < num_states; i++) {
+            //     state_db->account_storage_size[idx * num_states + i] = storage_size;
+            // }
             state_db->num_storage_elements += state_db->account_storage_size[idx * num_states];
             // allocate new page per account
             if (storage_size > account_prealloc_keys_size) {
@@ -1035,7 +1071,14 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
                 break;
             }
         } else
-            memset(&state_db->account_storage_size[idx * num_states], 0, num_states * sizeof(uint32_t));
+            state_db->account_storage_size[idx * num_states] = 0;
+        // memset(&state_db->account_storage_size[idx * num_states], 0, num_states * sizeof(uint32_t));
+        // clones to num_states
+        for (uint32_t i = 0; i < num_states; i++) {
+            state_db->account_storage_size[idx * num_states + i] = state_db->account_storage_size[idx * num_states];
+            state_db->account_balances[idx * num_states + i] = state_db->account_balances[idx * num_states];
+            state_db->account_nonces[idx * num_states + i] = state_db->account_nonces[idx * num_states];
+        }
 
         for (uint32_t i = 0; i < state_db->account_storage_size[idx * num_states]; i++) {
             cJSON *storage_element_json = cJSON_GetArrayItem(storage_json, i);
@@ -1112,12 +1155,13 @@ __host__ __device__ void StateDb::print() {
         printf("\n\n address: \n");
         address_list[i].print();
         printf("balance: \n");
-        account_balances[i].print();
-        printf("nonce: %d\n", account_nonces[i]);
-        if (account_storage_size[i] > 0) {
-            printf("keys size %d\n", account_storage_size[i]);
+        account_balances[i * num_states].print();
+        printf("nonce: %d\n", account_nonces[i * num_states]);
+        uint32_t account_storage_size_i = account_storage_size[i * num_states];
+        if (account_storage_size_i > 0) {
+            printf("keys size %d\n", account_storage_size_i);
             uint32_t contract_idx = contract_index[i];
-            for (uint32_t j = 0; j < account_storage_size[i]; j++) {
+            for (uint32_t j = 0; j < account_storage_size_i; j++) {
                 printf("\n key: \n");
                 prealloc_keys_pool[(account_prealloc_keys_size * contract_idx + j) * num_states].print();
                 printf("value: \n");
@@ -1125,8 +1169,8 @@ __host__ __device__ void StateDb::print() {
             }
             if (num_states > 1) {
                 printf("\n state 2 \n");
-                printf("keys size %d\n", account_storage_size[i]);
-                for (uint32_t j = 0; j < account_storage_size[i]; j++) {
+                printf("keys size %d\n", account_storage_size_i);
+                for (uint32_t j = 0; j < account_storage_size_i; j++) {
                     printf("\n key: \n");
                     prealloc_keys_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + 1].print();
                     printf("value: \n");

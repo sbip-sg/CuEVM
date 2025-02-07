@@ -29,7 +29,7 @@
 #ifdef __CUDA_ARCH__
 #define THREADIDX threadIdx.x
 #define INSTANCE_BLK_IDX threadIdx.x
-#define INSTANCE_GLOBAL_IDX threadIdx.x + blockIdx.x *blockDim.x
+#define INSTANCE_GLOBAL_IDX (threadIdx.x + blockIdx.x * blockDim.x)
 #else
 #define INSTANCE_BLK_IDX 0
 #define INSTANCE_GLOBAL_IDX 0

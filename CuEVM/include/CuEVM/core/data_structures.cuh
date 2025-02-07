@@ -8,7 +8,8 @@ constexpr uint32_t account_prealloc_keys_size = 4;  // configurable keys per acc
 constexpr uint32_t value_page_size = 16;
 constexpr uint32_t account_page_size = 16;
 
-constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
+// constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
+constexpr uint32_t memory_prealloc_size = 1024;  // prealloc 1 page + page size for all dynamic pages
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
 

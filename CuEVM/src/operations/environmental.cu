@@ -137,8 +137,11 @@ __device__ int32_t CALLDATALOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
                 error_code |=
                     stack.pushx(CuEVM::word_size, call_context->call_data + data_offset_ui32, CuEVM::word_size);
             } else {
-                error_code |= stack.pushx(remaining_call_data_size, call_context->call_data + data_offset_ui32,
-                                          remaining_call_data_size);
+                // padd zero
+                uint8_t zero_padding[CuEVM::word_size];
+                memset(zero_padding, 0, CuEVM::word_size);
+                memcpy(zero_padding, call_context->call_data + data_offset_ui32, remaining_call_data_size);
+                error_code |= stack.pushx(remaining_call_data_size, zero_padding, CuEVM::word_size);
             }
         }
     }

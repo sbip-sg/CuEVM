@@ -147,7 +147,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     if (parent->memory_ptr != nullptr) {
         this->memory_ptr->init(parent->memory_ptr->preallocated_base_offset + parent->memory_ptr->size);
     } else {
-        this->memory_ptr->init(0);  // no more prealloc after this point
+        this->memory_ptr->init(0);
     }
     // this->memory_ptr = new CuEVM::evm_memory_t();
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
@@ -157,38 +157,49 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
 
 __device__ void evm_call_context_t::copy_return_data_to_memory(uint32_t memory_offset, uint32_t data_offset,
                                                                uint32_t size) {
-    memory_ptr->set_buffer_data(return_data, data_offset, size, memory_offset, size);
+    uint8_t* preallocated_base =
+        CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
+
+    if (dynamic_ret_size <= memory_pool_return_data_preallocate) {
+        memory_ptr->set_buffer_data(preallocated_base, data_offset, size, memory_offset, size);
+    } else {
+        memory_ptr->set_buffer_data(return_data, data_offset, size, memory_offset, size);
+        // memory_ptr->set_buffer_data(preallocated_base, data_offset, memory_pool_return_data_preallocate,
+        // memory_offset,
+        //                             memory_pool_return_data_preallocate);
+        // memory_ptr->set_buffer_data(return_data, 0, dynamic_ret_size - memory_pool_return_data_preallocate,
+        //                             memory_offset + memory_pool_return_data_preallocate,
+        //                             size + data_offset - memory_pool_return_data_preallocate);
+    }
 }
 
 __device__ void evm_call_context_t::copy_return_data(uint8_t* dest, uint32_t data_offset, uint32_t size) {
     // printf(" copy_return_data dest %p, data_offset %d , size %d, dynamic_ret_size %d return_data %p\n", dest,
     //        data_offset, size, dynamic_ret_size, return_data);
+    if (size == 0) {
+        return;
+    }
     if (dynamic_ret_size == 0) {
         // printf("copy_return_data dynamic_ret_size == 0\n");
         memset(dest, 0, size);
     } else {
         uint8_t* preallocated_base = CuEVM::memory_pool::preallocated_return_data_base +
                                      INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
+
         if (size + data_offset > dynamic_ret_size) {
             // printf("copy_return_data size > dynamic_ret_size\n");
             memset(dest + dynamic_ret_size, 0, size - dynamic_ret_size);
             size = dynamic_ret_size - data_offset;
         }
-        if (size + data_offset <= memory_pool_return_data_preallocate) {
-            // printf("copy_return_data size <= memory_pool_return_data_preallocate\n");
+        if (dynamic_ret_size <= memory_pool_return_data_preallocate) {
             memcpy(dest, preallocated_base + data_offset, size);
         } else {
-            // printf("copy_return_data size > memory_pool_return_data_preallocate\n");
-            memcpy(dest, preallocated_base + data_offset, memory_pool_return_data_preallocate);
-            memcpy(dest + memory_pool_return_data_preallocate, return_data,
-                   size + data_offset - memory_pool_return_data_preallocate);
+            // memcpy(dest, preallocated_base + data_offset, memory_pool_return_data_preallocate);
+            // memcpy(dest + memory_pool_return_data_preallocate, return_data,
+            //        size + data_offset - memory_pool_return_data_preallocate);
+            memcpy(dest, return_data + data_offset, size);
         }
     }
-    // printf("copy_return_data end\n");
-    // for (uint32_t i = 0; i < size; i++) {
-    //     printf("%x ", dest[i]);
-    // }
-    // printf("\n");
 }
 __device__ void evm_call_context_t::set_parent_return_data(uint8_t* data, uint32_t size) {
     if (size == 0 || parent == nullptr) return;
@@ -199,49 +210,72 @@ __device__ void evm_call_context_t::set_parent_return_data(uint8_t* data, uint32
         CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
 
     if (size <= memory_pool_return_data_preallocate) {
-        // printf("size <= memory_pool_return_data_preallocate\n");
         memcpy(preallocated_base, data, size);
+
     } else {
         // Copy what fits in preallocated space
-        memcpy(preallocated_base, data, memory_pool_return_data_preallocate);
+        // memcpy(preallocated_base, data, memory_pool_return_data_preallocate);
+        // // Allocate and copy remaining data
+        // uint32_t remaining_size = size - memory_pool_return_data_preallocate;
 
-        // Allocate and copy remaining data
-        uint32_t remaining_size = size - memory_pool_return_data_preallocate;
         if (parent->return_data != nullptr) {
             delete[] parent->return_data;
         }
-        parent->return_data = new uint8_t[remaining_size];
-        memcpy(parent->return_data, data + memory_pool_return_data_preallocate, remaining_size);
+        parent->return_data = new uint8_t[size];
+        memory_ptr->copy(0, size, parent->return_data);
     }
 }
 __device__ void evm_call_context_t::set_parent_return_data(uint32_t offset, uint32_t size) {
     if (size == 0 || parent == nullptr) return;
-    // printf("set_parent_return_data %u %u\n", offset, size);
+
     parent->dynamic_ret_size = size;
     dynamic_ret_size = size;
-    uint8_t* source_data;
-    memory_ptr->get(offset, size, source_data);
-    // printf("source_data %p\n", source_data);
-    uint8_t* preallocated_base =
-        CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
+    // TODO: reimplement
 
     if (size <= memory_pool_return_data_preallocate) {
-        // printf("size <= memory_pool_return_data_preallocate\n");
-        memcpy(preallocated_base, source_data, size);
-    } else {
-        // Copy what fits in preallocated space
-        memcpy(preallocated_base, source_data, memory_pool_return_data_preallocate);
+        uint8_t* preallocated_base = CuEVM::memory_pool::preallocated_return_data_base +
+                                     INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
+        // printf("preallocated_base %p lobal idx %d %d %d thread %d\n", preallocated_base, INSTANCE_GLOBAL_IDX,
+        //        memory_pool_return_data_preallocate, INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate,
+        //        THREADIDX);
+        memory_ptr->copy(offset, size, preallocated_base);
 
-        // Allocate and copy remaining data
-        uint32_t remaining_size = size - memory_pool_return_data_preallocate;
-        uint8_t* new_return_data = parent->return_data;
-        if (new_return_data != nullptr) {
-            delete[] new_return_data;
+    } else {
+        uint8_t* new_return_data = new uint8_t[size];
+        memory_ptr->copy(offset, size, new_return_data);
+        if (parent->return_data != nullptr) {
+            delete[] parent->return_data;
         }
-        new_return_data = new uint8_t[remaining_size];
-        memcpy(new_return_data, source_data + memory_pool_return_data_preallocate, remaining_size);
         parent->return_data = new_return_data;
     }
+
+    // if (offset + size + memory_ptr->preallocated_base_offset <= memory_prealloc_size) {
+
+    // }
+    // uint8_t* source_data;
+    // memory_ptr->get(offset, size, source_data);
+    // // printf("source_data %p\n", source_data);
+    // uint8_t* preallocated_base =
+    //     CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX *
+    //     memory_pool_return_data_preallocate;
+
+    // if (size <= memory_pool_return_data_preallocate) {
+    //     // printf("size <= memory_pool_return_data_preallocate\n");
+    //     memcpy(preallocated_base, source_data, size);
+    // } else {
+    //     // Copy what fits in preallocated space
+    //     memcpy(preallocated_base, source_data, memory_pool_return_data_preallocate);
+
+    //     // Allocate and copy remaining data
+    //     uint32_t remaining_size = size - memory_pool_return_data_preallocate;
+    //     uint8_t* new_return_data = parent->return_data;
+    //     if (new_return_data != nullptr) {
+    //         delete[] new_return_data;
+    //     }
+    //     new_return_data = new uint8_t[remaining_size];
+    //     memcpy(new_return_data, source_data + memory_pool_return_data_preallocate, remaining_size);
+    //     parent->return_data = new_return_data;
+    // }
 }
 
 __device__ void evm_call_context_t::print_return_data() const {

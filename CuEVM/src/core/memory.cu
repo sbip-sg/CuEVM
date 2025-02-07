@@ -1,4 +1,4 @@
-#include <CuEVM/core/data_structures.cuh>
+
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 namespace CuEVM::memory {
@@ -28,11 +28,15 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
             // no need to allocate new page
 
         } else {
-            printf("instance %u dynamic memory allocation new size %u size %u\n", INSTANCE_GLOBAL_IDX, new_size, size);
+#ifdef EIP_3155
+            printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
+                   INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
+#endif
             // allocate new page
-            uint8_t *new_data = new uint8_t[new_size - memory_prealloc_size];
+            uint8_t *new_data = new uint8_t[new_size + preallocated_base_offset - memory_prealloc_size];
+
             if (dynamic_data != nullptr) {
-                memcpy(new_data, dynamic_data, size - memory_prealloc_size);
+                memcpy(new_data, dynamic_data, size + preallocated_base_offset - memory_prealloc_size);
                 delete[] dynamic_data;
             }
             dynamic_data = new_data;
@@ -48,7 +52,7 @@ __device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&
         data_ = nullptr;
         return error_code;
     }
-
+    // printf("memory get index %u length %eu\n", index, length);
     // Ensure the memory is grown to cover up to index+length.
     error_code |= grow(index + length);
     if (error_code != ERROR_SUCCESS) {
@@ -63,6 +67,7 @@ __device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&
     if (total_offset + length <= memory_prealloc_size) {
         data_ = &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
     } else {
+        printf("memory get total_offset + length > memory_prealloc_size\n");
         // The requested block spans the preallocated area and the dynamic area (or is entirely in dynamic)
         // Allocate a new buffer to hold the returned data.
         if (data_ == nullptr) data_ = new uint8_t[length];
@@ -78,13 +83,14 @@ __device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&
                    &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset],
                    prealloc_bytes);
         }
-
+        //
         // Copy the remaining portion from the dynamic memory.
         uint32_t dynamic_bytes = length - prealloc_bytes;
         if (dynamic_bytes > 0) {
             // The dynamic_data pointer holds bytes starting from offset memory_prealloc_size.
             // Compute the corresponding offset into dynamic_data.
             uint32_t dynamic_offset = (total_offset + prealloc_bytes) - memory_prealloc_size;
+            // printf("dynamic_offset %u dynamic_bytes %u\n", dynamic_offset, dynamic_bytes);
             memcpy(data_ + prealloc_bytes, dynamic_data + dynamic_offset, dynamic_bytes);
         }
     }
@@ -111,7 +117,9 @@ __device__ int32_t evm_memory_t::copy(uint32_t index, uint32_t length, uint8_t *
     // If the entire requested block fits within the preallocated memory,
     // note the boundary check now uses <= to include the case where the block exactly fits.
     if (total_offset + length <= memory_prealloc_size) {
-        data_ = &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
+        // data_ = &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
+        memcpy(data_, &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset],
+               length);
     } else {
         // The requested block spans the preallocated area and the dynamic area (or is entirely in dynamic)
         // Allocate a new buffer to hold the returned data.
@@ -177,9 +185,7 @@ __device__ int32_t evm_memory_t::set(uint8_t *data_, uint32_t data_size, const u
     uint32_t available_prealloc = (total_offset < memory_prealloc_size) ? (memory_prealloc_size - total_offset) : 0;
     uint32_t prealloc_bytes = (length < available_prealloc) ? length : available_prealloc;
     uint32_t dynamic_bytes = length - prealloc_bytes;
-    if (dynamic_bytes > 0 && dynamic_data == nullptr) {
-        printf("instance %u set dynamic_data is nullptr\n", INSTANCE_GLOBAL_IDX);
-    }
+
     // Write into the preallocated region.
     uint8_t *prealloc_dest =
         &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];

@@ -62,6 +62,9 @@ __device__ int32_t evm_stack_t::push_uint64(uint64_t value) {
         evm_word_t *dest = top();
         dest->words[0] = value;
         dest->words[1] = value >> 32;
+        for (uint8_t i = 2; i < UINT256_WORDS; i++) {
+            dest->words[i] = 0;
+        }
         stack_offset++;
         return ERROR_SUCCESS;
     } else {

@@ -141,8 +141,9 @@ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
     gas_used += GAS_PRECOMPILE_ECPAIRING + data_size / 192 * GAS_PRECOMPILE_ECPAIRING_PAIR;
 }
 
-__device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address) {
-    if (state_db->is_warm_account(address)) {
+__device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
+                                       bool set_warm) {
+    if (state_db->is_warm_account(address, set_warm)) {
         // printf("warm account\n");
         gas_used += GAS_WARM_ACCESS;
     } else {
