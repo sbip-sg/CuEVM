@@ -100,15 +100,18 @@ __device__ int32_t operation_RIPEMD160(gas_t &gas_limit, gas_t &gas_used, CuEVM:
 
 __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context) {
     evm_word_t base_size, exponent_size, modulus_size;
-    // TODO: fix this
-    // CuEVM::byte_array_t input_data(message->get_data(), 0, 96);
-    byte_array_t bsize_array = byte_array_t(call_context->call_data, 32);
-    byte_array_t esize_array = byte_array_t(call_context->call_data + 32, 32);
-    byte_array_t msize_array = byte_array_t(call_context->call_data + 64, 32);
+    uint8_t all_input_data[96];
+    for (int i = 0; i < 96; i++) {
+        if (i < call_context->call_data_size) {
+            all_input_data[i] = call_context->call_data[i];
+        } else {
+            all_input_data[i] = 0;
+        }
+    }
 
-    uint256_from_bytes(&base_size, bsize_array.data, bsize_array.size);
-    uint256_from_bytes(&exponent_size, esize_array.data, esize_array.size);
-    uint256_from_bytes(&modulus_size, msize_array.data, msize_array.size);
+    uint256_from_bytes(&base_size, all_input_data, 32);
+    uint256_from_bytes(&exponent_size, all_input_data + 32, 32);
+    uint256_from_bytes(&modulus_size, all_input_data + 64, 32);
 
     int32_t error = ERROR_SUCCESS;
 
@@ -203,17 +206,17 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     }
 
     bool base_is_zero = true;
-    // uint8_t base_data[32] = {0};
-    byte_array_t base_data = byte_array_t(base_len);
+
+    uint8_t *base_data = new uint8_t[base_len];
     for (uint32_t i = 0; i < base_len; i++) {
         auto idx = 96 + i;
         if (idx < data_len) {
-            base_data.data[i] = call_context->call_data[idx];
+            base_data[i] = call_context->call_data[idx];
         } else {
-            break;
+            base_data[i] = 0;
         }
 
-        if (base_data.data[i] != 0) {
+        if (base_data[i] != 0) {
             base_is_zero = false;
         }
     }
@@ -223,17 +226,17 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     }
 
     // uint8_t *mod_data = new uint8_t[mod_len];
-    byte_array_t mod_data = byte_array_t(mod_len);
+    uint8_t *mod_data = new uint8_t[mod_len];
     // loop and check for zero, if zero, then return 0
     bool mod_is_one = true;
     bool mod_is_zero = true;
     for (uint32_t i = 0; i < mod_len; i++) {
         auto idx = 96 + base_len + exp_len + i;
-        mod_data.data[i] = (idx < data_len) ? call_context->call_data[idx] : 0;
+        mod_data[i] = (idx < data_len) ? call_context->call_data[idx] : 0;
 
-        if (mod_data.data[i] != 0) {
+        if (mod_data[i] != 0) {
             mod_is_zero = false;
-            if (mod_data.data[i] != 1 || i != mod_len - 1) {
+            if (mod_data[i] != 1 || i != mod_len - 1) {
                 mod_is_one = false;
             }
         } else if (i == mod_len - 1) {
@@ -267,7 +270,7 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     // early return special cases
     if (mod_is_zero) {
         if (mod_len != 0) {
-            call_context->set_parent_return_data(mod_data.data, mod_len);
+            call_context->set_parent_return_data(mod_data, mod_len);
         } else if (call_context->parent != nullptr) {
             call_context->parent->dynamic_ret_size = 0;
         }
@@ -276,12 +279,12 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 
     if (exp_is_zero) {
         for (uint32_t i = 0; i < mod_len; i++) {
-            mod_data.data[i] = 0;
+            mod_data[i] = 0;
         }
         if (!mod_is_one) {
-            mod_data.data[mod_len - 1] = 1;  // return 1
+            mod_data[mod_len - 1] = 1;  // return 1
         }
-        call_context->set_parent_return_data(mod_data.data, mod_len);
+        call_context->set_parent_return_data(mod_data, mod_len);
         delete[] e_data;
         return ERROR_RETURN;
     }
@@ -289,15 +292,17 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     // convert to bigint values
     bigint base_bigint = {}, exponent_bigint = {}, result_bigint = {}, modulus_bigint = {};
 
-    bigint_from_bytes(&base_bigint, base_data.data, base_len);
+    bigint_from_bytes(&base_bigint, base_data, base_len);
     bigint_from_bytes(&exponent_bigint, e_data, exp_len);
-    bigint_from_bytes(&modulus_bigint, mod_data.data, mod_len);
+    bigint_from_bytes(&modulus_bigint, mod_data, mod_len);
     printf("call pow mod\n");
     // make the pow mod operation
     bigint_pow_mod(&result_bigint, &base_bigint, &exponent_bigint, &modulus_bigint);
-    bigint_to_bytes(mod_data.data, &result_bigint, mod_len);
-    call_context->set_parent_return_data(mod_data.data, mod_len);
+    bigint_to_bytes(mod_data, &result_bigint, mod_len);
+    call_context->set_parent_return_data(mod_data, mod_len);
     delete[] e_data;
+    delete[] base_data;
+    delete[] mod_data;
     return ERROR_RETURN;
 }
 
@@ -415,13 +420,15 @@ __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t 
     gas_used += GAS_PRECOMPILE_ECADD;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        CuEVM::byte_array_t input(call_context->call_data, 128);
-
+        uint8_t input[128];
+        for (uint32_t i = 0; i < 128; i++) {
+            input[i] = i < call_context->call_data_size ? call_context->call_data[i] : 0;
+        }
         evm_word_t x1, y1, x2, y2;
-        uint256_from_bytes(&x1, input.data, 32);
-        uint256_from_bytes(&y1, input.data + 32, 32);
-        uint256_from_bytes(&x2, input.data + 64, 32);
-        uint256_from_bytes(&y2, input.data + 96, 32);
+        uint256_from_bytes(&x1, input, 32);
+        uint256_from_bytes(&y1, input + 32, 32);
+        uint256_from_bytes(&x2, input + 64, 32);
+        uint256_from_bytes(&y2, input + 96, 32);
         // print
         // printf("x1: %s\n", ecc::bnt_to_string(arith._env, x1));
         // printf("y1: %s\n", ecc::bnt_to_string(arith._env, y1));
@@ -451,12 +458,14 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t 
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        CuEVM::byte_array_t input(call_context->call_data, 128);
-
+        uint8_t input[96];
+        for (uint32_t i = 0; i < 96; i++) {
+            input[i] = i < call_context->call_data_size ? call_context->call_data[i] : 0;
+        }
         evm_word_t x, y, k;
-        uint256_from_bytes(&x, input.data, 32);
-        uint256_from_bytes(&y, input.data + 32, 32);
-        uint256_from_bytes(&k, input.data + 64, 32);
+        uint256_from_bytes(&x, input, 32);
+        uint256_from_bytes(&y, input + 32, 32);
+        uint256_from_bytes(&k, input + 64, 32);
         // print
         // printf("mul x: %s\n", ecc::bnt_to_string(arith._env, x));
         // printf("mul y: %s\n", ecc::bnt_to_string(arith._env, y));
@@ -488,7 +497,7 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
     printf("ecPairing\n");
     printf("input size %d\n", call_context->call_data_size);
     // input = message.get_data(index, length, size);
-    CuEVM::byte_array_t input(call_context->call_data, call_context->call_data_size);
+
     CuEVM::gas_cost::ecpairing_cost(gas_used, call_context->call_data_size);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);

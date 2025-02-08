@@ -163,7 +163,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
     // printf("gas used before %lu thread %d\n", gas_used, THREADIDX);
     // get the key warm
     if (state_db->is_warm_key_with_offset(address, key, address_index, found_value) == false) {
-        printf("cold sstore\n");
+        // printf("cold sstore\n");
         gas_used += GAS_COLD_SLOAD;
     }
 
@@ -236,7 +236,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
             }
         }
     }
-    printf("gas used after %lu thread %d\n", gas_used, THREADIDX);
+    // printf("gas used after %lu thread %d\n", gas_used, THREADIDX);
     return ERROR_SUCCESS;
 }
 

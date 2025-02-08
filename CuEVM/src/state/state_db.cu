@@ -1,6 +1,6 @@
+#include <CuEVM/core/block_info.cuh>
 #include <CuEVM/state/state_db.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-
 namespace CuEVM {
 
 // return snapshot storage and the offset in the page
@@ -260,19 +260,19 @@ __device__ int32_t StateDb::get_value_offset(uint32_t storage_size, uint32_t con
 __device__ DynamicAccount *StateDb::get_dynamic_account_and_set_warm(const evm_word_t *address) const {
     // TODO: implement
     DynamicAccount *current_account = dynamic_accounts[INSTANCE_GLOBAL_IDX];
-    printf("get dynamic account thread %d, address %p current_account %p\n", INSTANCE_GLOBAL_IDX, address,
-           current_account);
+    // printf("get dynamic account thread %d, address %p current_account %p\n", INSTANCE_GLOBAL_IDX, address,
+    //        current_account);
     while (current_account != nullptr) {
-        printf("current_account address %p\n", current_account->address);
-        current_account->address.print();
+        // printf("current_account address %p\n", current_account->address);
+        // current_account->address.print();
         if (current_account->address == *address) {
             current_account->is_warm = true;
             return current_account;
         }
         current_account = current_account->next_account;
     }
-    printf("End of get dynamic account, failed to find \n");
-    printf("create new dynamic account\n");
+    // printf("End of get dynamic account, failed to find \n");
+    // printf("create new dynamic account\n");
     DynamicAccount *new_acc = new DynamicAccount(address, 0, 0, 0, 0, nullptr);
     new_acc->is_warm = true;
     new_acc->next_account = dynamic_accounts[INSTANCE_GLOBAL_IDX];
@@ -283,17 +283,17 @@ __device__ DynamicAccount *StateDb::get_dynamic_account_and_set_warm(const evm_w
 __device__ DynamicAccount *StateDb::get_dynamic_account(const evm_word_t *address) const {
     // TODO: implement
     DynamicAccount *current_account = dynamic_accounts[INSTANCE_GLOBAL_IDX];
-    printf("get dynamic account thread %d, address %p current_account %p\n", INSTANCE_GLOBAL_IDX, address,
-           current_account);
+    // printf("get dynamic account thread %d, address %p current_account %p\n", INSTANCE_GLOBAL_IDX, address,
+    //        current_account);
     while (current_account != nullptr) {
-        printf("current_account address %p\n", current_account->address);
-        current_account->address.print();
+        // printf("current_account address %p\n", current_account->address);
+        // current_account->address.print();
         if (current_account->address == *address) {
             return current_account;
         }
         current_account = current_account->next_account;
     }
-    printf("End of get dynamic account, failed to find \n");
+    // printf("End of get dynamic account, failed to find \n");
 
     return nullptr;
 }
@@ -301,7 +301,7 @@ __device__ DynamicAccount *StateDb::get_dynamic_account(const evm_word_t *addres
 __device__ DynamicAccount *StateDb::new_account(const uint16_t depth, const evm_word_t *address,
                                                 const evm_word_t *balance, const uint32_t nonce,
                                                 const uint32_t code_size, uint8_t *code) {
-    printf("Create new dynamic accoun \n");
+    // printf("Create new dynamic account \n");
     DynamicAccount *new_acc = new DynamicAccount(address, balance, nonce, 0, code_size, code);
     new_acc->next_account = dynamic_accounts[INSTANCE_GLOBAL_IDX];
     dynamic_accounts[INSTANCE_GLOBAL_IDX] = new_acc;
@@ -393,7 +393,8 @@ __device__ void StateDb::increase_balance(const uint16_t depth, const evm_word_t
     account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
 }
 // shortcut for deducting balance
-__device__ int32_t StateDb::deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount) {
+__device__ int32_t StateDb::deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount,
+                                           bool set_warm) {
     // printf("deduct balance thread %d\n", INSTANCE_GLOBAL_IDX);
     // address->print();
 
@@ -407,6 +408,9 @@ __device__ int32_t StateDb::deduct_balance(const uint16_t depth, const evm_word_
         }
         current_balance = &dynamic_account->balance;
     } else {
+        if (set_warm) {
+            account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = true;
+        }
         current_balance = &account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX];
     }
     // if (INSTANCE_GLOBAL_IDX == 0) {
@@ -422,6 +426,7 @@ __device__ int32_t StateDb::deduct_balance(const uint16_t depth, const evm_word_
         return ERROR_INSUFFICIENT_FUNDS;
     }
     uint256_sub(current_balance, current_balance, amount);
+
     return ERROR_SUCCESS;
 }
 
@@ -660,10 +665,10 @@ __device__ ValueStatus *StateDb::get_value_status(const int32_t address_index, c
     //        INSTANCE_GLOBAL_IDX);
     uint32_t contract_idx = contract_index[address_index];
     uint32_t storage_size = account_storage_size[instance_idx];
-    printf("get_value_status address_index %d, storage_size %d instance %d\n", address_index, storage_size,
-           INSTANCE_GLOBAL_IDX);
+    // printf("get_value_status address_index %d, storage_size %d instance %d\n", address_index, storage_size,
+    //        INSTANCE_GLOBAL_IDX);
     int32_t key_offset = get_value_offset(storage_size, contract_idx, key);
-    printf("get_value_status key_offset %d instance %d\n", key_offset, INSTANCE_GLOBAL_IDX);
+    // printf("get_value_status key_offset %d instance %d\n", key_offset, INSTANCE_GLOBAL_IDX);
 
     if (key_offset == -1) {
         // printf(" not found in prealloc_values_pool, search dynamic storage\n");
@@ -678,7 +683,7 @@ __device__ ValueStatus *StateDb::get_value_status(const int32_t address_index, c
         }
     } else {
         // printf("found in prealloc_values_pool\n");
-        printf("found thread %d key offset %d key %p\n", THREADIDX, key_offset, &prealloc_values_pool[key_offset]);
+        // printf("found thread %d key offset %d key %p\n", THREADIDX, key_offset, &prealloc_values_pool[key_offset]);
         return &prealloc_values_pool[key_offset];
     }
 }
@@ -736,17 +741,23 @@ __device__ uint32_t StateDb::get_nonce(const evm_word_t *address) {
     return account_nonces[address_index * num_states + INSTANCE_GLOBAL_IDX];
 }
 
-__device__ uint8_t *StateDb::get_code(uint32_t &code_size, const evm_word_t *address) {
+__device__ uint8_t *StateDb::get_code(uint32_t &code_size, const evm_word_t *address, bool set_warm) {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
         DynamicAccount *dynamic_account = get_dynamic_account(address);
         if (dynamic_account == nullptr) {
             return nullptr;
         }
+        if (set_warm) {
+            dynamic_account->is_warm = true;
+        }
         return dynamic_account->code;
     }
 
     code_size = account_codes_size[address_index];
+    if (set_warm) {
+        account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = true;
+    }
     return &all_account_codes[account_codes_offset[address_index]];
 }
 
@@ -769,11 +780,13 @@ __device__ void StateDb::set_warm_key(const evm_word_t *address, const evm_word_
 }
 
 __device__ bool StateDb::is_warm_account(const evm_word_t *address, bool set_warm) {
+    if (address->is_precompile()) return true;  // precompile contracts are warm
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
-        if (uint256_cmp_word(address, CuEVM::no_precompile_contracts) == -1)
-            return true;  // precompile contracts are warm
+        // if coinbase is in "pre state" it is set warm before executing kernel
+        if (uint256_cmp(address, &CuEVM::global_block_info->coin_base) == 0) return true;
         DynamicAccount *dynamic_account = get_dynamic_account(address);
+
         if (dynamic_account == nullptr) {
             return false;
         } else {
@@ -1058,6 +1071,12 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
 
         state_db->account_nonces[idx * num_states] = uint256_get_uint32_t(&nonce);
         state_db->account_balances[idx * num_states].from_hex(balance_json->valuestring);
+
+        // TODO: justify if it is appropriate to perform here
+        // if (state_db->address_list[idx] == sender) {
+        //     uint256_sub(&state_db->account_balances[idx * num_states], &state_db->account_balances[idx * num_states],
+        //                 &upfront_cost);
+        // }
 
         byte_array_t byte_code;
         byte_code.from_hex(cJSON_GetObjectItemCaseSensitive(account_json, "code")->valuestring, LITTLE_ENDIAN,

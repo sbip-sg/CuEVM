@@ -24,8 +24,8 @@ __host__ __device__ int32_t evm_word_t::operator==(const evm_word_t &other) cons
 }
 
 __host__ __device__ int32_t evm_word_t::from_hex(const char *hex_string) {
-  uint256_from_hex(this, hex_string);
-  return 0;
+    uint256_from_hex(this, hex_string);
+    return 0;
 }
 
 __device__ int32_t evm_word_t::from_byte_array_t(byte_array_t &byte_array, int32_t endian) {
@@ -48,8 +48,8 @@ __host__ __device__ int32_t evm_word_t::from_uint64_t(uint64_t value) {
 }
 
 __host__ __device__ int32_t evm_word_t::from_uint32_t(uint32_t value) {
-  uint256_from_uint32(this, value);
-  return 0;
+    uint256_from_uint32(this, value);
+    return 0;
 }
 
 __host__ __device__ int32_t evm_word_t_compare(const evm_word_t *a, const evm_word_t *b, uint16_t num_limbs = 8) {
@@ -89,6 +89,16 @@ __host__ __device__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty, u
         }
     }
     return hex_string;
+}
+
+__host__ __device__ bool evm_word_t::is_precompile() const {
+    // address cleaned 160 bits  = 5 limbs
+    for (uint8_t idx = 4; idx > 0; idx--) {
+        if (words[idx] != 0) {
+            return false;
+        }
+    }
+    return words[0] <= CuEVM::no_precompile_contracts && words[0] > 0x00;
 }
 
 __host__ __device__ char *evm_word_t::address_to_hex(char *hex_string, uint32_t count) const {

@@ -153,7 +153,7 @@ __device__ int32_t evm_memory_t::copy(uint32_t index, uint32_t length, uint8_t *
 // If 'src' is nullptr, it simply zeroes the destination.
 __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint32_t src_available, uint32_t bytes) {
     uint32_t to_copy = (src != nullptr) ? ((src_available < bytes) ? src_available : bytes) : 0;
-    printf("copy_with_padding thread %d to_copy %d bytes %d\n", THREADIDX, to_copy, bytes);
+    // printf("copy_with_padding thread %d to_copy %d bytes %d\n", THREADIDX, to_copy, bytes);
     if (src != nullptr && to_copy > 0) {
         memcpy(dest, src, to_copy);
     }
@@ -243,8 +243,8 @@ __device__ int32_t evm_memory_t::set_zero(const uint32_t index, const uint32_t l
 // When source data is not provided (or data_offset is invalid) the target is zero filled.
 __device__ int32_t evm_memory_t::set_buffer_data(uint8_t *data_, uint32_t data_offset, uint32_t data_size,
                                                  const uint32_t index, const uint32_t length) {
-    printf("set_buffer_data thread %d data_offset %d data_size %d index %d length %d\n", THREADIDX, data_offset,
-           data_size, index, length);
+    // printf("set_buffer_data thread %d data_offset %d data_size %d index %d length %d\n", THREADIDX, data_offset,
+    //        data_size, index, length);
     int32_t error_code = ERROR_SUCCESS;
     if (length == 0) return error_code;
 
@@ -261,22 +261,22 @@ __device__ int32_t evm_memory_t::set_buffer_data(uint8_t *data_, uint32_t data_o
     uint32_t available_prealloc = (total_offset < memory_prealloc_size) ? (memory_prealloc_size - total_offset) : 0;
     uint32_t prealloc_bytes = (length < available_prealloc) ? length : available_prealloc;
     uint32_t dynamic_bytes = length - prealloc_bytes;
-    printf("set_buffer_data thread %d total_offset %d available_prealloc %d prealloc_bytes %d dynamic_bytes %d\n",
-           THREADIDX, total_offset, available_prealloc, prealloc_bytes, dynamic_bytes);
+    // printf("set_buffer_data thread %d total_offset %d available_prealloc %d prealloc_bytes %d dynamic_bytes %d\n",
+    //        THREADIDX, total_offset, available_prealloc, prealloc_bytes, dynamic_bytes);
     // For the preallocated region, calculate the available bytes from the buffer.
     uint32_t available_source = (data_offset < data_size) ? (data_size - data_offset) : 0;
     uint8_t *prealloc_dest =
         &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
-    printf("available_source %d\n", available_source);
+    // printf("available_source %d\n", available_source);
     copy_with_padding(prealloc_dest, data_ + data_offset, available_source, prealloc_bytes);
-    printf("after copy_with_padding\n");
-    if (INSTANCE_GLOBAL_IDX == 0) {
-        printf("prealloc_dest\n");
-        for (uint32_t i = 0; i < prealloc_bytes; i++) {
-            printf("%x ", prealloc_dest[i]);
-        }
-        printf("\n");
-    }
+    // printf("after copy_with_padding\n");
+    // if (INSTANCE_GLOBAL_IDX == 0) {
+    //     printf("prealloc_dest\n");
+    //     for (uint32_t i = 0; i < prealloc_bytes; i++) {
+    //         printf("%x ", prealloc_dest[i]);
+    //     }
+    //     printf("\n");
+    // }
     // For the dynamic region, adjust the source pointer and available bytes.
     if (dynamic_bytes > 0) {
         uint32_t dynamic_offset = (total_offset + prealloc_bytes) - memory_prealloc_size;

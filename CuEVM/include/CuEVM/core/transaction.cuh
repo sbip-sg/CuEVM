@@ -269,8 +269,7 @@ __host__ uint32_t no_transactions(const cJSON *json);
  * @return 0 for success, error code for failure.
  */
 __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const cJSON *json,
-                                  uint32_t &transactions_count, uint32_t clones = 1,
-                                  CuEVM::StateDb *state_db_ptr = nullptr);
+                                  uint32_t &transactions_count, uint32_t clones = 1);
 
 /**
  * free the transactions

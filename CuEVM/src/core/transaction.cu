@@ -391,7 +391,7 @@ __host__ uint32_t no_transactions(const cJSON *json) {
 }
 
 __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const cJSON *json,
-                                  uint32_t &transactions_count, uint32_t clones, CuEVM::StateDb *state_db_ptr) {
+                                  uint32_t &transactions_count, uint32_t clones) {
     cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
     uint32_t available_transactions = no_transactions(json);
 
@@ -468,6 +468,7 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     transaction_list_ptr->call_data_size = new uint32_t[transactions_count];
     transaction_list_ptr->gas_limit = new uint64_t[transactions_count];
     transaction_list_ptr->value = new evm_word_t[transactions_count];
+    memset(transaction_list_ptr->value, 0, transactions_count * sizeof(evm_word_t));
 
     uint32_t index, gas_limit_index, value_index, call_data_offset = 0;
     for (uint32_t idx = 0; idx < data_counts; idx++) {
@@ -480,6 +481,7 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         // }
         gas_limit_index = index % gas_limit_counts;
         value_index = index % value_counts;
+
         CuEVM::byte_array_t data_init;
         data_init.from_hex(cJSON_GetArrayItem(data_json, index)->valuestring, LITTLE_ENDIAN,
                            CuEVM::PaddingDirection::NO_PADDING);
@@ -502,9 +504,17 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         tmp.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
         transaction_list_ptr->gas_limit[idx] = uint256_get_uint64_t(&tmp);
         // printf("gas limit uint64_t %lu\n", transaction_list_ptr->gas_limit[idx]);
+        // TODO check if it is appropriate to perform here
+        // if (idx == 0) {
+        //     sender = transaction_list_ptr->sender;
+        //     uint256_mul(&upfront_cost, &tmp, &transaction_list_ptr->gas_price);
+        // }
 
         transaction_list_ptr->value[idx].from_hex(cJSON_GetArrayItem(value_json, value_index)->valuestring);
+
+        transaction_list_ptr->value[idx].print();
     }
+
     // multiply the data
     uint32_t multiplier = transactions_count / data_counts;
     for (uint32_t idx = 1; idx < multiplier; idx++) {
@@ -517,6 +527,7 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         memcpy(&transaction_list_ptr->value[idx * data_counts], transaction_list_ptr->value,
                data_counts * sizeof(evm_word_t));
     }
+
     uint32_t call_data_size = transaction_list_ptr->call_data_offset[transactions_count - 1] +
                               transaction_list_ptr->call_data_size[transactions_count - 1];
     // printf("call_data_size %d\n", call_data_size);

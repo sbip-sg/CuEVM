@@ -106,7 +106,8 @@ class StateDb {
     __device__ void update_account(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
                                    const uint32_t nonce);
     // shortcuts to avoid search for balance location multiple times
-    __device__ int32_t deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount);
+    __device__ int32_t deduct_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *amount,
+                                      bool set_warm = false);
     __device__ void set_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
                                 bool is_warm = true);
     __device__ void increase_balance(const uint16_t depth, const evm_word_t *address, const evm_word_t *balance,
@@ -122,7 +123,7 @@ class StateDb {
     __device__ DynamicAccount *get_dynamic_account(const evm_word_t *address) const;
     __device__ DynamicAccount *get_dynamic_account_and_set_warm(const evm_word_t *address) const;
     __device__ evm_word_t *get_balance(const evm_word_t *address, bool set_warm = false);
-    __device__ uint8_t *get_code(uint32_t &code_size, const evm_word_t *address);
+    __device__ uint8_t *get_code(uint32_t &code_size, const evm_word_t *address, bool set_warm = true);
     __device__ uint32_t get_nonce(const evm_word_t *address);
 
     // Grow storage to store a key, return the pointer to the storage value for dynamic storage

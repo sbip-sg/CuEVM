@@ -133,7 +133,8 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
     gas_t memory_expansion_cost;
     uint32_t memory_offset_ui32 = uint256_get_uint32_t(memory_offset);
     uint32_t length_ui32 = uint256_get_uint32_t(length);
-    if (uint256_cmp_word(memory_offset, memory_offset_ui32) != 0 || uint256_cmp_word(length, length_ui32) != 0) {
+    if ((uint256_cmp_word(memory_offset, memory_offset_ui32) != 0 && !uint256_is_zero(length)) ||
+        uint256_cmp_word(length, length_ui32) != 0) {
         return ERR_MEMORY_INVALID_OFFSET;
     }
     int32_t error_code = CuEVM::gas_cost::memory_grow_cost(current_context->memory_ptr, memory_offset_ui32, length_ui32,
@@ -167,7 +168,8 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         evm_word_t sender_nonce(sender_nonce_uint);
         // Do not get_account after this to reuse sender_account
         if (opcode == OP_CREATE2) {
-            printf("create2 %p %p %p init code size %d\n", &contract_address, &current_context->to, &salt, length_ui32);
+            // printf("create2 %p %p %p init code size %d\n", &contract_address, &current_context->to, &salt,
+            // length_ui32);
             CuEVM::utils::get_contract_address_create2(&contract_address, &current_context->to, &salt,
                                                        initialisation_code, length_ui32);
 
@@ -213,8 +215,10 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
             CuEVM::global_state_db_ptr->update_nonce(current_context->depth, &current_context->to,
                                                      CuEVM::global_state_db_ptr->get_nonce(&current_context->to) + 1);
         }
-        printf("contract address\n");
-        contract_address.print();
+        if (THREADIDX == 1) {
+            printf("CREATE contract address\n");
+            contract_address.print();
+        }
         CuEVM::global_state_db_ptr->update_nonce(current_context->depth, &contract_address, 1);
     }
 
@@ -308,6 +312,9 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
     evm_word_t address = *original_address;
     CuEVM::utils::evm_address_conversion(address);
 
+    // get the account warm result first, get_code will warm up the account
+    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
+
     uint32_t byte_code_size = 0;
     uint8_t *byte_code = CuEVM::global_state_db_ptr->get_code(byte_code_size, &address);
 
@@ -323,8 +330,6 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
                                          current_context->to, *value, OP_CALLCODE, nullptr, 0, byte_code,
                                          byte_code_size, uint256_get_uint32_t(ret_offset),
                                          uint256_get_uint32_t(ret_size), current_context->static_env);
-
-    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
 
     return generic_CALL(args_offset, args_size, current_context->memory_ptr, new_context_ptr, cached_state);
 }
@@ -356,6 +361,8 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
     evm_word_t address = *original_address;
     CuEVM::utils::evm_address_conversion(address);
 
+    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
+
     uint32_t byte_code_size = 0;
     uint8_t *byte_code = CuEVM::global_state_db_ptr->get_code(byte_code_size, &address);
     // if (current_context->depth < memory_pool_call_context_preallocate) {
@@ -378,7 +385,6 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
                                          uint256_get_uint32_t(ret_size), current_context->static_env);
     // printf("new context ptr\n");
     // new_context_ptr->print();
-    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
 
     return generic_CALL(args_offset, args_size, current_context->memory_ptr, new_context_ptr, cached_state);
 }
@@ -546,7 +552,7 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
             sender_balance->set_zero();
             global_state_db_ptr->set_balance(call_context->depth, &call_context->to, sender_balance);
             // receiver = self => 0 balance
-            call_context->parent->dynamic_ret_size = 0;
+            if (call_context->depth > 1) call_context->parent->dynamic_ret_size = 0;
             error_code |= ERROR_RETURN;
         }
     }

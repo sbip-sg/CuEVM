@@ -46,7 +46,6 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
     uint8_t *call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
     uint32_t call_data_size = transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
 
-    transaction_list_ptr->call_data_size[INSTANCE_GLOBAL_IDX];
     CuEVM::evm_stack_t *stack_ptr = memory_pool::get_stack(0);
     // new CuEVM::evm_stack_t(CuEVM::memory_pool::global_memory_pool->stack_base);
 
@@ -84,6 +83,12 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
     CuEVM::gas_t gas_intrinsic;
     CuEVM::gas_cost::transaction_intrinsic_gas(transaction_list_ptr, gas_intrinsic);
     call_state_ptr->gas_used = gas_intrinsic;
+    // deduct upfront cost
+    evm_word_t upfront_cost = transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX];
+
+    uint256_mul(&upfront_cost, &upfront_cost, &transaction_list_ptr->gas_price);
+    global_state_db_ptr->deduct_balance(call_state_ptr->depth, &transaction_list_ptr->sender, &upfront_cost, true);
+    // global_state_db_ptr->set_warm_account(&global_block_info->coin_base);
     // printf("\n\ncall state ptr created %p\n\n", call_state_ptr);
     // call_state_ptr->print();
 #ifdef EIP_3155
@@ -124,7 +129,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     // Dont use account ptr here, byte_code already set
 
     if (call_state_ptr->byte_code_size == 0) {
-        if (uint256_cmp_word(&call_state_ptr->to, CuEVM::no_precompile_contracts) == -1) {
+        if (call_state_ptr->to.is_precompile()) {
             printf("precompile %d \n", call_state_ptr->to.words[0]);
             switch (call_state_ptr->to.words[0]) {
                 case 0x01:
@@ -231,14 +236,15 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         //     // printf("\n\n");
         //     // cached_call_state.stack_ptr->print();
         // }
-        if (INSTANCE_GLOBAL_IDX == 1) {
-            printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
-                   INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
-                   call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
-                   cached_call_state.gas_limit, cached_call_state.gas_used);
-            // printf("\n\n");
-            // cached_call_state.stack_ptr->print();
-        }
+        // if (INSTANCE_GLOBAL_IDX == 1) {
+        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
+        //     %lu\n",
+        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+        //            cached_call_state.gas_limit, cached_call_state.gas_used);
+        //     // printf("\n\n");
+        //     // cached_call_state.stack_ptr->print();
+        // }
 
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -881,7 +887,9 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     }
     // TODO check if neccessary
     call_state_ptr->dynamic_ret_size = 0;
-    call_state_ptr->parent->dynamic_ret_size = 0;
+    if (call_state_ptr->parent != nullptr) {
+        call_state_ptr->parent->dynamic_ret_size = 0;
+    }
 
     // if success, return ERROR_RETURN to continue finish call
     return error_code ? error_code : ERROR_RETURN;
@@ -909,7 +917,8 @@ __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *
     CuEVM::transaction::TransactionList *transaction_list_ptr = nullptr;
     uint32_t num_transactions = 0;
     uint32_t num_original_transactions = 0;
-    CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones, state_db_ptr);
+
+    CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones);
     // num_original_transactions = num_transactions;
     // num_transactions *= clones;
     // generate the evm instances

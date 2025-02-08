@@ -787,18 +787,21 @@ __host__ __device__ uint512 *uint512_shift_left(uint512 *dst, const uint512 *src
 __host__ __device__ uint256 *uint256_shift_right(uint256 *dst, const uint256 *src, uint32_t shift) {
     if (shift <= 0) return dst;
     uint8_t offset = shift / 32;
+
     for (int i = 0; i < UINT256_WORDS - offset; i++) {
         dst->words[i] = src->words[i + offset];
     }
+
     for (int i = UINT256_WORDS - offset; i < UINT256_WORDS; i++) {
         dst->words[i] = 0;
     }
 
     shift = shift % 32;
+
     if (shift > 0) {
         uint32_t carry = 0;
         for (int i = UINT256_WORDS - 1; i >= 0; --i) {
-            uint32_t word = src->words[i];
+            uint32_t word = dst->words[i];
             dst->words[i] = (word >> shift) | carry;
             carry = word << (32 - shift);
         }
@@ -823,7 +826,7 @@ __host__ __device__ uint512 *uint512_shift_right(uint512 *dst, const uint512 *sr
     if (shift > 0) {
         uint32_t carry = 0;
         for (int i = UINT256_WORDS * 2 - 1; i >= 0; --i) {
-            uint32_t word = src->words[i];
+            uint32_t word = dst->words[i];
             dst->words[i] = (word >> shift) | carry;
             carry = word << (32 - shift);
         }
