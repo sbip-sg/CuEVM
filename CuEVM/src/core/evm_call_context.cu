@@ -70,7 +70,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->byte_code = byte_code;
     this->byte_code_size = byte_code_size;
     this->parent = parent;
-    this->jump_destinations = nullptr;  // jump_destinations;
+    // this->jump_destinations = nullptr;  // jump_destinations;
     this->static_env = static_env;
     this->gas_refund = gas_refund;
     this->stack_ptr->init(CuEVM::memory_pool::global_memory_pool->stack_base);
@@ -91,7 +91,7 @@ __device__ void evm_call_context_t::clear() {
     this->byte_code_size = 0;
     this->static_env = false;
     this->gas_refund = 0;
-    this->jump_destinations = nullptr;
+    // this->jump_destinations = nullptr;
     if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
         // clear the grow memory when return from subcontext
         // printf("clear %d bytes from memory_pool::preallocated_memory_base[%d] + %d\n",
@@ -104,6 +104,19 @@ __device__ void evm_call_context_t::clear() {
     this->memory_ptr = nullptr;
 }
 
+/**
+ * The destructor of the evm_call_state_t
+ */
+__device__ evm_call_context_t::~evm_call_context_t() {
+    // printf("evm_call_context_t destructor thread %d, call state ptr %p, parent call state ptr %p\n",
+    //        INSTANCE_GLOBAL_IDX, this, parent);
+    if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
+        // clear the grow memory
+        memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+                                                      memory_ptr->preallocated_base_offset],
+               0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
+    }
+}
 /**
  * The constructor with the parent state and message call
  **/
@@ -132,7 +145,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     this->byte_code_size = byte_code_size;
     this->static_env = static_env;
     this->gas_refund = gas_refund;
-    this->jump_destinations = nullptr;
+    // this->jump_destinations = nullptr;
     this->from = from;
     this->to = to;
     this->storage_address = storage_address;
@@ -158,6 +171,12 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     } else {
         this->memory_ptr->init(0);
     }
+    // create snapshot account
+
+    // printf("Create snapshot account, depth %d\n", depth);
+
+    global_state_db_ptr->init_snapshot(this, depth, &storage_address);
+
     // this->memory_ptr = new CuEVM::evm_memory_t();
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
     // printf("this context\n");
@@ -242,10 +261,11 @@ __device__ void evm_call_context_t::set_parent_return_data(uint8_t* data, uint32
     }
 }
 __device__ void evm_call_context_t::set_parent_return_data(uint32_t offset, uint32_t size) {
-    if (size == 0 || parent == nullptr) return;
+    if (parent == nullptr) return;
 
     parent->dynamic_ret_size = size;
     dynamic_ret_size = size;
+    if (size == 0) return;
     // TODO: reimplement
 
     if (size <= memory_pool_return_data_preallocate) {
@@ -306,23 +326,6 @@ __device__ void evm_call_context_t::print_return_data() const {
     printf("\n");
 }
 
-/**
- * The destructor of the evm_call_state_t
- */
-__device__ evm_call_context_t::~evm_call_context_t() {
-    // printf("evm_call_context_t destructor thread %d, call state ptr %p, parent call state ptr %p\n",
-    //        INSTANCE_GLOBAL_IDX, this, parent);
-    if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
-        // clear the grow memory
-        memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
-                                                      memory_ptr->preallocated_base_offset],
-               0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
-    }
-    if (depth > memory_pool_call_context_preallocate) {
-        delete stack_ptr;
-        delete memory_ptr;
-    }
-}
 __device__ void evm_call_context_t::print() const {
     printf("EVM Call State\n");
     printf("Depth: %d\n", depth);

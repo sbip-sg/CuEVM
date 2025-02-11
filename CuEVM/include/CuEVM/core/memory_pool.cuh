@@ -2,29 +2,18 @@
 #include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/evm_word.cuh>
-#include <CuEVM/utils/ecc.cuh>
+
 namespace CuEVM::memory_pool {
-struct memory_pool_t {
-    // preallocate data structures for call_depths
-    evm_call_context_t* call_context;
-    evm_stack_t* prealloc_stack_instances;
-    evm_memory_t* prealloc_mem_instances;
-    //
-    evm_word_t* stack_base;
-    SnapshotValue* preallocated_snapshot_values;
-    uint8_t* return_data_base;
-    uint32_t num_instances;
-    uint32_t count_words;
-    uint32_t count_call_context;
-    uint32_t current_stack_page_size;
-    __host__ memory_pool_t() {};
-};
-extern __device__ memory_pool_t* global_memory_pool;
-extern __device__ CuEVM::EccConstants* ecc_constants_ptr;
 
 __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts);
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth);
 __device__ evm_stack_t* get_stack(uint16_t depth);
 __device__ evm_memory_t* get_memory(uint16_t depth);
+__device__ CuEVM::SnapshotState* get_snapshot_state();
+
+__device__ uint32_t get_next_snapshot_offset();
+__device__ void reset_snapshot_slot_offset(uint32_t offset);
+__device__ void reset_snapshot_account_offset(uint32_t offset);
+
 }  // namespace CuEVM::memory_pool

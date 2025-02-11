@@ -14,7 +14,8 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     // get the key warm
     int32_t address_index;
     ValueStatus *found_value;
-    if (state_db->is_warm_key_with_offset(&call_context->storage_address, key, address_index, found_value))
+    if (state_db->is_warm_key_with_offset(&call_context->storage_address, key, address_index, found_value,
+                                          call_context->snapshot_state))
         gas_used += GAS_WARM_ACCESS;
     else
         gas_used += GAS_COLD_SLOAD;
@@ -30,8 +31,8 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     int error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t *value = state_db->get_storage_with_known_index(call_context->depth, &call_context->storage_address,
-                                                                   key, address_index, found_value, true);
+        evm_word_t *value =
+            state_db->get_storage_with_known_index(&call_context->storage_address, key, address_index, found_value);
         // printf("finish get storage thread %d, value %p\n", INSTANCE_GLOBAL_IDX, value);
         if (value == nullptr)
             error_code |= stack.push_uint32(0);
@@ -63,7 +64,7 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     int32_t address_index;
     ValueStatus *found_value;
     error_code |= CuEVM::gas_cost::sstore_cost(gas_used, gas_refund, state_db, &call_context->storage_address, key,
-                                               value, address_index, found_value);
+                                               value, address_index, found_value, call_context->snapshot_state);
 
     // printf("SSTORE\n");
     // key->print();
@@ -76,8 +77,8 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        state_db->write_storage_with_known_index(call_context->depth, &call_context->storage_address, key, value,
-                                                 address_index, found_value, true);
+        state_db->write_storage_with_known_index(&call_context->storage_address, key, value, address_index,
+                                                 found_value);
     }
 
     return error_code;

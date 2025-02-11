@@ -212,14 +212,14 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         // printf("generic_CREATE error_code: %d\n", error_code);
         // todo update nonce
         if (CuEVM::global_state_db_ptr->is_contract(&current_context->to)) {
-            CuEVM::global_state_db_ptr->update_nonce(current_context->depth, &current_context->to,
+            CuEVM::global_state_db_ptr->update_nonce(&current_context->to,
                                                      CuEVM::global_state_db_ptr->get_nonce(&current_context->to) + 1);
         }
         if (THREADIDX == 1) {
             printf("CREATE contract address\n");
             contract_address.print();
         }
-        CuEVM::global_state_db_ptr->update_nonce(current_context->depth, &contract_address, 1);
+        CuEVM::global_state_db_ptr->update_nonce(&contract_address, 1);
     }
 
     // printf("generic_CREATE error_code: %d\n", error_code);
@@ -503,6 +503,7 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         // memory.increase_memory_cost(memory_expansion_cost);
+        printf("REVERT : set return data %u %u\n", memory_offset_ui32, length_ui32);
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
         // error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
         error_code = ERROR_REVERT;
@@ -546,11 +547,17 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
                 gas_used += GAS_NEW_ACCOUNT;
             }
         }
+        printf("sender \n");
+        call_context->to.print();
+        printf("recipient \n");
+        recipient.print();
+        printf("sender balance \n");
+        sender_balance->print();
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
-            global_state_db_ptr->increase_balance(call_context->depth, &recipient, sender_balance);
+            global_state_db_ptr->increase_balance(&recipient, sender_balance);
             sender_balance->set_zero();
-            global_state_db_ptr->set_balance(call_context->depth, &call_context->to, sender_balance);
+            global_state_db_ptr->set_balance(&call_context->to, sender_balance);
             // receiver = self => 0 balance
             if (call_context->depth > 1) call_context->parent->dynamic_ret_size = 0;
             error_code |= ERROR_RETURN;

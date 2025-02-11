@@ -20,12 +20,14 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
         }
 
         if (error_code == ERROR_SUCCESS) {
-            pc = call_context->jump_destinations->has(destination_u32) == ERROR_SUCCESS
-                     ? destination_u32 - 1
-                     : ([&]() -> uint32_t {
-                           error_code = ERROR_INVALID_JUMP_DESTINATION;
-                           return pc;
-                       })();
+            pc = destination_u32 - 1;
+            // TODO: implement jump destinations
+            // pc = call_context->jump_destinations->has(destination_u32) == ERROR_SUCCESS
+            //          ? destination_u32 - 1
+            //          : ([&]() -> uint32_t {
+            //                error_code = ERROR_INVALID_JUMP_DESTINATION;
+            //                return pc;
+            //            })();
         }
     }
     return error_code;
@@ -58,12 +60,14 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
                 return ERROR_INVALID_JUMP_DESTINATION;
             }
             if (error_code == ERROR_SUCCESS) {
-                pc = call_context->jump_destinations->has(destination_u32) == ERROR_SUCCESS
-                         ? destination_u32 - 1
-                         : ([&]() -> uint32_t {
-                               error_code = ERROR_INVALID_JUMP_DESTINATION;
-                               return pc;
-                           })();
+                pc = destination_u32 - 1;
+                // TODO: implement jump destinations
+                // pc = call_context->jump_destinations->has(destination_u32) == ERROR_SUCCESS
+                //          ? destination_u32 - 1
+                //          : ([&]() -> uint32_t {
+                //                error_code = ERROR_INVALID_JUMP_DESTINATION;
+                //                return pc;
+                //            })();
             }
         }
 #ifdef BUILD_LIBRARY

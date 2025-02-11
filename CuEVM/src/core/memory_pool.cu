@@ -11,12 +11,7 @@ __device__ CuEVM::EccConstants* ecc_constants_ptr;
 __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) {
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
-    memory_pool->current_stack_page_size = memory_pool_stack_preallocate;
-    memory_pool->count_words = 0;
-    memory_pool->count_call_context = 0;
-    // cuda malloc memory for words and call_context
-    // memory_pool->words = new evm_word_t[num_instances * memory_pool_word_preallocate];
-    // memory_pool->call_context = new evm_call_context_t[num_instances * memory_pool_call_context_preallocate];
+
     cudaMalloc(&memory_pool->stack_base, num_instances * memory_pool_stack_preallocate * sizeof(evm_word_t));
     printf("host: allocated stack base %p size %d\n", memory_pool->stack_base,
            num_instances * memory_pool_stack_preallocate);
@@ -34,6 +29,13 @@ __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_a
     printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base,
            num_instances * memory_pool_return_data_preallocate);
 
+    cudaMalloc(&memory_pool->snapshot_states_pool,
+               snapshot_account_pool_size * num_instances * sizeof(CuEVM::SnapshotState));
+    cudaMalloc(&memory_pool->snapshot_account_counts, num_instances * sizeof(uint16_t));
+    cudaMemset(memory_pool->snapshot_account_counts, 0, num_instances * sizeof(uint16_t));
+    cudaMalloc(&memory_pool->snapshot_slot_counts, num_instances * sizeof(uint16_t));
+    cudaMemset(memory_pool->snapshot_slot_counts, 0, num_instances * sizeof(uint16_t));
+
     memory_pool_t* d_memory_pool;
     cudaMalloc(&d_memory_pool, sizeof(memory_pool_t));
     cudaMemcpy(d_memory_pool, memory_pool, sizeof(memory_pool_t), cudaMemcpyHostToDevice);
@@ -41,14 +43,14 @@ __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_a
 
     SnapshotValue* d_preallocated_snapshot_values;
     cudaMalloc(&d_preallocated_snapshot_values,
-               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(SnapshotValue));
+               num_instances * memory_pool_snapshot_preallocate_slots * sizeof(SnapshotValue));
     cudaMemset(d_preallocated_snapshot_values, 0,
-               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(SnapshotValue));
+               num_instances * memory_pool_snapshot_preallocate_slots * sizeof(SnapshotValue));
     SnapshotValue** d_preallocated_snapshot_restore_ptr;
     cudaMalloc(&d_preallocated_snapshot_restore_ptr,
-               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(ValueStatus*));
+               num_instances * memory_pool_snapshot_preallocate_slots * sizeof(ValueStatus*));
     cudaMemset(d_preallocated_snapshot_restore_ptr, 0,
-               num_accounts * num_instances * memory_pool_snapshot_preallocate * sizeof(ValueStatus*));
+               num_instances * memory_pool_snapshot_preallocate_slots * sizeof(ValueStatus*));
 
     uint8_t* d_preallocated_memory_base;
     cudaMalloc(&d_preallocated_memory_base, num_instances * memory_prealloc_size * sizeof(uint8_t));
@@ -90,6 +92,34 @@ __device__ evm_stack_t* get_stack(uint16_t depth) {
     } else {
         return new evm_stack_t();
     }
+}
+__device__ CuEVM::SnapshotState* get_snapshot_state() {
+    // printf("get snapshot account instance %u counts %u\n", INSTANCE_GLOBAL_IDX,
+    //        CuEVM::memory_pool::global_memory_pool->snapshot_counts[INSTANCE_GLOBAL_IDX]);
+    uint32_t accounts_count = CuEVM::memory_pool::global_memory_pool->snapshot_account_counts[INSTANCE_GLOBAL_IDX]++;
+
+    if (accounts_count < snapshot_account_pool_size) {
+        // printf("get snapshot account instance %u counts %u\n", INSTANCE_GLOBAL_IDX, accounts_count);
+        return &CuEVM::memory_pool::global_memory_pool
+                    ->snapshot_states_pool[INSTANCE_GLOBAL_IDX + global_state_db_ptr->num_states * accounts_count];
+    } else {
+        printf("snapshot account pool is full for instance %u, create a new one\n", INSTANCE_GLOBAL_IDX);
+        SnapshotState* tmp = new CuEVM::SnapshotState();
+        printf("allocate new snapshot state %p\n", tmp);
+        return tmp;
+    }
+}
+
+__device__ uint32_t get_next_snapshot_offset() {
+    return CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX]++;
+}
+
+__device__ void reset_snapshot_slot_offset(uint32_t offset) {
+    CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX] = offset;
+}
+
+__device__ void reset_snapshot_account_offset(uint32_t offset) {
+    CuEVM::memory_pool::global_memory_pool->snapshot_account_counts[INSTANCE_GLOBAL_IDX] = offset;
 }
 
 __device__ evm_memory_t* get_memory(uint16_t depth) {

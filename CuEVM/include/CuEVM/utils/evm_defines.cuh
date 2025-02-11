@@ -194,12 +194,6 @@
 
 namespace CuEVM {
 
-constexpr CONSTANT uint32_t memory_pool_stack_preallocate = 32;         // 16 elements times num_instances
-constexpr CONSTANT uint32_t memory_pool_call_context_preallocate = 2;   // 2 call contexts times num_instances
-constexpr CONSTANT uint32_t memory_pool_return_data_preallocate = 128;  // 32 bytes times num_instances
-constexpr CONSTANT uint32_t memory_pool_snapshot_preallocate = 8;  // 2 elements for each account times num_instances
-constexpr CONSTANT uint32_t snapshot_page_size = 8;
-
 constexpr CONSTANT uint32_t uint256_limbs = 8;
 constexpr CONSTANT uint32_t bits_per_byte = 8;
 
@@ -237,7 +231,7 @@ constexpr CONSTANT uint32_t max_initcode_size = std::numeric_limits<uint32_t>::m
 constexpr CONSTANT uint32_t no_precompile_contracts = 10;
 
 // specific implementation constants
-constexpr CONSTANT uint32_t initial_storage_capacity = 4;
+constexpr CONSTANT uint32_t initial_storage_capacity = 8;
 
 typedef uint64_t gas_t;
 }  // namespace CuEVM

@@ -35,7 +35,6 @@ struct evm_instance_t {
 };
 
 struct evm_t {
-    CuEVM::StateDb* state_db_ptr;                                    /**< The world state pointer*/
     const CuEVM::transaction::TransactionList* transaction_list_ptr; /**< The transaction pointer */
     CuEVM::evm_call_context_t* call_state_ptr;                       /**< The call state pointer store in global mem*/
     gas_t gas_price;                                                 /**< The gas price */
@@ -57,7 +56,7 @@ struct evm_t {
      * @param[in] return_data_ptr The return data pointer
      * @param[in] tracer_ptr The tracer pointer
      */
-    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr,
+    __device__ evm_t(CuEVM::transaction::TransactionList* transaction_list_ptr,
                      CuEVM::evm_call_context_t* call_context_ptr, CuEVM::evm_word_t* shared_stack_ptr
 #ifdef EIP_3155
                      ,

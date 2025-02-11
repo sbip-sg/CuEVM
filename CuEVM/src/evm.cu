@@ -37,7 +37,7 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
 }
 
 __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::TransactionList *transaction_list_ptr)
-    : state_db_ptr(state_db_ptr), transaction_list_ptr(transaction_list_ptr) {
+    : transaction_list_ptr(transaction_list_ptr) {
     // printf("evm_t constructor\n");
     call_state_ptr = memory_pool::get_call_context(0);
     // CuEVM::evm_call_context_t *root_call_state_ptr = memory_pool::get_call_context(INSTANCE_GLOBAL_IDX);
@@ -87,7 +87,7 @@ __device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::Transa
     evm_word_t upfront_cost = transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX];
 
     uint256_mul(&upfront_cost, &upfront_cost, &transaction_list_ptr->gas_price);
-    global_state_db_ptr->deduct_balance(call_state_ptr->depth, &transaction_list_ptr->sender, &upfront_cost, true);
+    global_state_db_ptr->deduct_balance(&transaction_list_ptr->sender, &upfront_cost, true);
     // global_state_db_ptr->set_warm_account(&global_block_info->coin_base);
     // printf("\n\ncall state ptr created %p\n\n", call_state_ptr);
     // call_state_ptr->print();
@@ -116,7 +116,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 
     int32_t error_code =
         (((uint256_cmp_word(&call_state_ptr->value, 0) > 0) && (call_state_ptr->call_type != OP_DELEGATECALL))
-             ? global_state_db_ptr->transfer(call_state_ptr->depth, sender, recipient, &call_state_ptr->value)
+             ? global_state_db_ptr->transfer(sender, recipient, &call_state_ptr->value)
              : ERROR_SUCCESS);
 
     if (error_code != ERROR_SUCCESS) return error_code;
@@ -237,8 +237,8 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         //     // cached_call_state.stack_ptr->print();
         // }
         // if (INSTANCE_GLOBAL_IDX == 1) {
-        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
-        //     %lu\n",
+        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n
+        //     ",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
         //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
         //            cached_call_state.gas_limit, cached_call_state.gas_used);
@@ -823,7 +823,15 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         call_state_ptr->parent->dynamic_ret_size = 0;
         call_state_ptr->fixed_ret_size = 0;
     }
-    error_code = ERROR_SUCCESS;
+
+    if (error_code != ERROR_RETURN && call_state_ptr->snapshot_state != nullptr) {
+        printf("\n\nRevert to previous depth %d \n\n", call_state_ptr->depth - 1);
+        // state db revert
+        call_state_ptr->snapshot_state->revert();
+        // todo clear after revert
+        call_state_ptr->snapshot_state->clear();
+        call_state_ptr->snapshot_state = nullptr;
+    }
 
     if (call_state_ptr->depth > 1) {
         uint32_t ret_offset = call_state_ptr->fixed_ret_offset;
@@ -832,11 +840,6 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
         // printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,
         //        call_state_ptr, parent_call_state_ptr);
-        if (call_state_ptr->depth > memory_pool_call_context_preallocate) {
-            delete call_state_ptr;
-        } else {
-            call_state_ptr->clear();
-        }
 
         // push the result in the parent stack
         error_code |= parent_call_state_ptr->stack_ptr->push(child_success);
@@ -846,6 +849,32 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
 
         // have to clear memory first before copy return data to memory // due to shared memory between depths
         parent_call_state_ptr->copy_return_data_to_memory(ret_offset, 0, ret_size);
+        SnapshotState *snapshot_state = call_state_ptr->snapshot_state;
+        if (snapshot_state != nullptr) {
+            // printf("Finish call, set parent snapshot state\n");
+            while (snapshot_state->next_state != nullptr) {
+                snapshot_state = snapshot_state->next_state;
+            }
+            snapshot_state->next_state = parent_call_state_ptr->snapshot_state;
+
+            // Revert chain : new_parent -> chain -> old_parent
+        }
+        SnapshotState *new_parent_snapshot_state = CuEVM::memory_pool::get_snapshot_state();
+        new_parent_snapshot_state->address = parent_call_state_ptr->to;
+        new_parent_snapshot_state->storage_size = 0;
+        new_parent_snapshot_state->touched_account_counts = 0;
+        new_parent_snapshot_state->preallocated_offset =
+            CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX];
+        // printf("thread %d, new_parent_snapshot_state %p, preallocated_offset %d\n", INSTANCE_GLOBAL_IDX,
+        //        new_parent_snapshot_state, new_parent_snapshot_state->preallocated_offset);
+        new_parent_snapshot_state->next_state = call_state_ptr->snapshot_state;
+        parent_call_state_ptr->snapshot_state = new_parent_snapshot_state;
+        // free memory
+        if (call_state_ptr->depth > memory_pool_call_context_preallocate) {
+            delete call_state_ptr;
+        } else {
+            call_state_ptr->clear();
+        }
         call_state_ptr = parent_call_state_ptr;
     }
 
@@ -878,7 +907,7 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
                 error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
             }
 #endif
-            global_state_db_ptr->update_code(call_state_ptr->depth, &call_state_ptr->to, code_size, code);
+            global_state_db_ptr->update_code(&call_state_ptr->to, code_size, code);
         } else {
             error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
         }

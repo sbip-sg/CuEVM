@@ -185,16 +185,6 @@ __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db
                                        bool set_warm = true);
 
 /**
- * Add the cost for the SLOAD operation.
- * @param[inout] gas_used The gas used
- * @param[in] address The address of the account
- * @param[in] key The key of the storage
- * @return 0 for success, 1 for failure
- */
-__device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
-                              const evm_word_t *key);
-
-/**
  * Add the cost and refund for the SSTORE operation.
  * @param[inout] gas_used The gas used
  * @param[inout] gas_refund The refund
@@ -206,7 +196,7 @@ __device__ int32_t sload_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const e
  */
 __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateDb *state_db, const evm_word_t *address,
                                const evm_word_t *key, const evm_word_t *value, int32_t &address_index,
-                               ValueStatus *&found_value);
+                               ValueStatus *&found_value, SnapshotState *snapshot_state);
 
 /**
  * Get the transaction intrinsic gas.
