@@ -93,6 +93,7 @@ __device__ void evm_call_context_t::clear() {
     this->gas_refund = 0;
     // this->jump_destinations = nullptr;
     if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
+        // printf("clear memory ptr %p\n", memory_ptr);
         // clear the grow memory when return from subcontext
         // printf("clear %d bytes from memory_pool::preallocated_memory_base[%d] + %d\n",
         //        memory_prealloc_size - memory_ptr->preallocated_base_offset, INSTANCE_GLOBAL_IDX,
@@ -156,10 +157,10 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     this->stack_ptr = memory_pool::get_stack(parent->depth);
 
     if (parent->stack_ptr != nullptr) {
-        this->stack_ptr->init(parent->stack_ptr->shared_stack_base +
-                                  (parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset) *
-                                      CuEVM::memory_pool::global_memory_pool->num_instances,
-                              parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
+        this->stack_ptr->init(
+            parent->stack_ptr->shared_stack_base +
+                (parent->stack_ptr->stack_offset) * CuEVM::memory_pool::global_memory_pool->num_instances,
+            parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
         // printf("parent stack found %p thread %d\n", parent->stack_ptr, THREADIDX);
     } else {
         this->stack_ptr->init(CuEVM::memory_pool::global_memory_pool->stack_base);
@@ -189,7 +190,7 @@ __device__ void evm_call_context_t::copy_return_data_to_memory(uint32_t memory_o
         CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
 
     uint32_t actual_size = min(size, dynamic_ret_size);
-    // printf("size %d dynamic_ret_size %d actual_size %d\n", size, dynamic_ret_size, actual_size);
+
     uint32_t remaining_size = size > actual_size ? size - actual_size : 0;
     if (dynamic_ret_size <= memory_pool_return_data_preallocate) {
         memory_ptr->set_buffer_data(preallocated_base, data_offset, actual_size, memory_offset, actual_size);

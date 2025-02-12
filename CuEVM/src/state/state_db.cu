@@ -420,7 +420,10 @@ __device__ void StateDb::update_code(const evm_word_t *address, const uint32_t c
         dynamic_account = StateDb::new_account(address, 0, 0, code_size, code);
     }
     dynamic_account->code_size = code_size;
-    dynamic_account->code = code;
+    // clone code to dynamic account
+    dynamic_account->is_warm = true;
+    dynamic_account->code = new uint8_t[code_size];
+    memcpy(dynamic_account->code, code, code_size);
 }
 __device__ void StateDb::set_balance(const evm_word_t *address, const evm_word_t *balance, bool is_warm) {
     // printf("update balance thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
@@ -780,10 +783,13 @@ __device__ uint8_t *StateDb::get_code(uint32_t &code_size, const evm_word_t *add
         if (set_warm) {
             dynamic_account->is_warm = true;
         }
+        code_size = dynamic_account->code_size;
+        printf("get_code dynamic, code_size %d, code %p\n", code_size, dynamic_account->code);
         return dynamic_account->code;
     }
 
     code_size = account_codes_size[address_index];
+    printf("get_code address_index %d, code_size %d\n", address_index, code_size);
     if (set_warm) {
         account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = true;
     }

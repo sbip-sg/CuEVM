@@ -93,7 +93,7 @@ __device__ int32_t operation_RIPEMD160(gas_t &gas_limit, gas_t &gas_used, CuEVM:
     uint8_t *hash;
     hash = output + 12;
     CuCrypto::ripemd160::ripemd160(call_context->call_data, call_context->call_data_size, hash);
-    call_context->set_parent_return_data(hash, 32);
+    call_context->set_parent_return_data(output, 32);
 
     return ERROR_RETURN;
 }

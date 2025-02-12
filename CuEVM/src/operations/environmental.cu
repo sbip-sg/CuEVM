@@ -41,7 +41,7 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
             remaining_input_length = length_u32;
         else
             remaining_input_length = max(0, remaining_input_length);
-        uint8_t *memory_data;
+        uint8_t *memory_data = nullptr;
         memory.get(offset_u32, remaining_input_length, memory_data);
         CuCrypto::keccak::sha3(memory_data, remaining_input_length, hash_data, CuEVM::hash_size);
         // evm_word_t hash_word;
@@ -299,6 +299,7 @@ __device__ int32_t EXTCODECOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
         call_context->memory_ptr->increase_memory_cost(memory_expansion_cost);
         uint32_t code_size = 0;
         uint8_t *code = global_state_db_ptr->get_code(code_size, &address);
+
         uint32_t data_offset_ui32, length_ui32;
         // get values saturated to uint32_max, in overflow case
         data_offset_ui32 = uint256_get_uint32_t(&code_offset);
@@ -349,7 +350,10 @@ __device__ int32_t RETURNDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     // TODO: Check EOF format
-    if (length_ui32 + data_offset_ui32 > call_context->dynamic_ret_size) {
+    printf("RETURNDATASIZE thread %d, call_context %p, length_ui32 %u, data_offset_ui32 %u, dynamic_ret_size %u\n",
+           INSTANCE_GLOBAL_IDX, call_context, length_ui32, data_offset_ui32, call_context->dynamic_ret_size);
+    if (data_offset_ui32 > call_context->dynamic_ret_size ||
+        (data_offset_ui32 + length_ui32) > call_context->dynamic_ret_size) {
         return ERROR_RETURN_DATA_OVERFLOW;
     }
     if (error_code == ERROR_SUCCESS) {
@@ -398,9 +402,9 @@ __device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
 
 __device__ int32_t SELFBALANCE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                                CuEVM::StateDb *state_db, const CuEVM::evm_call_context_t *call_context) {
-    CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     // bn_t address;
     // message.get_recipient(arith, address);
+    gas_used += GAS_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         evm_word_t *balance;

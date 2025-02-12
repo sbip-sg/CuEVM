@@ -43,8 +43,16 @@ __device__ evm_word_t *evm_stack_t::top() {
     } else {
         if (global_stack_base == nullptr) {
             global_stack_base = new evm_word_t[max_stack_size];
+            if (stack_base_offset > memory_pool_stack_preallocate) {
+                stack_base_offset = memory_pool_stack_preallocate;
+            }
+
         }  // TODO reuse global stack allocation for child calls
-        return global_stack_base + stack_base_offset + stack_offset - memory_pool_stack_preallocate;
+        if (stack_base_offset <= memory_pool_stack_preallocate) {
+            return global_stack_base + stack_base_offset + stack_offset - memory_pool_stack_preallocate;
+        } else {
+            return global_stack_base + stack_offset;
+        }
     }
 }
 __device__ int32_t evm_stack_t::push_uint32(uint32_t value) {
@@ -128,12 +136,17 @@ __device__ int32_t evm_stack_t::pushx(uint8_t x, const uint8_t __restrict__ *src
 
 // The caller must check underflow
 __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) const {
-    // printf("global stack base %p shared stack base %p\n", global_stack_base, shared_stack_base);
     if (stack_base_offset + stack_offset - index < memory_pool_stack_preallocate)  // stack_offset is after added
         return shared_stack_base + (stack_offset - index) * CuEVM::memory_pool::global_memory_pool->num_instances +
                INSTANCE_GLOBAL_IDX;
-    else
-        return global_stack_base + stack_base_offset + stack_offset - index - memory_pool_stack_preallocate;
+    else {
+        if (stack_base_offset <= memory_pool_stack_preallocate) {
+            return global_stack_base + stack_base_offset + stack_offset - index - memory_pool_stack_preallocate;
+        } else {
+            return global_stack_base + stack_offset - index;
+        }
+    }
+    // return global_stack_base + stack_base_offset + stack_offset - index - memory_pool_stack_preallocate;
 }
 
 __device__ int32_t evm_stack_t::dupx(uint32_t x) {

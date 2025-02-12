@@ -11,20 +11,20 @@ constexpr uint32_t value_page_size = 16;
 constexpr uint32_t account_page_size = 16;
 
 // constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
-constexpr uint32_t memory_prealloc_size = 1024;  // prealloc 1 page + page size for all dynamic pages
+constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
 
 constexpr uint32_t snapshot_account_pool_size = 16;  // multiply by num_states
 
-constexpr uint32_t memory_pool_stack_preallocate = 32;           // 16 elements times num_instances
+constexpr uint32_t memory_pool_stack_preallocate = 4;            // 16 elements times num_instances
 constexpr uint32_t memory_pool_call_context_preallocate = 2;     // 2 call contexts times num_instances
 constexpr uint32_t memory_pool_return_data_preallocate = 128;    // 32 bytes times num_instances
 constexpr uint32_t memory_pool_snapshot_preallocate_slots = 32;  // 32 elements for each instance
 constexpr uint32_t snapshot_page_size = 8;
 // each snapshot state keeps track of the touched accounts warming up in the context
 constexpr uint32_t preallocated_touched_accounts_size = 4;
-constexpr uint32_t preallocated_touched_storage_keys_size = 2;
+constexpr uint32_t preallocated_touched_storage_keys_size = 4;
 struct SnapshotValue {
     evm_word_t value;
     bool is_warm = false;
@@ -223,13 +223,14 @@ namespace stack {
 constexpr CONSTANT uint32_t max_size = CuEVM::max_stack_size; /**< The maximum stack size*/
 struct evm_stack_t {
     evm_word_t *global_stack_base; /**< The stack YP: (YP: \f$\mu_{s}\f$)*/  // global memory store from X+1 element
-    evm_word_t *shared_stack_base;  // shared memory for X elements from the top => becomes preallocated stackbase
-    uint16_t stack_offset;          // offset of the current stack (its size) from it's base offset in shared memory
-    uint32_t stack_base_offset;     // offset of the stack base in shared memory or global memory
-                                    /**
-                                     * The default constructor
-                                     * Stack base offset of the child stack = parent stack offset  + 1
-                                     */
+    evm_word_t *shared_stack_base;    // shared memory for X elements from the top => becomes preallocated stackbase
+    uint16_t stack_offset;            // offset of the current stack (its size) from it's base offset in shared memory
+    uint32_t stack_base_offset;       // offset of the stack base in shared memory or global memory
+    uint32_t dynamic_stack_capacity;  // the capacity of the dynamic stack
+                                      /**
+                                       * The default constructor
+                                       * Stack base offset of the child stack = parent stack offset  + 1
+                                       */
     __device__ evm_stack_t(evm_word_t *shared_stack_base, uint32_t stack_base_offset = 0)
         : global_stack_base(nullptr),
           shared_stack_base(shared_stack_base),

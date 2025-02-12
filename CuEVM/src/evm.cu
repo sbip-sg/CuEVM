@@ -237,13 +237,16 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
         //     // cached_call_state.stack_ptr->print();
         // }
         // if (INSTANCE_GLOBAL_IDX == 1) {
-        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n
-        //     ",
+        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
+        //     %lu\n",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
         //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
         //            cached_call_state.gas_limit, cached_call_state.gas_used);
         //     // printf("\n\n");
         //     // cached_call_state.stack_ptr->print();
+        //     // if (call_state_ptr->memory_ptr->size <= 64) {
+        //     //     call_state_ptr->memory_ptr->print();
+        //     // }
         // }
 
 #ifdef BUILD_LIBRARY
@@ -841,14 +844,6 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         // printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,
         //        call_state_ptr, parent_call_state_ptr);
 
-        // push the result in the parent stack
-        error_code |= parent_call_state_ptr->stack_ptr->push(child_success);
-
-        // write the return data in the memory
-        parent_call_state_ptr->memory_ptr->grow(ret_offset + ret_size);
-
-        // have to clear memory first before copy return data to memory // due to shared memory between depths
-        parent_call_state_ptr->copy_return_data_to_memory(ret_offset, 0, ret_size);
         SnapshotState *snapshot_state = call_state_ptr->snapshot_state;
         if (snapshot_state != nullptr) {
             // printf("Finish call, set parent snapshot state\n");
@@ -875,6 +870,16 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         } else {
             call_state_ptr->clear();
         }
+
+        // push the result in the parent stack
+        error_code |= parent_call_state_ptr->stack_ptr->push(child_success);
+        // Free previous memory first before copy return data to memory
+        // write the return data in the memory
+        parent_call_state_ptr->memory_ptr->grow(ret_offset + ret_size);
+
+        // have to clear memory first before copy return data to memory // due to shared memory between depths
+        parent_call_state_ptr->copy_return_data_to_memory(ret_offset, 0, ret_size);
+
         call_state_ptr = parent_call_state_ptr;
     }
 
