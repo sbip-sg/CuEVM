@@ -571,9 +571,9 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         // sender_balance->print();
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
-            global_state_db_ptr->increase_balance(&recipient, sender_balance);
-            sender_balance->set_zero();
-            global_state_db_ptr->set_balance(&call_context->to, sender_balance);
+            global_state_db_ptr->increase_balance(&recipient, sender_balance, call_context->snapshot_state);
+            // sender_balance->set_zero();
+            global_state_db_ptr->deduct_balance(&call_context->to, sender_balance, call_context->snapshot_state);
             // receiver = self => 0 balance
             if (call_context->depth > 1) call_context->parent->dynamic_ret_size = 0;
             error_code |= ERROR_RETURN;

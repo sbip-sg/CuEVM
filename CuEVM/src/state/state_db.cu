@@ -27,24 +27,14 @@ __device__ int32_t SnapshotState::find_dynamic_offset(ValueStatus *value) {
 }
 __device__ void SnapshotState::print() const {
     printf("SnapshotState: %p\n", this);
-    printf("  Balance: ");
-    balance.print();
-    printf("  Nonce: %u\n", nonce);
-    printf("  Storage Size: %u\n", storage_size);
 
-    printf("  Code Size: %u\n", code_size);
-    printf("  Code Ptr: %p\n", code);
     printf("  Storage Page Ptr: %p\n", storage_page);
     printf("  Next State Ptr: %p\n", next_state);
 }
 
 __device__ void SnapshotState::clear() {
-    balance = 0;
-    nonce = 0;
     storage_size = 0;
 
-    code_size = 0;
-    code = nullptr;
     storage_page = nullptr;
     next_state = nullptr;
 }
@@ -69,10 +59,34 @@ __device__ SnapshotState *SnapshotState::revert() {
                 while (dynamic_account != nullptr) {
                     if (dynamic_account->dynamic_account_index == address_index) {
                         dynamic_account->is_warm = false;
+                        break;
                     }
                     dynamic_account = dynamic_account->next_account;
                 }
             }
+        }
+    }
+    if (diff_account_counts > 0) {
+        printf("revert account diff_account_counts %d\n", diff_account_counts);
+        SnapshotAccount *current_account = accounts;
+        while (current_account != nullptr) {
+            printf("revert account address_index %d\n", current_account->address_index);
+            if (current_account->address_index >= 0) {
+                uint32_t instance_idx =
+                    current_account->address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
+                global_state_db_ptr->account_balances[instance_idx] = current_account->balance;
+            } else {
+                printf("revert account negative address index set balance\n");
+                DynamicAccount *dynamic_account = global_state_db_ptr->dynamic_accounts[INSTANCE_GLOBAL_IDX];
+                while (dynamic_account != nullptr) {
+                    if (dynamic_account->dynamic_account_index == current_account->address_index) {
+                        dynamic_account->balance = current_account->balance;
+                        break;
+                    }
+                    dynamic_account = dynamic_account->next_account;
+                }
+            }
+            current_account = current_account->next_account;
         }
     }
     // N contract x mempool__snapshot_preallocate x num_states
@@ -476,27 +490,45 @@ __device__ void StateDb::set_balance(const evm_word_t *address, const evm_word_t
     account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
 }
 
-__device__ void StateDb::increase_balance(const evm_word_t *address, const evm_word_t *balance, bool is_warm) {
+__device__ void StateDb::increase_balance(const evm_word_t *address, const evm_word_t *balance,
+                                          SnapshotState *snapshot_state, bool is_warm) {
     // printf("update balance thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
 
     int32_t address_index = get_address_index(address);
+    evm_word_t *current_balance;
     if (address_index == -1) {
         DynamicAccount *dynamic_account = get_dynamic_account(address);
         if (dynamic_account == nullptr) {
-            dynamic_account = StateDb::new_account(address, balance, 0, 0, nullptr);
-        } else {
-            uint256_add(&dynamic_account->balance, &dynamic_account->balance, balance);
+            evm_word_t zero = 0;
+            dynamic_account = StateDb::new_account(address, &zero, 0, 0, nullptr);
         }
-
+        address_index = dynamic_account->dynamic_account_index;
+        current_balance = &dynamic_account->balance;
         dynamic_account->is_warm = is_warm;
-        return;
+    } else {
+        current_balance = &account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX];
+        account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
     }
-    uint256_add(&account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX],
-                &account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX], balance);
-    account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
+    if (snapshot_state != nullptr) {
+        // set snapshot of the balance
+        SnapshotAccount *snapshot_account = new SnapshotAccount();
+        snapshot_account->address_index = address_index;
+        snapshot_account->balance = *current_balance;
+        snapshot_account->next_account = snapshot_state->accounts;
+        snapshot_state->accounts = snapshot_account;
+        snapshot_state->diff_account_counts++;
+    }
+    // if (INSTANCE_GLOBAL_IDX == 0) {
+    //     printf("increase balance \n");
+    //     address->print();
+    //     current_balance->print();
+    //     balance->print();
+    // }
+    uint256_add(current_balance, current_balance, balance);
 }
 // shortcut for deducting balance
-__device__ int32_t StateDb::deduct_balance(const evm_word_t *address, const evm_word_t *amount, bool set_warm) {
+__device__ int32_t StateDb::deduct_balance(const evm_word_t *address, const evm_word_t *amount,
+                                           SnapshotState *snapshot_state, bool set_warm) {
     // printf("deduct balance thread %d\n", INSTANCE_GLOBAL_IDX);
     // address->print();
 
@@ -508,6 +540,7 @@ __device__ int32_t StateDb::deduct_balance(const evm_word_t *address, const evm_
         if (dynamic_account == nullptr) {
             return ERROR_INSUFFICIENT_FUNDS;
         }
+        address_index = dynamic_account->dynamic_account_index;
         current_balance = &dynamic_account->balance;
     } else {
         if (set_warm) {
@@ -520,6 +553,23 @@ __device__ int32_t StateDb::deduct_balance(const evm_word_t *address, const evm_
         // printf("deduct balance insufficient funds instance %d\n", INSTANCE_GLOBAL_IDX);
         return ERROR_INSUFFICIENT_FUNDS;
     }
+
+    // set snapshot of the balance
+    if (snapshot_state != nullptr) {
+        SnapshotAccount *snapshot_account = new SnapshotAccount();
+        snapshot_account->address_index = address_index;
+        snapshot_account->balance = *current_balance;
+        snapshot_account->next_account = snapshot_state->accounts;
+        snapshot_state->accounts = snapshot_account;
+        snapshot_state->diff_account_counts++;
+    }
+    // if (INSTANCE_GLOBAL_IDX == 0) {
+    //     printf("deduct balance \n");
+    //     address->print();
+    //     current_balance->print();
+    //     amount->print();
+    // }
+
     uint256_sub(current_balance, current_balance, amount);
 
     return ERROR_SUCCESS;
@@ -559,11 +609,12 @@ __device__ void StateDb::update_nonce(const evm_word_t *address, const uint32_t 
     account_nonces[address_index * num_states + INSTANCE_GLOBAL_IDX] = nonce;
 }
 
-__device__ int32_t StateDb::transfer(const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *value) {
-    int32_t error_code = deduct_balance(sender, value);
+__device__ int32_t StateDb::transfer(const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *value,
+                                     SnapshotState *snapshot_state) {
+    int32_t error_code = deduct_balance(sender, value, snapshot_state);
     // printf("transfer error code %d\n", error_code);
     if (error_code != ERROR_SUCCESS) return error_code;
-    increase_balance(recipient, value);
+    increase_balance(recipient, value, snapshot_state);
     return ERROR_SUCCESS;
 }
 
@@ -694,8 +745,6 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
         tmp->address = *address;
         tmp->storage_size = 0;
         tmp->touched_account_counts = 0;
-        tmp->balance = 0;
-        tmp->nonce = 0;
         tmp->preallocated_offset = memory_pool_snapshot_preallocate_slots;
         call_context->snapshot_state = tmp;
         tmp->next_state = nullptr;
@@ -711,8 +760,7 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
     tmp->address = *address;
     tmp->storage_size = 0;
     tmp->touched_account_counts = 0;
-    tmp->balance = account_balances[instance_idx];
-    tmp->nonce = account_nonces[instance_idx];
+    tmp->diff_account_counts = 0;
     tmp->preallocated_offset = CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX];
     // printf("thread %d, state %p, preallocated_offset %d\n", INSTANCE_GLOBAL_IDX, this, tmp->preallocated_offset);
     tmp->next_state = nullptr;

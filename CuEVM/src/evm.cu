@@ -116,7 +116,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 
     int32_t error_code =
         (((uint256_cmp_word(&call_state_ptr->value, 0) > 0) && (call_state_ptr->call_type != OP_DELEGATECALL))
-             ? global_state_db_ptr->transfer(sender, recipient, &call_state_ptr->value)
+             ? global_state_db_ptr->transfer(sender, recipient, &call_state_ptr->value, call_state_ptr->snapshot_state)
              : ERROR_SUCCESS);
 
     if (error_code != ERROR_SUCCESS) return error_code;
@@ -849,6 +849,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         new_parent_snapshot_state->address = parent_call_state_ptr->to;
         new_parent_snapshot_state->storage_size = 0;
         new_parent_snapshot_state->touched_account_counts = 0;
+        new_parent_snapshot_state->diff_account_counts = 0;
         new_parent_snapshot_state->preallocated_offset =
             CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX];
 

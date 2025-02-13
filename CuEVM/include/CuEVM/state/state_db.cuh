@@ -102,15 +102,19 @@ class StateDb {
                                            const uint32_t code_size, uint8_t *code);
     __device__ void update_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
     // shortcuts to avoid search for balance location multiple times
-    __device__ int32_t deduct_balance(const evm_word_t *address, const evm_word_t *amount, bool set_warm = false);
+    __device__ int32_t deduct_balance(const evm_word_t *address, const evm_word_t *amount,
+                                      SnapshotState *snapshot_state, bool set_warm = false);
+
+    __device__ void increase_balance(const evm_word_t *address, const evm_word_t *balance,
+                                     SnapshotState *snapshot_state, bool is_warm = true);
     // shortcut to deduct balance from sender and update nonce
     __device__ int32_t deduct_balance_sender(const evm_word_t *address, const evm_word_t *amount);
     __device__ void set_balance(const evm_word_t *address, const evm_word_t *balance, bool is_warm = true);
-    __device__ void increase_balance(const evm_word_t *address, const evm_word_t *balance, bool is_warm = true);
     __device__ void update_nonce(const evm_word_t *address, const uint32_t nonce);
     __device__ void update_code(const evm_word_t *address, const uint32_t code_size, uint8_t *code);
     __device__ int32_t create_contract(const evm_word_t *address, const uint32_t code_size, uint8_t *code);
-    __device__ int32_t transfer(const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *value);
+    __device__ int32_t transfer(const evm_word_t *sender, const evm_word_t *recipient, const evm_word_t *value,
+                                SnapshotState *snapshot_state);
 
     __device__ DynamicAccount *get_dynamic_account(const evm_word_t *address) const;
     __device__ DynamicAccount *get_dynamic_account_and_set_warm(const evm_word_t *address) const;

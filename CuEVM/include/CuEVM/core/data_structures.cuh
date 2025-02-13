@@ -25,6 +25,7 @@ constexpr uint32_t snapshot_page_size = 8;
 // each snapshot state keeps track of the touched accounts warming up in the context
 constexpr uint32_t preallocated_touched_accounts_size = 4;
 constexpr uint32_t preallocated_touched_storage_keys_size = 16;
+
 struct SnapshotValue {
     evm_word_t value;
     bool is_warm = false;
@@ -84,20 +85,32 @@ struct StateDbStoragePage {
     ValueStatus values[value_page_size];
     StateDbStoragePage *next_page = nullptr;
 };
+// store balance and code change in subcall
+struct SnapshotAccount {
+    int32_t address_index;
+    evm_word_t balance;
+    uint32_t storage_size;
+    uint32_t code_size = 0;
+    uint8_t *code = nullptr;
+    SnapshotAccount *next_account = nullptr;
+};
 
 struct SnapshotState {
     // store only the modified fields
     // uint16_t depth = 0;
     evm_word_t address;
-    evm_word_t balance;
-    uint32_t nonce = 0;
+    // evm_word_t balance;
+    // uint32_t nonce = 0;
     uint32_t storage_size = 0;
     uint32_t preallocated_offset = 0;  // the beginning offset of the preallocated storage
-    uint32_t code_size = 0;
-    uint8_t *code = nullptr;
+    // uint32_t code_size = 0;
+    // uint8_t *code = nullptr;
     SnapshotStoragePage *storage_page = nullptr;
     SnapshotState *next_state = nullptr;
-
+    SnapshotAccount *accounts = nullptr;
+    // number of account changes balances and codes, recorded by accounts
+    uint32_t diff_account_counts = 0;
+    // number of account from cold to warm
     uint32_t touched_account_counts = 0;
     uint32_t touched_storage_counts = 0;
     // arrays to store the accounts list warmed during execution
@@ -110,7 +123,7 @@ struct SnapshotState {
     evm_word_t preallocated_touched_storage_keys[preallocated_touched_storage_keys_size];
     evm_word_t *dynamic_touched_storage_keys = nullptr;
 
-    __host__ __device__ SnapshotState() : nonce(0), storage_size(0), code_size(0), code(nullptr) {}
+    __host__ __device__ SnapshotState() : storage_size(0) {}
 
     __host__ __device__ ~SnapshotState();
     // revert this state and return the next state
