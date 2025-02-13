@@ -177,7 +177,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     // printf("Create snapshot account, depth %d\n", depth);
 
     global_state_db_ptr->init_snapshot(this, depth, &storage_address);
-
+    // printf("init snapshot account, depth %d snapshot state %p\n", depth, snapshot_state);
     // this->memory_ptr = new CuEVM::evm_memory_t();
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);
     // printf("this context\n");
@@ -357,6 +357,14 @@ __device__ void evm_call_context_t::print() const {
     printf("Static Env: %d\n", static_env);
 }
 
-__device__ int32_t evm_call_context_t::revert() {}
-
+__device__ int32_t evm_call_context_t::revert() {
+    while (snapshot_state != nullptr) {
+        SnapshotState* current_snapshot_state = snapshot_state;
+        // state db revert
+        snapshot_state = snapshot_state->revert();
+        // todo clear after revert
+        current_snapshot_state->clear();
+        // current_snapshot_state = nullptr;
+    }
+}
 }  // namespace CuEVM

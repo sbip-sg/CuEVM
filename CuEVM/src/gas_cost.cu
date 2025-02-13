@@ -142,8 +142,8 @@ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
 }
 
 __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
-                                       bool set_warm) {
-    if (state_db->is_warm_account(address, set_warm)) {
+                                       SnapshotState *snapshot_state, bool set_warm) {
+    if (state_db->is_warm_account(address, snapshot_state, set_warm)) {
         // printf("warm account\n");
         gas_used += GAS_WARM_ACCESS;
     } else {

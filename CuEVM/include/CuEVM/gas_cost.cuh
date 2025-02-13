@@ -182,7 +182,7 @@ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size);
  * @return 0 for success, 1 for failure
  */
 __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
-                                       bool set_warm = true);
+                                       SnapshotState *snapshot_state, bool set_warm = true);
 
 /**
  * Add the cost and refund for the SSTORE operation.

@@ -61,8 +61,7 @@ __device__ int32_t SHA3(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stac
  * @param[in] message The message.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t ADDRESS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                           const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t ADDRESS(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The BALANCE operation implementation.
@@ -76,8 +75,7 @@ __device__ int32_t ADDRESS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_s
  * @param[in] touch_state The touch state object.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t BALANCE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                           CuEVM::StateDb *state_db_ptr);
+__device__ int32_t BALANCE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The ORIGIN operation implementation.
@@ -102,8 +100,7 @@ __device__ int32_t ORIGIN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @param[in] message The message.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CALLER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                          const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t CALLER(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLVALUE operation implementation.
@@ -114,8 +111,7 @@ __device__ int32_t CALLER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * @param[in] message The message.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CALLVALUE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                             const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t CALLVALUE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLDATALOAD operation implementation.
@@ -130,8 +126,7 @@ __device__ int32_t CALLVALUE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm
  * @param[in] message The message.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CALLDATALOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t CALLDATALOAD(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLDATASIZE operation implementation.
@@ -142,8 +137,7 @@ __device__ int32_t CALLDATALOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @param[in] message The message.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CALLDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t CALLDATASIZE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CALLDATACOPY operation implementation.
@@ -164,8 +158,7 @@ __device__ int32_t CALLDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @param[out] memory The memory.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CALLDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                const CuEVM::evm_call_context_t *call_context, CuEVM::evm_memory_t &memory);
+__device__ int32_t CALLDATACOPY(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CODESIZE operation implementation.
@@ -177,8 +170,7 @@ __device__ int32_t CALLDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::
  * @param[in] message The message.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The CODECOPY operation implementation.
@@ -200,8 +192,7 @@ __device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  * @param[out] memory The memory.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t CODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                            const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t CODECOPY(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The GASPRICE operation implementation.
@@ -232,8 +223,7 @@ __device__ int32_t GASPRICE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  * @param[in] state_db The state db.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t EXTCODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                               CuEVM::StateDb *state_db);
+__device__ int32_t EXTCODESIZE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The EXTCODECOPY operation implementation.
@@ -256,8 +246,7 @@ __device__ int32_t EXTCODESIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::e
  * @param[out] memory The memory.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t EXTCODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                               const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t EXTCODECOPY(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The RETURNDATASIZE operation implementation.
@@ -269,7 +258,7 @@ __device__ int32_t EXTCODECOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::e
  * @param[in] return_data The return data.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t RETURNDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
+__device__ int32_t RETURNDATASIZE(const gas_t &gas_limit, gas_t &gas_used,
                                   const CuEVM::evm_call_context_t *call_context);
 
 /**
@@ -291,8 +280,7 @@ __device__ int32_t RETURNDATASIZE(const gas_t &gas_limit, gas_t &gas_used, CuEVM
  * @param[in] return_data The return data.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t RETURNDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                  CuEVM::evm_call_context_t *call_context);
+__device__ int32_t RETURNDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context);
 
 /**
  * The EXTCODEHASH operation implementation.
@@ -309,8 +297,7 @@ __device__ int32_t RETURNDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM
  * @param[in] state_db The state db.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t EXTCODEHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                               CuEVM::StateDb *state_db);
+__device__ int32_t EXTCODEHASH(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 
 /**
  * The GAS operation implementation.
@@ -335,6 +322,5 @@ __device__ int32_t GAS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  * @param[in] transaction The transaction.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t SELFBALANCE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                               CuEVM::StateDb *state_db, const CuEVM::evm_call_context_t *call_context);
+__device__ int32_t SELFBALANCE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
 }  // namespace CuEVM::operations

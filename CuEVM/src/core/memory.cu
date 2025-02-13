@@ -8,10 +8,11 @@ __device__ void evm_memory_t::print() const {
     printf("Memory cost: %lu\n", memory_cost);
     printf("\n");
     for (uint32_t i = 0; i < size; i++) {
+        // if (i == 228) printf("---debug---\n");
         if (preallocated_base_offset + i < memory_prealloc_size) {
-            printf("%02x ", memory_pool::preallocated_memory_base[preallocated_base_offset + i]);
+            printf("%02x", memory_pool::preallocated_memory_base[preallocated_base_offset + i]);
         } else {
-            printf("...");
+            printf("%02x", dynamic_data[preallocated_base_offset + i - memory_prealloc_size]);
         }
     }
     printf("\n");
@@ -34,7 +35,7 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
 #endif
             // allocate new page
             uint8_t *new_data = new uint8_t[new_size + preallocated_base_offset - memory_prealloc_size];
-
+            memset(new_data, 0, new_size + preallocated_base_offset - memory_prealloc_size);
             if (dynamic_data != nullptr) {
                 memcpy(new_data, dynamic_data, size + preallocated_base_offset - memory_prealloc_size);
                 delete[] dynamic_data;

@@ -49,19 +49,29 @@ __device__ void SnapshotState::clear() {
     next_state = nullptr;
 }
 
-__device__ void SnapshotState::revert() {
+__device__ SnapshotState *SnapshotState::revert() {
     // TODO: implement
-    printf("\n\nrevert to snapshot thread %d, snapshot_state %p, storage_size %d\n", INSTANCE_GLOBAL_IDX, this,
-           storage_size);
+    printf("\n\nrevert snapshot_state %p next_state %p, storage_size %d touched_account_counts %d\n", this, next_state,
+           storage_size, touched_account_counts);
     if (touched_account_counts > 0) {
-        printf("revert touched account to cold\n");
+        printf("revert touched account to cold num touched %d\n", touched_account_counts);
         for (uint32_t i = 0; i < touched_account_counts; i++) {
             int32_t address_index = preallocated_touched_accounts[i];
             if (address_index >= 0) {
+                printf("set cold revert thread %d, address_index %d\n", INSTANCE_GLOBAL_IDX, address_index);
                 uint32_t instance_idx = address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
                 global_state_db_ptr->account_is_warm[instance_idx] = false;
             } else {
                 printf("todo negative address index set cold revert\n");
+
+                // find the dynamic account
+                DynamicAccount *dynamic_account = global_state_db_ptr->dynamic_accounts[INSTANCE_GLOBAL_IDX];
+                while (dynamic_account != nullptr) {
+                    if (dynamic_account->dynamic_account_index == address_index) {
+                        dynamic_account->is_warm = false;
+                    }
+                    dynamic_account = dynamic_account->next_account;
+                }
             }
         }
     }
@@ -118,12 +128,29 @@ __device__ void SnapshotState::revert() {
                                            &dynamic_touched_storage_keys[i - preallocated_touched_storage_keys_size]);
         }
     }
-    if (next_state != nullptr) {
-        // revert the next state until the end of the chain
-        next_state->revert();
-    }
+
+    return next_state;
 }
 
+__device__ void SnapshotState::set_touched_account(const int32_t address_index) {
+    // printf("snapshot %p set touched account thread %d, address_index %d, touched_account_counts %d\n", this,
+    //        INSTANCE_GLOBAL_IDX, address_index, touched_account_counts);
+    if (touched_account_counts < preallocated_touched_accounts_size) {
+        preallocated_touched_accounts[touched_account_counts] = address_index;
+    } else {
+        // allocate dynamic touched accounts
+        // todo: optimize
+        printf("allocate dynamic touched accounts\n");
+        int32_t *new_dynamic_touched_accounts =
+            new int32_t[touched_account_counts + 1 - preallocated_touched_accounts_size];
+        for (uint32_t i = 0; i < touched_account_counts - preallocated_touched_accounts_size; i++) {
+            new_dynamic_touched_accounts[i] = dynamic_touched_accounts[i];
+        }
+        dynamic_touched_accounts = new_dynamic_touched_accounts;
+        dynamic_touched_accounts[touched_account_counts - preallocated_touched_accounts_size] = address_index;
+    }
+    touched_account_counts++;
+}
 __device__ void SnapshotState::set_blank_key(const evm_word_t *key) {
     int32_t offset = -1;
     for (uint32_t i = 0; i < touched_storage_counts; i++) {
@@ -370,7 +397,15 @@ __device__ DynamicAccount *StateDb::new_account(const evm_word_t *address, const
                                                 const uint32_t nonce, const uint32_t code_size, uint8_t *code) {
     // printf("Create new dynamic account \n");
     DynamicAccount *new_acc = new DynamicAccount(address, balance, nonce, 0, code_size, code);
+
     new_acc->next_account = dynamic_accounts[INSTANCE_GLOBAL_IDX];
+
+    // dynamic account list has index from -1 to -N
+    if (dynamic_accounts[INSTANCE_GLOBAL_IDX] == nullptr) {
+        new_acc->dynamic_account_index = -1;
+    } else {
+        new_acc->dynamic_account_index = dynamic_accounts[INSTANCE_GLOBAL_IDX]->dynamic_account_index - 1;
+    }
     dynamic_accounts[INSTANCE_GLOBAL_IDX] = new_acc;
     return new_acc;
 }
@@ -480,20 +515,34 @@ __device__ int32_t StateDb::deduct_balance(const evm_word_t *address, const evm_
         }
         current_balance = &account_balances[address_index * num_states + INSTANCE_GLOBAL_IDX];
     }
-    // if (INSTANCE_GLOBAL_IDX == 0) {
-    //     printf("deduct balance\n");
-    //     address->print();
-    //     printf("current balance\n");
-    //     current_balance->print();
-    //     printf("amount\n");
-    //     amount->print();
-    // }
+
     if (uint256_cmp(current_balance, amount) < 0) {
         // printf("deduct balance insufficient funds instance %d\n", INSTANCE_GLOBAL_IDX);
         return ERROR_INSUFFICIENT_FUNDS;
     }
     uint256_sub(current_balance, current_balance, amount);
 
+    return ERROR_SUCCESS;
+}
+
+__device__ int32_t StateDb::deduct_balance_sender(const evm_word_t *address, const evm_word_t *amount) {
+    // sender always must have balance and in static statedb
+    int32_t address_index = get_address_index(address);
+    if (address_index == -1) {
+        return ERROR_INSUFFICIENT_FUNDS;
+    }
+    uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    // printf("address index %d instance %d\n", address_index, INSTANCE_GLOBAL_IDX);
+    evm_word_t *current_balance;
+
+    account_is_warm[instance_idx] = true;
+    account_nonces[instance_idx]++;
+    current_balance = &account_balances[instance_idx];
+    if (uint256_cmp(current_balance, amount) < 0) {
+        // printf("deduct balance insufficient funds instance %d\n", INSTANCE_GLOBAL_IDX);
+        return ERROR_INSUFFICIENT_FUNDS;
+    }
+    uint256_sub(current_balance, current_balance, amount);
     return ERROR_SUCCESS;
 }
 
@@ -640,6 +689,16 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
     uint32_t address_index = get_address_index(address);
     if (address_index == -1) {
         printf("init_snapshot address not found in state db\n");
+        address->print();
+        SnapshotState *tmp = CuEVM::memory_pool::get_snapshot_state();
+        tmp->address = *address;
+        tmp->storage_size = 0;
+        tmp->touched_account_counts = 0;
+        tmp->balance = 0;
+        tmp->nonce = 0;
+        tmp->preallocated_offset = memory_pool_snapshot_preallocate_slots;
+        call_context->snapshot_state = tmp;
+        tmp->next_state = nullptr;
         return;
     }
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
@@ -663,8 +722,24 @@ __device__ evm_word_t *StateDb::get_storage_with_known_index(const evm_word_t *a
                                                              int32_t address_index, ValueStatus *found_value,
                                                              bool set_warm) {
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-    // printf("get_storage_with_known_index found_value %p\n", found_value);
-    // printf("account_storage_size %d\n", account_storage_size[instance_idx]);
+    if (address_index == -1) {
+        DynamicAccount *dynamic_account = get_dynamic_account(address);
+        if (dynamic_account == nullptr) {
+            return nullptr;
+        }
+        found_value = dynamic_account->get_value_status(key);
+        if (found_value == nullptr) {
+            if (set_warm) {
+                // insert new value
+                evm_word_t zero = 0;
+                dynamic_account->set_storage(key, &zero, true);
+            }
+            return nullptr;
+        }
+
+        found_value->is_warm = set_warm;
+        return &found_value->value;
+    }
 
     if (found_value == nullptr) {
         evm_word_t zero = 0;
@@ -780,16 +855,17 @@ __device__ uint8_t *StateDb::get_code(uint32_t &code_size, const evm_word_t *add
         if (dynamic_account == nullptr) {
             return nullptr;
         }
+        // todo implement revert warm state for dynamic account
         if (set_warm) {
             dynamic_account->is_warm = true;
         }
         code_size = dynamic_account->code_size;
-        printf("get_code dynamic, code_size %d, code %p\n", code_size, dynamic_account->code);
+        // printf("get_code dynamic, code_size %d, code %p\n", code_size, dynamic_account->code);
         return dynamic_account->code;
     }
 
     code_size = account_codes_size[address_index];
-    printf("get_code address_index %d, code_size %d\n", address_index, code_size);
+    // printf("get_code address_index %d, code_size %d\n", address_index, code_size);
     if (set_warm) {
         account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = true;
     }
@@ -814,7 +890,7 @@ __device__ void StateDb::set_warm_key(const evm_word_t *address, const evm_word_
     // todo :implement
 }
 
-__device__ bool StateDb::is_warm_account(const evm_word_t *address, bool set_warm) {
+__device__ bool StateDb::is_warm_account(const evm_word_t *address, SnapshotState *snapshot_state, bool set_warm) {
     if (address->is_precompile()) return true;  // precompile contracts are warm
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
@@ -823,6 +899,15 @@ __device__ bool StateDb::is_warm_account(const evm_word_t *address, bool set_war
         DynamicAccount *dynamic_account = get_dynamic_account(address);
 
         if (dynamic_account == nullptr) {
+            if (set_warm) {
+                dynamic_account = new_account(address, 0, 0, 0, nullptr);
+                dynamic_account->is_warm = true;
+
+                if (snapshot_state != nullptr) {
+                    // set the snapshot state
+                    snapshot_state->set_touched_account(dynamic_account->dynamic_account_index);
+                }
+            }
             return false;
         } else {
             if (set_warm) {
@@ -834,10 +919,12 @@ __device__ bool StateDb::is_warm_account(const evm_word_t *address, bool set_war
         }
     }
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-    if (set_warm) {
-        bool temp = account_is_warm[instance_idx];
-        account_is_warm[instance_idx] = set_warm;
-        return temp;
+    if (set_warm && account_is_warm[instance_idx] == false) {
+        if (snapshot_state != nullptr) {
+            snapshot_state->set_touched_account(address_index);
+        }
+        account_is_warm[instance_idx] = true;
+        return false;
     }
     return account_is_warm[instance_idx];
 }

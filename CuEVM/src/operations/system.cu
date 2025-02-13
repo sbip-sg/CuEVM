@@ -234,6 +234,9 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
 __device__ int32_t STOP(CuEVM::evm_call_context_t *call_state_ptr) {
     // TODO: fix this
     call_state_ptr->dynamic_ret_size = 0;
+    if (call_state_ptr->parent != nullptr) {
+        call_state_ptr->parent->dynamic_ret_size = 0;
+    }
     return ERROR_RETURN;
 }
 
@@ -259,11 +262,10 @@ __device__ int32_t CREATE(CuEVM::evm_call_context_t *current_context, CuEVM::evm
 __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                         CuEVM::cached_evm_call_context &cached_state) {
     evm_word_t *gas_word, *original_address, *value, *args_offset, *args_size, *ret_offset, *ret_size;
-    if (INSTANCE_GLOBAL_IDX == 1) {
-        printf("stack before call %p\n", cached_state.stack_ptr);
-        printf("stack base %p size offset %d, global offset %d\n", cached_state.stack_ptr->shared_stack_base,
-               cached_state.stack_ptr->stack_offset, cached_state.stack_ptr->stack_base_offset);
-    }
+    // if (INSTANCE_GLOBAL_IDX == 1) {
+    //     printf("stack before call %p\n", cached_state.stack_ptr);
+    //     printf("snapshot state before call %p\n", current_context->snapshot_state);
+    // }
 
     if (cached_state.stack_ptr->size() < 7) return ERROR_STACK_UNDERFLOW;
     gas_word = cached_state.stack_ptr->get_address_at_index(1);
@@ -274,11 +276,7 @@ __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_c
     ret_offset = cached_state.stack_ptr->get_address_at_index(6);
     ret_size = cached_state.stack_ptr->get_address_at_index(7);
     cached_state.stack_ptr->reduce_size(7);
-    if (INSTANCE_GLOBAL_IDX == 1) {
-        printf("stack after call %p\n", cached_state.stack_ptr);
-        printf("stack base %p size offset %d, global offset %d\n", cached_state.stack_ptr->shared_stack_base,
-               cached_state.stack_ptr->stack_offset, cached_state.stack_ptr->stack_base_offset);
-    }
+
     gas_t gas = uint256_get_uint64_t(gas_word);
 
     evm_word_t address = *original_address;
@@ -292,7 +290,8 @@ __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_c
                                      nullptr, 0, nullptr, 0, uint256_get_uint32_t(ret_offset),
                                      uint256_get_uint32_t(ret_size), current_context->static_env);
 
-    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
+    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address,
+                                         current_context->snapshot_state);
 
     return generic_CALL(args_offset, args_size, current_context->memory_ptr, new_context_ptr, cached_state);
 }
@@ -324,10 +323,12 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
     CuEVM::utils::evm_address_conversion(address);
 
     // get the account warm result first, get_code will warm up the account
-    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
+    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address,
+                                         current_context->snapshot_state);
 
     uint32_t byte_code_size = 0;
-    uint8_t *byte_code = CuEVM::global_state_db_ptr->get_code(byte_code_size, &address);
+    uint8_t *byte_code =
+        CuEVM::global_state_db_ptr->get_code(byte_code_size, &address, current_context->snapshot_state);
 
     // new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr = memory_pool::get_call_context(current_context->depth);
@@ -372,10 +373,12 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
     evm_word_t address = *original_address;
     CuEVM::utils::evm_address_conversion(address);
 
-    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
+    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address,
+                                         current_context->snapshot_state);
 
     uint32_t byte_code_size = 0;
-    uint8_t *byte_code = CuEVM::global_state_db_ptr->get_code(byte_code_size, &address);
+    uint8_t *byte_code =
+        CuEVM::global_state_db_ptr->get_code(byte_code_size, &address, current_context->snapshot_state);
     // if (current_context->depth < memory_pool_call_context_preallocate) {
     //     new_context_ptr = memory_pool::get_call_context(current_context->depth);
     // } else {
@@ -432,7 +435,8 @@ __device__ int32_t STATICCALL(CuEVM::evm_call_context_t *current_context, CuEVM:
                                      uint256_get_uint32_t(ret_size), true);
     // printf("new context ptr\n");
     // new_context_ptr->print();
-    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address);
+    CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address,
+                                         current_context->snapshot_state);
 
     return generic_CALL(args_offset, args_size, current_context->memory_ptr, new_context_ptr, cached_state);
 }
@@ -514,7 +518,7 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         // memory.increase_memory_cost(memory_expansion_cost);
-        printf("REVERT : set return data %u %u\n", memory_offset_ui32, length_ui32);
+        // printf("REVERT : set return data %u %u\n", memory_offset_ui32, length_ui32);
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
         // error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
         error_code = ERROR_REVERT;
@@ -549,7 +553,8 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
         error_code |= stack.pop(recipient);
         gas_used += GAS_SELFDESTRUCT;
         // custom logic, cannot use access_account_cost (no warm cost)
-        if (!global_state_db_ptr->is_warm_account(&recipient)) gas_used += GAS_COLD_ACCOUNT_ACCESS;
+        if (!global_state_db_ptr->is_warm_account(&recipient, call_context->snapshot_state))
+            gas_used += GAS_COLD_ACCOUNT_ACCESS;
 
         evm_word_t *sender_balance = global_state_db_ptr->get_balance(&call_context->to);
 
@@ -558,12 +563,12 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
                 gas_used += GAS_NEW_ACCOUNT;
             }
         }
-        printf("sender \n");
-        call_context->to.print();
-        printf("recipient \n");
-        recipient.print();
-        printf("sender balance \n");
-        sender_balance->print();
+        // printf("sender \n");
+        // call_context->to.print();
+        // printf("recipient \n");
+        // recipient.print();
+        // printf("sender balance \n");
+        // sender_balance->print();
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
             global_state_db_ptr->increase_balance(&recipient, sender_balance);

@@ -30,6 +30,8 @@ struct DynamicAccount {
     uint32_t storage_size = 0;
     uint32_t dynamic_storage_capacity = 0;
     uint32_t code_size = 0;
+    // keep track of the index of the account in the dynamic account list
+    int32_t dynamic_account_index = 0;
     uint8_t *code = nullptr;
     StateDbStoragePage *storage_page = nullptr;
     DynamicAccount *next_account = nullptr;
@@ -101,6 +103,8 @@ class StateDb {
     __device__ void update_account(const evm_word_t *address, const evm_word_t *balance, const uint32_t nonce);
     // shortcuts to avoid search for balance location multiple times
     __device__ int32_t deduct_balance(const evm_word_t *address, const evm_word_t *amount, bool set_warm = false);
+    // shortcut to deduct balance from sender and update nonce
+    __device__ int32_t deduct_balance_sender(const evm_word_t *address, const evm_word_t *amount);
     __device__ void set_balance(const evm_word_t *address, const evm_word_t *balance, bool is_warm = true);
     __device__ void increase_balance(const evm_word_t *address, const evm_word_t *balance, bool is_warm = true);
     __device__ void update_nonce(const evm_word_t *address, const uint32_t nonce);
@@ -130,7 +134,7 @@ class StateDb {
                                                         bool set_warm = true);
     __device__ ValueStatus *get_value_status(const evm_word_t *address, const evm_word_t *key) const;
     __device__ ValueStatus *get_value_status(const int32_t address_index, const evm_word_t *key) const;
-    __device__ bool is_warm_account(const evm_word_t *address, bool set_warm = false);
+    __device__ bool is_warm_account(const evm_word_t *address, SnapshotState *snapshot_state, bool set_warm = false);
     __device__ bool is_warm_key(const evm_word_t *address, const evm_word_t *key) const;
     __device__ bool is_warm_key_with_offset(const evm_word_t *address, const evm_word_t *key, int32_t &address_index,
                                             ValueStatus *&found_value, SnapshotState *snapshot_state,
