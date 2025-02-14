@@ -27,9 +27,9 @@ CuEVM::block_info_t* getBlockDataFromPyObject(PyObject* data);
 
 void print_dict_recursive(PyObject* dict, int indent_level);
 
-CuEVM::evm_transaction_t* getTransactionDataFromListofPyObject(PyObject* read_roots);
+CuEVM::transaction::TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots);
 
-CuEVM::state_t* getStateDataFromPyObject(PyObject* data);
+CuEVM::StateDb* getStateDataFromPyObject(PyObject* data, uint32_t num_states);
 void get_evm_instances_from_PyObject(CuEVM::evm_instance_t*& evm_instances, PyObject* read_roots,
                                      uint32_t& num_instances);
 

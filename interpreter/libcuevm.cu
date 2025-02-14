@@ -10,59 +10,66 @@ using namespace python_utils;
 
 PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_parsing) {
     CuEVM::evm_instance_t* instances_data;
-    CuEVM::ArithEnv arith(cgbn_no_checks, 0);
-    // printf("Running the interpreter\n");
+
 #ifndef GPU
     printf("CPU libcuevm is not supported at the moment\n");
     return NULL;
 #endif
+
     CUDA_CHECK(cudaSetDevice(0));
     CUDA_CHECK(cudaDeviceReset());
-    // printf("Running on GPU\n");
-    cgbn_error_report_t* report = nullptr;
-    // CUDA_CHECK(cgbn_error_report_alloc(&report));
+
     cudaEvent_t start, stop;
     float milliseconds = 0;
 
-    size_t size_value;
-    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    // printf("current stack size %zu\n", size_value);
-    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    // printf("current heap size %zu\n", size_value);
     size_t heap_size = (size_t(500) << 20);  // 500MB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 2 * 1024));
-    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    // printf("current stack size %zu\n", size_value);
     CUDA_CHECK(cudaDeviceSynchronize());
-    // CUDA_CHECK(cudaEventCreate(&start));
-    // CUDA_CHECK(cudaEventCreate(&stop));
 
     // read the json file with the global state
-
     uint32_t num_instances = 0;
     uint32_t managed = 1;
 
+    // Some basic data validity checking
+    // todo we accept a list of Json objects, each representing a transaction
+    // while here we assume that each transaction contains the same `pre`-state
     if (!PyList_Check(read_roots)) {
         PyErr_SetString(PyExc_TypeError, "Argument must be a list of dictionaries.");
         return NULL;
     }
 
-    Py_ssize_t count = PyList_Size(read_roots);
+    PyObject* first_item = PyList_GetItem(read_roots, 0);
+
+    if (!PyDict_Check(first_item)) {
+      PyErr_SetString(PyExc_TypeError, "First item in the list must be a dictionary.");
+      return NULL;
+    }
+
+    PyObject* data = PyDict_GetItemString(first_item, "pre");
+
+    if (!PyDict_Check(data)) {
+      PyErr_SetString(PyExc_TypeError, "pre must be a dictionary.");
+      return NULL;
+    }
+
+    auto num_accounts = PyDict_Size(data);
 
     python_utils::get_evm_instances_from_PyObject(instances_data, read_roots, num_instances);
-    // printf("print simplified trace data host\n");
-    // instances_data[0].simplified_trace_data_ptr->print();
+    CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
 
     uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
-    // printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
-    //        CGBN_TPI * CGBN_IBP);
-    // run the evm
+
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(report, instances_data, num_instances);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(instances_data->state_db_ptr, instances_data->transaction_list_ptr,
+                                                                              instances_data->simplified_trace_data_ptr,
+                                                                              num_instances);
+    cudaDeviceSynchronize();
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -71,19 +78,8 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    // CUDA_CHECK(cudaDeviceSynchronize());
-
     CUDA_CHECK(cudaGetLastError());
-    // printf("GPU kernel finished\n");
-    // CGBN_CHECK(report);
 
-    // printf("\n\ntesting world state printing on host\n\n");
-    // instances_data[0].serialized_worldstate_data_ptr->print();
-    // printf("print simplified trace data host\n");
-    // for (uint32_t i = 0; i < num_instances; i++) {
-    //     printf("\n\ninstance %d\n", i);
-    //     instances_data[i].simplified_trace_data_ptr->print();
-    // }
     PyObject* write_root;
     if (!skip_trace_parsing) {
         write_root = python_utils::pyobject_from_evm_instances(instances_data, num_instances);
@@ -93,7 +89,6 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
 
     CuEVM::free_evm_instances(instances_data, num_instances);
 
-    CUDA_CHECK(cgbn_error_report_free(report));
     CUDA_CHECK(cudaDeviceReset());
     return write_root;
 }
@@ -101,17 +96,12 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
 static PyObject* run_dict(PyObject* self, PyObject* args) {
     PyObject* read_root;
     uint32_t skip_trace_parsing = 0;
-    // Parse the input PyObject* to get the Python object (dictionary)
-    // if (!PyArg_ParseTuple(args, "O", &read_root)) {
-    //     return NULL;  // If parsing fails, return NULL
-    // }
-    // Parse the input PyObject* to get the Python object (dictionary) and optionally the boolean flag
+
     if (!PyArg_ParseTuple(args, "O|i", &read_root, &skip_trace_parsing)) {
         return NULL;  // If parsing fails, return NULL
     }
 
     PyObject* write_root = run_interpreter_pyobject(read_root, skip_trace_parsing);
-    // Return the resulting PyObject* (no need for manual memory management on Python side)
     return write_root;
 }
 

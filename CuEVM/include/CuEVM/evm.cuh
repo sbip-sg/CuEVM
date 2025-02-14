@@ -31,7 +31,7 @@ struct evm_instance_t {
 #endif
 
     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
-    CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
+  CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
 };
 
 struct evm_t {
@@ -67,14 +67,6 @@ struct evm_t {
                      CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr,
                      CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr);
 
-    /**
-     * @brief Construct a new evm_t object
-     * Construct a new evm_t object
-     * @param[in] evm_instance The evm instance
-     */
-    __host__ __device__ evm_t(CuEVM::evm_instance_t& evm_instance,
-                              CuEVM::evm_call_context_t* call_context_ptr = nullptr,
-                              CuEVM::evm_word_t* shared_stack_ptr = nullptr);
 
     __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr);
 
@@ -159,6 +151,7 @@ __host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* 
 __host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances);
 
 __global__ void kernel_evm_multiple_instances(StateDb* state_db_ptr, transaction::TransactionList* transaction_list_ptr,
+                                              CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr, // optional only required if BUILD_LIBRARY
                                               uint32_t count);
 
 }  // namespace CuEVM

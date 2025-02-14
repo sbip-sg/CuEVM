@@ -71,7 +71,9 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         cudaEventRecord(start);
 
         CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(
-            instances_data->state_db_ptr, instances_data->transaction_list_ptr, num_instances);
+            instances_data->state_db_ptr, instances_data->transaction_list_ptr,
+            nullptr,
+            num_instances);
 
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
@@ -146,4 +148,6 @@ int main(int argc, char *argv[]) {  // getting the input
         exit(EXIT_FAILURE);
     }
     run_interpreter(read_json_filename, write_json_filename, clones, verbose);
+
+    return 0;
 }

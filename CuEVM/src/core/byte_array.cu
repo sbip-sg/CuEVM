@@ -49,11 +49,13 @@ __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size, int32
 
 __device__ byte_array_t::~byte_array_t() { free(); }
 
-__device__ void byte_array_t::free() {
-    if ((size > 0) && (data != nullptr)) {
-        delete[] data;
-        clear();
-    }
+__host__ __device__ void byte_array_t::free() {
+  if ((size > 0) && (data != nullptr)) {
+#ifndef __CUDA_ARCH__
+    delete[] data;
+#endif
+    clear();
+  }
 }
 __host__ void byte_array_t::free_managed() {
     if ((size > 0) && (data != nullptr)) {
@@ -61,7 +63,7 @@ __host__ void byte_array_t::free_managed() {
     }
     clear();
 }
-__device__ void byte_array_t::clear() {
+__host__ __device__ void byte_array_t::clear() {
     data = nullptr;
     size = 0;
 }
@@ -245,7 +247,6 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
             CUDA_CHECK(cudaMallocManaged((void **)&data, sizeof(uint8_t) * size));
             memset(data, 0, size * sizeof(uint8_t));
         } else {
-            // data = (uint8_t*) std::calloc(size, sizeof(uint8_t));
             data = new uint8_t[size];
             memset(data, 0, size * sizeof(uint8_t));
         }
