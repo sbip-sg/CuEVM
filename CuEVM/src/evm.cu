@@ -1,25 +1,21 @@
 #include <CuEVM/evm.cuh>
+#include <cassert>
 
 namespace CuEVM {
 
 // define the kernel function
 __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
                                               CuEVM::transaction::TransactionList *transaction_list_ptr,
+                                              CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr,
                                               uint32_t count) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
 
-    // printf("instance %d\n", instance);
-    // printf("state db ptr %p\n", state_db_ptr);
-    // printf("global state db ptr %p\n", global_state_db_ptr);
-    // printf("transaction list ptr %p\n", transaction_list_ptr);
-    // printf("printing state db\n");
-    // global_state_db_ptr->print();
-    // printf("printing transaction list\n");
-    // transaction_list_ptr->print();
-
     CuEVM::evm_t evm = CuEVM::evm_t(state_db_ptr, transaction_list_ptr);
-
+#ifdef BUILD_LIBRARY
+    assert(simplified_trace_data_ptr != nullptr);
+    evm.simplified_trace_data_ptr = simplified_trace_data_ptr + instance;
+#endif
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
 
     evm.run(cached_call_state);
@@ -103,8 +99,6 @@ __device__ evm_t::~evm_t() {
     tracer_ptr = nullptr;
 #endif
 }
-__host__ evm_t::evm_t(CuEVM::evm_instance_t &evm_instance, CuEVM::evm_call_context_t *call_context_ptr,
-                      CuEVM::evm_word_t *shared_stack_ptr) {}
 
 __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state) {
     // printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
@@ -186,20 +180,16 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 }
 __device__ void evm_t::run() {
     cached_evm_call_context cached_call_state(call_state_ptr);
-    // printf("\n\ncached call state created %p\n\n", cached_call_state.stack_ptr);
-    // cached_call_state.print();
-
     run(cached_call_state);
 }
 
 __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
-    // if (status != ERROR_SUCCESS) {
-    //     return;  // finish transaction
-    // }
-
 #ifdef BUILD_LIBRARY
-    simplified_trace_data_ptr->start_call(0, call_state_ptr->message_ptr);
+    assert(simplified_trace_data_ptr!=nullptr);
+    assert(memory_pool::global_memory_pool!=nullptr);
+    simplified_trace_data_ptr->start_call(0, call_state_ptr); // pc is 0?
 #endif
+
     int32_t error_code = start_CALL(cached_call_state);
 
     if (error_code != ERROR_SUCCESS) {
@@ -321,35 +311,35 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                     break;
                 case OP_LT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::LT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_GT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::GT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SLT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SLT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_SGT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SGT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_EQ:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(arith, opcode, *cached_call_state.stack_ptr);
+                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::EQ(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
@@ -647,7 +637,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                 cached_call_state = cached_evm_call_context(call_state_ptr);
                 error_code = start_CALL(cached_call_state);
 #ifdef BUILD_LIBRARY
-                simplified_trace_data_ptr->start_call(call_state_ptr->parent->pc, call_state_ptr->message_ptr);
+                simplified_trace_data_ptr->start_call(call_state_ptr->parent->pc, call_state_ptr);
 #endif
             } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                 // Logic: when op_create or create2 does not succeed,
@@ -695,7 +685,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
     // sent the gas value to the block beneficiary
     gas_t gas_value;
     const evm_word_t *beneficiary = &(global_block_info->coin_base);
-    // block_info_ptr->get_coin_base(arith, beneficiary);
+    // block_info_ptr->get_coin_base(beneficiary);
 
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         gas_t gas_left;
@@ -723,7 +713,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
         evm_word_t *sender_balance;
         // bn_t sender_address;
         // send back the gas left and gas refund to the sender
-        // transaction_ptr->get_sender(arith, sender_address);
+        // transaction_ptr->get_sender(sender_address);
         // deduct transaction value; TODO this probably should be done at some
         // other place _transaction->get_value(tx_value); cgbn_sub(arith.env,
         // sender_balance, sender_balance, tx_value); the gas value for the
@@ -884,7 +874,7 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     // TODO: increase sender nonce if the sender is a contract
     // to see if the contract is a contract
     // bn_t sender_address;
-    // call_state_ptr->message_ptr->get_sender(arith, sender_address);
+    // call_state_ptr->message_ptr->get_sender(sender_address);
 
     // TODO: fix this
     printf("finish_CREATE thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);

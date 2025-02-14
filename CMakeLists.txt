@@ -84,7 +84,7 @@ if(CPU)
         target_compile_definitions(${CPU_INTERPRETER} PRIVATE EIP_3155_OPTIONAL)
     endif()
     target_compile_definitions(${CPU_INTERPRETER} PRIVATE EVM_VERSION=${EVM_VERSION})
-    
+
     target_compile_definitions(${CPU_INTERPRETER} PRIVATE CGBN_TPI=${CGBN_TPI})
 endif()
 
@@ -135,9 +135,10 @@ if(GPU)
         target_compile_definitions(${PROJECT_NAME} PRIVATE EVM_VERSION=${EVM_VERSION})
 
         target_compile_definitions(${PROJECT_NAME} PRIVATE GPU)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_LIBRARY)
 
         target_compile_definitions(${PROJECT_NAME} PRIVATE CGBN_TPI=${CGBN_TPI})
-        
+
     else()
 
         set(GPU_INTERPRETER ${PROJECT_NAME}_GPU)
@@ -175,7 +176,7 @@ if(GPU)
         target_compile_definitions(${GPU_INTERPRETER} PRIVATE GPU)
 
         target_compile_definitions(${GPU_INTERPRETER} PRIVATE CGBN_TPI=${CGBN_TPI})
-    endif() 
+    endif()
 
 endif()
 

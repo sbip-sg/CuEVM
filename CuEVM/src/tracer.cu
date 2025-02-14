@@ -1,4 +1,5 @@
 #include <CuEVM/tracer.cuh>
+#include <cassert>
 
 namespace CuEVM::utils {
 
@@ -51,6 +52,7 @@ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t
     no_events++;
 }
 __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t *call_context_ptr) {
+    assert(call_context_ptr != nullptr);
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];

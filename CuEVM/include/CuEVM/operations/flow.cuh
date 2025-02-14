@@ -6,6 +6,7 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
+#include <CuEVM/tracer.cuh>
 /**
  * 50s: Flow Operations:
  * - JUMP
@@ -43,7 +44,7 @@ __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, C
 __device__ int32_t JUMPI(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
                          evm_call_context_t *call_context
 #ifdef BUILD_LIBRARY
-                             CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
+                         , CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
 #endif
 );
 

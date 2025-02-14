@@ -19,8 +19,12 @@
 #define DEBUG_PRINT(fmt, args...) /* Don't do anything in release builds */
 #endif
 
-#ifndef CONSTANT
-#define CONSTANT __device__ __constant__ const
+#ifndef __CUDA_ARCH__
+#  undef CONSTANT
+#  define CONSTANT const
+#else
+#  undef CONSTANT
+#  define CONSTANT __device__ __constant__ const
 #endif
 
 #define CUDA_CHECK(action) cuda_check(action, #action, __FILE__, __LINE__)

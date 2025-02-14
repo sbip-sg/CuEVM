@@ -1,4 +1,5 @@
 #include <CuEVM/core/memory_pool.cuh>
+#include <assert.h>
 
 namespace CuEVM::memory_pool {
 __device__ memory_pool_t* global_memory_pool;
@@ -8,7 +9,7 @@ __device__ SnapshotValue* preallocated_snapshot_values;
 __device__ ValueStatus** preallocated_snapshot_restore_ptr;
 __device__ uint8_t* preallocated_memory_base;
 __device__ CuEVM::EccConstants* ecc_constants_ptr;
-__host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) {
+__host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) {
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
 
@@ -16,18 +17,14 @@ __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_a
     printf("host: allocated stack base %p size %d\n", memory_pool->stack_base,
            num_instances * memory_pool_stack_preallocate);
 
-    cudaMalloc(&memory_pool->call_context,
-               num_instances * memory_pool_call_context_preallocate * sizeof(evm_call_context_t));
+    CUDA_CHECK(cudaMalloc(&memory_pool->call_context, num_instances * memory_pool_call_context_preallocate * sizeof(evm_call_context_t)));
 
-    cudaMalloc(&memory_pool->prealloc_stack_instances,
-               num_instances * memory_pool_call_context_preallocate * sizeof(evm_stack_t));
+    CUDA_CHECK(cudaMalloc(&memory_pool->prealloc_stack_instances, num_instances * memory_pool_call_context_preallocate * sizeof(evm_stack_t)));
 
-    cudaMalloc(&memory_pool->prealloc_mem_instances,
-               num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t));
+    CUDA_CHECK(cudaMalloc(&memory_pool->prealloc_mem_instances, num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t)));
 
-    cudaMalloc(&memory_pool->return_data_base, num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t));
-    printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base,
-           num_instances * memory_pool_return_data_preallocate);
+    CUDA_CHECK(cudaMalloc(&memory_pool->return_data_base, num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t)));
+    printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base, num_instances * memory_pool_return_data_preallocate);
 
     cudaMalloc(&memory_pool->snapshot_states_pool,
                snapshot_account_pool_size * num_instances * sizeof(CuEVM::SnapshotState));
@@ -37,9 +34,10 @@ __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_a
     cudaMemset(memory_pool->snapshot_slot_counts, 0, num_instances * sizeof(uint16_t));
 
     memory_pool_t* d_memory_pool;
-    cudaMalloc(&d_memory_pool, sizeof(memory_pool_t));
-    cudaMemcpy(d_memory_pool, memory_pool, sizeof(memory_pool_t), cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(global_memory_pool, &d_memory_pool, sizeof(memory_pool_t*));
+    CUDA_CHECK(cudaMalloc(&d_memory_pool, sizeof(memory_pool_t)));
+    assert(d_memory_pool != nullptr);
+    CUDA_CHECK(cudaMemcpy(d_memory_pool, memory_pool, sizeof(memory_pool_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpyToSymbol(global_memory_pool, &d_memory_pool, sizeof(memory_pool_t*)));
 
     SnapshotValue* d_preallocated_snapshot_values;
     cudaMalloc(&d_preallocated_snapshot_values,
@@ -72,12 +70,13 @@ __host__ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_a
     delete host_ecc_constants_ptr;
 }
 
-__device__ evm_call_context_t* get_call_context(uint16_t depth) {
-    if (depth < memory_pool_call_context_preallocate) {
-        return &global_memory_pool->call_context[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
-    } else {
-        return new evm_call_context_t();
-    }
+  __device__ evm_call_context_t* get_call_context(uint16_t depth) {
+      assert(global_memory_pool!=nullptr);
+      if (depth < memory_pool_call_context_preallocate) {
+          return &global_memory_pool->call_context[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
+      } else {
+          return new evm_call_context_t();
+      }
 }
 
 __device__ evm_stack_t* get_stack(uint16_t depth) {
