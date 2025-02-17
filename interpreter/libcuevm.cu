@@ -1,5 +1,4 @@
 #include <CuEVM/utils/python_utils.h>
-#include <Python.h>
 #include <getopt.h>
 
 #include <CuEVM/utils/evm_utils.cuh>
@@ -9,12 +8,7 @@
 using namespace python_utils;
 
 PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_parsing) {
-    CuEVM::evm_instance_t* instances_data;
-
-#ifndef GPU
-    printf("CPU libcuevm is not supported at the moment\n");
-    return NULL;
-#endif
+    // CuEVM::evm_instance_t* instances_data;
 
     CUDA_CHECK(cudaSetDevice(0));
     CUDA_CHECK(cudaDeviceReset());
@@ -22,9 +16,9 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     cudaEvent_t start, stop;
     float milliseconds = 0;
 
-    size_t heap_size = (size_t(500) << 20);  // 500MB
+    size_t heap_size = (size_t(1) << 32);  // 4GB
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 2 * 1024));
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
     CUDA_CHECK(cudaDeviceSynchronize());
 
     // read the json file with the global state
@@ -42,20 +36,23 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     PyObject* first_item = PyList_GetItem(read_roots, 0);
 
     if (!PyDict_Check(first_item)) {
-      PyErr_SetString(PyExc_TypeError, "First item in the list must be a dictionary.");
-      return NULL;
+        PyErr_SetString(PyExc_TypeError, "First item in the list must be a dictionary.");
+        return NULL;
     }
 
     PyObject* data = PyDict_GetItemString(first_item, "pre");
 
     if (!PyDict_Check(data)) {
-      PyErr_SetString(PyExc_TypeError, "pre must be a dictionary.");
-      return NULL;
+        PyErr_SetString(PyExc_TypeError, "pre must be a dictionary.");
+        return NULL;
     }
 
     auto num_accounts = PyDict_Size(data);
+    printf("num_accounts: %d\n", num_accounts);
 
-    python_utils::get_evm_instances_from_PyObject(instances_data, read_roots, num_instances);
+    CuEVM::transaction::TransactionList* all_transactions =
+        python_utils::get_evm_instances_from_PyObject(read_roots, num_instances);
+
     CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
 
     uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
@@ -66,9 +63,7 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(instances_data->state_db_ptr, instances_data->transaction_list_ptr,
-                                                                              instances_data->simplified_trace_data_ptr,
-                                                                              num_instances);
+    CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(all_transactions, num_instances);
     cudaDeviceSynchronize();
 
     cudaEventRecord(stop);
@@ -82,12 +77,12 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
 
     PyObject* write_root;
     if (!skip_trace_parsing) {
-        write_root = python_utils::pyobject_from_evm_instances(instances_data, num_instances);
+        write_root = python_utils::pyobject_from_evm_instances(num_instances);
     } else {
         write_root = PyDict_New();
     }
 
-    CuEVM::free_evm_instances(instances_data, num_instances);
+    // CuEVM::free_evm_instances(instances_data, num_instances);
 
     CUDA_CHECK(cudaDeviceReset());
     return write_root;

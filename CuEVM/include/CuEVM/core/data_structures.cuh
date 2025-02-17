@@ -1,6 +1,7 @@
 #pragma once
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/ecc.cuh>
+#include <CuEVM/utils/evm_defines.cuh>
 namespace CuEVM {
 constexpr uint32_t worldstate_addresses_size = 32;
 constexpr uint32_t worldstate_storage_values_size = 1024;
@@ -136,6 +137,30 @@ struct SnapshotState {
     __device__ void print() const;
     __device__ void clear();
 };
+namespace transaction {
+class TransactionList {
+   public:
+    uint32_t size;
+    // shared among all transactions (eth-tests)
+    evm_word_t nonce;
+    evm_word_t sender;
+    evm_word_t to;
+    evm_word_t max_fee_per_gas;
+    evm_word_t max_priority_fee_per_gas;
+    evm_word_t gas_price;
+    uint16_t type;
+    // different for each transaction (eth-tests)
+    evm_word_t *value;
+    gas_t *gas_limit;
+    uint8_t *call_data;
+    uint32_t *call_data_offset;
+    uint32_t *call_data_size;
+    // TODO: access list
+
+    __host__ __device__ void print();
+};
+}  // namespace transaction
+
 namespace memory {
 // to change for making more optimal memory allocation current 1KB
 // constexpr CONSTANT uint32_t page_size = 1024U;
@@ -487,5 +512,23 @@ extern __device__ uint8_t *preallocated_return_data_base;
 extern __device__ SnapshotValue *preallocated_snapshot_values;
 extern __device__ ValueStatus **preallocated_snapshot_restore_ptr;  // store the original value to restore
 extern __device__ uint8_t *preallocated_memory_base;
+
 }  // namespace memory_pool
+
+// typedef int32_t (*evm_operation_f)(CuEVM::evm_call_context_t* call_state);
+
+/**
+ * @brief Get the CPU EVM instances object
+ * Get the evm instances from the json file
+ * @param[in] arith The arithmetic environment
+ * @param[in] test_json The json object
+ * @param[out] evm_instances The evm instances
+ * @param[out] num_instances The number of instances
+ * @param[in] managed Whether the memory is managed
+ * @return int32_t The error code, 0 if successful
+ */
+__host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *test_json, uint32_t &num_instances,
+                                                                uint32_t &num_account, uint32_t clones = 1);
+
+__global__ void kernel_evm_multiple_instances(transaction::TransactionList *transaction_list_ptr, uint32_t count);
 }  // namespace CuEVM

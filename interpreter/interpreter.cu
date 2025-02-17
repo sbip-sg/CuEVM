@@ -11,7 +11,7 @@
 #include <fstream>
 
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose = false) {
-    CuEVM::evm_instance_t *instances_data;
+    // CuEVM::evm_instance_t *instances_data;
 
     printf("Running the interpreter\n");
 
@@ -54,7 +54,8 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         auto start_cpu = std::chrono::high_resolution_clock::now();
         uint32_t num_accounts = 0;
 
-        CuEVM::get_evm_instances(instances_data, test_json, num_instances, num_accounts, clones);
+        CuEVM::transaction::TransactionList *transaction_list_ptr =
+            CuEVM::get_evm_instances(test_json, num_instances, num_accounts, clones);
         CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
         printf("num_accounts: %d\n", num_accounts);
         auto end_cpu = std::chrono::high_resolution_clock::now();
@@ -70,10 +71,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         cudaEventCreate(&stop);
         cudaEventRecord(start);
 
-        CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(
-            instances_data->state_db_ptr, instances_data->transaction_list_ptr,
-            nullptr,
-            num_instances);
+        CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(transaction_list_ptr, num_instances);
 
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
@@ -86,7 +84,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     }
 
     printf("Freeing the memory ...\n");
-    CuEVM::free_evm_instances(instances_data, num_instances);
+    // CuEVM::free_evm_instances(instances_data, num_instances);
 
     CUDA_CHECK(cudaDeviceReset());
 

@@ -1329,27 +1329,6 @@ __host__ StateDb *StateDb::CPUFromGPU(StateDb *&state_db) {
     return state_db_cpu;
 }
 
-__device__ void StateDb::serialize_data(serialized_worldstate_data *data) {
-    // TODO: reenable
-    // data->no_accounts = _state->no_accounts;
-    // for (uint32_t idx = 0; idx < _state->no_accounts; idx++) {
-    //     account_t *account_ptr = &_state->accounts[idx];
-    //     account_ptr->address.address_to_hex(data->addresses[idx]);
-    //     account_ptr->balance.to_hex(data->balance[idx]);
-    //     data->nonce[idx] = account_ptr->nonce._limbs[0];  // check if limbs 0
-    //     if (account_ptr->storage.size > 0) {
-    //         for (uint32_t idx_storage = 0; idx_storage < account_ptr->storage.size; idx_storage++) {
-    //             account_ptr->storage.storage[idx_storage].key.to_hex(
-    //                 data->storage_keys[data->no_storage_elements + idx_storage]);
-    //             account_ptr->storage.storage[idx_storage].value.to_hex(
-    //                 data->storage_values[data->no_storage_elements + idx_storage]);
-    //             data->storage_indexes[data->no_storage_elements + idx_storage] = idx;
-    //         }
-    //     }
-    //     data->no_storage_elements += account_ptr->storage.size;
-    // }
-}
-
 __host__ __device__ void StateDb::print() {
     printf("num_accounts: %d\n", num_accounts);
     printf("num_storage_elements: %d\n", num_storage_elements);
@@ -1361,8 +1340,8 @@ __host__ __device__ void StateDb::print() {
         printf("nonce: %d\n", account_nonces[i * num_states]);
         uint32_t account_storage_size_i = account_storage_size[i * num_states];
         if (account_storage_size_i > 0) {
-            printf("keys size %d\n", account_storage_size_i);
             uint32_t contract_idx = contract_index[i];
+            printf("keys size %d contract_idx: %d\n", account_storage_size_i, contract_idx);
             for (uint32_t j = 0; j < account_storage_size_i; j++) {
                 printf("\n key: \n");
                 prealloc_keys_pool[(account_prealloc_keys_size * contract_idx + j) * num_states].print();
@@ -1391,20 +1370,5 @@ __host__ __device__ void StateDb::print() {
     }
 }
 
-__host__ void serialized_worldstate_data::print() {
-    printf("\nPrinting serialized worldstate data\n");
-    printf("no_accounts: %d\n", no_accounts);
-    printf("no_storage_elements: %d\n", no_storage_elements);
-    for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        printf("address: %s\n", addresses[idx]);
-        printf("balance: %s\n", balance[idx]);
-        printf("nonce: %d\n", nonce[idx]);
-    }
-    for (uint32_t idx = 0; idx < no_storage_elements; idx++) {
-        printf("storage_key: %s\n", storage_keys[idx]);
-        printf("storage_value: %s\n", storage_values[idx]);
-        printf("storage_index: %d\n", storage_indexes[idx]);
-    }
-}
 __device__ StateDb *global_state_db_ptr;
 }  // namespace CuEVM

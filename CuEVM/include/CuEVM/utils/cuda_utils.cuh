@@ -1,9 +1,5 @@
 #pragma once
 
-// // CGBN parameters
-// #ifndef CGBN_TPI
-// #define CGBN_TPI 1
-// #endif
 #define INSTANCES_PER_BLOCK 128
 // #define SHARED_STACK_SIZE 12
 
@@ -20,11 +16,11 @@
 #endif
 
 #ifndef __CUDA_ARCH__
-#  undef CONSTANT
-#  define CONSTANT const
+#undef CONSTANT
+#define CONSTANT const
 #else
-#  undef CONSTANT
-#  define CONSTANT __device__ __constant__ const
+#undef CONSTANT
+#define CONSTANT __device__ __constant__ const
 #endif
 
 #define CUDA_CHECK(action) cuda_check(action, #action, __FILE__, __LINE__)

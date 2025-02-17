@@ -1,12 +1,12 @@
-#ifndef _CUEVM_FLOW_OP_H_
-#define _CUEVM_FLOW_OP_H_
-
+#pragma once
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/gas_cost.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/python_utils.h>
+#endif
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
-#include <CuEVM/tracer.cuh>
 /**
  * 50s: Flow Operations:
  * - JUMP
@@ -44,7 +44,8 @@ __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, C
 __device__ int32_t JUMPI(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
                          evm_call_context_t *call_context
 #ifdef BUILD_LIBRARY
-                         , CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
+                         ,
+                         simplified_trace_data *simplified_trace_data_ptr
 #endif
 );
 
@@ -69,5 +70,3 @@ __device__ int32_t PC(const gas_t &gas_limit, gas_t &gas_used, const uint32_t &p
  */
 __device__ int32_t JUMPDEST(const gas_t &gas_limit, gas_t &gas_used);
 }  // namespace CuEVM::operations
-
-#endif

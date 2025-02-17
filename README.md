@@ -12,19 +12,6 @@ There are two methods, one requires installing all prequisited in the system, th
 
 ### On your own system
 
-Note : In Makefile, there is one `ENABLE_TRACING` flag that is required for now to compare the results against reference REVM and to demonstrate bug detection. It will slowdown the execution.
-
-* Example : `make ENABLE_TRACING=1 interpreter`
-* `mkdir out` folder if it does not exist
-
-Building on Ubuntu (with sudo):
-* Setup required libraries: `sudo apt install libgmp-dev`
-* Setup cJSON: `sudo apt install libcjson-dev`
-* `make interpreter` or for running with cpu :`make cpu_interpreter`
-
-
-Building without sudo is also possible with extra configuration and modification on the Makefile or evironment variables, please refer to online tutorials on how to build and use libraries in custom directory
-
 #### Building using docker image:
 * Build the docker image first: `docker build -f .devcontainer/Dockerfile -t cuevm`
 * Run and mount the current code folder `docker run -it -v $(pwd):/CuEVM cuevm`
@@ -33,7 +20,7 @@ Building without sudo is also possible with extra configuration and modification
 #### CMake
 
 * `mkdir build`
-* `cmake -S . -B build ` (to build only CPU version : `-DONLY_CPU=ON for debug -DCMAKE_BUILD_TYPE=Debug)
+* `cmake -DBUILD_LIBRARY=ON -DENABLE_EIP_3155=ON -DCUDA_COMPUTE_CAPABILITY=89  cmake  -S . -B build` (Flags to turn on shared library mode and EIP3155 tracing)
 * `cmake --build build`
 
 ##### Build librarue

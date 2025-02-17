@@ -214,6 +214,9 @@ constexpr CONSTANT uint32_t hash_size = 32;
 constexpr CONSTANT uint16_t SPECIAL_CREATE_TRANSACTION_TYPE = 256;
 // outside the yellow paper's definition, use to mark the tx as create
 
+constexpr CONSTANT uint32_t serialized_worldstate_addresses_size = 32;
+constexpr CONSTANT uint32_t serialized_worldstate_storage_slots = 512;
+
 #ifdef EIP_170
 constexpr CONSTANT uint32_t max_code_size = 24576;
 #else
@@ -234,4 +237,5 @@ constexpr CONSTANT uint32_t no_precompile_contracts = 10;
 constexpr CONSTANT uint32_t initial_storage_capacity = 8;
 
 typedef uint64_t gas_t;
+
 }  // namespace CuEVM

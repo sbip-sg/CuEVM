@@ -11,8 +11,8 @@ import time
 from utils import *
 
 # Add the directory containing your .so file to the Python path
-# sys.path.append("../build/")
-sys.path.append("./binary/")
+sys.path.append("../build/")
+# sys.path.append("./binary/")
 
 import libcuevm  # Now you can import your module as usual
 
@@ -300,6 +300,9 @@ def test_state_change():
     # for debugging, altering tx2 data
     tx_2["data"] = ["0x12"]
     tx_2["value"] = [hex(10)]
+    my_lib.instances[0]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
+        "0x00"
+    ] = "0x10"
     # for debugging, altering the state 2
     my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
         "0x00"
@@ -310,7 +313,9 @@ def test_state_change():
     my_lib.instances[2]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
         "0x00"
     ] = "0x30"
-
+    
+    print("\n\n instance data before running \n\n")
+    my_lib.print_instance_data()
     trace_res = my_lib.run_transactions([tx_1],)
     # trace_res = my_lib.run_transactions([tx_1])
     # print("\n\n trace res \n\n")
@@ -318,21 +323,21 @@ def test_state_change():
     print("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()
 
-    trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1])
+    # trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1])
 
-    # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
-    # # trace_res = my_lib.run_transactions([tx_1, tx_1])
-    # print("\n\n trace res \n\n")
-    # pprint(trace_res)
-    print("\n\n Updated instance data \n\n")
-    my_lib.print_instance_data()
+    # # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
+    # # # trace_res = my_lib.run_transactions([tx_1, tx_1])
+    # # print("\n\n trace res \n\n")
+    # # pprint(trace_res)
+    # print("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
 
 
 
 def test_erc20():
     my_lib = CuEVMLib(
         "contracts/erc20.sol",
-        5000,
+        5,
         "configurations/erc20.json",
         contract_name="ERC20",
         detect_bug=False,

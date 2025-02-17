@@ -66,27 +66,6 @@ struct access_list_t {
 };
 #endif
 
-class TransactionList {
-   public:
-    uint32_t size;
-    // shared among all transactions (eth-tests)
-    evm_word_t nonce;
-    evm_word_t sender;
-    evm_word_t to;
-    evm_word_t max_fee_per_gas;
-    evm_word_t max_priority_fee_per_gas;
-    evm_word_t gas_price;
-    uint16_t type;
-    // different for each transaction (eth-tests)
-    evm_word_t *value;
-    gas_t *gas_limit;
-    uint8_t *call_data;
-    uint32_t *call_data_offset;
-    uint32_t *call_data_size;
-    // TODO: access list
-
-    __host__ __device__ void print();
-};
 /**
  * The transaction struct.
  * YP: \f$T\f$

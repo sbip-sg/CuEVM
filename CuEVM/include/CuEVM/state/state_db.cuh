@@ -5,23 +5,6 @@
 #include <CuEVM/utils/evm_defines.cuh>
 
 namespace CuEVM {
-// for convenient data transfer between host and device. set a fixed maximum size for the number of addresses to be
-// transferred
-// todo : optimize this later
-
-struct serialized_worldstate_data {
-    uint32_t no_accounts;
-    uint32_t no_storage_elements;
-    char addresses[worldstate_addresses_size][43];  // 0x + ... + \0
-    char balance[worldstate_addresses_size][67];    // 0x + ... + \0
-    uint32_t nonce[worldstate_addresses_size];
-    uint16_t storage_indexes[worldstate_storage_values_size];
-    char storage_keys[worldstate_storage_values_size][67];    // 0x + ... + \0
-    char storage_values[worldstate_storage_values_size][67];  // 0x + ... + \0
-    // currently dont support copy back the bytecode hex string
-    // TODO: use 1 large preallocated buffer for bytecode
-    void print();
-};
 
 struct DynamicAccount {
     evm_word_t address;
@@ -161,8 +144,6 @@ class StateDb {
     __device__ void init_snapshot(evm_call_context_t *call_context, const uint16_t depth, const evm_word_t *address);
 
     __device__ void revert_to_snapshot(const uint16_t depth);
-
-    __device__ void serialize_data(serialized_worldstate_data *data);
 
     __host__ __device__ void print();
 

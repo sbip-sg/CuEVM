@@ -37,7 +37,7 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
                          evm_call_context_t *call_context
 #ifdef BUILD_LIBRARY
                          ,
-                         CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr
+                         simplified_trace_data *simplified_trace_data_ptr
 #endif
 ) {
     gas_used += GAS_HIGH;

@@ -1,6 +1,6 @@
 #pragma once
-
 #include <CuEVM/core/block_info.cuh>
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/core/transaction.cuh>
@@ -20,6 +20,9 @@
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/opcodes.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/python_utils.h>
+#endif
 namespace CuEVM {
 struct evm_instance_t {
     CuEVM::StateDb* state_db_ptr;                              /**< The world state pointer*/
@@ -30,8 +33,10 @@ struct evm_instance_t {
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer*/
 #endif
 
+#ifdef BUILD_LIBRARY
     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
-  CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
+    CuEVM::simplified_trace_data* simplified_trace_data_ptr;           /**< The simplified trace data pointer */
+#endif
 };
 
 struct evm_t {
@@ -43,8 +48,8 @@ struct evm_t {
 #ifdef EIP_3155
     CuEVM::utils::tracer_t* tracer_ptr; /**< The tracer pointer */
 #endif
-    CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
-    CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
+    // CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr; /**< The serialized worldstate data */
+    // CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr;    /**< The simplified trace data pointer */
     /**
      * @brief Construct a new evm_t object
      * Construct a new evm_t object
@@ -63,12 +68,9 @@ struct evm_t {
                      CuEVM::utils::tracer_t* tracer_ptr
 #endif
 
-                     ,
-                     CuEVM::serialized_worldstate_data* serialized_worldstate_data_ptr,
-                     CuEVM::utils::simplified_trace_data* simplified_trace_data_ptr);
+    );
 
-
-    __device__ evm_t(CuEVM::StateDb* state_db_ptr, CuEVM::transaction::TransactionList* transaction_list_ptr);
+    __device__ evm_t(CuEVM::transaction::TransactionList* transaction_list_ptr);
 
     /**
      * @brief Destroy the evm_t object
@@ -125,33 +127,5 @@ struct evm_t {
     __device__ void run(cached_evm_call_context& cache_call_state);
     __device__ void run();
 };
-
-// typedef int32_t (*evm_operation_f)(CuEVM::evm_call_context_t* call_state);
-
-/**
- * @brief Get the CPU EVM instances object
- * Get the evm instances from the json file
- * @param[in] arith The arithmetic environment
- * @param[in] test_json The json object
- * @param[out] evm_instances The evm instances
- * @param[out] num_instances The number of instances
- * @param[in] managed Whether the memory is managed
- * @return int32_t The error code, 0 if successful
- */
-__host__ int32_t get_evm_instances(evm_instance_t*& evm_instances, const cJSON* test_json, uint32_t& num_instances,
-                                   uint32_t& num_account, uint32_t clones = 1);
-
-/**
- * @brief Free the EVM instances object
- * Free the evm instances
- * @param[in] evm_instances The evm instances
- * @param[in] num_instances The number of instances
- * @param[in] managed Whether the memory is managed
- */
-__host__ void free_evm_instances(evm_instance_t*& evm_instances, uint32_t num_instances);
-
-__global__ void kernel_evm_multiple_instances(StateDb* state_db_ptr, transaction::TransactionList* transaction_list_ptr,
-                                              CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr, // optional only required if BUILD_LIBRARY
-                                              uint32_t count);
 
 }  // namespace CuEVM

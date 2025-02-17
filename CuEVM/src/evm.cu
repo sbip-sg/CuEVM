@@ -4,17 +4,17 @@
 namespace CuEVM {
 
 // define the kernel function
-__global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
-                                              CuEVM::transaction::TransactionList *transaction_list_ptr,
-                                              CuEVM::utils::simplified_trace_data *simplified_trace_data_ptr,
+__global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionList *transaction_list_ptr,
                                               uint32_t count) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
 
-    CuEVM::evm_t evm = CuEVM::evm_t(state_db_ptr, transaction_list_ptr);
+    CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef BUILD_LIBRARY
-    assert(simplified_trace_data_ptr != nullptr);
-    evm.simplified_trace_data_ptr = simplified_trace_data_ptr + instance;
+    // printf("global_simplified_trace: %p\n", global_simplified_trace);
+    // assert(global_simplified_trace != nullptr);
+    // printf("transaction_list_ptr: %p\n", transaction_list_ptr);
+    // if (THREADIDX == 1) transaction_list_ptr->print();
 #endif
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
 
@@ -32,7 +32,7 @@ __global__ void kernel_evm_multiple_instances(StateDb *state_db_ptr,
 #endif
 }
 
-__device__ evm_t::evm_t(CuEVM::StateDb *state_db_ptr, CuEVM::transaction::TransactionList *transaction_list_ptr)
+__device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_ptr)
     : transaction_list_ptr(transaction_list_ptr) {
     // printf("evm_t constructor\n");
     call_state_ptr = memory_pool::get_call_context(0);
@@ -185,16 +185,15 @@ __device__ void evm_t::run() {
 
 __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 #ifdef BUILD_LIBRARY
-    assert(simplified_trace_data_ptr!=nullptr);
-    assert(memory_pool::global_memory_pool!=nullptr);
-    simplified_trace_data_ptr->start_call(0, call_state_ptr); // pc is 0?
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(0, call_state_ptr);  // pc is 0?
 #endif
-
+    printf("call_state_ptr: %p\n", call_state_ptr);
+    cached_call_state.print();
     int32_t error_code = start_CALL(cached_call_state);
-
+    printf("error_code start_call: %d\n", error_code);
     if (error_code != ERROR_SUCCESS) {
 #ifdef BUILD_LIBRARY
-        simplified_trace_data_ptr->finish_call(0);
+        global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(0);
 #endif
         return;  // finish call
     }
@@ -215,17 +214,15 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                                     cached_call_state.gas_limit, cached_call_state.gas_used);
 
 #endif
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf(
-        //         "\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n
-        //         ",
-        //         INSTANCE_GLOBAL_IDX,
-        //         cached_call_state.pc, opcode, call_state_ptr->depth, call_state_ptr->memory_ptr->size,
-        //         cached_call_state.stack_ptr->stack_offset, cached_call_state.gas_limit, cached_call_state.gas_used);
+        if (INSTANCE_GLOBAL_IDX == 0) {
+            printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+                   INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+                   call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+                   cached_call_state.gas_limit, cached_call_state.gas_used);
 
-        //     // printf("\n\n");
-        //     // cached_call_state.stack_ptr->print();
-        // }
+            // printf("\n\n");
+            // cached_call_state.stack_ptr->print();
+        }
         // if (INSTANCE_GLOBAL_IDX == 1) {
         //     printf("\nIdx %d, pc: %d op: %d, depth %d, msize %d stksze %d gs_lmit %lu g_used %lu\n ",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
@@ -242,7 +239,8 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 #ifdef BUILD_LIBRARY
         // comparison, arithmetic, revert/invalid
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
-            simplified_trace_data_ptr->start_operation(cached_call_state.pc, opcode, *cached_call_state.stack_ptr);
+            global_simplified_trace[INSTANCE_GLOBAL_IDX].start_operation(cached_call_state.pc, opcode,
+                                                                         *cached_call_state.stack_ptr);
         }
         if (opcode == OP_JUMPI) pc_src = cached_call_state.pc;
 #endif
@@ -311,35 +309,35 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                     break;
                 case OP_LT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::LT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_GT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::GT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SLT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SLT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_SGT:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SGT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_EQ:
 #ifdef BUILD_LIBRARY
-                    simplified_trace_data_ptr->record_distance(opcode, *cached_call_state.stack_ptr);
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::EQ(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
@@ -522,7 +520,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                                                  cached_call_state.pc, *cached_call_state.stack_ptr, call_state_ptr
 #ifdef BUILD_LIBRARY
                                                  ,
-                                                 simplified_trace_data_ptr
+                                                 &global_simplified_trace[INSTANCE_GLOBAL_IDX]
 #endif
                         );
 
@@ -624,7 +622,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
 #endif
 #ifdef BUILD_LIBRARY
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
-            simplified_trace_data_ptr->finish_operation(*cached_call_state.stack_ptr, error_code);
+            global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_operation(*cached_call_state.stack_ptr, error_code);
         }
 #endif
 
@@ -637,7 +635,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
                 cached_call_state = cached_evm_call_context(call_state_ptr);
                 error_code = start_CALL(cached_call_state);
 #ifdef BUILD_LIBRARY
-                simplified_trace_data_ptr->start_call(call_state_ptr->parent->pc, call_state_ptr);
+                global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(call_state_ptr->parent->pc, call_state_ptr);
 #endif
             } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                 // Logic: when op_create or create2 does not succeed,
@@ -762,6 +760,10 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
     tracer_ptr->finish_transaction(nullptr, call_state_ptr->gas_used, status);
 #endif
 
+#ifdef BUILD_LIBRARY
+    // serialize data
+    python_utils::serialize_state_data(&global_serialized_worldstate[INSTANCE_GLOBAL_IDX]);
+#endif
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
     // printf("updated final world state\n");
 
@@ -801,7 +803,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         }
     }
 #ifdef BUILD_LIBRARY
-    simplified_trace_data_ptr->finish_call((error_code == ERROR_RETURN));
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call((error_code == ERROR_RETURN));
 #endif
 
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
@@ -915,8 +917,8 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     return ERROR_SUCCESS;
 }
 
-__host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *test_json, uint32_t &num_instances,
-                                   uint32_t &num_accounts, uint32_t clones) {
+__host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *test_json, uint32_t &num_instances,
+                                                                uint32_t &num_accounts, uint32_t clones) {
     // get the world state
 
     CuEVM::StateDb *state_db_ptr = nullptr;
@@ -927,7 +929,7 @@ __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *
     else if (cJSON_IsArray(test_json))
         world_state_json = test_json;
     else
-        return 1;
+        return nullptr;
 
     CuEVM::get_block_info(test_json);
 
@@ -944,22 +946,12 @@ __host__ int32_t get_evm_instances(evm_instance_t *&evm_instances, const cJSON *
     // CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
     printf("num_transactions %d\n", num_transactions);
 
-    evm_instances = new evm_instance_t[num_transactions];
+    // evm_instance_t *evm_instances = new evm_instance_t[num_transactions];
 
     CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts);
-    // state_db_ptr->print();
-    for (uint32_t index = 0; index < num_transactions; index++) {
-        evm_instances[index].state_db_ptr = state_db_ptr;
-        evm_instances[index].transaction_list_ptr = transaction_list_ptr;
-        // evm_instances[index].transaction_ptr = &transactions_ptr[index % num_original_transactions];
-        // CUDA_CHECK(cudaMalloc(&evm_instances[index].serialized_worldstate_data_ptr,
-        //                       sizeof(CuEVM::serialized_worldstate_data)));
-        // CUDA_CHECK(
-        //     cudaMalloc(&evm_instances[index].simplified_trace_data_ptr,
-        //     sizeof(CuEVM::utils::simplified_trace_data)));
-    }
+
     num_instances = num_transactions;
-    return ERROR_SUCCESS;
+    return transaction_list_ptr;
 }
 
 __host__ void free_evm_instances(evm_instance_t *&evm_instances, uint32_t num_instances) {
