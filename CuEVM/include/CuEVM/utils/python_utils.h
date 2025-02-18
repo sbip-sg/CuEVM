@@ -134,4 +134,16 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
  * @return pyobject
  */
 PyObject* pyobject_from_evm_instances(uint32_t num_instances);
+
+/*
+ * Convert a Python int (assumed to be non-negative and fitting in 256 bits)
+ * into a native uint256 value.
+ */
+int py_long_to_uint256(PyObject* py_num, uint256* dst);
+
+/*
+ * Convert a native uint256 value to a Python int.
+ */
+PyObject* uint256_to_py_long(const uint256* src);
+
 }  // namespace python_utils

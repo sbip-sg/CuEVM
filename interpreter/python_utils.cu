@@ -133,31 +133,6 @@ using namespace CuEVM;
 using CuEVM::simplified_trace_data;
 using CuEVM::transaction::TransactionList;
 
-CuEVM::block_info_t* getBlockDataFromPyObject(PyObject* data) {
-    // construct blockt_t
-
-    block_info_t* block_data;
-
-    CUDA_CHECK(cudaMallocManaged((void**)&(block_data), sizeof(block_info_t)));
-
-    const char* base_fee = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentBaseFee", DefaultBlock::BaseFee);
-    const char* coin_base = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentCoinbase", DefaultBlock::CoinBase);
-    const char* difficulty = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentDifficulty", DefaultBlock::Difficulty);
-    const char* block_number = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentNumber", DefaultBlock::BlockNumber);
-    const char* gas_limit = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentGasLimit", DefaultBlock::GasLimit);
-    const char* time_stamp = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentTimestamp", DefaultBlock::TimeStamp);
-    const char* previous_hash = GET_STR_FROM_DICT_WITH_DEFAULT(data, "previousHash", DefaultBlock::PreviousHash);
-    block_data->coin_base.from_hex(coin_base);
-    block_data->difficulty.from_hex(difficulty);
-    block_data->number.from_hex(block_number);
-    block_data->gas_limit.from_hex(gas_limit);
-    block_data->time_stamp.from_hex(time_stamp);
-    block_data->base_fee.from_hex(base_fee);
-    block_data->chain_id.from_hex("0x01");
-    block_data->previous_blocks[0].hash.from_hex(previous_hash);
-    return block_data;
-}
-
 void print_dict_recursive(PyObject* dict, int indent_level) {
     PyObject *key, *value;
     Py_ssize_t pos = 0;
@@ -238,9 +213,16 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
     // evm_word_t max_priority_fee_per_gas;
     // evm_word_t gas_price;
     // uint16_t type;
-    transactions->nonce.from_hex(GET_STR_FROM_DICT_WITH_DEFAULT(first_transaction, "nonce", "0x00"));
-    transactions->sender.from_hex(GET_STR_FROM_DICT_WITH_DEFAULT(first_transaction, "sender", "0x00"));
-    transactions->to.from_hex(GET_STR_FROM_DICT_WITH_DEFAULT(first_transaction, "to", "0x00"));
+    // transactions->nonce.from_hex(GET_STR_FROM_DICT_WITH_DEFAULT(first_transaction, "nonce", "0x00"));
+    // transactions->sender.from_hex(GET_STR_FROM_DICT_WITH_DEFAULT(first_transaction, "sender", "0x00"));
+    // transactions->to.from_hex(GET_STR_FROM_DICT_WITH_DEFAULT(first_transaction, "to", "0x00"));
+    py_long_to_uint256(PyDict_GetItemString(first_transaction, "to"), &transactions->to);
+    // printf("transactions->to: %s\n", transactions->to.to_hex());
+    py_long_to_uint256(PyDict_GetItemString(first_transaction, "sender"), &transactions->sender);
+    // printf("transactions->sender: %s\n", transactions->sender.to_hex());
+    py_long_to_uint256(PyDict_GetItemString(first_transaction, "nonce"), &transactions->nonce);
+    // printf("transactions->nonce: %s\n", transactions->nonce.to_hex());
+
     transactions->max_fee_per_gas.from_hex("0x00");
     transactions->max_priority_fee_per_gas.from_hex("0x00");
     transactions->gas_price.from_hex("0x01");
@@ -251,8 +233,8 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
     transactions->call_data_offset = new uint32_t[count];
     transactions->call_data_size = new uint32_t[count];
 
-    printf("first transaction \n");
-    print_dict_recursive(first_transaction, 1);
+    // printf("first transaction \n");
+    // print_dict_recursive(first_transaction, 1);
 
     uint32_t curr_call_data_offset = 0;
 
@@ -270,7 +252,6 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
         // todo_cl data structure might differ from what's provided by Python
         PyObject* tx_data =
             PyList_GetItem(PyDict_GetItemString(data, "data"), 0);  // data is a list with only one item ["0x..."]
-        printf("tx_data: %s\n", PyUnicode_AsUTF8(tx_data));
 
         CHECK_AND_RETURN_ON_ERROR(
             data_init.from_hex(PyUnicode_AsUTF8(tx_data), LITTLE_ENDIAN, CuEVM::PaddingDirection::NO_PADDING));
@@ -278,29 +259,24 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
         PyObject* tx_gas_limit = PyList_GetItem(PyDict_GetItemString(data, "gasLimit"), 0);
         PyObject* tx_value = PyList_GetItem(PyDict_GetItemString(data, "value"), 0);
 
-        CHECK_AND_RETURN_ON_ERROR(transactions->nonce.from_hex(PyUnicode_AsUTF8(PyDict_GetItemString(data, "nonce"))));
         CHECK_AND_RETURN_ON_ERROR(
             data_init.from_hex(PyUnicode_AsUTF8(tx_data), LITTLE_ENDIAN, CuEVM::PaddingDirection::NO_PADDING));
-        CHECK_AND_RETURN_ON_ERROR(
-            transactions->sender.from_hex(PyUnicode_AsUTF8(PyDict_GetItemString(data, "sender"))));
-        transactions->max_fee_per_gas = 0;
-        transactions->max_priority_fee_per_gas = 0;
-        CHECK_AND_RETURN_ON_ERROR(transactions->gas_price.from_hex("0x0a"));
 
         evm_word_t tmp;
 
-        CHECK_AND_RETURN_ON_ERROR(tmp.from_hex(PyUnicode_AsUTF8(tx_gas_limit)));
+        // CHECK_AND_RETURN_ON_ERROR(tmp.from_hex(PyUnicode_AsUTF8(tx_gas_limit)));
+
         transactions->gas_limit[idx] = UINT32_MAX;  // use max gas limit for fuzzing uint256_get_uint64_t(&tmp);
-        CHECK_AND_RETURN_ON_ERROR(transactions->value[idx].from_hex(PyUnicode_AsUTF8(tx_value)));
+        // CHECK_AND_RETURN_ON_ERROR(transactions->value[idx].from_hex(PyUnicode_AsUTF8(tx_value)));
+        py_long_to_uint256(tx_value, &transactions->value[idx]);
 
         transactions->call_data_offset[idx] = curr_call_data_offset;
         transactions->call_data_size[idx] = data_init.size;
-
         if (data_init.size > 0) {
             if (transactions->call_data == nullptr) {
                 transactions->call_data = new uint8_t[data_init.size];
             } else {
-                uint8_t* tmp = new uint8_t[curr_call_data_offset];
+                uint8_t* tmp = new uint8_t[curr_call_data_offset + data_init.size];
                 memcpy(tmp, transactions->call_data, curr_call_data_offset);
                 delete[] transactions->call_data;
                 transactions->call_data = tmp;
@@ -311,7 +287,7 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
         curr_call_data_offset += data_init.size;
     }
 
-    auto call_data_size = curr_call_data_offset;
+    uint32_t call_data_size = curr_call_data_offset;
 
     // Copy the transaction data to device memory,
     TransactionList* d_transaction_list_ptr;
@@ -402,25 +378,28 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
     evm_word_t t_word;
 
     for (uint32_t state_idx = 0; state_idx < num_states; state_idx++) {
-        printf("state_idx: %d\n", state_idx);
+        // printf("state_idx: %d\n", state_idx);
         PyObject* current_state = PyList_GetItem(readroot, state_idx);
         data = PyDict_GetItemString(current_state, "pre");
         Py_ssize_t pos = 0;
+
         while (PyDict_Next(data, &pos, &key, &value)) {
             int address_index = pos - 1;  // Adjust index since PyDict_Next increments pos
-            printf("address_index: %d\n", address_index);
-            const char* address_str = PyUnicode_AsUTF8(key);
+            // printf("address_index: %d\n", address_index);
+            // const char* address_str = PyUnicode_AsUTF8(key);
             uint32_t instance_idx = address_index * num_states + state_idx;
             // Extract balance, nonce, and code
-            const char* balance = GET_STR_FROM_DICT_WITH_DEFAULT(value, "balance", "0x0");
-            const char* nonce = GET_STR_FROM_DICT_WITH_DEFAULT(value, "nonce", "0x0");
+            // const char* balance = GET_STR_FROM_DICT_WITH_DEFAULT(value, "balance", "0x0");
+            // const char* nonce = GET_STR_FROM_DICT_WITH_DEFAULT(value, "nonce", "0x0");
             const char* code = GET_STR_FROM_DICT_WITH_DEFAULT(value, "code", "");
             PyObject* storage_dict = PyDict_GetItemString(value, "storage");
             uint32_t storage_size = PyDict_Size(storage_dict);
-            printf("storage_size: %d\n", storage_size);
+
+            // printf("storage_size: %d\n", storage_size);
             // Initialize account details
             if (state_idx == 0) {
-                state_db_cpu->address_list[address_index].from_hex(address_str);
+                // state_db_cpu->address_list[address_index].from_hex(address_str);
+                py_long_to_uint256(key, &state_db_cpu->address_list[address_index]);
                 // Code
                 byte_array_t byte_code;
                 byte_code.from_hex(code, LITTLE_ENDIAN, NO_PADDING);
@@ -441,12 +420,17 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
                     state_db_cpu->contract_index[address_index] = -1;
                 }
             }
-            state_db_cpu->account_balances[instance_idx].from_hex(balance);
-            t_word.from_hex(nonce);
+
+            // state_db_cpu->account_balances[instance_idx].from_hex(balance);
+            // t_word.from_hex(nonce);
+            // state_db_cpu->account_nonces[instance_idx] = uint256_get_uint32_t(&t_word);
+            py_long_to_uint256(PyDict_GetItemString(value, "balance"), &state_db_cpu->account_balances[instance_idx]);
+            py_long_to_uint256(PyDict_GetItemString(value, "nonce"), &t_word);
             state_db_cpu->account_nonces[instance_idx] = uint256_get_uint32_t(&t_word);
-            printf("account_nonces[%d] = %d\n", instance_idx, state_db_cpu->account_nonces[instance_idx]);
-            printf("account_balances[%d] = %s\n", instance_idx, state_db_cpu->account_balances[instance_idx].to_hex());
-            printf("address_list[%d] = %s\n", address_index, state_db_cpu->address_list[address_index].to_hex());
+            // printf("account_nonces[%d] = %d\n", instance_idx, state_db_cpu->account_nonces[instance_idx]);
+            // printf("account_balances[%d] = %s\n", instance_idx,
+            // state_db_cpu->account_balances[instance_idx].to_hex()); printf("address_list[%d] = %s\n", address_index,
+            // state_db_cpu->address_list[address_index].to_hex());
 
             state_db_cpu->account_storage_size[instance_idx] = storage_size;
             // Storage
@@ -457,31 +441,37 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
                 return;
             }
 
-            printf("state_idx: %d instance_idx: %d address_index: %d contract_idx: %d\n", state_idx, instance_idx,
-                   address_index, state_db_cpu->contract_index[address_index]);
+            // printf("state_idx: %d instance_idx: %d address_index: %d contract_idx: %d\n", state_idx, instance_idx,
+            //        address_index, state_db_cpu->contract_index[address_index]);
             // Iterate through the dictionary
             PyObject *key_storage, *value_storage;
             Py_ssize_t pos_1 = 0;
+
             while (PyDict_Next(storage_dict, &pos_1, &key_storage, &value_storage)) {
                 int storage_idx = pos_1 - 1;  // Adjust index since PyDict_Next increments pos
                 Py_INCREF(key_storage);
                 Py_INCREF(value_storage);
-                printf("key_storage: %s\n", PyUnicode_AsUTF8(key_storage));
-                printf("value_storage: %s\n", PyUnicode_AsUTF8(value_storage));
+
                 uint32_t contract_idx = state_db_cpu->contract_index[address_index];
-                printf("contract_idx: %d\n", contract_idx);
+                // printf("contract_idx: %d\n", contract_idx);
                 uint32_t pre_alloc_keys_idx =
                     (account_prealloc_keys_size * contract_idx + storage_idx) * num_states + state_idx;
-                printf("pre_alloc_keys_idx: %d\n", pre_alloc_keys_idx);
-                state_db_cpu->prealloc_keys_pool[pre_alloc_keys_idx].from_hex(PyUnicode_AsUTF8(key_storage));
-                state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].from_hex(PyUnicode_AsUTF8(value_storage));
+                // printf("pre_alloc_keys_idx: %d\n", pre_alloc_keys_idx);
+                // state_db_cpu->prealloc_keys_pool[pre_alloc_keys_idx].from_hex(PyUnicode_AsUTF8(key_storage));
+                // state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].from_hex(PyUnicode_AsUTF8(value_storage));
+                py_long_to_uint256(key_storage, &state_db_cpu->prealloc_keys_pool[pre_alloc_keys_idx]);
+                py_long_to_uint256(value_storage, &state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].value);
+                state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].original_value =
+                    state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].value;
+                state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].is_warm = false;
             }
         }
     }
-    printf("state_db_cpu->num_accounts: %d\n", state_db_cpu->num_accounts);
-    printf("statedb cpu\n");
-    state_db_cpu->print();
-    printf("end of statedb cpu\n");
+
+    // printf("state_db_cpu->num_accounts: %d\n", state_db_cpu->num_accounts);
+    // printf("statedb cpu\n");
+    // state_db_cpu->print();
+    // printf("end of statedb cpu\n");
     // copy to device. c.f., StateDb::GPUfromJson
     StateDb* tmp_state_db = new StateDb(num_states);
     tmp_state_db->num_accounts = state_db_cpu->num_accounts;
@@ -563,30 +553,7 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
     cudaMemcpyToSymbol(global_state_db_ptr, &state_db_gpu, sizeof(StateDb*));
     delete state_db_cpu;
     delete tmp_state_db;
-
-    return;
 }
-
-// __device__ void StateDb::serialize_data(serialized_worldstate_data *data) {
-// TODO: reenable
-// data->no_accounts = _state->no_accounts;
-// for (uint32_t idx = 0; idx < _state->no_accounts; idx++) {
-//     account_t *account_ptr = &_state->accounts[idx];
-//     account_ptr->address.address_to_hex(data->addresses[idx]);
-//     account_ptr->balance.to_hex(data->balance[idx]);
-//     data->nonce[idx] = account_ptr->nonce._limbs[0];  // check if limbs 0
-//     if (account_ptr->storage.size > 0) {
-//         for (uint32_t idx_storage = 0; idx_storage < account_ptr->storage.size; idx_storage++) {
-//             account_ptr->storage.storage[idx_storage].key.to_hex(
-//                 data->storage_keys[data->no_storage_elements + idx_storage]);
-//             account_ptr->storage.storage[idx_storage].value.to_hex(
-//                 data->storage_values[data->no_storage_elements + idx_storage]);
-//             data->storage_indexes[data->no_storage_elements + idx_storage] = idx;
-//         }
-//     }
-//     data->no_storage_elements += account_ptr->storage.size;
-// }
-// }
 
 __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
     // Use the global state database pointer to access the account data
@@ -623,15 +590,17 @@ __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
         data->balance[acct] = state->account_balances[instance_idx];
         // Copy the account's nonce (again using state index 0).
         data->nonce[acct] = state->account_nonces[instance_idx];
-        if (INSTANCE_GLOBAL_IDX == 0) {
-            printf("address: \n");
-            state->address_list[acct].print();
-            printf("balance: \n");
-            state->account_balances[instance_idx].print();
 
-            // Get the storage size for this account (again, from the first snapshot).
-            printf("account %d instance %d storage size: %d\n", acct, instance_idx, storage_size);
-        }
+        // if (INSTANCE_GLOBAL_IDX == 0) {
+        //     printf("address: \n");
+        //     state->address_list[acct].print();
+        //     printf("balance: \n");
+        //     state->account_balances[instance_idx].print();
+
+        //     // Get the storage size for this account (again, from the first snapshot).
+        //     printf("account %d instance %d storage size: %d\n", acct, instance_idx, storage_size);
+        // }
+
         if (storage_size > 0) {
             // The contract index tells us which section of the preallocated storage pool to use.
             for (uint32_t s = 0; s < storage_size; s++) {
@@ -675,10 +644,6 @@ TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t&
     cudaMemset(d_serialized_worldstate_data, 0, num_transactions * sizeof(CuEVM::serialized_worldstate_data));
 #endif
 
-    // for (uint32_t index = 0; index < num_transactions; index++) {
-    //     evm_instances[index].state_db_ptr = state_db;
-    //     evm_instances[index].transaction_list_ptr = all_transactions;
-    // }
 #ifdef BUILD_LIBRARY
     cudaMemcpyToSymbol(global_simplified_trace, &d_trace_data, sizeof(CuEVM::simplified_trace_data*));
     cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
@@ -693,21 +658,56 @@ __host__ void get_block_info_from_PyObject(PyObject* data) {
 
     block_info_t* block_data = new block_info_t();
 
-    const char* base_fee = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentBaseFee", DefaultBlock::BaseFee);
-    const char* coin_base = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentCoinbase", DefaultBlock::CoinBase);
-    const char* difficulty = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentDifficulty", DefaultBlock::Difficulty);
-    const char* block_number = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentNumber", DefaultBlock::BlockNumber);
-    const char* gas_limit = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentGasLimit", DefaultBlock::GasLimit);
-    const char* time_stamp = GET_STR_FROM_DICT_WITH_DEFAULT(data, "currentTimestamp", DefaultBlock::TimeStamp);
-    const char* previous_hash = GET_STR_FROM_DICT_WITH_DEFAULT(data, "previousHash", DefaultBlock::PreviousHash);
-    block_data->coin_base.from_hex(coin_base);
-    block_data->difficulty.from_hex(difficulty);
-    block_data->number.from_hex(block_number);
-    block_data->gas_limit.from_hex(gas_limit);
-    block_data->time_stamp.from_hex(time_stamp);
-    block_data->base_fee.from_hex(base_fee);
-    block_data->chain_id.from_hex("0x01");
-    block_data->previous_blocks[0].hash.from_hex(previous_hash);
+    PyObject* base_fee_obj = PyDict_GetItemString(data, "currentBaseFee");
+    if (base_fee_obj) {
+        py_long_to_uint256(base_fee_obj, &block_data->base_fee);
+    } else {
+        block_data->base_fee.from_hex(DefaultBlock::BaseFee);
+    }
+
+    PyObject* coin_base_obj = PyDict_GetItemString(data, "currentCoinbase");
+    if (coin_base_obj) {
+        py_long_to_uint256(coin_base_obj, &block_data->coin_base);
+    } else {
+        block_data->coin_base.from_hex(DefaultBlock::CoinBase);
+    }
+
+    PyObject* difficulty_obj = PyDict_GetItemString(data, "currentDifficulty");
+    if (difficulty_obj) {
+        py_long_to_uint256(difficulty_obj, &block_data->difficulty);
+    } else {
+        block_data->difficulty.from_hex(DefaultBlock::Difficulty);
+    }
+
+    PyObject* block_number_obj = PyDict_GetItemString(data, "currentNumber");
+    if (block_number_obj) {
+        py_long_to_uint256(block_number_obj, &block_data->number);
+    } else {
+        block_data->number.from_hex(DefaultBlock::BlockNumber);
+    }
+
+    PyObject* gas_limit_obj = PyDict_GetItemString(data, "currentGasLimit");
+    if (gas_limit_obj) {
+        py_long_to_uint256(gas_limit_obj, &block_data->gas_limit);
+    } else {
+        block_data->gas_limit.from_hex(DefaultBlock::GasLimit);
+    }
+
+    PyObject* time_stamp_obj = PyDict_GetItemString(data, "currentTimestamp");
+    if (time_stamp_obj) {
+        py_long_to_uint256(time_stamp_obj, &block_data->time_stamp);
+    } else {
+        block_data->time_stamp.from_hex(DefaultBlock::TimeStamp);
+    }
+
+    PyObject* previous_hash_obj = PyDict_GetItemString(data, "previousHash");
+    if (previous_hash_obj) {
+        py_long_to_uint256(previous_hash_obj, &block_data->previous_blocks[0].hash);
+    } else {
+        block_data->previous_blocks[0].hash.from_hex(DefaultBlock::PreviousHash);
+    }
+
+    block_data->chain_id = 1;
 
     // Allocate device memory for block info
     block_info_t* d_block_info;
@@ -783,14 +783,17 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
     if (serialized_worldstate_instance == nullptr) {
         return state_dict;
     }
-    char hex_string_1[67];
-    char hex_string_2[67];
+    // printf("cpu side\n");
+
     for (uint32_t i = 0; i < serialized_worldstate_instance->no_accounts; i++) {
         PyObject* account_dict = PyDict_New();
         // uint256_to_hex(hex_string_1, &serialized_worldstate_instance->balance[i]);
-        serialized_worldstate_instance->balance[i].to_hex(hex_string_1, 1);
-        printf("balance: %s\n", hex_string_1);
-        PyDict_SetItemString(account_dict, "balance", PyUnicode_FromString(hex_string_1));
+        // serialized_worldstate_instance->balance[i].to_hex(hex_string_1, 1);
+        // printf("balance: %s\n", serialized_worldstate_instance->balance[i].to_hex());
+        PyObject *py_long_1, *py_long_2;
+        py_long_1 = uint256_to_py_long(&serialized_worldstate_instance->balance[i]);
+
+        PyDict_SetItemString(account_dict, "balance", py_long_1);
         PyDict_SetItemString(account_dict, "nonce", PyLong_FromUnsignedLong(serialized_worldstate_instance->nonce[i]));
 
         // Add storage elements for the account if they exist
@@ -799,11 +802,13 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
                serialized_worldstate_instance->storage_indexes[storage_idx] == i) {
             PyObject* storage_key_value = PyDict_New();
 
-            serialized_worldstate_instance->storage_keys[storage_idx].to_hex(hex_string_1, 1);
-            printf("storage_key: %s\n", hex_string_1);
-            serialized_worldstate_instance->storage_values[storage_idx].to_hex(hex_string_2, 1);
-            printf("storage_value: %s\n", hex_string_2);
-            PyDict_SetItem(storage_dict, PyUnicode_FromString(hex_string_1), PyUnicode_FromString(hex_string_2));
+            // serialized_worldstate_instance->storage_keys[storage_idx].to_hex(hex_string_1, 1);
+            // printf("storage_key: %s\n", hex_string_1);
+            // serialized_worldstate_instance->storage_values[storage_idx].to_hex(hex_string_2, 1);
+            // printf("storage_value: %s\n", hex_string_2);
+            py_long_1 = uint256_to_py_long(&serialized_worldstate_instance->storage_keys[storage_idx]);
+            py_long_2 = uint256_to_py_long(&serialized_worldstate_instance->storage_values[storage_idx]);
+            PyDict_SetItem(storage_dict, py_long_1, py_long_2);
             Py_DECREF(storage_key_value);
             storage_idx++;
         }
@@ -811,11 +816,13 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
         PyDict_SetItemString(account_dict, "storage", storage_dict);
         // PyList_Append(accounts_list, account_dict);
         // uint256_to_hex(hex_string_1, &serialized_worldstate_instance->addresses[i]);
-        serialized_worldstate_instance->addresses[i].to_hex(hex_string_1, 1);
-        printf("address: %s\n", hex_string_1);
-        PyDict_SetItemString(state_dict, hex_string_1, account_dict);
+        PyObject* py_long_3 = uint256_to_py_long(&serialized_worldstate_instance->addresses[i]);
+
+        PyDict_SetItem(state_dict, py_long_3, account_dict);
         Py_DECREF(account_dict);
     }
+    // printf("state dict \n");
+    // print_dict_recursive(state_dict, 1);
     return state_dict;
 }
 
@@ -862,6 +869,38 @@ PyObject* pyobject_from_evm_instances(uint32_t num_instances) {
     delete[] world_data;
 
     return root;
+}
+/*
+ * Convert a Python int (assumed to be non-negative and fitting in 256 bits)
+ * into a native uint256 value.
+ */
+int py_long_to_uint256(PyObject* py_num, uint256* dst) {
+    if (!PyLong_Check(py_num)) {
+        printf("pylong to uint256 error\n");
+        PyErr_SetString(PyExc_TypeError, "Expected an int.");
+        return 0;
+    }
+
+    // Zero out the destination buffer.
+    // memset(dst->words, 0, sizeof(dst->words));
+
+    // Py_ssize_t PyLong_AsNativeBytes(PyObject *pylong, void *buffer, Py_ssize_t n_bytes, int flags)¶
+    return PyLong_AsNativeBytes(py_num, (unsigned char*)dst->words, sizeof(dst->words), -1);
+}
+/**
+ * Convert a native uint256 structure to a Python long (PyLong) object.
+
+ * Returns:
+ *   A new reference to a PyLongObject on success, or NULL on failure.
+ */
+__host__ PyObject* uint256_to_py_long(const uint256* src) {
+    if (src == nullptr) {
+        printf("uint256_to_py_long error\n");
+        PyErr_SetString(PyExc_ValueError, "NULL pointer provided for uint256_to_py_long conversion.");
+        return NULL;
+    }
+    // PyObject *PyLong_FromUnsignedNativeBytes(const void *buffer, size_t n_bytes, int flags)¶
+    return PyLong_FromUnsignedNativeBytes((const unsigned char*)src->words, sizeof(src->words), -1);
 }
 
 }  // namespace python_utils

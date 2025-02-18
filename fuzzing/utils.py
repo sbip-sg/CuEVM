@@ -145,6 +145,29 @@ def get_transaction_data_from_config(item, contract_instance):
 
     return [four_byte + encoded_data]
 
+def hexify(obj):
+    """
+    Recursively convert integers (and dictionary keys that are ints)
+    in a nested structure (dicts/lists) into hexadecimal strings.
+    """
+    if isinstance(obj, int):
+        return hex(obj)
+    elif isinstance(obj, list):
+        return [hexify(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {
+            hexify(key) if isinstance(key, int) else key: hexify(value)
+            for key, value in obj.items()
+        }
+    return obj
+
+def print_hex(data):
+    """
+    Pretty-print the data after converting all ints to hex strings.
+    """
+    from pprint import pprint
+    pprint(hexify(data))
+
 
 def get_transaction_data_from_processed_abi(processed_abi, function_name, inputs):
     # print("Target function inputs ", function_name, inputs)

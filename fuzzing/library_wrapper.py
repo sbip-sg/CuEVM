@@ -16,7 +16,6 @@ sys.path.append("../build/")
 
 import libcuevm  # Now you can import your module as usual
 
-
 class CuEVMLib:
     def __init__(
         self,
@@ -25,7 +24,7 @@ class CuEVMLib:
         config=None,
         contract_name=None,
         detect_bug=False,
-        sender="0x1111111111111111111111111111111111111111",
+        sender=int("0x1111111111111111111111111111111111111111",16),
         contract_bin_runtime=None,
         run_eth_tests=False,
     ):
@@ -63,17 +62,17 @@ class CuEVMLib:
                 else:
                     self.instances[i]["pre"][key] = value
                     self.instances[i]["pre"][key]["code"] = "0x"
-                self.instances[i]["pre"][key]["nonce"] = hex(
-                    self.instances[i]["pre"][key]["nonce"]
-                )
+                # self.instances[i]["pre"][key]["nonce"] = hex(
+                #     self.instances[i]["pre"][key]["nonce"]
+                # )
+                self.instances[i]["pre"][key]["nonce"] = self.instances[i]["pre"][key]["nonce"]
 
                 # self.instances[i]["pre"][key]["storage"] = value.get("storage")
 
             # sender = next_config["transaction"]["sender"]
             
-            self.instances[i]["transaction"]["nonce"] = hex(
-                post_state.get(self.sender, {}).get("nonce", 0)
-            )
+            self.instances[i]["transaction"]["nonce"] = post_state.get(self.sender, {}).get("nonce", 0)
+            
     def run_eth_tests(self):
         result_state = libcuevm.run_dict(self.instances)
         return result_state
@@ -82,8 +81,6 @@ class CuEVMLib:
     ## 3. return the simplified trace during execution
     def run_transactions(self, tx_data, skip_trace_parsing=False, measure_performance=False):
         self.build_instance_data(tx_data)
-        # self.print_instance_data()
-        # print ("before running")
         if measure_performance:
             time_start = time.time()
         result_state = libcuevm.run_dict(self.instances, skip_trace_parsing)
@@ -186,6 +183,44 @@ class CuEVMLib:
         
         return final_trace
 
+    def convert_pre_state_to_int(self, pre_state):
+        block_info = pre_state.get("env", {})
+        for key, value in block_info.items():
+            if isinstance(value, str):
+                block_info[key] = int(value, 16)
+        pre_state["env"] = block_info
+        pre_state["target_address"] = int(pre_state["target_address"], 16)
+        pre = pre_state.get("pre", {})
+        new_pre = {}
+        for key, value in pre.items():
+            int_key = int(key, 16)
+            # If a 'storage' dictionary is present, convert its keys from hex to int as well.
+            if "storage" in value and isinstance(value["storage"], dict):
+                new_storage = {}
+                for stor_key, stor_value in value["storage"].items():
+                    new_storage[int(stor_key, 16)] = int(stor_value, 16)
+                value["storage"] = new_storage
+            if "nonce" in value:
+                value["nonce"] = int(value["nonce"], 16)
+            if "balance" in value:
+                value["balance"] = int(value["balance"], 16)
+            new_pre[int_key] = value
+        pre_state["pre"] = new_pre
+
+        transaction = pre_state.get("transaction", {})
+        transaction["to"] = int(transaction["to"], 16)
+        transaction["sender"] = int(transaction["sender"], 16)
+        transaction["value"] = [int(value, 16) for value in transaction["value"]]
+        pre_state["transaction"] = transaction
+        return pre_state
+    def convert_tx_sequence_config_to_int(self, tx_sequence_config):
+        storage = tx_sequence_config.get("storage", {})
+        new_storage = {}
+        for key, value in storage.items():
+            new_storage[int(key, 16)] = int(value, 16)
+        tx_sequence_config["storage"] = new_storage
+        return tx_sequence_config
+
     ## initiate num_instances clones of the initial state
     def initiate_instance_data(
         self,
@@ -199,10 +234,12 @@ class CuEVMLib:
     ):
         
         default_config = json.loads(open("configurations/default.json").read())
+        default_config = self.convert_pre_state_to_int(default_config)
         # print(default_config)
         self.detect_bug = detect_bug
         # tx_sequence_list
         tx_sequence_config = json.loads(open(config).read())
+        tx_sequence_config = self.convert_tx_sequence_config_to_int(tx_sequence_config)
         if run_eth_tests:
             self.instances = [copy.deepcopy(tx_sequence_config) for _ in range(num_instances)]
             return
@@ -242,14 +279,14 @@ class CuEVMLib:
         new_test["transaction"]["to"] = target_address
         new_test["transaction"]["data"] = ["0x00"]
         new_test["transaction"]["value"] = [0]
-        new_test["transaction"]["nonce"] = "0x00"
+        new_test["transaction"]["nonce"] = 0
     
         self.instances = [copy.deepcopy(new_test) for _ in range(num_instances)]
 
     def print_instance_data(self):
         for idx, instance in enumerate(self.instances):
             print(f"\n\n Instance data {idx}\n\n")
-            pprint(instance)
+            print_hex(instance)
 
     ## build instances data from new tx data
     ## tx_data is a list of tx data
@@ -271,7 +308,7 @@ class CuEVMLib:
 def test_state_change():
     my_lib = CuEVMLib(
         "contracts/state_change.sol",
-        3,
+        20000,
         "configurations/state_change.json",
         # contract_bin_runtime="6011602201600460110260005560015561123460015561ffff60ff5500",
         # contract_bin_runtime="6042611234621234567F123456789101112131415161718192021000"
@@ -288,42 +325,42 @@ def test_state_change():
         "data": get_transaction_data_from_config(
             test_case, my_lib.contract_instance
         ),  # must return an array
-        "value": [hex(0)],
+        "value": [0],
     }
     tx_2 = {
         "data": get_transaction_data_from_config(
             test_case, my_lib.contract_instance
         ),  # must return an array
-        "value": [hex(0)],
+        "value": [0],
     }
 
     # for debugging, altering tx2 data
     tx_2["data"] = ["0x12"]
-    tx_2["value"] = [hex(10)]
-    my_lib.instances[0]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
-        "0x00"
-    ] = "0x10"
+    tx_2["value"] = [10]
+    my_lib.instances[0]["pre"][int("0xcccccccccccccccccccccccccccccccccccccccc",16)]["storage"][
+        int("0x00",16)
+    ] = int("0x10",16)
     # for debugging, altering the state 2
-    my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
-        "0x00"
-    ] = "0x2000"
+    my_lib.instances[1]["pre"][int("0xcccccccccccccccccccccccccccccccccccccccc",16)]["storage"][
+        int("0x00",16)
+    ] = int("0x2000",16)
     # my_lib.instances[1]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"][
     #     "balance"
     # ] = "0x00"
-    my_lib.instances[2]["pre"]["0xcccccccccccccccccccccccccccccccccccccccc"]["storage"][
-        "0x00"
-    ] = "0x30"
+    my_lib.instances[2]["pre"][int("0xcccccccccccccccccccccccccccccccccccccccc",16)]["storage"][
+        int("0x00",16)
+    ] = int("0x30",16)
     
-    print("\n\n instance data before running \n\n")
-    my_lib.print_instance_data()
     trace_res = my_lib.run_transactions([tx_1],)
     # trace_res = my_lib.run_transactions([tx_1])
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
-    print("\n\n Updated instance data \n\n")
-    my_lib.print_instance_data()
+    # print("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
 
     # trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1])
+    # print("\n\n Updated instance data \n\n")
+    # my_lib.print_instance_data()
 
     # # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
     # # # trace_res = my_lib.run_transactions([tx_1, tx_1])

@@ -97,6 +97,7 @@ static PyObject* run_dict(PyObject* self, PyObject* args) {
     }
 
     PyObject* write_root = run_interpreter_pyobject(read_root, skip_trace_parsing);
+
     return write_root;
 }
 

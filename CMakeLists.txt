@@ -31,8 +31,10 @@ if(DOCS)
 endif()
 
 if(BUILD_LIBRARY)
-    find_package(PythonLibs REQUIRED)
-    include_directories(${PYTHON_INCLUDE_DIRS})
+    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+    include_directories(${Python3_INCLUDE_DIRS})
+    message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
+    message(STATUS "Python libraries: ${Python3_LIBRARIES}")
 endif()
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/CuEVM")
@@ -87,7 +89,7 @@ if(BUILD_LIBRARY)
     # our own libraries first
     target_link_libraries(${PROJECT_NAME} PRIVATE CuCrypto CuBigInt CuEVM)
     # then the external ones
-    target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${PYTHON_LIBRARIES} ${CUDA_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${Python3_LIBRARIES} ${CUDA_LIBRARIES})
 
     target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
     if(ENABLE_EIP_3155)
