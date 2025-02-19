@@ -107,8 +107,6 @@ class Fuzzer:
         self.branch_source_mapping = {}
         self.run_seed_round()
 
-
-
     def prepare_abi(self, abi):
         print("prepare_abi")
         for item in abi:
@@ -128,6 +126,7 @@ class Fuzzer:
 
         print ("after processing")
         print (self.abi_list)
+        
     def get_branch_source_mapping(self, branch, branch_id):
         if not self.branch_heuristic:
             return

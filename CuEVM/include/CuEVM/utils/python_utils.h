@@ -111,12 +111,15 @@ void get_block_info_from_PyObject(PyObject* data);
 void print_dict_recursive(PyObject* dict, int indent_level = 2);
 
 CuEVM::transaction::TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots);
-
+void freeTransactionList(CuEVM::transaction::TransactionList* d_transaction_list_ptr);
+void freeTraceData(bool copy_state_data);
 void getStateDataFromPyObject(PyObject* data, uint32_t num_states);
 
 void getPreStateDataFromTransactionList(PyObject* readroot, uint32_t num_states);
 
-CuEVM::transaction::TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances);
+CuEVM::transaction::TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances,
+                                                                     bool reuse_state_data = false,
+                                                                     bool copy_state_data = true);
 
 std::unordered_set<int> const bug_opcodes = {OP_ADD, OP_MUL, OP_SUB, OP_MOD, OP_EXP, OP_SELFDESTRUCT, OP_ORIGIN};
 std::unordered_set<int> const call_opcodes = {OP_CALL, OP_CALLCODE, OP_DELEGATECALL};  // ignore static call for now
@@ -133,7 +136,7 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
  * @param[in] instances evm instances
  * @return pyobject
  */
-PyObject* pyobject_from_evm_instances(uint32_t num_instances);
+PyObject* pyobject_from_evm_instances(uint32_t num_instances, bool copy_state_data = false);
 
 /*
  * Convert a Python int (assumed to be non-negative and fitting in 256 bits)

@@ -7,19 +7,23 @@
 
 using namespace python_utils;
 
-PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_parsing) {
+PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_parsing, uint32_t copy_state_data,
+                                   uint32_t reuse_state_data) {
     // CuEVM::evm_instance_t* instances_data;
-
+    printf("run configuration skip_trace_parsing: %d, copy_state_data: %d, reuse_state_data: %d\n", skip_trace_parsing,
+           copy_state_data, reuse_state_data);
     CUDA_CHECK(cudaSetDevice(0));
-    CUDA_CHECK(cudaDeviceReset());
+    if (!reuse_state_data) {
+        CUDA_CHECK(cudaDeviceReset());
+
+        size_t heap_size = (size_t(1) << 32);  // 4GB
+        CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
+        CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
+        CUDA_CHECK(cudaDeviceSynchronize());
+    }
 
     cudaEvent_t start, stop;
     float milliseconds = 0;
-
-    size_t heap_size = (size_t(1) << 32);  // 4GB
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
-    CUDA_CHECK(cudaDeviceSynchronize());
 
     // read the json file with the global state
     uint32_t num_instances = 0;
@@ -51,9 +55,9 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     printf("num_accounts: %d\n", num_accounts);
 
     CuEVM::transaction::TransactionList* all_transactions =
-        python_utils::get_evm_instances_from_PyObject(read_roots, num_instances);
+        python_utils::get_evm_instances_from_PyObject(read_roots, num_instances, reuse_state_data, copy_state_data);
 
-    CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
+    CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts, reuse_state_data);
 
     uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
 
@@ -77,27 +81,35 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
 
     PyObject* write_root;
     if (!skip_trace_parsing) {
-        write_root = python_utils::pyobject_from_evm_instances(num_instances);
+        write_root = python_utils::pyobject_from_evm_instances(num_instances, copy_state_data);
     } else {
         write_root = PyDict_New();
     }
 
     // CuEVM::free_evm_instances(instances_data, num_instances);
-
-    CUDA_CHECK(cudaDeviceReset());
+    if (!reuse_state_data) {
+        CUDA_CHECK(cudaDeviceReset());
+    } else {
+        // free other memory than the state data
+        CuEVM::memory_pool::clear_memory_pool();
+        python_utils::freeTransactionList(all_transactions);
+        python_utils::freeTraceData(copy_state_data);
+    }
     return write_root;
 }
 
 static PyObject* run_dict(PyObject* self, PyObject* args) {
     PyObject* read_root;
     uint32_t skip_trace_parsing = 0;
+    uint32_t copy_state_data = 0;
+    uint32_t reuse_state_data = 0;
 
-    if (!PyArg_ParseTuple(args, "O|i", &read_root, &skip_trace_parsing)) {
+    if (!PyArg_ParseTuple(args, "O|iii", &read_root, &skip_trace_parsing, &copy_state_data, &reuse_state_data)) {
         printf("parse tuple failed\n");
         return NULL;  // If parsing fails, return NULL
     }
 
-    PyObject* write_root = run_interpreter_pyobject(read_root, skip_trace_parsing);
+    PyObject* write_root = run_interpreter_pyobject(read_root, skip_trace_parsing, copy_state_data, reuse_state_data);
 
     return write_root;
 }

@@ -44,11 +44,11 @@ class CuEVMLib:
         # print ("trace value result")
         # pprint(json_result)
 
-        if trace_values is None or trace_values.get("post") is None:
+        if trace_values is None or trace_values.get("states") is None:
             print("Skipping updating state")
             return
-        for i in range(len(trace_values.get("post"))):
-            post_state = trace_values.get("post")[i].get("state")
+        for i in range(len(trace_values.get("states"))):
+            post_state = trace_values.get("states")[i]
             if post_state is None:
                 # print(f"Skipping updating state for instance {i}")
                 continue
@@ -79,82 +79,67 @@ class CuEVMLib:
     ## 1. run transactions on the EVM instances
     ## 2. update the persistent state of the EVM instances
     ## 3. return the simplified trace during execution
-    def run_transactions(self, tx_data, skip_trace_parsing=False, measure_performance=False):
+    def run_transactions(self, tx_data, skip_trace_parsing=False, copy_state_data=True, reuse_state_data=False, measure_performance=False):
         self.build_instance_data(tx_data)
         # print("instances")
         # pprint(self.instances)
         if measure_performance:
             time_start = time.time()
-        result_state = libcuevm.run_dict(self.instances, skip_trace_parsing)
+        result_state = libcuevm.run_dict(self.instances, skip_trace_parsing, copy_state_data, reuse_state_data)
         if measure_performance:
             time_end = time.time()
             print(f"Time taken: {time_end - time_start} seconds")
-        self.update_persistent_state(result_state)
+        if copy_state_data:
+            self.update_persistent_state(result_state)
         # print("result after running transactions")
         # pprint(self.instances)
         return self.post_process_trace(result_state)
 
     # post process the trace to detect integer bugs and simplify the distance
     def post_process_trace(self, json_result):
-        if json_result is None or json_result.get("post") is None:
+        if json_result is None or json_result.get("traces") is None:
             print("Skipping post processing")
             return []
-        final_trace = []
+        final_trace = json_result.get("traces")
+        storage_write = []
         # print("\ntrace\n")
         # pprint(trace)
-        for i in range(len(json_result.get("post"))):
-            tx_trace = json_result.get("post")[i].get("trace")
-            # print("tx trace")
-            # pprint(tx_trace)
-            storage_write = []
-            bugs = []
-            branches = tx_trace.get("branches", [])
-            events = tx_trace.get("events", [])
-            for current_event in events:
-                if current_event.opcode == OP_SSTORE:
-                    storage_write.append(
-                        EVMStorageWrite(
-                            pc=current_event.pc,
-                            key=current_event.operand_1,
-                            value=current_event.operand_2,
-                        )
-                    )
-                else:
-                    if self.detect_bug:
-                        if (current_event.opcode == OPADD and current_event.operand_1 + current_event.operand_2 >= 2**256):
-                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
-                        elif (current_event.opcode == OPMUL and current_event.operand_1 * current_event.operand_2 >= 2**256):
-                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
-                        elif (current_event.opcode == OPSUB and current_event.operand_1 < current_event.operand_2):
-                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer underflow"))
-                        elif (current_event.opcode == OPEXP and current_event.operand_1 ** current_event.operand_2 >= 2**256):
-                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
-                        elif current_event.opcode == OP_SELFDESTRUCT:
-                            bugs.append(EVMBug(current_event.pc, current_event.opcode, "selfdestruct"))
-
-            all_call = tx_trace.get("calls", [])
-            for call in all_call:
-                if self.detect_bug:
-                    if call.value > 0 and call.pc != 0:
-                        bugs.append(
-                            EVMBug(
-                                pc=call.pc,
-                                opcode=call.opcode,
-                                bug_type="Leaking Ether",
+        if self.detect_bug:
+            for tx_trace in final_trace:
+                bugs = []
+                for current_event in tx_trace.get("events", []):
+                    if current_event.opcode == OP_SSTORE:
+                        storage_write.append(
+                            EVMStorageWrite(
+                                pc=current_event.pc,
+                                key=current_event.operand_1,
+                                value=current_event.operand_2,
                             )
                         )
+                    if (current_event.opcode == OPADD and current_event.operand_1 + current_event.operand_2 >= 2**256):
+                        bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
+                    elif (current_event.opcode == OPMUL and current_event.operand_1 * current_event.operand_2 >= 2**256):
+                        bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
+                    elif (current_event.opcode == OPSUB and current_event.operand_1 < current_event.operand_2):
+                        bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer underflow"))
+                    elif (current_event.opcode == OPEXP and current_event.operand_1 ** current_event.operand_2 >= 2**256):
+                        bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
+                    elif current_event.opcode == OP_SELFDESTRUCT:
+                        bugs.append(EVMBug(current_event.pc, current_event.opcode, "selfdestruct"))
 
-            final_trace.append(
-                {
-                    "branches": branches,
-                    "events": events,
-                    "calls": all_call,
-                    "storage_write": storage_write,
-                    "bugs": bugs,
-                }
-            )
-
-        
+                all_call = tx_trace.get("calls", [])
+                for call in all_call:
+                    if self.detect_bug:
+                        if call.value > 0 and call.pc != 0:
+                            bugs.append(
+                                EVMBug(
+                                    pc=call.pc,
+                                    opcode=call.opcode,
+                                    bug_type="Leaking Ether",
+                                )
+                            )
+                tx_trace["bugs"] = bugs
+                tx_trace["storage_write"] = storage_write
         return final_trace
 
     def convert_pre_state_to_int(self, pre_state):
@@ -287,6 +272,7 @@ class CuEVMLib:
     ## build instances data from new tx data
     ## tx_data is a list of tx data
     def build_instance_data(self, tx_data):
+        # todo consider clearing pre_state data
         if len(tx_data) < len(self.instances):
             tx_data = tx_data + [tx_data[-1]] * (len(self.instances) - len(tx_data))
         if len(tx_data) > len(self.instances):

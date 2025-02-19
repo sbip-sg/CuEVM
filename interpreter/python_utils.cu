@@ -648,31 +648,36 @@ __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
     }
 }
 
-TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances) {
+TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances, bool reuse_state_data,
+                                                 bool copy_state_data) {
     uint32_t num_transactions = PyList_Size(read_roots);
 
     num_instances = num_transactions;
     // evm_instances = new evm_instance_t[num_instances];
-    get_block_info_from_PyObject(read_roots);
+    TransactionList* all_transactions;
+    if (!reuse_state_data) {
+        get_block_info_from_PyObject(read_roots);
 
-    TransactionList* all_transactions = getTransactionDataFromListofPyObject(read_roots);
-    getPreStateDataFromListofPyObject(read_roots, num_transactions);
+        getPreStateDataFromListofPyObject(read_roots, num_transactions);
+    }
+    all_transactions = getTransactionDataFromListofPyObject(read_roots);
 
 #ifdef BUILD_LIBRARY
     // Simplified trace data
     CuEVM::simplified_trace_data* d_trace_data;
-    CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
+
     CUDA_CHECK(cudaMalloc(&d_trace_data, num_transactions * sizeof(CuEVM::simplified_trace_data)));
     cudaMemset(d_trace_data, 0, num_transactions * sizeof(CuEVM::simplified_trace_data));
-
-    CUDA_CHECK(cudaMalloc(&d_serialized_worldstate_data, num_transactions * sizeof(CuEVM::serialized_worldstate_data)));
-    cudaMemset(d_serialized_worldstate_data, 0, num_transactions * sizeof(CuEVM::serialized_worldstate_data));
-#endif
-
-#ifdef BUILD_LIBRARY
     cudaMemcpyToSymbol(global_simplified_trace, &d_trace_data, sizeof(CuEVM::simplified_trace_data*));
-    cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
-                       sizeof(CuEVM::serialized_worldstate_data*));
+
+    if (copy_state_data) {
+        CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
+        CUDA_CHECK(
+            cudaMalloc(&d_serialized_worldstate_data, num_transactions * sizeof(CuEVM::serialized_worldstate_data)));
+        cudaMemset(d_serialized_worldstate_data, 0, num_transactions * sizeof(CuEVM::serialized_worldstate_data));
+        cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
+                           sizeof(CuEVM::serialized_worldstate_data*));
+    }
 #endif
 
     return all_transactions;
@@ -879,12 +884,49 @@ static PyObject* create_evm_branch(const CuEVM::branch_trace& branch) {
     Py_DECREF(args);
     return branch_instance;
 }
+// Add these new helper functions
+static PyObject* create_evm_storage_write(uint32_t pc, const evm_word_t& key, const evm_word_t& value) {
+    static PyObject* EVMStorageWrite = nullptr;
+
+    if (EVMStorageWrite == nullptr) {
+        EVMStorageWrite = get_utils_class("EVMStorageWrite");
+        if (!EVMStorageWrite) {
+            printf("EVMStorageWrite class not found\n");
+            return nullptr;
+        }
+    }
+
+    PyObject* args = Py_BuildValue("(iNN)", pc, uint256_to_py_long(&key), uint256_to_py_long(&value));
+
+    PyObject* storage_write_instance = PyObject_CallObject(EVMStorageWrite, args);
+    Py_DECREF(args);
+    return storage_write_instance;
+}
+
+static PyObject* create_evm_bug(uint32_t pc, uint8_t opcode, const char* bug_type) {
+    static PyObject* EVMBug = nullptr;
+
+    if (EVMBug == nullptr) {
+        EVMBug = get_utils_class("EVMBug");
+        if (!EVMBug) {
+            printf("EVMBug class not found\n");
+            return nullptr;
+        }
+    }
+
+    PyObject* args = Py_BuildValue("(iis)", pc, opcode, bug_type);
+    PyObject* bug_instance = PyObject_CallObject(EVMBug, args);
+    Py_DECREF(args);
+    return bug_instance;
+}
 
 static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* trace_data) {
     PyObject* tracer_root = PyDict_New();
     PyObject* branches = PyList_New(0);
     PyObject* events = PyList_New(0);
     PyObject* calls = PyList_New(0);
+    PyObject* storage_writes = PyList_New(0);
+    // PyObject* bugs = PyList_New(0);
 
     // printf("trace data before conversion\n");
     // trace_data->print();
@@ -893,6 +935,15 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* tr
         PyObject* call_item = create_evm_call(trace_data->calls[idx]);
         PyList_Append(calls, call_item);
         Py_DECREF(call_item);
+        // Detect ether leaking
+        // if (detect_bug && trace_data->calls[idx].pc != 0) {
+        //     evm_word_t zero;
+
+        //     if (!uint256_is_zero(&trace_data->calls[idx].value)) {
+        //         PyList_Append(bugs,
+        //                       create_evm_bug(trace_data->calls[idx].pc, trace_data->calls[idx].op, "Leaking Ether"));
+        //     }
+        // }
     }
 
     // Process events
@@ -900,6 +951,14 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* tr
         PyObject* event_item = create_trace_event(trace_data->events[idx]);
         PyList_Append(events, event_item);
         Py_DECREF(event_item);
+
+        // // Handle storage writes
+        // if (trace_data->events[idx].opcode == OP_SSTORE) {
+        //     PyObject* storage_write = create_evm_storage_write(
+        //         trace_data->events[idx].pc, trace_data->events[idx].operand_1, trace_data->events[idx].operand_2);
+        //     PyList_Append(storage_writes, storage_write);
+        //     Py_DECREF(storage_write);
+        // }
     }
 
     // Process branches
@@ -912,10 +971,14 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* tr
     PyDict_SetItemString(tracer_root, "events", events);
     PyDict_SetItemString(tracer_root, "branches", branches);
     PyDict_SetItemString(tracer_root, "calls", calls);
+    // PyDict_SetItemString(tracer_root, "storage_write", storage_writes);
+    // PyDict_SetItemString(tracer_root, "bugs", bugs);
 
     Py_DECREF(events);
     Py_DECREF(branches);
     Py_DECREF(calls);
+    Py_DECREF(storage_writes);
+    // Py_DECREF(bugs);
 
     return tracer_root;
 }
@@ -973,49 +1036,62 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
     return state_dict;
 }
 
-PyObject* pyobject_from_evm_instances(uint32_t num_instances) {
+PyObject* pyobject_from_evm_instances(uint32_t num_instances, bool copy_state_data) {
     PyObject* root = PyDict_New();
 
     // todo_cl Need to copy from device memory before using
     CuEVM::simplified_trace_data* trace_data = new CuEVM::simplified_trace_data[num_instances];
-    CuEVM::serialized_worldstate_data* world_data = new CuEVM::serialized_worldstate_data[num_instances];
-
     CuEVM::simplified_trace_data* d_trace_data;
-    CuEVM::serialized_worldstate_data* d_world_data;
-
     // First, retrieve the device pointers stored in the global symbols.
     CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
-    CUDA_CHECK(cudaMemcpyFromSymbol(&d_world_data, global_serialized_worldstate, sizeof(d_world_data)));
-
     // Now copy the data arrays from the device to host memory.
     CUDA_CHECK(cudaMemcpy(trace_data, d_trace_data, sizeof(CuEVM::simplified_trace_data) * num_instances,
                           cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(world_data, d_world_data, sizeof(CuEVM::serialized_worldstate_data) * num_instances,
-                          cudaMemcpyDeviceToHost));
 
+    CuEVM::serialized_worldstate_data* world_data;
+    CuEVM::serialized_worldstate_data* d_world_data;
+    if (copy_state_data) {
+        world_data = new CuEVM::serialized_worldstate_data[num_instances];
+        CUDA_CHECK(cudaMemcpyFromSymbol(&d_world_data, global_serialized_worldstate, sizeof(d_world_data)));
+        CUDA_CHECK(cudaMemcpy(world_data, d_world_data, sizeof(CuEVM::serialized_worldstate_data) * num_instances,
+                              cudaMemcpyDeviceToHost));
+    }
     // PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
     // PyDict_SetItemString(root, "pre", world_state_json);
     // Py_DECREF(world_state_json);
-    PyObject* instances_json = PyList_New(0);
-    PyDict_SetItemString(root, "post", instances_json);
-    Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
+    PyObject* state_list = PyList_New(0);
+    PyObject* trace_list = PyList_New(0);
+    // PyDict_SetItemString(root, "post", instances_json);
+    // Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
     printf("num_instances: %d\n", num_instances);
     for (uint32_t idx = 0; idx < num_instances; idx++) {
         // printf("idx: %d\n", idx);
-        CuEVM::serialized_worldstate_data* serialized_worldstate = &world_data[idx];
-        PyObject* instance_json = PyDict_New();
 
-        PyObject* state_json = pyobject_from_serialized_state(serialized_worldstate);  // PyList_New(0);
+        PyObject* state_json;
+        if (copy_state_data) {
+            CuEVM::serialized_worldstate_data* serialized_worldstate = &world_data[idx];
+            state_json = pyobject_from_serialized_state(serialized_worldstate);  // PyList_New(0);
+        } else
+            state_json = PyDict_New();
 
-        PyDict_SetItemString(instance_json, "state", state_json);
         PyObject* tracer_json = pyobject_from_simplified_trace(&trace_data[idx]);
-        PyDict_SetItemString(instance_json, "trace", tracer_json);
-        PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
+
+        PyList_Append(state_list, state_json);   // Appends and steals the reference, so no need to DECREF
+        PyList_Append(trace_list, tracer_json);  // Appends and steals the reference, so no need to DECREF
+        Py_DECREF(state_json);
+        Py_DECREF(tracer_json);
         // printf("done processing instance %d\n", idx);
     }
+    PyDict_SetItemString(root, "states", state_list);
+    PyDict_SetItemString(root, "traces", trace_list);
+
+    Py_DECREF(state_list);
+    Py_DECREF(trace_list);
 
     delete[] trace_data;
-    delete[] world_data;
+    if (copy_state_data) {
+        delete[] world_data;
+    }
 
     return root;
 }
@@ -1052,6 +1128,55 @@ __host__ PyObject* uint256_to_py_long(const uint256* src) {
     }
     // PyObject *PyLong_FromUnsignedNativeBytes(const void *buffer, size_t n_bytes, int flags)¶
     return PyLong_FromUnsignedNativeBytes((const unsigned char*)src->words, sizeof(src->words), -1);
+}
+
+void freeTransactionList(TransactionList* d_transaction_list_ptr) {
+    if (d_transaction_list_ptr == nullptr) {
+        return;
+    }
+
+    // Create a temporary TransactionList to store device pointers
+    TransactionList temp_list;
+    CUDA_CHECK(cudaMemcpy(&temp_list, d_transaction_list_ptr, sizeof(TransactionList), cudaMemcpyDeviceToHost));
+
+    // Free all device memory allocations
+    if (temp_list.value != nullptr) {
+        CUDA_CHECK(cudaFree(temp_list.value));
+    }
+    if (temp_list.gas_limit != nullptr) {
+        CUDA_CHECK(cudaFree(temp_list.gas_limit));
+    }
+    if (temp_list.call_data != nullptr) {
+        CUDA_CHECK(cudaFree(temp_list.call_data));
+    }
+    if (temp_list.call_data_offset != nullptr) {
+        CUDA_CHECK(cudaFree(temp_list.call_data_offset));
+    }
+    if (temp_list.call_data_size != nullptr) {
+        CUDA_CHECK(cudaFree(temp_list.call_data_size));
+    }
+
+    // Finally free the TransactionList itself
+    CUDA_CHECK(cudaFree(d_transaction_list_ptr));
+}
+
+void freeTraceData(bool copy_state_data) {
+    // Free simplified trace data
+    CuEVM::simplified_trace_data* d_trace_data;
+    CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(CuEVM::simplified_trace_data*)));
+    if (d_trace_data != nullptr) {
+        CUDA_CHECK(cudaFree(d_trace_data));
+    }
+
+    // Free serialized worldstate data if it was allocated
+    if (copy_state_data) {
+        CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
+        CUDA_CHECK(cudaMemcpyFromSymbol(&d_serialized_worldstate_data, global_serialized_worldstate,
+                                        sizeof(CuEVM::serialized_worldstate_data*)));
+        if (d_serialized_worldstate_data != nullptr) {
+            CUDA_CHECK(cudaFree(d_serialized_worldstate_data));
+        }
+    }
 }
 
 }  // namespace python_utils
