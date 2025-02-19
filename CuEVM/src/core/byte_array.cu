@@ -39,23 +39,23 @@ __device__ byte_array_t::byte_array_t(const byte_array_t &src_byte_array, uint32
 
 __host__ byte_array_t::byte_array_t(const char *hex_string, int32_t endian, PaddingDirection padding)
     : size(0), data(nullptr) {
-    from_hex(hex_string, endian, padding, 0);
+    from_hex(hex_string, endian, padding);
 }
 
 __host__ byte_array_t::byte_array_t(const char *hex_string, uint32_t size, int32_t endian, PaddingDirection padding)
     : size(size), data(nullptr) {
-    from_hex(hex_string, endian, padding, 0);
+    from_hex(hex_string, endian, padding);
 }
 
 __device__ byte_array_t::~byte_array_t() { free(); }
 
 __host__ __device__ void byte_array_t::free() {
-  if ((size > 0) && (data != nullptr)) {
+    if ((size > 0) && (data != nullptr)) {
 #ifndef __CUDA_ARCH__
-    delete[] data;
+        delete[] data;
 #endif
-    clear();
-  }
+        clear();
+    }
 }
 __host__ void byte_array_t::free_managed() {
     if ((size > 0) && (data != nullptr)) {
@@ -224,10 +224,10 @@ __host__ int32_t byte_array_t::from_hex_set_be(const char *clean_hex_string, int
     return 0;
 }
 
-__host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, PaddingDirection padding,
-                                        int32_t managed) {
+__host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, PaddingDirection padding) {
     char *tmp_hex_char;
     tmp_hex_char = (char *)hex_string;
+    printf("byte array from hex: %s\n", hex_string);
     int32_t length = CuEVM::utils::clean_hex_string(&tmp_hex_char);
     if (length < 0) {
         data = nullptr;
@@ -235,21 +235,14 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
     }
     uint32_t new_size = (size == 0) ? (length + 1) / 2 : size;
     if (size > 0) {
-        if (managed) {
-            free_managed();
-        } else {
-            free();
-        }
+        free();
     }
     size = new_size;
+    printf("size: %d\n", size);
     if (size > 0) {
-        if (managed) {
-            CUDA_CHECK(cudaMallocManaged((void **)&data, sizeof(uint8_t) * size));
-            memset(data, 0, size * sizeof(uint8_t));
-        } else {
-            data = new uint8_t[size];
-            memset(data, 0, size * sizeof(uint8_t));
-        }
+        data = new uint8_t[size];
+        memset(data, 0, size * sizeof(uint8_t));
+
     } else
         data = nullptr;
     int32_t error_code = ERROR_SUCCESS;
@@ -259,14 +252,16 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
         error_code = this->from_hex_set_be(tmp_hex_char, length, padding);
     }
     if (error_code != ERROR_SUCCESS) {
-        if (managed) {
-            CUDA_CHECK(cudaFree(data));
-        } else {
-            delete[] data;
-        }
+        delete[] data;
+
         data = nullptr;
         size = 0;
     }
+    printf("end of byte array from hex\n");
+    for (uint32_t idx = 0; idx < size; idx++) {
+        printf("%02x", data[idx]);
+    }
+    printf("\n");
     return error_code;
 }
 

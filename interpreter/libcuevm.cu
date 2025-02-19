@@ -93,6 +93,7 @@ static PyObject* run_dict(PyObject* self, PyObject* args) {
     uint32_t skip_trace_parsing = 0;
 
     if (!PyArg_ParseTuple(args, "O|i", &read_root, &skip_trace_parsing)) {
+        printf("parse tuple failed\n");
         return NULL;  // If parsing fails, return NULL
     }
 

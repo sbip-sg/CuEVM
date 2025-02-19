@@ -125,7 +125,7 @@ struct byte_array_t {
      * @return The Error code. 0 for success, 1 for failure.
      */
     __host__ int32_t from_hex(const char *hex_string, int32_t endian = LITTLE_ENDIAN,
-                              PaddingDirection padding = NO_PADDING, int32_t managed = 0);
+                              PaddingDirection padding = NO_PADDING);
     /**
      * Copy the source byte array
      * considering a Big Endian format, the extra size

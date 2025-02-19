@@ -61,7 +61,7 @@ class CuEVMLib:
                     self.instances[i]["pre"][key].update(value)
                 else:
                     self.instances[i]["pre"][key] = value
-                    self.instances[i]["pre"][key]["code"] = "0x"
+                    self.instances[i]["pre"][key]["code"] = b""
                 # self.instances[i]["pre"][key]["nonce"] = hex(
                 #     self.instances[i]["pre"][key]["nonce"]
                 # )
@@ -81,6 +81,8 @@ class CuEVMLib:
     ## 3. return the simplified trace during execution
     def run_transactions(self, tx_data, skip_trace_parsing=False, measure_performance=False):
         self.build_instance_data(tx_data)
+        # print("instances")
+        # pprint(self.instances)
         if measure_performance:
             time_start = time.time()
         result_state = libcuevm.run_dict(self.instances, skip_trace_parsing)
@@ -88,6 +90,8 @@ class CuEVMLib:
             time_end = time.time()
             print(f"Time taken: {time_end - time_start} seconds")
         self.update_persistent_state(result_state)
+        # print("result after running transactions")
+        # pprint(self.instances)
         return self.post_process_trace(result_state)
 
     # post process the trace to detect integer bugs and simplify the distance
@@ -102,41 +106,21 @@ class CuEVMLib:
             tx_trace = json_result.get("post")[i].get("trace")
             # print("tx trace")
             # pprint(tx_trace)
-            branches = []
-            events = []
             storage_write = []
             bugs = []
-            for branch in tx_trace.get("branches", [])[3:]:
-                branches.append(
-                    EVMBranch(
-                        pc_src=branch.get("pc_src"),
-                        pc_dst=branch.get("pc_dst"),
-                        pc_missed=branch.get("pc_missed"),
-                        distance=int(branch.get("distance"), 16),
-                    )
-                )
-                
-            for event in tx_trace.get("events", []):
-                if event.get("opcode") == OP_SSTORE:
+            branches = tx_trace.get("branches", [])
+            events = tx_trace.get("events", [])
+            for current_event in events:
+                if current_event.opcode == OP_SSTORE:
                     storage_write.append(
                         EVMStorageWrite(
-                            pc=event.get("pc"),
-                            key=event.get("operand_1"),
-                            value=event.get("operand_2"),
+                            pc=current_event.pc,
+                            key=current_event.operand_1,
+                            value=current_event.operand_2,
                         )
                     )
                 else:
-                    events.append(
-                        TraceEvent(
-                            pc=event.get("pc"),
-                            opcode=event.get("op"),
-                            operand_1=int(event.get("operand_1"), 16),
-                            operand_2=int(event.get("operand_2"), 16),
-                            result=int(event.get("res"), 16),
-                        )
-                    )
                     if self.detect_bug:
-                        current_event = events[-1]
                         if (current_event.opcode == OPADD and current_event.operand_1 + current_event.operand_2 >= 2**256):
                             bugs.append(EVMBug(current_event.pc, current_event.opcode, "integer overflow"))
                         elif (current_event.opcode == OPMUL and current_event.operand_1 * current_event.operand_2 >= 2**256):
@@ -148,24 +132,14 @@ class CuEVMLib:
                         elif current_event.opcode == OP_SELFDESTRUCT:
                             bugs.append(EVMBug(current_event.pc, current_event.opcode, "selfdestruct"))
 
-            all_call = []
-            for call in tx_trace.get("calls", []):
-                all_call.append(
-                    EVMCall(
-                        pc=call.get("pc"),
-                        opcode=call.get("op"),
-                        _from=call.get("sender"),
-                        _to=call.get("receiver"),
-                        value=int(call.get("value"), 16),
-                        result=call.get("success")
-                    )
-                )
+            all_call = tx_trace.get("calls", [])
+            for call in all_call:
                 if self.detect_bug:
-                    if all_call[-1].value > 0 and all_call[-1].pc != 0:
+                    if call.value > 0 and call.pc != 0:
                         bugs.append(
                             EVMBug(
-                                pc=all_call[-1].pc,
-                                opcode=all_call[-1].opcode,
+                                pc=call.pc,
+                                opcode=call.opcode,
                                 bug_type="Leaking Ether",
                             )
                         )
@@ -204,6 +178,8 @@ class CuEVMLib:
                 value["nonce"] = int(value["nonce"], 16)
             if "balance" in value:
                 value["balance"] = int(value["balance"], 16)
+            if "code" in value:
+                value["code"] = convert_hexstr_to_bytes(value["code"])
             new_pre[int_key] = value
         pre_state["pre"] = new_pre
 
@@ -213,12 +189,31 @@ class CuEVMLib:
         transaction["value"] = [int(value, 16) for value in transaction["value"]]
         pre_state["transaction"] = transaction
         return pre_state
+    
     def convert_tx_sequence_config_to_int(self, tx_sequence_config):
         storage = tx_sequence_config.get("storage", {})
         new_storage = {}
         for key, value in storage.items():
             new_storage[int(key, 16)] = int(value, 16)
         tx_sequence_config["storage"] = new_storage
+        pre = tx_sequence_config.get("pre", {})
+        new_pre = {}
+        for key, value in pre.items():
+            int_key = int(key, 16)
+            # If a 'storage' dictionary is present, convert its keys from hex to int as well.
+            if "storage" in value and isinstance(value["storage"], dict):
+                new_storage = {}
+                for stor_key, stor_value in value["storage"].items():
+                    new_storage[int(stor_key, 16)] = int(stor_value, 16)
+                value["storage"] = new_storage
+            if "nonce" in value:
+                value["nonce"] = int(value["nonce"], 16)
+            if "balance" in value:
+                value["balance"] = int(value["balance"], 16)
+            if "code" in value:
+                value["code"] = convert_hexstr_to_bytes(value["code"])
+            new_pre[int_key] = value
+        tx_sequence_config["pre"] = new_pre
         return tx_sequence_config
 
     ## initiate num_instances clones of the initial state
@@ -256,6 +251,7 @@ class CuEVMLib:
             return
         if contract_bin_runtime is None:
             contract_bin_runtime = self.contract_instance.get("binary_runtime")
+        contract_bin_runtime = convert_hexstr_to_bytes(contract_bin_runtime)
         # the merged config fields : "env", "pre" (populated with code), "transaction" (populated with tx data and value)
         pre_env = tx_sequence_config.get("pre", {})
         
@@ -277,7 +273,7 @@ class CuEVMLib:
         new_test["transaction"] = default_config["transaction"].copy()
 
         new_test["transaction"]["to"] = target_address
-        new_test["transaction"]["data"] = ["0x00"]
+        new_test["transaction"]["data"] = [b""]
         new_test["transaction"]["value"] = [0]
         new_test["transaction"]["nonce"] = 0
     
@@ -308,7 +304,7 @@ class CuEVMLib:
 def test_state_change():
     my_lib = CuEVMLib(
         "contracts/state_change.sol",
-        20000,
+        3,
         "configurations/state_change.json",
         # contract_bin_runtime="6011602201600460110260005560015561123460015561ffff60ff5500",
         # contract_bin_runtime="6042611234621234567F123456789101112131415161718192021000"
@@ -335,7 +331,7 @@ def test_state_change():
     }
 
     # for debugging, altering tx2 data
-    tx_2["data"] = ["0x12"]
+    tx_2["data"] = [b"\x12"]
     tx_2["value"] = [10]
     my_lib.instances[0]["pre"][int("0xcccccccccccccccccccccccccccccccccccccccc",16)]["storage"][
         int("0x00",16)
@@ -355,12 +351,12 @@ def test_state_change():
     # trace_res = my_lib.run_transactions([tx_1])
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
-    # print("\n\n Updated instance data \n\n")
-    # my_lib.print_instance_data()
+    print("\n\n Updated instance data \n\n")
+    my_lib.print_instance_data()
 
-    # trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1])
-    # print("\n\n Updated instance data \n\n")
-    # my_lib.print_instance_data()
+    trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1])
+    print("\n\n Updated instance data \n\n")
+    my_lib.print_instance_data()
 
     # # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
     # # # trace_res = my_lib.run_transactions([tx_1, tx_1])
@@ -374,7 +370,7 @@ def test_state_change():
 def test_erc20():
     my_lib = CuEVMLib(
         "contracts/erc20.sol",
-        5,
+        10000,
         "configurations/erc20.json",
         contract_name="ERC20",
         detect_bug=False,
@@ -391,15 +387,16 @@ def test_erc20():
         "data": get_transaction_data_from_config(
             test_case, my_lib.contract_instance
         ),  # must return an array
-        "value": [hex(512)],
+        "value": [512],
     }
     tx_2 = {
         "data": get_transaction_data_from_config(
             test_case, my_lib.contract_instance
         ),  # must return an array
-        "value": [hex(512)],
+        "value": [512],
     }
-    trace_res = my_lib.run_transactions([tx_1, tx_2], skip_trace_parsing=True)
+    # trace_res = my_lib.run_transactions([tx_1, tx_2], skip_trace_parsing=True)
+    trace_res = my_lib.run_transactions([tx_1,tx_2])
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
 
@@ -427,12 +424,12 @@ def test_branching():
 
     tx_1 = {
         "data": get_transaction_data_from_config(test_case_1, my_lib.contract_instance),
-        "value": [hex(0)],
+        "value": [0],
     }
 
     tx_2 = {
         "data": get_transaction_data_from_config(test_case_2, my_lib.contract_instance),
-        "value": [hex(0)],
+        "value": [0],
     }
     trace_res = my_lib.run_transactions([tx_1, tx_2])
     print("\n\n trace res \n\n")
@@ -455,10 +452,11 @@ def test_system_operation():
 
     tx_1 = {
         "data": get_transaction_data_from_config(test_case, my_lib.contract_instance),
-        "value": [hex(1234)],
+        "value": [1234],
     }
     print("instance data")
     pprint(my_lib.instances)
+    # my_lib.print_instance_data()
     print("tx_1")
     pprint(tx_1)
     trace_res = my_lib.run_transactions([tx_1])
@@ -486,7 +484,7 @@ def test_bugs_simple():
 
     tx_1 = {
         "data": get_transaction_data_from_config(test_case, my_lib.contract_instance),
-        "value": [hex(0)],
+        "value": [0],
     }
 
     trace_res = my_lib.run_transactions([tx_1], measure_performance=True, skip_trace_parsing=False)
@@ -568,7 +566,7 @@ def test_cross_contract():
 
     tx_1 = {
         "data": get_transaction_data_from_config(test_case, my_lib.contract_instance),
-        "value": [hex(300)],
+        "value": [300],
     }
 
     trace_res = my_lib.run_transactions([tx_1])

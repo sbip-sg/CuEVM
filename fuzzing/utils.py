@@ -136,14 +136,31 @@ def get_transaction_data_from_config(item, contract_instance):
     input_types = item["input_types"]
     # print (function_abi[0])
     function_abi = function_abi[0]
-    four_byte = "0x" + function_abi_to_4byte_selector(function_abi).hex()
+    four_byte = function_abi_to_4byte_selector(function_abi)
     print(four_byte)
     if len(inputs) > 0:
-        encoded_data = encode(input_types, inputs).hex()
+        encoded_data = encode(input_types, inputs)
     else:
-        encoded_data = ""
+        encoded_data = b""
 
     return [four_byte + encoded_data]
+
+def convert_hexstr_to_bytes(hexstr):
+    if isinstance(hexstr, bytes):
+        return hexstr
+    elif isinstance(hexstr, str):
+        # If the code string is empty or only "0x", return empty bytes.
+        if hexstr in ("", "0x"):
+            return b""
+        else:
+            # Remove the "0x" or "0X" prefix if present.
+            if hexstr.startswith("0x") or hexstr.startswith("0X"):
+                hexstr = hexstr[2:]
+            # Convert the remaining hex string to a byte array.
+            return bytes.fromhex(hexstr)
+    else:
+        # If it is neither str nor bytes, you may want to handle this case appropriately.
+        return b""
 
 def hexify(obj):
     """
@@ -152,6 +169,8 @@ def hexify(obj):
     """
     if isinstance(obj, int):
         return hex(obj)
+    elif isinstance(obj, bytes):
+        return obj.hex()
     elif isinstance(obj, list):
         return [hexify(item) for item in obj]
     elif isinstance(obj, dict):
@@ -174,14 +193,14 @@ def get_transaction_data_from_processed_abi(processed_abi, function_name, inputs
     entry = processed_abi.get(function_name)
     if entry:
         input_types = entry.get("input_types")
-        four_byte = "0x" + entry.get("4byte")
+        four_byte = entry.get("4byte")
         if len(inputs) > 0:
-            encoded_data = encode(input_types, inputs).hex()
+            encoded_data = encode(input_types, inputs)
         else:
-            encoded_data = ""
+            encoded_data = b""
         return [four_byte + encoded_data]
     else:
-        return [""]
+        return [b""]
 
 
 def decode_abi_bin_from_compiled_json(compiled_sol):

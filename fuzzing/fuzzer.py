@@ -123,7 +123,7 @@ class Fuzzer:
                         input_list.append(input_.get("type"))
                     self.abi_list[item.get("name")] = {
                         "input_types" : input_list,
-                        "4byte" : function_abi_to_4byte_selector(item).hex()
+                        "4byte" : function_abi_to_4byte_selector(item)
                         }
 
         print ("after processing")
@@ -220,7 +220,7 @@ class Fuzzer:
 
         tx_data.append({
             "data":  get_transaction_data_from_processed_abi(self.abi_list, function, inputs),
-            "value": [hex(0)]
+            "value": [0]
         })
 
     def run_seed_round(self):

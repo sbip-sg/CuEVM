@@ -105,7 +105,7 @@ __device__ void simplified_trace_data::finish_call(uint8_t success) {
         }
     }
 }
-__device__ void simplified_trace_data::print() {
+__host__ __device__ void simplified_trace_data::print() {
     printf("no_events %u\n", no_events);
     printf("no_calls %u\n", no_calls);
     printf("events\n");
@@ -197,6 +197,25 @@ void hex_to_bytes(const char* hex_string, uint8_t* byte_array, size_t length) {
     }
 }
 
+void get_c_byte_array_from_pyobject(PyObject* pyobject, uint8_t*& c_byte_array, uint32_t& size) {
+    if (PyBytes_Check(pyobject)) {
+        // Get the pointer to the underlying buffer (it's a char*, so cast it to uint8_t*)
+        c_byte_array = reinterpret_cast<uint8_t*>(PyBytes_AsString(pyobject));
+        // Retrieve the size of the byte string
+        size = PyBytes_Size(pyobject);
+        // Now you have both the C uint8_t array (c_byte_array) and its size (size)
+    } else if (PyByteArray_Check(pyobject)) {
+        // If it's a bytearray, use the corresponding functions
+        c_byte_array = reinterpret_cast<uint8_t*>(PyByteArray_AsString(pyobject));
+        size = PyByteArray_Size(pyobject);
+        // Now you have the uint8_t array and its size
+    } else {
+        printf("pyobject to byte array failed: %p\n", pyobject);
+        PyErr_SetString(PyExc_TypeError, "Expected a bytes or bytearray object.");
+        exit(0);
+        // return;
+    }
+}
 // similar to CuEVM/src/core/transaction.cu#get_transactions
 TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
     Py_ssize_t count = PyList_Size(read_roots);
@@ -238,7 +257,7 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
 
     uint32_t curr_call_data_offset = 0;
 
-    CuEVM::byte_array_t data_init;
+    // CuEVM::byte_array_t data_init;
 
     for (Py_ssize_t idx = 0; idx < count; idx++) {
         PyObject* current_instance = PyList_GetItem(read_roots, idx);
@@ -249,18 +268,20 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
         }
 
         PyObject* data = PyDict_GetItemString(current_instance, "transaction");
-        // todo_cl data structure might differ from what's provided by Python
-        PyObject* tx_data =
-            PyList_GetItem(PyDict_GetItemString(data, "data"), 0);  // data is a list with only one item ["0x..."]
 
-        CHECK_AND_RETURN_ON_ERROR(
-            data_init.from_hex(PyUnicode_AsUTF8(tx_data), LITTLE_ENDIAN, CuEVM::PaddingDirection::NO_PADDING));
+        // printf("transaction: %p\n", current_instance);
+        // print_dict_recursive(current_instance, 1);
+        // printf("data: %p\n", data);
+        // print_dict_recursive(data, 1);
+
+        PyObject* first_tx_data = PyList_GetItem(PyDict_GetItemString(data, "data"), 0);
+
+        uint8_t* tx_data;
+        uint32_t tx_data_size;
+        get_c_byte_array_from_pyobject(first_tx_data, tx_data, tx_data_size);
 
         PyObject* tx_gas_limit = PyList_GetItem(PyDict_GetItemString(data, "gasLimit"), 0);
         PyObject* tx_value = PyList_GetItem(PyDict_GetItemString(data, "value"), 0);
-
-        CHECK_AND_RETURN_ON_ERROR(
-            data_init.from_hex(PyUnicode_AsUTF8(tx_data), LITTLE_ENDIAN, CuEVM::PaddingDirection::NO_PADDING));
 
         evm_word_t tmp;
 
@@ -271,20 +292,20 @@ TransactionList* getTransactionDataFromListofPyObject(PyObject* read_roots) {
         py_long_to_uint256(tx_value, &transactions->value[idx]);
 
         transactions->call_data_offset[idx] = curr_call_data_offset;
-        transactions->call_data_size[idx] = data_init.size;
-        if (data_init.size > 0) {
+        transactions->call_data_size[idx] = tx_data_size;
+        if (tx_data_size > 0) {
             if (transactions->call_data == nullptr) {
-                transactions->call_data = new uint8_t[data_init.size];
+                transactions->call_data = new uint8_t[tx_data_size];
             } else {
-                uint8_t* tmp = new uint8_t[curr_call_data_offset + data_init.size];
+                uint8_t* tmp = new uint8_t[curr_call_data_offset + tx_data_size];
                 memcpy(tmp, transactions->call_data, curr_call_data_offset);
                 delete[] transactions->call_data;
                 transactions->call_data = tmp;
             }
-            memcpy(&transactions->call_data[curr_call_data_offset], data_init.data, data_init.size);
+            memcpy(&transactions->call_data[curr_call_data_offset], tx_data, tx_data_size);
         }
 
-        curr_call_data_offset += data_init.size;
+        curr_call_data_offset += tx_data_size;
     }
 
     uint32_t call_data_size = curr_call_data_offset;
@@ -391,7 +412,8 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
             // Extract balance, nonce, and code
             // const char* balance = GET_STR_FROM_DICT_WITH_DEFAULT(value, "balance", "0x0");
             // const char* nonce = GET_STR_FROM_DICT_WITH_DEFAULT(value, "nonce", "0x0");
-            const char* code = GET_STR_FROM_DICT_WITH_DEFAULT(value, "code", "");
+            // const char* code = GET_STR_FROM_DICT_WITH_DEFAULT(value, "code", "");
+            PyObject* code = PyDict_GetItemString(value, "code");
             PyObject* storage_dict = PyDict_GetItemString(value, "storage");
             uint32_t storage_size = PyDict_Size(storage_dict);
 
@@ -401,19 +423,22 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
                 // state_db_cpu->address_list[address_index].from_hex(address_str);
                 py_long_to_uint256(key, &state_db_cpu->address_list[address_index]);
                 // Code
-                byte_array_t byte_code;
-                byte_code.from_hex(code, LITTLE_ENDIAN, NO_PADDING);
-                state_db_cpu->account_codes_size[address_index] = byte_code.size;
+                // byte_array_t byte_code;
+                uint8_t* byte_code;
+                uint32_t byte_code_size;
+                get_c_byte_array_from_pyobject(code, byte_code, byte_code_size);
+                // byte_code.from_hex(code, LITTLE_ENDIAN, NO_PADDING);
+                state_db_cpu->account_codes_size[address_index] = byte_code_size;
                 state_db_cpu->account_codes_offset[address_index] = bytecode_offset;
-                if (byte_code.size > 0) {
+                if (byte_code_size > 0) {
                     uint8_t* tmp = state_db_cpu->all_account_codes;
-                    state_db_cpu->all_account_codes = new uint8_t[bytecode_offset + byte_code.size];
+                    state_db_cpu->all_account_codes = new uint8_t[bytecode_offset + byte_code_size];
                     memcpy(state_db_cpu->all_account_codes, tmp, bytecode_offset * sizeof(uint8_t));
                     delete[] tmp;
-                    memcpy(&state_db_cpu->all_account_codes[bytecode_offset], byte_code.data, byte_code.size);
-                    bytecode_offset += byte_code.size;
+                    memcpy(&state_db_cpu->all_account_codes[bytecode_offset], byte_code, byte_code_size);
+                    bytecode_offset += byte_code_size;
                 }
-                if (byte_code.size > 0 || storage_size > 0) {
+                if (byte_code_size > 0 || storage_size > 0) {
                     state_db_cpu->contract_index[address_index] = state_db_cpu->num_contracts;
                     state_db_cpu->num_contracts++;
                 } else {
@@ -719,49 +744,167 @@ __host__ void get_block_info_from_PyObject(PyObject* data) {
     // Copy pointer to symbol
     cudaMemcpyToSymbol(global_block_info, &d_block_info, sizeof(block_info_t*));
 }
+// static PyObject* get_utils_class(const char* class_name) {
+//     // Get the main module's dict
+//     PyObject* main_module = PyImport_AddModule("__main__");
+//     PyObject* main_dict = PyModule_GetDict(main_module);
+
+//     // Get the utils module (assuming it's imported as 'utils')
+//     PyObject* utils = PyDict_GetItemString(main_dict, "utils");
+//     if (!utils) {
+//         PyErr_SetString(PyExc_ImportError, "Cannot find utils module");
+//         return nullptr;
+//     }
+
+//     // Get the class from utils module
+//     PyObject* class_obj = PyObject_GetAttrString(utils, class_name);
+//     if (!class_obj) {
+//         PyErr_SetString(PyExc_AttributeError, "Cannot find class in utils module");
+//         return nullptr;
+//     }
+
+//     return class_obj;
+// }
+static PyObject* get_utils_class(const char* class_name) {
+    // Get the main module's dict
+    PyObject* main_module = PyImport_AddModule("__main__");
+    if (!main_module) {
+        printf("Failed to get __main__ module\n");
+        return nullptr;
+    }
+
+    PyObject* main_dict = PyModule_GetDict(main_module);
+    if (!main_dict) {
+        printf("Failed to get main module dict\n");
+        return nullptr;
+    }
+
+    // // Debug: Print all keys in main_dict
+    // PyObject *key, *value;
+    // Py_ssize_t pos = 0;
+    // printf("Available modules in __main__:\n");
+    // while (PyDict_Next(main_dict, &pos, &key, &value)) {
+    //     const char* key_str = PyUnicode_AsUTF8(key);
+    //     printf("  - %s\n", key_str);
+    // }
+
+    // Try different ways to get the utils module
+    PyObject* utils = nullptr;
+
+    // Try direct access to 'utils'
+    utils = PyDict_GetItemString(main_dict, "utils");
+    if (!utils) {
+        // Try accessing through sys.modules
+        PyObject* sys_modules = PyImport_GetModuleDict();
+        utils = PyDict_GetItemString(sys_modules, "utils");
+    }
+    if (!utils) {
+        printf("Cannot find utils module\n");
+        return nullptr;
+    }
+
+    // // Debug: Print all attributes of utils module
+    // printf("Available classes in utils module:\n");
+    // PyObject* dir = PyObject_Dir(utils);
+    // if (dir != nullptr) {
+    //     Py_ssize_t size = PyList_Size(dir);
+    //     for (Py_ssize_t i = 0; i < size; i++) {
+    //         PyObject* attr = PyList_GetItem(dir, i);
+    //         const char* attr_str = PyUnicode_AsUTF8(attr);
+    //         printf("  - %s\n", attr_str);
+    //     }
+    //     Py_DECREF(dir);
+    // }
+
+    // Get the class from utils module
+    PyObject* class_obj = PyObject_GetAttrString(utils, class_name);
+    if (!class_obj) {
+        printf("Cannot find class %s in utils module\n", class_name);
+        return nullptr;
+    }
+
+    return class_obj;
+}
+
+// Add these helper functions to create Python dataclass instances directly
+static PyObject* create_evm_call(const CuEVM::call_trace& call) {
+    static PyObject* EVMCall = nullptr;
+
+    // Cache the EVMCall class object (do this once)
+
+    EVMCall = get_utils_class("EVMCall");
+    if (!EVMCall) {
+        printf("EVMCall class not found\n");
+        return nullptr;
+    }
+
+    PyObject* args = Py_BuildValue("(iiNNNi)", call.pc, call.op, uint256_to_py_long(&call.sender),
+                                   uint256_to_py_long(&call.receiver), uint256_to_py_long(&call.value), call.success);
+
+    PyObject* call_instance = PyObject_CallObject(EVMCall, args);
+    Py_DECREF(args);
+    return call_instance;
+}
+
+static PyObject* create_trace_event(const CuEVM::simple_event_trace& event) {
+    static PyObject* TraceEvent = nullptr;
+
+    TraceEvent = get_utils_class("TraceEvent");
+    if (!TraceEvent) {
+        printf("TraceEvent class not found\n");
+        return nullptr;
+    }
+
+    PyObject* args = Py_BuildValue("(iiNNN)", event.pc, event.op, uint256_to_py_long(&event.operand_1),
+                                   uint256_to_py_long(&event.operand_2), uint256_to_py_long(&event.res));
+
+    PyObject* event_instance = PyObject_CallObject(TraceEvent, args);
+    Py_DECREF(args);
+    return event_instance;
+}
+
+static PyObject* create_evm_branch(const CuEVM::branch_trace& branch) {
+    static PyObject* EVMBranch = nullptr;
+
+    EVMBranch = get_utils_class("EVMBranch");
+    if (!EVMBranch) {
+        printf("EVMBranch class not found\n");
+        return nullptr;
+    }
+
+    PyObject* args =
+        Py_BuildValue("(iiiN)", branch.pc_src, branch.pc_dst, branch.pc_missed, uint256_to_py_long(&branch.distance));
+
+    PyObject* branch_instance = PyObject_CallObject(EVMBranch, args);
+    Py_DECREF(args);
+    return branch_instance;
+}
 
 static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* trace_data) {
     PyObject* tracer_root = PyDict_New();
-    return tracer_root;
-
     PyObject* branches = PyList_New(0);
     PyObject* events = PyList_New(0);
     PyObject* calls = PyList_New(0);
-    char hex_string[43];
-    // process call
-    for (size_t idx = 0; idx < trace_data->no_calls; idx++) {
-        PyObject* call_item = PyDict_New();
-        PyDict_SetItemString(call_item, "sender",
-                             PyUnicode_FromString(trace_data->calls[idx].sender.address_to_hex(hex_string)));
-        PyDict_SetItemString(call_item, "receiver",
-                             PyUnicode_FromString(trace_data->calls[idx].receiver.address_to_hex(hex_string)));
 
-        PyDict_SetItemString(call_item, "pc", PyLong_FromSize_t(trace_data->calls[idx].pc));
-        PyDict_SetItemString(call_item, "op", PyLong_FromSize_t(trace_data->calls[idx].op));
-        PyDict_SetItemString(call_item, "value", PyUnicode_FromString(trace_data->calls[idx].value.to_hex()));
-        PyDict_SetItemString(call_item, "success", PyLong_FromSize_t(trace_data->calls[idx].success));
+    // printf("trace data before conversion\n");
+    // trace_data->print();
+    // Process calls
+    for (size_t idx = 0; idx < trace_data->no_calls; idx++) {
+        PyObject* call_item = create_evm_call(trace_data->calls[idx]);
         PyList_Append(calls, call_item);
         Py_DECREF(call_item);
     }
 
+    // Process events
     for (size_t idx = 0; idx < trace_data->no_events; idx++) {
-        PyObject* event_item = PyDict_New();
-        PyDict_SetItemString(event_item, "pc", PyLong_FromSize_t(trace_data->events[idx].pc));
-        PyDict_SetItemString(event_item, "op", PyLong_FromSize_t(trace_data->events[idx].op));
-        PyDict_SetItemString(event_item, "operand_1", PyUnicode_FromString(trace_data->events[idx].operand_1.to_hex()));
-        PyDict_SetItemString(event_item, "operand_2", PyUnicode_FromString(trace_data->events[idx].operand_2.to_hex()));
-        PyDict_SetItemString(event_item, "res", PyUnicode_FromString(trace_data->events[idx].res.to_hex()));
+        PyObject* event_item = create_trace_event(trace_data->events[idx]);
         PyList_Append(events, event_item);
         Py_DECREF(event_item);
     }
 
+    // Process branches
     for (size_t idx = 0; idx < trace_data->no_branches; idx++) {
-        PyObject* branch_item = PyDict_New();
-        PyDict_SetItemString(branch_item, "pc_src", PyLong_FromSize_t(trace_data->branches[idx].pc_src));
-        PyDict_SetItemString(branch_item, "pc_dst", PyLong_FromSize_t(trace_data->branches[idx].pc_dst));
-        PyDict_SetItemString(branch_item, "pc_missed", PyLong_FromSize_t(trace_data->branches[idx].pc_missed));
-        PyDict_SetItemString(branch_item, "distance",
-                             PyUnicode_FromString(trace_data->branches[idx].distance.to_hex()));
+        PyObject* branch_item = create_evm_branch(trace_data->branches[idx]);
         PyList_Append(branches, branch_item);
         Py_DECREF(branch_item);
     }
@@ -769,6 +912,10 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* tr
     PyDict_SetItemString(tracer_root, "events", events);
     PyDict_SetItemString(tracer_root, "branches", branches);
     PyDict_SetItemString(tracer_root, "calls", calls);
+
+    Py_DECREF(events);
+    Py_DECREF(branches);
+    Py_DECREF(calls);
 
     return tracer_root;
 }
@@ -852,8 +999,9 @@ PyObject* pyobject_from_evm_instances(uint32_t num_instances) {
     PyObject* instances_json = PyList_New(0);
     PyDict_SetItemString(root, "post", instances_json);
     Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
-
+    printf("num_instances: %d\n", num_instances);
     for (uint32_t idx = 0; idx < num_instances; idx++) {
+        // printf("idx: %d\n", idx);
         CuEVM::serialized_worldstate_data* serialized_worldstate = &world_data[idx];
         PyObject* instance_json = PyDict_New();
 
@@ -863,6 +1011,7 @@ PyObject* pyobject_from_evm_instances(uint32_t num_instances) {
         PyObject* tracer_json = pyobject_from_simplified_trace(&trace_data[idx]);
         PyDict_SetItemString(instance_json, "trace", tracer_json);
         PyList_Append(instances_json, instance_json);  // Appends and steals the reference, so no need to DECREF
+        // printf("done processing instance %d\n", idx);
     }
 
     delete[] trace_data;
@@ -878,7 +1027,8 @@ int py_long_to_uint256(PyObject* py_num, uint256* dst) {
     if (!PyLong_Check(py_num)) {
         printf("pylong to uint256 error\n");
         PyErr_SetString(PyExc_TypeError, "Expected an int.");
-        return 0;
+        exit(0);
+        // return 0;
     }
 
     // Zero out the destination buffer.
@@ -897,7 +1047,8 @@ __host__ PyObject* uint256_to_py_long(const uint256* src) {
     if (src == nullptr) {
         printf("uint256_to_py_long error\n");
         PyErr_SetString(PyExc_ValueError, "NULL pointer provided for uint256_to_py_long conversion.");
-        return NULL;
+        exit(0);
+        // return NULL;
     }
     // PyObject *PyLong_FromUnsignedNativeBytes(const void *buffer, size_t n_bytes, int flags)¶
     return PyLong_FromUnsignedNativeBytes((const unsigned char*)src->words, sizeof(src->words), -1);
