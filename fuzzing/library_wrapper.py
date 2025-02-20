@@ -344,7 +344,7 @@ def test_state_change():
     trace_res = my_lib.run_transactions([tx_1],reuse_state_data=True,copy_state_data=False)
     print("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()
-    
+
     trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1],reuse_state_data=True,copy_state_data=True)
     print("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()
@@ -387,12 +387,12 @@ def test_erc20():
         "value": [512],
     }
     # trace_res = my_lib.run_transactions([tx_1, tx_2], skip_trace_parsing=True)
-    trace_res = my_lib.run_transactions([tx_1,tx_2], reuse_state_data=True, copy_state_data=False)
+    trace_res = my_lib.run_transactions([tx_1,tx_2], reuse_state_data=True, copy_state_data=False, measure_performance=True)
 
 
-    trace_res = my_lib.run_transactions([tx_1,tx_2], reuse_state_data=True, copy_state_data=False)
+    trace_res = my_lib.run_transactions([tx_1,tx_2], reuse_state_data=True, copy_state_data=False, measure_performance=True)
 
-    trace_res = my_lib.run_transactions([tx_1, tx_1], reuse_state_data=True, copy_state_data=False)
+    trace_res = my_lib.run_transactions([tx_1, tx_1], reuse_state_data=True, copy_state_data=False, measure_performance=True)
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
 
