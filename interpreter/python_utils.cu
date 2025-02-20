@@ -649,13 +649,14 @@ __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
 }
 
 TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances, bool reuse_state_data,
-                                                 bool copy_state_data) {
+                                                 bool copy_state_data, uint32_t call_counter) {
     uint32_t num_transactions = PyList_Size(read_roots);
 
     num_instances = num_transactions;
     // evm_instances = new evm_instance_t[num_instances];
     TransactionList* all_transactions;
-    if (!reuse_state_data) {
+    if (!reuse_state_data || call_counter == 0) {
+        printf("create state data and block info\n");
         get_block_info_from_PyObject(read_roots);
 
         getPreStateDataFromListofPyObject(read_roots, num_transactions);

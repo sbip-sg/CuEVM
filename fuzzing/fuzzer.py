@@ -237,7 +237,7 @@ class Fuzzer:
                 self.post_process_input(tx_data, inputs, function)
 
 
-            tx_trace = self.library.run_transactions(tx_data)
+            tx_trace = self.library.run_transactions(tx_data, reuse_state_data=True, copy_state_data=False)
             # print(f"Seed round {function} : {tx_data}")
             # print(f"Trace result : ")
             # pprint(tx_trace)
@@ -305,7 +305,7 @@ class Fuzzer:
                     print(f"Function {function} : {new_input}")
                 self.post_process_input(tx_data, new_input, function)
 
-            tx_trace = self.library.run_transactions(tx_data)
+            tx_trace = self.library.run_transactions(tx_data, reuse_state_data=True, copy_state_data=False)
             self.process_tx_trace(tx_trace)
             if len(DEBUG) > 1 and DEBUG[1] == "v":
                 print(f"Iteration {i} : {tx_data}")

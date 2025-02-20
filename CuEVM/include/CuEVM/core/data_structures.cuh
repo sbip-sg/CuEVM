@@ -530,5 +530,6 @@ extern __device__ uint8_t *preallocated_memory_base;
 __host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *test_json, uint32_t &num_instances,
                                                                 uint32_t &num_account, uint32_t clones = 1);
 
-__global__ void kernel_evm_multiple_instances(transaction::TransactionList *transaction_list_ptr, uint32_t count);
+__global__ void kernel_evm_multiple_instances(transaction::TransactionList *transaction_list_ptr, uint32_t count,
+                                              bool copy_state_data = true);
 }  // namespace CuEVM

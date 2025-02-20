@@ -4,8 +4,8 @@
 namespace CuEVM {
 
 // define the kernel function
-__global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionList *transaction_list_ptr,
-                                              uint32_t count) {
+__global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionList *transaction_list_ptr, uint32_t count,
+                                              bool copy_state_data) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
 
@@ -18,7 +18,7 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
 #endif
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
 
-    evm.run(cached_call_state);
+    evm.run(cached_call_state, copy_state_data);
 
 #ifdef EIP_3155
     // if (instance == 0) {
@@ -178,12 +178,12 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 
     return error_code;
 }
-__device__ void evm_t::run() {
-    cached_evm_call_context cached_call_state(call_state_ptr);
-    run(cached_call_state);
-}
+// __device__ void evm_t::run() {
+//     cached_evm_call_context cached_call_state(call_state_ptr);
+//     run(cached_call_state);
+// }
 
-__device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
+__device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy_state_data) {
 #ifdef BUILD_LIBRARY
     global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(0, call_state_ptr);  // pc is 0?
 #endif
@@ -667,7 +667,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
             cached_call_state.write_cache_to_state(call_state_ptr);
             if (call_state_ptr->depth == 1) {
                 finish_CALL(error_code);
-                finish_TRANSACTION(error_code);
+                finish_TRANSACTION(error_code, copy_state_data);
                 return;
             } else {
                 // TODO: finish call
@@ -679,7 +679,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state) {
     }
 }
 
-__device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
+__device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state_data) {
     // sent the gas value to the block beneficiary
     gas_t gas_value;
     const evm_word_t *beneficiary = &(global_block_info->coin_base);
@@ -762,7 +762,9 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code) {
 
 #ifdef BUILD_LIBRARY
     // serialize data
-    python_utils::serialize_state_data(&global_serialized_worldstate[INSTANCE_GLOBAL_IDX]);
+    if (copy_state_data) {
+        python_utils::serialize_state_data(&global_serialized_worldstate[INSTANCE_GLOBAL_IDX]);
+    }
 #endif
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
     // printf("updated final world state\n");

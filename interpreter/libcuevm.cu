@@ -7,6 +7,9 @@
 
 using namespace python_utils;
 
+// Add this near the top of the file, after the includes
+static int call_counter = 0;
+
 PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_parsing, uint32_t copy_state_data,
                                    uint32_t reuse_state_data) {
     // CuEVM::evm_instance_t* instances_data;
@@ -54,10 +57,12 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     auto num_accounts = PyDict_Size(data);
     printf("num_accounts: %d\n", num_accounts);
 
-    CuEVM::transaction::TransactionList* all_transactions =
-        python_utils::get_evm_instances_from_PyObject(read_roots, num_instances, reuse_state_data, copy_state_data);
-
-    CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts, reuse_state_data);
+    CuEVM::transaction::TransactionList* all_transactions = python_utils::get_evm_instances_from_PyObject(
+        read_roots, num_instances, reuse_state_data, copy_state_data, call_counter);
+    if (!reuse_state_data || call_counter == 0) {
+        printf("create memory pool \n");
+        CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
+    }
 
     uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
 
@@ -67,7 +72,8 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(all_transactions, num_instances);
+    CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(all_transactions, num_instances,
+                                                                              copy_state_data);
     cudaDeviceSynchronize();
 
     cudaEventRecord(stop);
@@ -78,6 +84,7 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
     CUDA_CHECK(cudaGetLastError());
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     PyObject* write_root;
     if (!skip_trace_parsing) {
@@ -86,8 +93,13 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
         write_root = PyDict_New();
     }
 
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    printf("Time taken to create write_root: %lld milliseconds\n", duration.count());
+
     // CuEVM::free_evm_instances(instances_data, num_instances);
     if (!reuse_state_data) {
+        printf("reset device\n");
         CUDA_CHECK(cudaDeviceReset());
     } else {
         // free other memory than the state data
@@ -95,6 +107,10 @@ PyObject* run_interpreter_pyobject(PyObject* read_roots, uint32_t skip_trace_par
         python_utils::freeTransactionList(all_transactions);
         python_utils::freeTraceData(copy_state_data);
     }
+    // Increment counter at the start of each call
+    call_counter++;
+    printf("Call number: %d\n", call_counter);
+
     return write_root;
 }
 
@@ -131,10 +147,15 @@ static PyObject* print_dict(PyObject* self, PyObject* args) {
     Py_RETURN_NONE;
 }
 
+// Add a new method to get the counter value
+static PyObject* get_call_count(PyObject* self, PyObject* args) { return PyLong_FromLong(call_counter); }
+
 // Method definition
-static PyMethodDef ExampleMethods[] = {{"print_dict", print_dict, METH_VARARGS, "Print dictionary keys and values."},
-                                       {"run_dict", run_dict, METH_VARARGS, "Run the interpreter with a JSON object."},
-                                       {nullptr, nullptr, 0, nullptr}};
+static PyMethodDef ExampleMethods[] = {
+    {"print_dict", print_dict, METH_VARARGS, "Print dictionary keys and values."},
+    {"run_dict", run_dict, METH_VARARGS, "Run the interpreter with a JSON object."},
+    {"get_call_count", get_call_count, METH_VARARGS, "Get the number of times run_interpreter_pyobject was called."},
+    {nullptr, nullptr, 0, nullptr}};
 
 // Module definition
 static PyModuleDef examplemodule = {PyModuleDef_HEAD_INIT,

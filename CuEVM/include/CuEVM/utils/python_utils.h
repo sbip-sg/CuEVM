@@ -29,9 +29,9 @@ struct serialized_worldstate_data {
     void print();
 };
 
-#define MAX_TRACE_EVENTS 1024
-#define MAX_ADDRESSES_TRACING 32
-#define MAX_CALLS_TRACING 32
+#define MAX_TRACE_EVENTS 512
+#define MAX_ADDRESSES_TRACING 16
+#define MAX_CALLS_TRACING 16
 #define MAX_BRANCHES_TRACING 32  // only track the latest 32 branches
 struct simple_event_trace {
     // pc // op //  operand 1, operand 2, res
@@ -119,7 +119,8 @@ void getPreStateDataFromTransactionList(PyObject* readroot, uint32_t num_states)
 
 CuEVM::transaction::TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances,
                                                                      bool reuse_state_data = false,
-                                                                     bool copy_state_data = true);
+                                                                     bool copy_state_data = true,
+                                                                     uint32_t call_counter = 0);
 
 std::unordered_set<int> const bug_opcodes = {OP_ADD, OP_MUL, OP_SUB, OP_MOD, OP_EXP, OP_SELFDESTRUCT, OP_ORIGIN};
 std::unordered_set<int> const call_opcodes = {OP_CALL, OP_CALLCODE, OP_DELEGATECALL};  // ignore static call for now

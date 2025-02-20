@@ -90,6 +90,8 @@ class CuEVMLib:
             time_end = time.time()
             print(f"Time taken: {time_end - time_start} seconds")
         if copy_state_data:
+            # print("copy_state_data")
+            # pprint(result_state)
             self.update_persistent_state(result_state)
         # print("result after running transactions")
         # pprint(self.instances)
@@ -333,18 +335,21 @@ def test_state_change():
         int("0x00",16)
     ] = int("0x30",16)
     
-    trace_res = my_lib.run_transactions([tx_1],)
+    trace_res = my_lib.run_transactions([tx_1],reuse_state_data=True,copy_state_data=False)
     # trace_res = my_lib.run_transactions([tx_1])
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
     print("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()
-
-    trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1])
+    trace_res = my_lib.run_transactions([tx_1],reuse_state_data=True,copy_state_data=False)
     print("\n\n Updated instance data \n\n")
     my_lib.print_instance_data()
-
-    # # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
+    
+    trace_res = my_lib.run_transactions([tx_1, tx_2, tx_1],reuse_state_data=True,copy_state_data=True)
+    print("\n\n Updated instance data \n\n")
+    my_lib.print_instance_data()
+    pprint(trace_res)
+    # trace_res = my_lib.run_transactions([tx_2, tx_1, tx_2])
     # # # trace_res = my_lib.run_transactions([tx_1, tx_1])
     # # print("\n\n trace res \n\n")
     # # pprint(trace_res)
@@ -382,7 +387,12 @@ def test_erc20():
         "value": [512],
     }
     # trace_res = my_lib.run_transactions([tx_1, tx_2], skip_trace_parsing=True)
-    trace_res = my_lib.run_transactions([tx_1,tx_2])
+    trace_res = my_lib.run_transactions([tx_1,tx_2], reuse_state_data=True, copy_state_data=False)
+
+
+    trace_res = my_lib.run_transactions([tx_1,tx_2], reuse_state_data=True, copy_state_data=False)
+
+    trace_res = my_lib.run_transactions([tx_1, tx_1], reuse_state_data=True, copy_state_data=False)
     # print("\n\n trace res \n\n")
     # pprint(trace_res)
 

@@ -3,16 +3,14 @@
 #include <CuEVM/core/memory_pool.cuh>
 
 namespace CuEVM::memory_pool {
-__device__ memory_pool_t* global_memory_pool;
-__device__ evm_word_t* preallocated_stack_base;
-__device__ uint8_t* preallocated_return_data_base;
-__device__ SnapshotValue* preallocated_snapshot_values;
-__device__ ValueStatus** preallocated_snapshot_restore_ptr;
-__device__ uint8_t* preallocated_memory_base;
-__device__ CuEVM::EccConstants* ecc_constants_ptr;
-__host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts, bool reuse_state_data) {
-    if (reuse_state_data) return;
-
+__device__ memory_pool_t* global_memory_pool = nullptr;
+__device__ evm_word_t* preallocated_stack_base = nullptr;
+__device__ uint8_t* preallocated_return_data_base = nullptr;
+__device__ SnapshotValue* preallocated_snapshot_values = nullptr;
+__device__ ValueStatus** preallocated_snapshot_restore_ptr = nullptr;
+__device__ uint8_t* preallocated_memory_base = nullptr;
+__device__ CuEVM::EccConstants* ecc_constants_ptr = nullptr;
+__host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) {
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
 
@@ -110,35 +108,44 @@ __host__ void free_memory_pool() {
 }
 __host__ void clear_memory_pool() {
     // Get the memory_pool pointer from device
-    memory_pool_t* d_memory_pool;
+    memory_pool_t* d_memory_pool = global_memory_pool;
     CUDA_CHECK(cudaMemcpyFromSymbol(&d_memory_pool, global_memory_pool, sizeof(memory_pool_t*)));
-
+    memory_pool_t* memory_pool = new memory_pool_t();
+    CUDA_CHECK(cudaMemcpy(memory_pool, d_memory_pool, sizeof(memory_pool_t), cudaMemcpyDeviceToHost));
     // Clear memory allocated in memory_pool
-    CUDA_CHECK(cudaMemset(d_memory_pool->stack_base, 0,
-                          d_memory_pool->num_instances * memory_pool_stack_preallocate * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMemset(memory_pool->stack_base, 0,
+                          memory_pool->num_instances * memory_pool_stack_preallocate * sizeof(evm_word_t)));
     CUDA_CHECK(
-        cudaMemset(d_memory_pool->call_context, 0,
-                   d_memory_pool->num_instances * memory_pool_call_context_preallocate * sizeof(evm_call_context_t)));
-    CUDA_CHECK(cudaMemset(d_memory_pool->prealloc_stack_instances, 0,
-                          d_memory_pool->num_instances * memory_pool_call_context_preallocate * sizeof(evm_stack_t)));
-    CUDA_CHECK(cudaMemset(d_memory_pool->prealloc_mem_instances, 0,
-                          d_memory_pool->num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t)));
-    CUDA_CHECK(cudaMemset(d_memory_pool->return_data_base, 0,
-                          d_memory_pool->num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t)));
-    CUDA_CHECK(cudaMemset(d_memory_pool->snapshot_states_pool, 0,
-                          snapshot_account_pool_size * d_memory_pool->num_instances * sizeof(CuEVM::SnapshotState)));
-    CUDA_CHECK(cudaMemset(d_memory_pool->snapshot_account_counts, 0, d_memory_pool->num_instances * sizeof(uint16_t)));
-    CUDA_CHECK(cudaMemset(d_memory_pool->snapshot_slot_counts, 0, d_memory_pool->num_instances * sizeof(uint16_t)));
+        cudaMemset(memory_pool->call_context, 0,
+                   memory_pool->num_instances * memory_pool_call_context_preallocate * sizeof(evm_call_context_t)));
+    CUDA_CHECK(cudaMemset(memory_pool->prealloc_stack_instances, 0,
+                          memory_pool->num_instances * memory_pool_call_context_preallocate * sizeof(evm_stack_t)));
+    CUDA_CHECK(cudaMemset(memory_pool->prealloc_mem_instances, 0,
+                          memory_pool->num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t)));
+    CUDA_CHECK(cudaMemset(memory_pool->return_data_base, 0,
+                          memory_pool->num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t)));
+    CUDA_CHECK(cudaMemset(memory_pool->snapshot_states_pool, 0,
+                          snapshot_account_pool_size * memory_pool->num_instances * sizeof(CuEVM::SnapshotState)));
+    CUDA_CHECK(cudaMemset(memory_pool->snapshot_account_counts, 0, memory_pool->num_instances * sizeof(uint16_t)));
+    CUDA_CHECK(cudaMemset(memory_pool->snapshot_slot_counts, 0, memory_pool->num_instances * sizeof(uint16_t)));
 
     // Clear preallocated memory
+    SnapshotValue* d_preallocated_snapshot_values;
+    ValueStatus** d_preallocated_snapshot_restore_ptr;
+    uint8_t* d_preallocated_memory_base;
+
     CUDA_CHECK(
-        cudaMemset(preallocated_snapshot_values, 0,
-                   d_memory_pool->num_instances * memory_pool_snapshot_preallocate_slots * sizeof(SnapshotValue)));
+        cudaMemcpyFromSymbol(&d_preallocated_snapshot_values, preallocated_snapshot_values, sizeof(SnapshotValue*)));
+    CUDA_CHECK(cudaMemcpyFromSymbol(&d_preallocated_snapshot_restore_ptr, preallocated_snapshot_restore_ptr,
+                                    sizeof(ValueStatus**)));
+    CUDA_CHECK(cudaMemcpyFromSymbol(&d_preallocated_memory_base, preallocated_memory_base, sizeof(uint8_t*)));
+
+    CUDA_CHECK(cudaMemset(d_preallocated_snapshot_values, 0,
+                          memory_pool->num_instances * memory_pool_snapshot_preallocate_slots * sizeof(SnapshotValue)));
+    CUDA_CHECK(cudaMemset(d_preallocated_snapshot_restore_ptr, 0,
+                          memory_pool->num_instances * memory_pool_snapshot_preallocate_slots * sizeof(ValueStatus*)));
     CUDA_CHECK(
-        cudaMemset(preallocated_snapshot_restore_ptr, 0,
-                   d_memory_pool->num_instances * memory_pool_snapshot_preallocate_slots * sizeof(ValueStatus*)));
-    CUDA_CHECK(
-        cudaMemset(preallocated_memory_base, 0, d_memory_pool->num_instances * memory_prealloc_size * sizeof(uint8_t)));
+        cudaMemset(d_preallocated_memory_base, 0, memory_pool->num_instances * memory_prealloc_size * sizeof(uint8_t)));
 }
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth) {

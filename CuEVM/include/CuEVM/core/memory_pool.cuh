@@ -5,7 +5,7 @@
 
 namespace CuEVM::memory_pool {
 
-__host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts, bool reuse_state_data = false);
+__host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts);
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth);
 __device__ evm_stack_t* get_stack(uint16_t depth);

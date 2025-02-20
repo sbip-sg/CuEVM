@@ -117,15 +117,15 @@ struct evm_t {
      * @param[in] error_code The error code
      * @return int32_t The error code, or 0 if successful
      */
-    __device__ int32_t finish_TRANSACTION(int32_t error_code);
+    __device__ int32_t finish_TRANSACTION(int32_t error_code, bool copy_state_data);
 
     /**
      * @brief run the EVM for the given transaction
      * Run the EVM for the given transaction
      * @param[in] arith The arithmetic environment
      */
-    __device__ void run(cached_evm_call_context& cache_call_state);
-    __device__ void run();
+    __device__ void run(cached_evm_call_context& cache_call_state, bool copy_state_data);
+    // __device__ void run();
 };
 
 }  // namespace CuEVM
