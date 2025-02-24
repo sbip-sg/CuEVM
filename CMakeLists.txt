@@ -66,7 +66,6 @@ if(BUILD_LIBRARY)
         "${PROJECT_SOURCE_DIR}/interpreter/python_utils.cu"
         $<TARGET_OBJECTS:CuEVM>
         $<TARGET_OBJECTS:CuCrypto>
-        $<TARGET_OBJECTS:CGBN>
         $<TARGET_OBJECTS:CuBigInt>
     )
 
@@ -108,7 +107,6 @@ else()
         "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
         $<TARGET_OBJECTS:CuEVM>
         $<TARGET_OBJECTS:CuCrypto>
-        $<TARGET_OBJECTS:CGBN>
         $<TARGET_OBJECTS:CuBigInt>
     )
 

@@ -24,7 +24,6 @@
 #endif
 
 #define CUDA_CHECK(action) cuda_check(action, #action, __FILE__, __LINE__)
-#define CGBN_CHECK(report) cgbn_check(report, __FILE__, __LINE__)
 
 #ifdef __CUDA_ARCH__
 #define THREADIDX threadIdx.x

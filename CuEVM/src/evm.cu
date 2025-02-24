@@ -5,10 +5,12 @@ namespace CuEVM {
 
 // define the kernel function
 __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionList *transaction_list_ptr, uint32_t count,
+#ifdef EIP_3155
+                                              char *d_buffer, size_t buffer_size,
+#endif
                                               bool copy_state_data) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
-
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef BUILD_LIBRARY
     // printf("global_simplified_trace: %p\n", global_simplified_trace);
@@ -25,9 +27,26 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     //     evm.tracer_ptr->print_err();
     // }
     __syncthreads();
+    // if (instance == 1) {
+    //     printf("\n\ninstance 10\n\n");
+    //     evm.tracer_ptr->print_err();
+    // }
     if (instance == 1) {
-        printf("\n\ninstance 10\n\n");
-        evm.tracer_ptr->print_err();
+        uint32_t offset = sizeof(uint32_t);
+        printf("evm instance call serialize buffer %p size %d offset %d\n", d_buffer, buffer_size, offset);
+
+        bool success = evm.tracer_ptr->serialize(d_buffer, buffer_size, offset);
+        // Store success flag or final offset if needed
+        if (!success) {
+            printf("serialize failed\n");
+            // Handle buffer overflow, e.g., set a flag in the buffer
+            *(int *)d_buffer = -1;  // Indicate failure
+        } else {
+            printf("serialize success %d\n", offset);
+            // *(uint32_t *)d_buffer = offset;  // Store final offset
+            memcpy(d_buffer, &evm.tracer_ptr->size, sizeof(uint32_t));
+            // memcpy(d_buffer + sizeof(uint32_t), &evm.tracer_ptr->size, sizeof(uint32_t));
+        }
     }
 #endif
 }
@@ -845,7 +864,8 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         new_parent_snapshot_state->touched_account_counts = 0;
         new_parent_snapshot_state->diff_account_counts = 0;
         new_parent_snapshot_state->preallocated_offset =
-            CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX];
+            min(CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX],
+                memory_pool_snapshot_preallocate_slots);
 
         new_parent_snapshot_state->next_state =
             call_state_ptr->snapshot_state ? call_state_ptr->snapshot_state : parent_call_state_ptr->snapshot_state;

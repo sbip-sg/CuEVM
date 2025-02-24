@@ -319,11 +319,11 @@ __device__ int32_t SAR(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         error_code |= stack->pop(value);
         evm_word_t r;
         if (uint256_cmp_word(&shift, UINT256_BITS - 1) == 1) {
-            uint256_set_zero(&r);
-        } else {
-            uint32_t shift_right = uint256_get_uint32_t(&shift);
-            uint256_shift_arithmetic_right(&r, &value, shift_right);
+            shift = UINT256_BITS;
         }
+        uint32_t shift_right = uint256_get_uint32_t(&shift);
+        uint256_shift_arithmetic_right(&r, &value, shift_right);
+
         error_code |= stack->push(r);
     }
     return error_code;

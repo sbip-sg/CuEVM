@@ -50,6 +50,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 
     const cJSON *test_json = nullptr;
     test_json = cJSON_GetArrayItem(read_root, 0);
+// tracer
+#ifdef EIP_3155
+    const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
+    char *d_buffer;
+    cudaMalloc(&d_buffer, BUFFER_SIZE);
+#endif
     if (test_json != nullptr) {
         auto start_cpu = std::chrono::high_resolution_clock::now();
         uint32_t num_accounts = 0;
@@ -71,7 +77,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         cudaEventCreate(&stop);
         cudaEventRecord(start);
 
-        CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(transaction_list_ptr, num_instances);
+        CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(transaction_list_ptr, num_instances
+#ifdef EIP_3155
+                                                                                  ,
+                                                                                  d_buffer, BUFFER_SIZE
+#endif
+        );
 
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
@@ -85,6 +96,23 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 
     printf("Freeing the memory ...\n");
     // CuEVM::free_evm_instances(instances_data, num_instances);
+
+#ifdef EIP_3155
+    // After kernel execution, copy the buffer back to the host
+    char *h_buffer = new char[BUFFER_SIZE];
+    cudaMemcpy(h_buffer, d_buffer, BUFFER_SIZE, cudaMemcpyDeviceToHost);
+    // printf("h_buffer: %p\n", h_buffer);
+    // uint32_t *buffer_as_uint = (uint32_t *)h_buffer;
+    // for (int i = 0; i < 20; i++) {
+    //     printf("buffer[%d]: %x\n", i, buffer_as_uint[i]);
+    // }
+    // Parse and print the data (implemented later)
+    CuEVM::utils::print_tracer_data(h_buffer);
+
+    // Clean up
+    delete[] h_buffer;
+    cudaFree(d_buffer);
+#endif
 
     CUDA_CHECK(cudaDeviceReset());
 

@@ -167,6 +167,7 @@ __device__ evm_stack_t* get_stack(uint16_t depth) {
         return &global_memory_pool
                     ->prealloc_stack_instances[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
     } else {
+        printf("stack dynamic allocation\n");
         return new evm_stack_t();
     }
 }
@@ -209,6 +210,7 @@ __device__ evm_memory_t* get_memory(uint16_t depth) {
         return &global_memory_pool
                     ->prealloc_mem_instances[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
     } else {
+        printf("memory dynamic allocation\n");
         return new evm_memory_t();
     }
 }

@@ -27,7 +27,6 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
         return ERR_MEMORY_INVALID_OFFSET;
     }
     error_code |= CuEVM::gas_cost::memory_grow_cost(&memory, offset_u32, length_u32, memory_expansion_cost, gas_used);
-
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
@@ -47,6 +46,7 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
         CuCrypto::keccak::sha3(memory_data, remaining_input_length, hash_data, CuEVM::hash_size);
         // evm_word_t hash_word;
         // uint256_from_bytes(&hash_word, hash_data, CuEVM::hash_size);
+        // printf("hash_data: %x\n", hash_data);
         error_code |= stack.pushx(CuEVM::hash_size, hash_data, CuEVM::hash_size);
     }
     // }
@@ -353,8 +353,8 @@ __device__ int32_t RETURNDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     // TODO: Check EOF format
-    printf("RETURNDATASIZE thread %d, call_context %p, length_ui32 %u, data_offset_ui32 %u, dynamic_ret_size %u\n",
-           INSTANCE_GLOBAL_IDX, call_context, length_ui32, data_offset_ui32, call_context->dynamic_ret_size);
+    // printf("RETURNDATASIZE thread %d, call_context %p, length_ui32 %u, data_offset_ui32 %u, dynamic_ret_size %u\n",
+    //        INSTANCE_GLOBAL_IDX, call_context, length_ui32, data_offset_ui32, call_context->dynamic_ret_size);
     if (data_offset_ui32 > call_context->dynamic_ret_size ||
         (data_offset_ui32 + length_ui32) > call_context->dynamic_ret_size) {
         return ERROR_RETURN_DATA_OVERFLOW;

@@ -29,10 +29,8 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
             // no need to allocate new page
             // clear the grow memory when return from subcontext
         } else {
-#ifdef EIP_3155
             printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
                    INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
-#endif
             // allocate new page
             uint8_t *new_data = new uint8_t[new_size + preallocated_base_offset - memory_prealloc_size];
             memset(new_data, 0, new_size + preallocated_base_offset - memory_prealloc_size);

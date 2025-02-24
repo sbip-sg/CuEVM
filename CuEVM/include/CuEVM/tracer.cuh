@@ -1,6 +1,7 @@
 #pragma once
 #include <cjson/cJSON.h>
 
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/stack.cuh>
@@ -8,7 +9,9 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <iostream>
 #include <string>
+
 namespace CuEVM::utils {
+void print_tracer_data(char *h_buffer);
 // PyObject* branches = PyList_New(0);
 // PyObject* bugs = PyList_New(0);
 // PyObject* calls = PyList_New(0);
@@ -35,6 +38,8 @@ struct trace_data_t {
     __host__ cJSON *to_json();
 
     __device__ void print_err();
+    __device__ void append_to_buffer(char *buffer, size_t &offset);
+    __device__ bool serialize(char *buf, uint32_t buf_size, uint32_t &offset);
 };
 
 struct tracer_t {
@@ -65,6 +70,7 @@ struct tracer_t {
     __device__ void print_err();
 
     __device__ void print_device_err();
+    __device__ bool serialize(char *buf, uint32_t buf_size, uint32_t &offset);
 };
 __device__ void print_device_data(tracer_t *device_tracer);
 

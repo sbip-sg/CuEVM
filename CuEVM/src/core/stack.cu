@@ -42,6 +42,7 @@ __device__ evm_word_t *evm_stack_t::top() {
                INSTANCE_GLOBAL_IDX;
     } else {
         if (global_stack_base == nullptr) {
+            printf("stack content dynamic allocation\n");
             global_stack_base = new evm_word_t[max_stack_size];
             if (stack_base_offset > memory_pool_stack_preallocate) {
                 stack_base_offset = memory_pool_stack_preallocate;

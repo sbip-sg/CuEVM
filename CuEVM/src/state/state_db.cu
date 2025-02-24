@@ -225,8 +225,9 @@ __device__ void SnapshotState::set_storage(ValueStatus *src_value) {
         uint32_t dynamic_offset = find_dynamic_offset(src_value);
         if (dynamic_offset == -1) {
             dynamic_offset = (next_offset - memory_pool_snapshot_preallocate_slots) % snapshot_page_size;
-            printf("next_offset %d memory_pool_snapshot_preallocate_slots %d snapshot_page_size %d dynamic_offset %d\n",
-                   next_offset, memory_pool_snapshot_preallocate_slots, snapshot_page_size, dynamic_offset);
+            // printf("next_offset %d memory_pool_snapshot_preallocate_slots %d snapshot_page_size %d dynamic_offset
+            // %d\n",
+            //        next_offset, memory_pool_snapshot_preallocate_slots, snapshot_page_size, dynamic_offset);
             if (dynamic_offset == 0) {
                 printf("allocate new page %p\n", storage_page);
                 SnapshotStoragePage *new_page = new SnapshotStoragePage();
@@ -711,6 +712,7 @@ __device__ void StateDb::write_storage_with_known_index(const evm_word_t *addres
             // num_storage_elements++;
 
         } else {
+            printf("Dynamic storage grow\n");
             ValueStatus *dynamic_value = get_dynamic_value_location(storage_size, instance_idx, key);
             if (dynamic_value == nullptr) {
                 dynamic_value = grow_storage_and_set_key(storage_size, instance_idx, key);
@@ -761,7 +763,8 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
     tmp->storage_size = 0;
     tmp->touched_account_counts = 0;
     tmp->diff_account_counts = 0;
-    tmp->preallocated_offset = CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX];
+    tmp->preallocated_offset = min(CuEVM::memory_pool::global_memory_pool->snapshot_slot_counts[INSTANCE_GLOBAL_IDX],
+                                   memory_pool_snapshot_preallocate_slots);
     // printf("thread %d, state %p, preallocated_offset %d\n", INSTANCE_GLOBAL_IDX, this, tmp->preallocated_offset);
     tmp->next_state = nullptr;
 }
@@ -800,6 +803,7 @@ __device__ evm_word_t *StateDb::get_storage_with_known_index(const evm_word_t *a
                 prealloc_keys_pool[new_offset] = *key;
                 prealloc_values_pool[new_offset].set_value(&zero, true);
             } else {
+                printf("Dynamic storage grow in get_storage_with_known_index\n");
                 ValueStatus *value_status = grow_storage_and_set_key(storage_size, instance_idx, key);
                 value_status->set_value(&zero, true);
             }
@@ -983,6 +987,7 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
     address_index = get_address_index(address);
     if (address_index == -1) {
         found_value = nullptr;
+        printf("Dynamic storage grow\n");
         DynamicAccount *dynamic_account = get_dynamic_account(address);
         if (dynamic_account != nullptr) {
             found_value = dynamic_account->get_value_status(key);
@@ -994,14 +999,14 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
     }
 
     found_value = get_value_status(address_index, key);
-    // if (INSTANCE_GLOBAL_IDX == 0) {
-    //     printf("is_warm_key_with_offset found value %p\n", found_value);
-    //     printf("address_index %d\n", address_index);
-    //     printf("address\n");
-    //     address->print();
-    //     printf("key\n");
-    //     key->print();
-    // }
+    if (INSTANCE_GLOBAL_IDX == 0) {
+        printf("is_warm_key_with_offset found value %p\n", found_value);
+        printf("address_index %d\n", address_index);
+        printf("address\n");
+        address->print();
+        printf("key\n");
+        key->print();
+    }
     if (found_value == nullptr) {
         // todo: // implement value not found in both pools
         // printf("is_warm_key_with_offset value not found in both pools\n");

@@ -67,12 +67,12 @@ target_include_directories(${PROJECT_NAME}
 
 # Link the library to its dependencies
 # our own libraries first
-target_link_libraries(${PROJECT_NAME} PRIVATE CGBN CuCrypto CuBigInt)
+target_link_libraries(${PROJECT_NAME} PRIVATE CuCrypto CuBigInt)
 # then the external ones
 target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${CUDA_LIBRARIES})
 
 
 # Add specific NVCC flags using target_compile_options (if necessary)
 target_compile_options(${PROJECT_NAME}  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
-target_compile_definitions(${PROJECT_NAME} PRIVATE CGBN_TPI=${CGBN_TPI})
+
 

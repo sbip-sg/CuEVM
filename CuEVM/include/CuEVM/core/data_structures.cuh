@@ -3,29 +3,32 @@
 #include <CuEVM/utils/ecc.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 namespace CuEVM {
+
 constexpr uint32_t worldstate_addresses_size = 32;
 constexpr uint32_t worldstate_storage_values_size = 1024;
-
 constexpr uint32_t account_prealloc_keys_size = 32;  // configurable keys per account for "pre state"
-
 constexpr uint32_t value_page_size = 16;
 constexpr uint32_t account_page_size = 16;
-
 // constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
-constexpr uint32_t memory_prealloc_size = 1024;  // prealloc 1 page + page size for all dynamic pages
+constexpr uint32_t memory_prealloc_size = 2048;          // prealloc 1 page + page size for all dynamic pages
+constexpr uint32_t memory_pool_stack_preallocate = 128;  // 16 elements times num_instances
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
+constexpr uint32_t snapshot_account_pool_size = 32;  // multiply by num_states
 
-constexpr uint32_t snapshot_account_pool_size = 16;  // multiply by num_states
-
-constexpr uint32_t memory_pool_stack_preallocate = 32;           // 16 elements times num_instances
-constexpr uint32_t memory_pool_call_context_preallocate = 2;     // 2 call contexts times num_instances
+constexpr uint32_t memory_pool_call_context_preallocate = 4;     // 2 call contexts times num_instances
 constexpr uint32_t memory_pool_return_data_preallocate = 128;    // 32 bytes times num_instances
 constexpr uint32_t memory_pool_snapshot_preallocate_slots = 32;  // 32 elements for each instance
 constexpr uint32_t snapshot_page_size = 8;
 // each snapshot state keeps track of the touched accounts warming up in the context
 constexpr uint32_t preallocated_touched_accounts_size = 4;
 constexpr uint32_t preallocated_touched_storage_keys_size = 16;
+
+constexpr CONSTANT uint32_t serialized_worldstate_addresses_size = 32;
+constexpr CONSTANT uint32_t serialized_worldstate_storage_slots = 512;
+
+// specific implementation constants
+// constexpr CONSTANT uint32_t initial_storage_capacity = 8;
 
 struct SnapshotValue {
     evm_word_t value;
@@ -515,6 +518,12 @@ extern __device__ uint8_t *preallocated_memory_base;
 
 }  // namespace memory_pool
 
+#ifdef EIP_3155
+namespace utils {
+extern __device__ char **global_trace_buffers;
+extern __device__ size_t *global_trace_lengths;
+}  // namespace utils
+#endif
 // typedef int32_t (*evm_operation_f)(CuEVM::evm_call_context_t* call_state);
 
 /**
@@ -531,5 +540,8 @@ __host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *tes
                                                                 uint32_t &num_account, uint32_t clones = 1);
 
 __global__ void kernel_evm_multiple_instances(transaction::TransactionList *transaction_list_ptr, uint32_t count,
+#ifdef EIP_3155
+                                              char *d_buffer, size_t buffer_size,
+#endif
                                               bool copy_state_data = true);
 }  // namespace CuEVM

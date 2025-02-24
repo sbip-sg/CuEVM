@@ -579,7 +579,7 @@ __host__ __device__ uint256 *uint512_mod(uint256 *dst_remainder, const uint512 *
     // The total number of 32-bit digits in our 512-bit number.
     int total_digits = 2 * UINT256_WORDS;
 
-    // Process each 32-bit “digit” from most-significant to least.
+    // Process each 32-bit "digit" from most-significant to least.
     // Note: The uint512 'words' array is little-endian,
     // so the most significant word is at index (total_digits-1).
     for (int i = total_digits - 1; i >= 0; i--) {
@@ -690,15 +690,17 @@ __host__ __device__ uint256 *uint256_signed_div(uint256 *dst, const uint256 *num
 }
 
 __host__ __device__ uint256 *uint256_sign_extension(uint256 *dst, const uint256 *src, const uint32_t byte_index) {
+    uint256_cpy(dst, src);
     if (byte_index >= UINT256_WORDS * sizeof(uint32_t)) {
         // If byte_index is out of bounds, just copy the source
-        uint256_cpy(dst, src);
+        // uint256_cpy(dst, src);
         return dst;
     }
     uint32_t word_index = byte_index / sizeof(uint32_t);
     uint32_t byte_in_word = byte_index % sizeof(uint32_t);
+    // printf("byte_index: %u, word_index: %u, byte_in_word: %u\n", byte_index, word_index, byte_in_word);
     uint32_t sign_bit = (src->words[word_index] >> (byte_in_word * 8 + 7)) & 1;
-    printf("sign_bit: %d\n", sign_bit);
+    // printf("sign_bit: %d\n", sign_bit);
     if (sign_bit) {
         // If the sign bit is set, extend with 1s
         for (uint32_t i = word_index; i < UINT256_WORDS; i++) {
@@ -710,12 +712,12 @@ __host__ __device__ uint256 *uint256_sign_extension(uint256 *dst, const uint256 
         }
     } else {
         // If the sign bit is not set, copy the source (only from the byte_index to the end)
-        for (uint32_t i = 0; i < word_index; i++) {
-            dst->words[i] = 0;
-        }
+        // for (uint32_t i = 0; i < word_index; i++) {
+        //     dst->words[i] = 0;
+        // }
         dst->words[word_index] = src->words[word_index] & ((1U << (byte_in_word * 8 + 8)) - 1);
         for (uint32_t i = word_index + 1; i < UINT256_WORDS; i++) {
-            dst->words[i] = src->words[i];
+            dst->words[i] = 0;
         }
     }
     return dst;
@@ -785,7 +787,10 @@ __host__ __device__ uint512 *uint512_shift_left(uint512 *dst, const uint512 *src
 }
 
 __host__ __device__ uint256 *uint256_shift_right(uint256 *dst, const uint256 *src, uint32_t shift) {
-    if (shift <= 0) return dst;
+    if (shift <= 0) {
+        uint256_cpy(dst, src);
+        return dst;
+    }
     uint8_t offset = shift / 32;
 
     for (int i = 0; i < UINT256_WORDS - offset; i++) {
@@ -835,27 +840,41 @@ __host__ __device__ uint512 *uint512_shift_right(uint512 *dst, const uint512 *sr
 }
 
 __host__ __device__ uint256 *uint256_shift_arithmetic_right(uint256 *dst, const uint256 *src, uint32_t shift) {
-    if (shift <= 0) return dst;
+    if (shift <= 0) {
+        uint256_cpy(dst, src);
+        return dst;
+    }
+    printf("shift %u src : \n", shift);
+    print_uint256(src);
+    // Determine if the number is negative (most significant bit is set)
+    bool msb_set = src->words[UINT256_WORDS - 1] & (1U << 31);
+    printf("msb_set: %d\n", msb_set);
+    // Handle whole word shifts first
+    uint8_t offset = shift / 32;
 
-    // Determine if the most significant bit is set
-    bool msb_set = src->words[UINT256_WORDS - 1] & (1U << (32 - 1));
-
-    while (shift >= 32) {
-        for (int i = UINT256_WORDS - 1; i > 0; --i) {
-            dst->words[i] = src->words[i - 1];
-        }
-        dst->words[0] = msb_set ? ~0U : 0;  // Fill with 1s if msb_set, else 0s
-        shift -= 32;
+    // Copy words with offset
+    for (int i = 0; i < UINT256_WORDS - offset; i++) {
+        dst->words[i] = src->words[i + offset];
     }
 
+    // Fill remaining words based on sign
+    for (int i = UINT256_WORDS - offset; i < UINT256_WORDS; i++) {
+        dst->words[i] = msb_set ? ~0U : 0;
+    }
+    printf("dst after whole word shift : ");
+    print_uint256(dst);
+    // Handle remaining bits
+    shift = shift % 32;
     if (shift > 0) {
         uint32_t carry = msb_set ? ~0U << (32 - shift) : 0;
         for (int i = UINT256_WORDS - 1; i >= 0; --i) {
-            uint32_t word = src->words[i];
+            uint32_t word = dst->words[i];
             dst->words[i] = (word >> shift) | carry;
             carry = word << (32 - shift);
         }
     }
+    printf("dst: ");
+    print_uint256(dst);
     return dst;
 }
 
