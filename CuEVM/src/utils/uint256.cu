@@ -623,6 +623,7 @@ __host__ __device__ uint256 *uint512_mod(uint256 *dst_remainder, const uint512 *
 //     memcpy(dst->words, src->words, UINT256_WORDS * sizeof(uint32_t));
 //     return dst;
 // }
+// check if can be imnplemented by shift, return true and result if can
 
 __host__ __device__ uint256 *uint256_div(uint256 *dst, const uint256 *numerator, const uint256 *denominator) {
     uint256 remainder;
@@ -844,11 +845,10 @@ __host__ __device__ uint256 *uint256_shift_arithmetic_right(uint256 *dst, const 
         uint256_cpy(dst, src);
         return dst;
     }
-    printf("shift %u src : \n", shift);
-    print_uint256(src);
+
     // Determine if the number is negative (most significant bit is set)
     bool msb_set = src->words[UINT256_WORDS - 1] & (1U << 31);
-    printf("msb_set: %d\n", msb_set);
+
     // Handle whole word shifts first
     uint8_t offset = shift / 32;
 
@@ -861,8 +861,7 @@ __host__ __device__ uint256 *uint256_shift_arithmetic_right(uint256 *dst, const 
     for (int i = UINT256_WORDS - offset; i < UINT256_WORDS; i++) {
         dst->words[i] = msb_set ? ~0U : 0;
     }
-    printf("dst after whole word shift : ");
-    print_uint256(dst);
+
     // Handle remaining bits
     shift = shift % 32;
     if (shift > 0) {
@@ -873,8 +872,6 @@ __host__ __device__ uint256 *uint256_shift_arithmetic_right(uint256 *dst, const 
             carry = word << (32 - shift);
         }
     }
-    printf("dst: ");
-    print_uint256(dst);
     return dst;
 }
 
@@ -989,4 +986,62 @@ __host__ __device__ char *uint256_to_hex(char *dst, const uint256 *a) {
 
     dst[n] = '\0';
     return dst;
+}
+
+__device__ bool uint256_is_power_of_2(const uint256 *a) {
+    if (uint256_is_zero(a)) return false;
+
+    // Check if only one bit is set
+    uint256 tmp;
+    uint256_from_word(&tmp, 1);
+    uint256_sub(&tmp, a, &tmp);
+    uint256_bitwise_and(&tmp, a, &tmp);
+    return uint256_is_zero(&tmp);
+}
+
+__device__ uint32_t uint256_count_trailing_zeros(const uint256 *a) {
+    uint32_t count = 0;
+    for (int i = 0; i < UINT256_WORDS; i++) {
+        if (a->words[i] == 0) {
+            count += 32;
+            continue;
+        }
+        count += __ffs(a->words[i]) - 1;  // CUDA built-in function
+        break;
+    }
+    return count;
+}
+
+__device__ bool uint256_fast_div(uint256 *dst, const uint256 *src_num, const uint256 *src_den) {
+    // Check if denominator is a power of 2
+    if (!uint256_is_zero(src_den) && uint256_is_power_of_2(src_den)) {
+        // Special case: shift right by number of trailing zeros
+        uint32_t shift = uint256_count_trailing_zeros(src_den);
+        uint256_shift_right(dst, src_num, shift);
+        return true;
+    }
+
+    // Fallback to normal division
+    return false;
+}
+
+__device__ bool uint256_fast_exp(uint256 *dst, const uint256 *base_org, const uint256 *exponent_org) {
+    uint32_t exp = uint256_get_uint32_t(exponent_org);
+    uint32_t base = uint256_get_uint32_t(base_org);
+    uint256 one;
+    uint256_from_word(&one, 1);
+    // Check if base is a power of 2
+    if (base > 0 && (base & (base - 1)) == 0) {
+        // Use __ffs to find first set bit (1-based index)
+        // Subtract 1 to get 0-based count of trailing zeros
+        int k = __ffs(base) - 1;
+        // printf("k: %d\n", k);
+        uint64_t total_exp = (uint64_t)k * exp;
+        // printf("total_exp: %llu\n", total_exp);
+        uint256_shift_left(dst, &one, total_exp);
+        // dst->words[word_index] = 1U << bit_position;
+        return true;
+    }
+
+    return false;
 }

@@ -102,7 +102,7 @@ __device__ void evm_call_context_t::clear() {
                                                       memory_ptr->preallocated_base_offset],
                0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
     }
-    this->memory_ptr = nullptr;
+    // this->memory_ptr = nullptr;
 }
 
 /**

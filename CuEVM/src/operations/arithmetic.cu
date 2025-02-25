@@ -58,11 +58,22 @@ __device__ int32_t DIV(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         evm_word_t a, b, r;
         error_code |= stack->pop(a);
         error_code |= stack->pop(b);
+        // printf("div a \n");
+        // a.print();
+        // printf("div b \n");
+        // b.print();
         if (b == 0) {
             stack->push_uint32(0);
             return ERROR_SUCCESS;
         }
-        uint256_div(&r, &a, &b);
+        if (uint256_fast_div(&r, &a, &b)) {
+            // printf("fast div\n");
+        } else {
+            // printf("slow div\n");
+            uint256_div(&r, &a, &b);
+        }
+        // printf("div r \n");
+        // r.print();
 
         error_code |= stack->push(r);
     }
@@ -157,17 +168,32 @@ __device__ int32_t EXP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         evm_word_t a, exponent, r;
         error_code |= stack->pop(a);
         error_code |= stack->pop(exponent);
-
+        // if (threadIdx.x == 1) {
+        //     printf("exp a \n");
+        //     a.print();
+        //     printf("exp exponent \n");
+        //     exponent.print();
+        // }
         if (error_code == ERROR_SUCCESS) {
             uint32_t exponent_bit_length = uint256_bitlength(&exponent);
             if (exponent_bit_length == 0) {
                 error_code |= stack->push_uint32(1);
             } else {
                 gas_used += GAS_EXP_BYTE * ((exponent_bit_length + 7) / 8);
-                uint256_exp(&r, &a, &exponent);
-                error_code |= stack->push(r);
+                if (uint256_fast_exp(&r, &a, &exponent)) {
+                    error_code |= stack->push(r);
+                    // printf("fast exp\n");
+                } else {
+                    uint256_exp(&r, &a, &exponent);
+                    error_code |= stack->push(r);
+                    // printf("slow exp\n");
+                }
             }
         }
+        // if (threadIdx.x == 1) {
+        //     printf("exp r \n");
+        //     r.print();
+        // }
     }
     return error_code;
 }

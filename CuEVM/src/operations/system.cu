@@ -19,11 +19,11 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
                               ? ERROR_STATIC_CALL_CONTEXT_CALL_VALUE
                               : ERROR_SUCCESS);
 
-    if (INSTANCE_GLOBAL_IDX == 1) {
-        printf("call \n");
-        new_context_ptr->to.print();
-        new_context_ptr->value.print();
-    }
+    // if (INSTANCE_GLOBAL_IDX == 1) {
+    //     printf("call \n");
+    //     new_context_ptr->to.print();
+    //     new_context_ptr->value.print();
+    // }
 
     // replace gas_used, throw away after the call
     // because we did not increase_memory_cost between expansions

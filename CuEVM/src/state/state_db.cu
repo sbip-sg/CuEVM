@@ -999,14 +999,7 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
     }
 
     found_value = get_value_status(address_index, key);
-    if (INSTANCE_GLOBAL_IDX == 0) {
-        printf("is_warm_key_with_offset found value %p\n", found_value);
-        printf("address_index %d\n", address_index);
-        printf("address\n");
-        address->print();
-        printf("key\n");
-        key->print();
-    }
+
     if (found_value == nullptr) {
         // todo: // implement value not found in both pools
         // printf("is_warm_key_with_offset value not found in both pools\n");

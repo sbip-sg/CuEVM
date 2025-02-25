@@ -10,13 +10,13 @@ constexpr uint32_t account_prealloc_keys_size = 32;  // configurable keys per ac
 constexpr uint32_t value_page_size = 16;
 constexpr uint32_t account_page_size = 16;
 // constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
-constexpr uint32_t memory_prealloc_size = 2048;          // prealloc 1 page + page size for all dynamic pages
+constexpr uint32_t memory_prealloc_size = 4096;          // prealloc 1 page + page size for all dynamic pages
 constexpr uint32_t memory_pool_stack_preallocate = 128;  // 16 elements times num_instances
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
 constexpr uint32_t snapshot_account_pool_size = 32;  // multiply by num_states
 
-constexpr uint32_t memory_pool_call_context_preallocate = 4;     // 2 call contexts times num_instances
+constexpr uint32_t memory_pool_call_context_preallocate = 8;     // 2 call contexts times num_instances
 constexpr uint32_t memory_pool_return_data_preallocate = 128;    // 32 bytes times num_instances
 constexpr uint32_t memory_pool_snapshot_preallocate_slots = 32;  // 32 elements for each instance
 constexpr uint32_t snapshot_page_size = 8;

@@ -19,7 +19,6 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     // if (THREADIDX == 1) transaction_list_ptr->print();
 #endif
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
-
     evm.run(cached_call_state, copy_state_data);
 
 #ifdef EIP_3155

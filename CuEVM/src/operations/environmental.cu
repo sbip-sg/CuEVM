@@ -261,7 +261,6 @@ __device__ int32_t EXTCODESIZE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     uint32_t code_size = 0;
     uint8_t *code = global_state_db_ptr->get_code(code_size, &address);
-    CuEVM::byte_array_t byte_code(code, code_size);
     evm_word_t code_size_word;
     uint256_from_word(&code_size_word, code_size);
     error_code |= call_context->stack_ptr->push(code_size_word);

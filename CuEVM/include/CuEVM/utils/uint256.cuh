@@ -93,3 +93,6 @@ __host__ __device__ uint512 *uint512_shift_left(uint512 *dst, const uint512 *src
 __host__ __device__ uint512 *uint512_shift_right(uint512 *dst, const uint512 *src, uint32_t shift);
 __host__ __device__ uint256 *uint512_div_mod(uint256 *dst_quotient, uint256 *dst_remainder, const uint512 *src_dividend,
                                              const uint256 *src_divisor);
+
+__device__ bool uint256_fast_div(uint256 *dst, const uint256 *src_num, const uint256 *src_den);
+__device__ bool uint256_fast_exp(uint256 *dst, const uint256 *base, const uint256 *exponent);
