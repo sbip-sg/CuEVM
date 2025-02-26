@@ -18,10 +18,7 @@ __device__ int32_t PUSH0(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t r;
-        r.set_zero();
-
-        error_code |= stack.push(r);
+        error_code |= stack.push_uint32(0);
     }
     return error_code;
 }
