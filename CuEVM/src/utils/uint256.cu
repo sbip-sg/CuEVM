@@ -1026,7 +1026,12 @@ __device__ bool uint256_fast_div(uint256 *dst, const uint256 *src_num, const uin
 }
 
 __device__ bool uint256_fast_exp(uint256 *dst, const uint256 *base_org, const uint256 *exponent_org) {
+    // printf("uint256_fast_exp\n");
     uint32_t exp = uint256_get_uint32_t(exponent_org);
+    if (uint256_cmp_word(exponent_org, exp)) {
+        // printf("exponent_org is not a uint32_t\n");
+        return false;
+    }
     uint32_t base = uint256_get_uint32_t(base_org);
     uint256 one;
     uint256_from_word(&one, 1);
