@@ -101,9 +101,13 @@ __device__ void evm_call_context_t::clear() {
         uint32_t size_to_clear = min(memory_ptr->size, memory_prealloc_size - memory_ptr->preallocated_base_offset);
         // printf("size_to_clear %d printf memory\n", size_to_clear);
         // printf("previous size to clear %d\n", memory_prealloc_size - memory_ptr->preallocated_base_offset);
-        memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
-                                                      memory_ptr->preallocated_base_offset],
-               0, size_to_clear);
+        // memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+        //                                               memory_ptr->preallocated_base_offset],
+        //        0, size_to_clear);
+        memory::warp_cooperative_setzero(
+            &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+                                                   memory_ptr->preallocated_base_offset],
+            size_to_clear);
     }
     // this->memory_ptr = nullptr;
 }
@@ -115,10 +119,15 @@ __device__ evm_call_context_t::~evm_call_context_t() {
     // printf("evm_call_context_t destructor thread %d, call state ptr %p, parent call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, this, parent);
     if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
+        uint32_t size_to_clear = min(memory_ptr->size, memory_prealloc_size - memory_ptr->preallocated_base_offset);
         // clear the grow memory
-        memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
-                                                      memory_ptr->preallocated_base_offset],
-               0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
+        // memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+        //                                               memory_ptr->preallocated_base_offset],
+        //        0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
+        memory::warp_cooperative_setzero(
+            &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+                                                   memory_ptr->preallocated_base_offset],
+            size_to_clear);
     }
 }
 /**

@@ -225,11 +225,11 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                       : OP_STOP);
 
 #ifdef EIP_3155
-
-        tracer_ptr->start_operation(cached_call_state.pc, opcode, call_state_ptr->memory_ptr,
-                                    cached_call_state.stack_ptr, call_state_ptr->depth, nullptr,
-                                    cached_call_state.gas_limit, cached_call_state.gas_used);
-
+        if (INSTANCE_GLOBAL_IDX == 1) {
+            tracer_ptr->start_operation(cached_call_state.pc, opcode, call_state_ptr->memory_ptr,
+                                        cached_call_state.stack_ptr, call_state_ptr->depth, nullptr,
+                                        cached_call_state.gas_limit, cached_call_state.gas_used);
+        }
 #endif
         // if (INSTANCE_GLOBAL_IDX == 0) {
         //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
@@ -775,7 +775,9 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
     //  call_state_ptr = parent_call_state_ptr;
 
 #ifdef EIP_3155
-    tracer_ptr->finish_transaction(nullptr, call_state_ptr->gas_used, status);
+    if (INSTANCE_GLOBAL_IDX == 1) {
+        tracer_ptr->finish_transaction(nullptr, call_state_ptr->gas_used, status);
+    }
 #endif
 
 #ifdef BUILD_LIBRARY

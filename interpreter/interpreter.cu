@@ -130,7 +130,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 int main(int argc, char *argv[]) {  // getting the input
     char *read_json_filename = NULL;
     char *write_json_filename = NULL;
-    size_t clones = 2;
+    size_t clones = 32;
     bool verbose = false;  // Verbose flag
     static struct option long_options[] = {{"input", required_argument, 0, 'i'},
                                            {"output", optional_argument, 0, 'o'},
@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {  // getting the input
         fprintf(stdout, "--input argument is required\n");
         exit(EXIT_FAILURE);
     }
-
+    if (clones < 32) clones = 32;
     // check if the file exists
     std::ifstream file(read_json_filename);
     if (!file) {

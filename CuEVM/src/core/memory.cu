@@ -43,6 +43,7 @@ __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
     uint32_t lane_id = threadIdx.x % 32;
 
     // Iterate over each thread in the warp
+#pragma unroll
     for (int i = 0; i < 32; i++) {
         // Cast pointer to unsigned long long for shuffling
         unsigned long long ptr1_int = reinterpret_cast<unsigned long long>(ptr1);
@@ -187,8 +188,12 @@ __device__ int32_t evm_memory_t::copy(uint32_t index, uint32_t length, uint8_t *
     if (total_offset + length <= memory_prealloc_size) {
         // data_ = &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
         // total_offset];
-        memcpy(data_, &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset],
-               length);
+        // memcpy(data_, &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+        // total_offset],
+        //        length);
+        memory::warp_cooperative_set(
+            data_, &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset],
+            length);
     } else {
         // The requested block spans the preallocated area and the dynamic area (or is entirely in dynamic)
         // Allocate a new buffer to hold the returned data.
@@ -224,11 +229,12 @@ __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint
     uint32_t to_copy = (src != nullptr) ? ((src_available < bytes) ? src_available : bytes) : 0;
     // printf("copy_with_padding thread %d to_copy %d bytes %d\n", THREADIDX, to_copy, bytes);
     if (src != nullptr && to_copy > 0) {
-        memcpy(dest, src, to_copy);
-        // CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
+        // memcpy(dest, src, to_copy);
+        CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
     }
     if (to_copy < bytes) {
-        memset(dest + to_copy, 0, bytes - to_copy);
+        // memset(dest + to_copy, 0, bytes - to_copy);
+        CuEVM::memory::warp_cooperative_setzero(dest + to_copy, bytes - to_copy);
     }
 }
 
@@ -287,8 +293,10 @@ __device__ int32_t evm_memory_t::set_zero(const uint32_t index, const uint32_t l
     uint32_t total_offset = preallocated_base_offset + index;
     if (total_offset + length <= memory_prealloc_size) {
         // Entire block is within the preallocated memory.
-        memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset], 0,
-               length);
+        // memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset], 0,
+        //        length);
+        CuEVM::memory::warp_cooperative_setzero(
+            &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset], length);
     } else {
         // The request spans both preallocated and dynamic memory.
         uint32_t prealloc_bytes = 0;

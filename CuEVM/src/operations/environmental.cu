@@ -43,10 +43,26 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
             remaining_input_length = max(0, remaining_input_length);
         uint8_t *memory_data = nullptr;
         memory.get(offset_u32, remaining_input_length, memory_data);
+        // if (INSTANCE_GLOBAL_IDX == 0) {
+        //     printf("memory_data %p\n", memory_data);
+        //     memory.print();
+        //     printf("SHA3 thread %d, memory_data\n", INSTANCE_GLOBAL_IDX);
+        //     for (uint32_t i = 0; i < remaining_input_length; i++) {
+        //         printf("%x", memory_data[i]);
+        //     }
+        //     printf("\n");
+        // }
         CuCrypto::keccak::sha3(memory_data, remaining_input_length, hash_data, CuEVM::hash_size);
         // evm_word_t hash_word;
         // uint256_from_bytes(&hash_word, hash_data, CuEVM::hash_size);
         // printf("hash_data: %x\n", hash_data);
+        // if (INSTANCE_GLOBAL_IDX == 0) {
+        //     printf("SHA3 thread %d, hash_data\n", INSTANCE_GLOBAL_IDX);
+        //     for (uint32_t i = 0; i < CuEVM::hash_size; i++) {
+        //         printf("%x", hash_data[i]);
+        //     }
+        //     printf("\n");
+        // }
         error_code |= stack.pushx(CuEVM::hash_size, hash_data, CuEVM::hash_size);
     }
     // }
