@@ -10,7 +10,7 @@ constexpr uint32_t account_prealloc_keys_size = 32;  // configurable keys per ac
 constexpr uint32_t value_page_size = 16;
 constexpr uint32_t account_page_size = 16;
 // constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
-constexpr uint32_t memory_prealloc_size = 4096;          // prealloc 1 page + page size for all dynamic pages
+constexpr uint32_t memory_prealloc_size = 8096;          // prealloc 1 page + page size for all dynamic pages
 constexpr uint32_t memory_pool_stack_preallocate = 128;  // 16 elements times num_instances
 // heuristic size for the bytecode hex string to keep everything within 1MB
 constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
@@ -167,7 +167,8 @@ class TransactionList {
 namespace memory {
 // to change for making more optimal memory allocation current 1KB
 // constexpr CONSTANT uint32_t page_size = 1024U;
-
+__device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_t length);
+__device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length);
 /**
  * The memory data structure.
  */
@@ -279,7 +280,8 @@ struct evm_stack_t {
           shared_stack_base(shared_stack_base),
           stack_base_offset(stack_base_offset),
           stack_offset(0) {
-        // printf("stack constructor shared stack base %p, stack base offset %d, stack offset %d\n", shared_stack_base,
+        // printf("stack constructor shared stack base %p, stack base offset %d, stack offset %d\n",
+        // shared_stack_base,
         //        stack_base_offset, stack_offset);
     }
     __device__ evm_stack_t()

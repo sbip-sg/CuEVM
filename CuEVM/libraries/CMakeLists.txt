@@ -5,5 +5,4 @@ endif()
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 add_subdirectory(CuBigInt/CuBigInt)
-add_subdirectory(CGBN/CGBN)
 add_subdirectory(CuCrypto/CuCrypto)

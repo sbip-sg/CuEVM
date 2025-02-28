@@ -98,9 +98,12 @@ __device__ void evm_call_context_t::clear() {
         // printf("clear %d bytes from memory_pool::preallocated_memory_base[%d] + %d\n",
         //        memory_prealloc_size - memory_ptr->preallocated_base_offset, INSTANCE_GLOBAL_IDX,
         //        memory_ptr->preallocated_base_offset);
+        uint32_t size_to_clear = min(memory_ptr->size, memory_prealloc_size - memory_ptr->preallocated_base_offset);
+        // printf("size_to_clear %d printf memory\n", size_to_clear);
+        // printf("previous size to clear %d\n", memory_prealloc_size - memory_ptr->preallocated_base_offset);
         memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
                                                       memory_ptr->preallocated_base_offset],
-               0, memory_prealloc_size - memory_ptr->preallocated_base_offset);
+               0, size_to_clear);
     }
     // this->memory_ptr = nullptr;
 }

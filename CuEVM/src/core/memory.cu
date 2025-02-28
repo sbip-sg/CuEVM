@@ -1,7 +1,71 @@
+#include <cuda_runtime.h>
 
 #include <CuEVM/core/memory.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 namespace CuEVM::memory {
+
+// experimental, not used
+__device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_t length) {
+    // Get the lane ID within the warp (0 to 31)
+    uint32_t lane_id = threadIdx.x % 32;
+
+// Iterate over each thread in the warp
+#pragma unroll
+    for (int i = 0; i < 32; i++) {
+        // Cast pointers to unsigned long long for shuffling
+        unsigned long long ptr1_int = reinterpret_cast<unsigned long long>(ptr1);
+        unsigned long long ptr2_int = reinterpret_cast<unsigned long long>(ptr2);
+
+        // Broadcast values using __shfl_sync
+        unsigned long long current_ptr1_int = __shfl_sync(0xffffffff, ptr1_int, i);
+        unsigned long long current_ptr2_int = __shfl_sync(0xffffffff, ptr2_int, i);
+        uint32_t current_length = __shfl_sync(0xffffffff, length, i);
+
+        // Cast back to pointers
+        uint8_t *current_ptr1 = reinterpret_cast<uint8_t *>(current_ptr1_int);
+        uint8_t *current_ptr2 = reinterpret_cast<uint8_t *>(current_ptr2_int);
+
+        // Only proceed if there's data to process
+        if (current_length > 0) {
+            // Each thread handles a portion of the memory operation
+            for (uint32_t offset = lane_id; offset < current_length; offset += 32) {
+                if (offset < current_length) {
+                    // Set: Copy from ptr2 (source) to ptr1 (destination)
+                    current_ptr1[offset] = current_ptr2[offset];
+                }
+            }
+        }
+    }
+}
+
+__device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
+    // Get the lane ID within the warp (0 to 31)
+    uint32_t lane_id = threadIdx.x % 32;
+
+    // Iterate over each thread in the warp
+    for (int i = 0; i < 32; i++) {
+        // Cast pointer to unsigned long long for shuffling
+        unsigned long long ptr1_int = reinterpret_cast<unsigned long long>(ptr1);
+
+        // Broadcast values using __shfl_sync
+        unsigned long long current_ptr1_int = __shfl_sync(0xffffffff, ptr1_int, i);
+        uint32_t current_length = __shfl_sync(0xffffffff, length, i);
+
+        // Cast back to pointer
+        uint8_t *current_ptr1 = reinterpret_cast<uint8_t *>(current_ptr1_int);
+
+        // Only proceed if there's data to process
+        if (current_length > 0) {
+            // Each thread handles a portion of the memory operation
+            for (uint32_t offset = lane_id; offset < current_length; offset += 32) {
+                if (offset < current_length) {
+                    // Set Zero: Zero out ptr1
+                    current_ptr1[offset] = 0;
+                }
+            }
+        }
+    }
+}
 __device__ void evm_memory_t::print() const {
     printf("Memory data: \n");
     printf("Size: %d\n", size);
@@ -161,6 +225,7 @@ __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint
     // printf("copy_with_padding thread %d to_copy %d bytes %d\n", THREADIDX, to_copy, bytes);
     if (src != nullptr && to_copy > 0) {
         memcpy(dest, src, to_copy);
+        // CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
     }
     if (to_copy < bytes) {
         memset(dest + to_copy, 0, bytes - to_copy);
