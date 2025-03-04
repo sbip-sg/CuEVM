@@ -88,14 +88,17 @@ __device__ void evm_memory_t::increase_memory_cost(gas_t memory_expansion_cost) 
 }
 
 __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
+    // printf("grow new_size %u size %u\n", new_size, size);
     if (new_size > size) {
         new_size = (new_size + 31) / 32 * 32;
         if (new_size + preallocated_base_offset <= memory_prealloc_size) {
             // no need to allocate new page
             // clear the grow memory when return from subcontext
         } else {
+#ifdef DEBUG_PERF
             printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
                    INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
+#endif
             // allocate new page
             uint8_t *new_data = new uint8_t[new_size + preallocated_base_offset - memory_prealloc_size];
             memset(new_data, 0, new_size + preallocated_base_offset - memory_prealloc_size);
@@ -131,8 +134,10 @@ __device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&
     if (total_offset + length <= memory_prealloc_size) {
         data_ = &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
     } else {
+#ifdef DEBUG_PERF
         printf("memory get total_offset + length %d > memory_prealloc_size %d\n", total_offset + length,
                memory_prealloc_size);
+#endif
         // The requested block spans the preallocated area and the dynamic area (or is entirely in dynamic)
         // Allocate a new buffer to hold the returned data.
 

@@ -167,7 +167,9 @@ __device__ evm_stack_t* get_stack(uint16_t depth) {
         return &global_memory_pool
                     ->prealloc_stack_instances[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
     } else {
+#ifdef DEBUG_PERF
         printf("stack dynamic allocation\n");
+#endif
         return new evm_stack_t();
     }
 }
@@ -181,9 +183,11 @@ __device__ CuEVM::SnapshotState* get_snapshot_state() {
         return &CuEVM::memory_pool::global_memory_pool
                     ->snapshot_states_pool[INSTANCE_GLOBAL_IDX + global_state_db_ptr->num_states * accounts_count];
     } else {
+#ifdef DEBUG_PERF
         printf("snapshot account pool is full for instance %u, create a new one\n", INSTANCE_GLOBAL_IDX);
+#endif
         SnapshotState* tmp = new CuEVM::SnapshotState();
-        printf("allocate new snapshot state %p\n", tmp);
+
         return tmp;
     }
 }
@@ -210,7 +214,9 @@ __device__ evm_memory_t* get_memory(uint16_t depth) {
         return &global_memory_pool
                     ->prealloc_mem_instances[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
     } else {
+#ifdef DEBUG_PERF
         printf("memory dynamic allocation\n");
+#endif
         return new evm_memory_t();
     }
 }

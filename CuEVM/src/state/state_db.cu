@@ -40,19 +40,20 @@ __device__ void SnapshotState::clear() {
 }
 
 __device__ SnapshotState *SnapshotState::revert() {
-    // TODO: implement
+#ifdef DEBUG_PERF
     printf("\n\nrevert snapshot_state %p next_state %p, storage_size %d touched_account_counts %d\n", this, next_state,
            storage_size, touched_account_counts);
+    printf("revert touched account to cold num touched %d\n", touched_account_counts);
+#endif
     if (touched_account_counts > 0) {
-        printf("revert touched account to cold num touched %d\n", touched_account_counts);
         for (uint32_t i = 0; i < touched_account_counts; i++) {
             int32_t address_index = preallocated_touched_accounts[i];
             if (address_index >= 0) {
-                printf("set cold revert thread %d, address_index %d\n", INSTANCE_GLOBAL_IDX, address_index);
+                // printf("set cold revert thread %d, address_index %d\n", INSTANCE_GLOBAL_IDX, address_index);
                 uint32_t instance_idx = address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
                 global_state_db_ptr->account_is_warm[instance_idx] = false;
             } else {
-                printf("todo negative address index set cold revert\n");
+                // printf("todo negative address index set cold revert\n");
 
                 // find the dynamic account
                 DynamicAccount *dynamic_account = global_state_db_ptr->dynamic_accounts[INSTANCE_GLOBAL_IDX];
@@ -67,16 +68,19 @@ __device__ SnapshotState *SnapshotState::revert() {
         }
     }
     if (diff_account_counts > 0) {
+#ifdef DEBUG_PERF
         printf("revert account diff_account_counts %d\n", diff_account_counts);
+#endif
         SnapshotAccount *current_account = accounts;
         while (current_account != nullptr) {
+#ifdef DEBUG_PERF
             printf("revert account address_index %d\n", current_account->address_index);
+#endif
             if (current_account->address_index >= 0) {
                 uint32_t instance_idx =
                     current_account->address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
                 global_state_db_ptr->account_balances[instance_idx] = current_account->balance;
             } else {
-                printf("revert account negative address index set balance\n");
                 DynamicAccount *dynamic_account = global_state_db_ptr->dynamic_accounts[INSTANCE_GLOBAL_IDX];
                 while (dynamic_account != nullptr) {
                     if (dynamic_account->dynamic_account_index == current_account->address_index) {
@@ -91,25 +95,30 @@ __device__ SnapshotState *SnapshotState::revert() {
     }
     // N contract x mempool__snapshot_preallocate x num_states
     uint32_t start_offset = preallocated_offset;
+#ifdef DEBUG_PERF
     printf("thread %d, state %p, start_offset %d\n", INSTANCE_GLOBAL_IDX, this, start_offset);
+#endif
     uint32_t end_offset = min(start_offset + storage_size, memory_pool_snapshot_preallocate_slots);
     for (uint32_t i = start_offset; i < end_offset; i++) {
         uint32_t coalesced_offset = i * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
         if (i < memory_pool_snapshot_preallocate_slots) {
+#ifdef DEBUG_PERF
             if (INSTANCE_GLOBAL_IDX == 1) {
                 printf("thread %d, state %p, i %d, coalesced_offset %d, preallocated snapshot current value \n",
                        INSTANCE_GLOBAL_IDX, this, i, coalesced_offset);
                 CuEVM::memory_pool::preallocated_snapshot_values[coalesced_offset].value.print();
             }
-
+#endif
             // Todo: check logic of this case
             if (CuEVM::memory_pool::preallocated_snapshot_restore_ptr[coalesced_offset] == nullptr) continue;
+#ifdef DEBUG_PERF
             if (INSTANCE_GLOBAL_IDX == 1) {
                 printf("thread %d, preallocated snapshot restore ptr %p\n", INSTANCE_GLOBAL_IDX,
                        CuEVM::memory_pool::preallocated_snapshot_restore_ptr[coalesced_offset]);
                 printf("thread %d, preallocated snapshot restore value \n", INSTANCE_GLOBAL_IDX);
                 CuEVM::memory_pool::preallocated_snapshot_restore_ptr[coalesced_offset]->value.print();
             }
+#endif
             CuEVM::memory_pool::preallocated_snapshot_restore_ptr[coalesced_offset]->value =
                 CuEVM::memory_pool::preallocated_snapshot_values[coalesced_offset].value;
             CuEVM::memory_pool::preallocated_snapshot_restore_ptr[coalesced_offset]->is_warm =
@@ -119,12 +128,14 @@ __device__ SnapshotState *SnapshotState::revert() {
             while (current_page != nullptr) {
                 for (uint32_t j = 0; j < snapshot_page_size; j++) {
                     if (current_page->restore_ptr[j] != nullptr) {
+#ifdef DEBUG_PERF
                         printf("current page restore ptr %p\n", current_page->restore_ptr[j]);
                         printf("current page value \n");
                         current_page->restore_ptr[j]->value.print();
                         printf("current page restore value \n");
                         current_page->values[j].value.print();
                         printf("current page restore value is_warm %d\n", current_page->values[j].is_warm);
+#endif
                         current_page->restore_ptr[j]->value = current_page->values[j].value;
                         current_page->restore_ptr[j]->is_warm = current_page->values[j].is_warm;
                     }
@@ -154,7 +165,9 @@ __device__ void SnapshotState::set_touched_account(const int32_t address_index) 
     } else {
         // allocate dynamic touched accounts
         // todo: optimize
+#ifdef DEBUG_PERF
         printf("allocate dynamic touched accounts\n");
+#endif
         int32_t *new_dynamic_touched_accounts =
             new int32_t[touched_account_counts + 1 - preallocated_touched_accounts_size];
         for (uint32_t i = 0; i < touched_account_counts - preallocated_touched_accounts_size; i++) {
@@ -229,7 +242,9 @@ __device__ void SnapshotState::set_storage(ValueStatus *src_value) {
             // %d\n",
             //        next_offset, memory_pool_snapshot_preallocate_slots, snapshot_page_size, dynamic_offset);
             if (dynamic_offset == 0) {
+#ifdef DEBUG_PERF
                 printf("allocate new page %p\n", storage_page);
+#endif
                 SnapshotStoragePage *new_page = new SnapshotStoragePage();
                 new_page->next_page = storage_page;
                 storage_page = new_page;
@@ -237,8 +252,10 @@ __device__ void SnapshotState::set_storage(ValueStatus *src_value) {
             storage_page->restore_ptr[dynamic_offset] = src_value;
             storage_page->values[dynamic_offset].value = src_value->value;
             storage_page->values[dynamic_offset].is_warm = src_value->is_warm;
+#ifdef DEBUG_PERF
             printf("to restore value %p, is_warm %d\n", storage_page->restore_ptr[dynamic_offset],
                    storage_page->values[dynamic_offset].is_warm);
+#endif
         }
     } else {
         uint32_t coalesced_offset = next_offset * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
@@ -644,6 +661,7 @@ __device__ ValueStatus *StateDb::get_dynamic_value_location(uint32_t storage_siz
 }
 
 __device__ void StateDb::reset_key(const evm_word_t *address, const evm_word_t *key) {
+#ifdef DEBUG_PERF
     printf("state db reset key thread %d, address %p, key %p\n", INSTANCE_GLOBAL_IDX, address, key);
     if (INSTANCE_GLOBAL_IDX == 0) {
         printf("address\n");
@@ -651,6 +669,8 @@ __device__ void StateDb::reset_key(const evm_word_t *address, const evm_word_t *
         printf("key\n");
         key->print();
     }
+#endif
+
     int32_t address_index = global_state_db_ptr->get_address_index(address);
     // for revert logic, the account must be found , and the key must exist
     ValueStatus *found_value = nullptr;
@@ -681,7 +701,7 @@ __device__ void StateDb::write_storage_with_known_index(const evm_word_t *addres
     // printf("write storage with known index thread %d, address %p\n", INSTANCE_GLOBAL_IDX, address);
     if (address_index == -1) {
         DynamicAccount *dynamic_account = get_dynamic_account(address);
-        printf("dynamic_account %p\n", dynamic_account);
+        // printf("dynamic_account %p\n", dynamic_account);
         if (dynamic_account == nullptr) {
             return;  // should never write directly to storage before creating account
         }
@@ -712,7 +732,9 @@ __device__ void StateDb::write_storage_with_known_index(const evm_word_t *addres
             // num_storage_elements++;
 
         } else {
+#ifdef DEBUG_PERF
             printf("Dynamic storage grow\n");
+#endif
             ValueStatus *dynamic_value = get_dynamic_value_location(storage_size, instance_idx, key);
             if (dynamic_value == nullptr) {
                 dynamic_value = grow_storage_and_set_key(storage_size, instance_idx, key);
@@ -803,7 +825,9 @@ __device__ evm_word_t *StateDb::get_storage_with_known_index(const evm_word_t *a
                 prealloc_keys_pool[new_offset] = *key;
                 prealloc_values_pool[new_offset].set_value(&zero, true);
             } else {
+#ifdef DEBUG_PERF
                 printf("Dynamic storage grow in get_storage_with_known_index\n");
+#endif
                 ValueStatus *value_status = grow_storage_and_set_key(storage_size, instance_idx, key);
                 value_status->set_value(&zero, true);
             }
@@ -987,7 +1011,9 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
     address_index = get_address_index(address);
     if (address_index == -1) {
         found_value = nullptr;
+#ifdef DEBUG_PERF
         printf("Dynamic storage grow\n");
+#endif
         DynamicAccount *dynamic_account = get_dynamic_account(address);
         if (dynamic_account != nullptr) {
             found_value = dynamic_account->get_value_status(key);
@@ -1045,7 +1071,9 @@ __device__ bool StateDb::is_empty_create(const evm_word_t *address) {
     if (address_index == -1) {
         DynamicAccount *dynamic_account = get_dynamic_account(address);
         if (dynamic_account == nullptr) {
+#ifdef DEBUG_PERF
             printf("dynamic account is null, create new account\n");
+#endif
             DynamicAccount *new_acc = new_account(address, 0, 0, 0, nullptr);
             return true;
         } else {
