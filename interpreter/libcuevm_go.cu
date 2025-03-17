@@ -1,47 +1,16 @@
-#include <CuEVM/utils/evm_utils.cuh>
-#include <stdio.h>
-#include <stdint.h>
-#include <string>
-#include <vector>
-#include <sstream>
-#include <iomanip>
+#include <CuEVM/libcuevm_go.h>
 
-// Move struct definitions OUTSIDE the extern "C" block
-// Define the uint256 structure (must match the one in Go)
-#define UINT256_WORDS 8
-#define UINT256_BITS 256
-#define UINT256_BYTES 32
-
-typedef struct {
-    uint32_t words[UINT256_WORDS];
-} go_uint256_t;
-
-// Account data structure
-struct GoAccount {
-    go_uint256_t address;
-    go_uint256_t balance;
-    uint64_t nonce;
-    std::vector<unsigned char> root;
-    std::vector<unsigned char> codeHash;
-    std::vector<unsigned char> code;
-    bool hasCode;
-    std::vector<go_uint256_t> storageKeys;
-    std::vector<go_uint256_t> storageVals;
-};
-
-// State data container
-struct GoStateData {
-    go_uint256_t root;
-    std::vector<GoAccount> accounts;
-    static int call_counter;
-};
 
 // Initialize static counter
 int GoStateData::call_counter = 0;
 
+// Initialize static counter
+int GoTransactionData::tx_counter = 0;
+
 // Helper function declarations
 std::string uint256_to_hex(const go_uint256_t& value);
 std::string bytes_to_hex(const unsigned char* data, int len);
+go_uint256_t bytes_to_uint256(const unsigned char* data, int data_len);
 
 // Helper function implementations - MOVE THESE OUTSIDE extern "C" BLOCK
 // Helper function to convert uint256 to hex string for printing
@@ -64,6 +33,23 @@ std::string bytes_to_hex(const unsigned char* data, int len) {
     return ss.str();
 }
 
+// Convert byte array to uint256 (big-endian to little-endian)
+go_uint256_t bytes_to_uint256(const unsigned char* data, int data_len) {
+    go_uint256_t result;
+    memset(&result, 0, sizeof(go_uint256_t));
+    
+    int copyLen = data_len < UINT256_BYTES ? data_len : UINT256_BYTES;
+    if (copyLen > 0) {
+        for (int i = 0; i < copyLen; i++) {
+            int pos = i % 4;
+            int word = i / 4;
+            result.words[word] |= (static_cast<uint32_t>(data[data_len - 1 - i]) << (pos * 8));
+        }
+    }
+    
+    return result;
+}
+
 // Ensure C linkage for Go to call these functions
 #ifdef __cplusplus
 extern "C" {
@@ -78,19 +64,7 @@ GoStateData* create_state_data() {
 // Set state root from byte array
 void set_state_root(GoStateData* state, const unsigned char* root, int root_len) {
     printf("Go interface: Setting state root, length: %d\n", root_len);
-    
-    // Initialize to zero
-    memset(&state->root, 0, sizeof(go_uint256_t));
-    
-    // Convert bytes to uint256 (big-endian to little-endian)
-    int copyLen = root_len < UINT256_BYTES ? root_len : UINT256_BYTES;
-    if (copyLen > 0) {
-        for (int i = 0; i < copyLen; i++) {
-            int pos = i % 4;
-            int word = i / 4;
-            state->root.words[word] |= (static_cast<uint32_t>(root[root_len - 1 - i]) << (pos * 8));
-        }
-    }
+    state->root = bytes_to_uint256(root, root_len);
 }
 
 // Add an account to state data with byte array inputs
@@ -108,23 +82,9 @@ void add_account(GoStateData* state,
     // Create a new account
     GoAccount account;
     
-    // Convert address bytes to uint256
-    memset(&account.address, 0, sizeof(go_uint256_t));
-    int addrCopyLen = addr_len < UINT256_BYTES ? addr_len : UINT256_BYTES;
-    for (int i = 0; i < addrCopyLen; i++) {
-        int pos = i % 4;
-        int word = i / 4;
-        account.address.words[word] |= (static_cast<uint32_t>(addr[addr_len - 1 - i]) << (pos * 8));
-    }
-    
-    // Convert balance bytes to uint256
-    memset(&account.balance, 0, sizeof(go_uint256_t));
-    int balanceCopyLen = balance_len < UINT256_BYTES ? balance_len : UINT256_BYTES;
-    for (int i = 0; i < balanceCopyLen; i++) {
-        int pos = i % 4;
-        int word = i / 4;
-        account.balance.words[word] |= (static_cast<uint32_t>(balance[balance_len - 1 - i]) << (pos * 8));
-    }
+    // Convert address and balance bytes to uint256
+    account.address = bytes_to_uint256(addr, addr_len);
+    account.balance = bytes_to_uint256(balance, balance_len);
     
     // Set the account nonce
     account.nonce = nonce;
@@ -167,90 +127,178 @@ void add_storage_entry(GoStateData* state,
     
     printf("Go interface: Adding storage entry, key length: %d, value length: %d\n", key_len, value_len);
     
-    // Convert key bytes to uint256
-    go_uint256_t key_uint256;
-    memset(&key_uint256, 0, sizeof(go_uint256_t));
-    int keyCopyLen = key_len < UINT256_BYTES ? key_len : UINT256_BYTES;
-    for (int i = 0; i < keyCopyLen; i++) {
-        int pos = i % 4;
-        int word = i / 4;
-        key_uint256.words[word] |= (static_cast<uint32_t>(key[key_len - 1 - i]) << (pos * 8));
-    }
-    
-    // Convert value bytes to uint256
-    go_uint256_t value_uint256;
-    memset(&value_uint256, 0, sizeof(go_uint256_t));
-    int valueCopyLen = value_len < UINT256_BYTES ? value_len : UINT256_BYTES;
-    for (int i = 0; i < valueCopyLen; i++) {
-        int pos = i % 4;
-        int word = i / 4;
-        value_uint256.words[word] |= (static_cast<uint32_t>(value[value_len - 1 - i]) << (pos * 8));
-    }
+    // Convert key and value bytes to uint256
+    go_uint256_t key_uint256 = bytes_to_uint256(key, key_len);
+    go_uint256_t value_uint256 = bytes_to_uint256(value, value_len);
     
     // Add to the last account's storage
     state->accounts.back().storageKeys.push_back(key_uint256);
     state->accounts.back().storageVals.push_back(value_uint256);
 }
-
-// Process state data on GPU - for now just print the data
+using namespace CuEVM;
+// Process state data on GPU - initialize StateDB and print data
 int process_state_data_gpu(GoStateData* state) {
     printf("CuEVM Go interface: Processing state data in GPU C++ function...\n");
     printf("State root: %s\n", uint256_to_hex(state->root).c_str());
     printf("Number of accounts: %zu\n", state->accounts.size());
     
     try {
-        int count = 0;
-        for (const auto& account : state->accounts) {
-            if (count >= 10) {
-                printf("\n... and %zu more accounts\n", state->accounts.size() - 10);
-                break;
+
+        // NEW: Initialize StateDB for GPU processing
+        uint32_t num_states = 2; // Start with a single state
+        uint32_t num_accounts = state->accounts.size();
+
+        // Create CPU-side StateDB
+        StateDb* state_db_cpu = new StateDb(num_states);
+        state_db_cpu->num_accounts = num_accounts;
+        state_db_cpu->num_states = num_states;
+        
+        // Allocate memory for accounts
+        state_db_cpu->address_list = new evm_word_t[num_accounts];
+        state_db_cpu->contract_index = new int16_t[num_accounts];
+        state_db_cpu->account_balances = new evm_word_t[num_states * num_accounts];
+        state_db_cpu->account_nonces = new uint32_t[num_states * num_accounts];
+        state_db_cpu->account_storage_size = new uint32_t[num_states * num_accounts];
+        state_db_cpu->account_codes_size = new uint32_t[num_accounts];
+        state_db_cpu->account_codes_offset = new uint32_t[num_accounts];
+        
+        // Initialize dynamic memory structures
+        uint32_t bytecode_offset = 0;
+        
+        // Count contracts and determine storage size
+        uint32_t num_contracts = 0;
+        uint32_t total_storage_size = 0;
+        
+        for (size_t i = 0; i < state->accounts.size(); i++) {
+            const auto& account = state->accounts[i];
+            bool is_contract = !account.code.empty() || !account.storageKeys.empty();
+            if (is_contract) {
+                num_contracts++;
+            }
+            total_storage_size += account.storageKeys.size();
+        }
+        printf("num contract %d\n", num_contracts);
+        
+        state_db_cpu->num_contracts = num_contracts;
+        state_db_cpu->num_storage_elements = total_storage_size;
+        
+        // Allocate preallocated storage pool
+        state_db_cpu->prealloc_keys_pool = new evm_word_t[account_prealloc_keys_size * num_contracts * num_states];
+        state_db_cpu->prealloc_values_pool = new ValueStatus[account_prealloc_keys_size * num_contracts * num_states];
+        
+        // Initialize other necessary structures
+        state_db_cpu->dynamic_pool_capacity = new uint32_t[num_states * num_accounts];
+        state_db_cpu->account_is_warm = new bool[num_states * num_accounts];
+        state_db_cpu->dynamic_accounts = new DynamicAccount*[num_states];
+        
+        memset(state_db_cpu->prealloc_keys_pool, 0, 
+               account_prealloc_keys_size * num_contracts * num_states * sizeof(evm_word_t));
+        memset(state_db_cpu->prealloc_values_pool, 0,
+               account_prealloc_keys_size * num_contracts * num_states * sizeof(ValueStatus));
+        memset(state_db_cpu->dynamic_accounts, 0, num_states * sizeof(DynamicAccount*));
+        
+        // Transfer account data from Go structure to StateDB
+        uint32_t contract_idx = 0;
+        for (uint32_t i = 0; i < num_accounts; i++) {
+            const auto& account = state->accounts[i];
+            uint32_t base_idx = i * num_states;
+            
+            // Convert Go uint256 to evm_word_t - first for state 0
+            for (int w = 0; w < UINT256_WORDS; w++) {
+                state_db_cpu->address_list[i].words[w] = account.address.words[w];
+                state_db_cpu->account_balances[base_idx].words[w] = account.balance.words[w];
             }
             
-            printf("\n=== Account %s ===\n", uint256_to_hex(account.address).c_str());
-            printf("  Balance:  %s\n", uint256_to_hex(account.balance).c_str());
-            printf("  Nonce:    %lu\n", account.nonce);
-            printf("  Has Code: %s\n", account.hasCode ? "true" : "false");
+            // Set nonce for state 0
+            state_db_cpu->account_nonces[base_idx] = static_cast<uint32_t>(account.nonce);
             
-            // Print root
-            if (!account.root.empty()) {
-                printf("  Root:     %s\n", bytes_to_hex(account.root.data(), account.root.size()).c_str());
+            // Handle code
+            state_db_cpu->account_codes_size[i] = account.code.size();
+            state_db_cpu->account_codes_offset[i] = bytecode_offset;
+            
+            bool is_contract = !account.code.empty() || !account.storageKeys.empty();
+            
+            if (is_contract) {
+                state_db_cpu->contract_index[i] = contract_idx;
+                
+                // Handle storage for state 0
+                state_db_cpu->account_storage_size[base_idx] = account.storageKeys.size();
+                
+                // Copy storage entries for state 0
+                for (size_t s = 0; s < account.storageKeys.size() && s < account_prealloc_keys_size; s++) {
+                    uint32_t pre_alloc_keys_idx = 
+                        (account_prealloc_keys_size * contract_idx + s) * num_states;
+                    printf("contract_idx %d s %d pre_alloc_keys_idx %d\n", contract_idx, s, pre_alloc_keys_idx);
+                    
+                    // Copy key and value for state 0
+                    for (int w = 0; w < UINT256_WORDS; w++) {
+                        state_db_cpu->prealloc_keys_pool[pre_alloc_keys_idx].words[w] = 
+                            account.storageKeys[s].words[w];
+                        state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].value.words[w] = 
+                            account.storageVals[s].words[w];
+                    }
+                    state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].original_value = 
+                        state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].value;
+                    state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].is_warm = false;
+                    
+                    // Clone to all other states
+                    for (uint32_t state_idx = 1; state_idx < num_states; state_idx++) {
+                        uint32_t dst_storage_idx = pre_alloc_keys_idx + state_idx;
+                        // Copy key and value
+                        state_db_cpu->prealloc_keys_pool[dst_storage_idx] = 
+                            state_db_cpu->prealloc_keys_pool[pre_alloc_keys_idx];
+                        state_db_cpu->prealloc_values_pool[dst_storage_idx] = 
+                            state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx];
+                    }
+                }
+                
+                contract_idx++;
+            } else {
+                state_db_cpu->contract_index[i] = -1;
+                state_db_cpu->account_storage_size[base_idx] = 0;
             }
             
-            // Print code hash
-            if (!account.codeHash.empty()) {
-                printf("  CodeHash: %s\n", bytes_to_hex(account.codeHash.data(), account.codeHash.size()).c_str());
-            }
-            
-            // Print code information
+            // Add code if it exists
             if (!account.code.empty()) {
-                int codePreviewSize = account.code.size() < 64 ? account.code.size() : 64;
-                printf("  Code:     %s...\n", bytes_to_hex(account.code.data(), codePreviewSize).c_str());
-                printf("  Code Length: %zu bytes\n", account.code.size());
-            } else {
-                printf("  Code:     <empty>\n");
+                uint8_t* tmp = state_db_cpu->all_account_codes;
+                state_db_cpu->all_account_codes = new uint8_t[bytecode_offset + account.code.size()];
+                if (tmp != nullptr) {
+                    memcpy(state_db_cpu->all_account_codes, tmp, bytecode_offset * sizeof(uint8_t));
+                    delete[] tmp;
+                }
+                memcpy(&state_db_cpu->all_account_codes[bytecode_offset], account.code.data(), account.code.size());
+                bytecode_offset += account.code.size();
             }
             
-            // Print storage
-            if (!account.storageKeys.empty()) {
-                printf("  Storage:\n");
-                size_t storageDisplayLimit = 5;
-                for (size_t i = 0; i < (account.storageKeys.size() < storageDisplayLimit ? account.storageKeys.size() : storageDisplayLimit); i++) {
-                    printf("    %s: %s\n", 
-                           uint256_to_hex(account.storageKeys[i]).c_str(), 
-                           uint256_to_hex(account.storageVals[i]).c_str());
-                }
-                if (account.storageKeys.size() > storageDisplayLimit) {
-                    printf("    ... and %zu more entries\n", account.storageKeys.size() - storageDisplayLimit);
-                }
-            } else {
-                printf("  Storage:  <empty>\n");
+            // Clone account data to all other states right after processing this account
+            for (uint32_t state_idx = 1; state_idx < num_states; state_idx++) {
+                uint32_t dst_idx = base_idx + state_idx;
+                
+                // Copy balance
+                state_db_cpu->account_balances[dst_idx] = state_db_cpu->account_balances[base_idx];
+                
+                // Copy nonce and storage size
+                state_db_cpu->account_nonces[dst_idx] = state_db_cpu->account_nonces[base_idx];
+                state_db_cpu->account_storage_size[dst_idx] = state_db_cpu->account_storage_size[base_idx];
+                
+                // Initialize other per-state properties
+                state_db_cpu->account_is_warm[dst_idx] = state_db_cpu->account_is_warm[base_idx];
+                state_db_cpu->dynamic_pool_capacity[dst_idx] = state_db_cpu->dynamic_pool_capacity[base_idx];
             }
-            
-            count++;
         }
         
-        // This is where we'd launch a CUDA kernel in the future
-        // For now, just print that we're incrementing the call counter
+        // Print the StateDB contents to verify
+        printf("\nInitialized StateDB from Go data:\n");
+        printf("Num accounts: %d\n", state_db_cpu->num_accounts);
+        printf("Num contracts: %d\n", state_db_cpu->num_contracts);
+        printf("Num storage elements: %d\n", state_db_cpu->num_storage_elements);
+        
+        // Print some account details
+        state_db_cpu->print();
+        // Cleanup - in a real implementation we would transfer to GPU before this
+        delete state_db_cpu;
+        
+        // Increment call counter and return success
         state->call_counter++;
         printf("\nGo interface call number: %d\n", state->call_counter);
         
@@ -290,6 +338,118 @@ int run_interpreter_go(const char* json_input, uint32_t skip_trace_parsing,
     // This is where we would process the JSON input and run the CUDA kernel
     // For now, just return success
     return 0;
+}
+
+// Create a new transaction data container
+GoTransactionData* create_transaction_data() {
+    printf("Go interface: Creating new transaction data container\n");
+    return new GoTransactionData();
+}
+
+// Add a transaction to the data container
+void add_transaction(GoTransactionData* txData,
+                     const unsigned char* from, int from_len,
+                     const unsigned char* to, int to_len,
+                     const unsigned char* value, int value_len,
+                     uint64_t gas,
+                     const unsigned char* gasPrice, int gasPrice_len,
+                     uint64_t nonce,
+                     const unsigned char* data, int data_len) {
+    
+    GoTransactionData* typedTxData = static_cast<GoTransactionData*>(txData);
+    printf("Go interface: Adding transaction, from length: %d, to length: %d, data length: %d\n", 
+           from_len, to_len, data_len);
+    
+    // Create a new transaction
+    GoTransaction tx;
+    
+    // Convert addresses and values to uint256
+    tx.from = bytes_to_uint256(from, from_len);
+    tx.to = bytes_to_uint256(to, to_len);
+    tx.value = bytes_to_uint256(value, value_len);
+    tx.gasPrice = bytes_to_uint256(gasPrice, gasPrice_len);
+    
+    // Set gas and nonce
+    tx.gas = gas;
+    tx.nonce = nonce;
+    
+    // Set transaction data if provided
+    if (data != nullptr && data_len > 0) {
+        tx.data.resize(data_len);
+        memcpy(tx.data.data(), data, data_len);
+    }
+    
+    // Add the transaction to our data container
+    typedTxData->transactions.push_back(tx);
+}
+
+// Process transaction data on GPU
+int process_transaction_data_gpu(GoTransactionData* txData) {
+    printf("CuEVM Go interface: Processing transaction data in GPU C++ function...\n");
+    printf("Number of transactions: %zu\n", static_cast<GoTransactionData*>(txData)->transactions.size());
+    
+    try {
+        // Print transaction details (for debugging)
+        int count = 0;
+        for (const auto& tx : static_cast<GoTransactionData*>(txData)->transactions) {
+            if (count >= 10) {
+                printf("\n... and %zu more transactions\n", static_cast<GoTransactionData*>(txData)->transactions.size() - 10);
+                break;
+            }
+            
+            printf("\n=== Transaction %d ===\n", count);
+            printf("  From:     %s\n", uint256_to_hex(tx.from).c_str());
+            if (tx.to.words[0] != 0 || tx.to.words[1] != 0 || 
+                tx.to.words[2] != 0 || tx.to.words[3] != 0 || 
+                tx.to.words[4] != 0 || tx.to.words[5] != 0 || 
+                tx.to.words[6] != 0 || tx.to.words[7] != 0) {
+                printf("  To:       %s\n", uint256_to_hex(tx.to).c_str());
+            } else {
+                printf("  To:       <contract creation>\n");
+            }
+            printf("  Value:    %s\n", uint256_to_hex(tx.value).c_str());
+            printf("  Gas:      %lu\n", tx.gas);
+            printf("  GasPrice: %s\n", uint256_to_hex(tx.gasPrice).c_str());
+            printf("  Nonce:    %lu\n", tx.nonce);
+            
+            // Print data information
+            if (!tx.data.empty()) {
+                int dataPreviewSize = tx.data.size() < 64 ? tx.data.size() : 64;
+                printf("  Data:     %s...\n", bytes_to_hex(tx.data.data(), dataPreviewSize).c_str());
+                printf("  Data Length: %zu bytes\n", tx.data.size());
+            } else {
+                printf("  Data:     <empty>\n");
+            }
+            
+            count++;
+        }
+        
+        // TODO: Future implementation will integrate with interpreter
+        // This would involve transferring transactions to GPU memory and executing them
+        
+        // Increment call counter and return success
+        static_cast<GoTransactionData*>(txData)->tx_counter++;
+        printf("\nTransaction processing call number: %d\n", static_cast<GoTransactionData*>(txData)->tx_counter);
+        
+        return 0; // Success
+    } catch (const std::exception& e) {
+        printf("Error in process_transaction_data_gpu: %s\n", e.what());
+        return 1; // Error code
+    } catch (...) {
+        printf("Unknown error in process_transaction_data_gpu\n");
+        return 2; // Different error code
+    }
+}
+
+// Free transaction data memory
+void free_transaction_data(GoTransactionData* txData) {
+    printf("Go interface: Freeing transaction data\n");
+    delete txData;
+}
+
+// Function to get the transaction call counter
+int get_tx_call_count() {
+    return GoTransactionData::tx_counter;
 }
 
 #ifdef __cplusplus
