@@ -12,13 +12,22 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
         evm_word_t *destination = stack.get_address_at_index(1);
         stack.reduce_size(1);
         uint32_t destination_u32 = uint256_get_uint32_t(destination);
+
+        if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
+
         int32_t  address_index = CuEVM::global_state_db_ptr->get_address_index(&call_context->to);
-        auto err = address_index >= 0 ? CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(address_index, destination_u32) : JUMPTABLE_ADDRESS_NOT_WARM;
-        if (err) {
-            if (err != ERROR_INVALID_JUMP_DESTINATION){
-                printf("Internal Error (dynamic created contract not supported yet): %x\n", err);
+
+        if (address_index < 0) {
+            // Dynamically created address, not analyzed at the moment
+            if ((destination_u32 >= call_context->byte_code_size) ||
+                (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
+                return ERROR_INVALID_JUMP_DESTINATION;
             }
-            return err;
+        }else {
+            auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(address_index, destination_u32);
+            if (err) {
+                return err;
+            }
         }
         pc = destination_u32 - 1;
     }
@@ -46,14 +55,19 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 #ifdef BUILD_LIBRARY
             simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
 #endif
-            int32_t  address_index = CuEVM::global_state_db_ptr->get_address_index(&call_context->to);
-            auto err = address_index >= 0 ? CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(address_index, destination_u32) : JUMPTABLE_ADDRESS_NOT_WARM;
 
-            if (err) {
-                if (err != ERROR_INVALID_JUMP_DESTINATION){
-                    printf("Internal Error (dynamic created contract not supported yet): %x\n", err);
+            int32_t  address_index = CuEVM::global_state_db_ptr->get_address_index(&call_context->to);
+            if (address_index < 0) {
+                // Dynamically created address, not analyzed at the moment
+                if ((destination_u32 >= call_context->byte_code_size) ||
+                    (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
+                    return ERROR_INVALID_JUMP_DESTINATION;
                 }
-                return err;
+            }else {
+                auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(address_index, destination_u32);
+                if (err) {
+                    return err;
+                }
             }
             pc = destination_u32 - 1;
         }
