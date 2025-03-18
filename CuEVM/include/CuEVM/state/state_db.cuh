@@ -1,6 +1,7 @@
 #pragma once
 
 #include <CuEVM/core/memory_pool.cuh>
+#include <CuEVM/core/jump_table.cuh>
 #include <CuEVM/utils/cuda_utils.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 
@@ -65,6 +66,8 @@ class StateDb {
     // evm_word_t **dynamic_keys_pool;     // size equals number of accounts
     // ValueStatus **dynamic_values_pool;  // size equals number of accounts
     StateDbStoragePage **dynamic_storage_pages;
+
+    GlobalJumpTable *global_jump_table;
 
     uint32_t *dynamic_pool_capacity;  // size equals number of accounts
     /**

@@ -961,7 +961,11 @@ __host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *tes
     uint32_t num_transactions = 0;
     uint32_t num_original_transactions = 0;
 
-    CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones);
+    auto err = CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones);
+    if (err){
+        printf("get_transactions failed with error %d\n", err);
+        return nullptr;
+    }
     // num_original_transactions = num_transactions;
     // num_transactions *= clones;
     // generate the evm instances
