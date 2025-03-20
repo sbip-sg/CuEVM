@@ -15,7 +15,7 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
 
         if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
 
-        int32_t  address_index = CuEVM::global_state_db_ptr->get_address_index(&call_context->to);
+        int32_t address_index = call_context->to_address_index;
 
         if (address_index < 0) {
             // Dynamically created address, not analyzed at the moment
@@ -56,7 +56,7 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
             simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
 #endif
 
-            int32_t  address_index = CuEVM::global_state_db_ptr->get_address_index(&call_context->to);
+            int32_t  address_index = call_context->to_address_index;
             if (address_index < 0) {
                 // Dynamically created address, not analyzed at the moment
                 if ((destination_u32 >= call_context->byte_code_size) ||

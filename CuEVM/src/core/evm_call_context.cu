@@ -75,6 +75,8 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->gas_refund = gas_refund;
     this->stack_ptr->init(CuEVM::memory_pool::global_memory_pool->stack_base);
     this->memory_ptr->init(0);  // no more prealloc after this point
+
+    this->to_address_index = global_state_db_ptr->get_address_index(&to);
 }
 
 __device__ void evm_call_context_t::clear() {
@@ -197,6 +199,8 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     // printf("Create snapshot account, depth %d\n", depth);
 
     global_state_db_ptr->init_snapshot(this, depth, &storage_address);
+
+    this->to_address_index = global_state_db_ptr->get_address_index(&to);
     // printf("init snapshot account, depth %d snapshot state %p\n", depth, snapshot_state);
     // this->memory_ptr = new CuEVM::evm_memory_t();
     // printf("evm_call_state_t constructor with parent %d\n", THREADIDX);

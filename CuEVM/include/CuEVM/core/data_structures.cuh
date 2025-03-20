@@ -436,6 +436,7 @@ struct evm_call_context_t {
 
     evm_word_t from;
     evm_word_t to;
+    int32_t to_address_index;
     evm_word_t storage_address;
     evm_word_t value;
     uint32_t call_type; /**< The call type internal has the opcode */
