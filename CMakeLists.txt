@@ -8,7 +8,8 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 option(DOCS "Generating the documentation for the code" OFF)
 option(ENABLE_EIP_3155 "Enable EIP_3155 tracer" ON)
 option(ENABLE_PAIRING_CODE "Enable ec pairing precompile code" OFF)
-option(BUILD_LIBRARY "Build Python library" OFF)
+option(BUILD_PYTHON_LIBRARY "Build Python library" OFF)
+option(BUILD_GO_LIBRARY "Build Go library" OFF)
 set(EVM_VERSION "SHANGHAI" CACHE STRING "EVM version to use")
 project("cuevm"
         VERSION 0.1.0
@@ -30,7 +31,7 @@ if(DOCS)
         add_subdirectory("${PROJECT_SOURCE_DIR}/docs")
 endif()
 
-if(BUILD_LIBRARY)
+if(BUILD_PYTHON_LIBRARY)
     find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
     include_directories(${Python3_INCLUDE_DIRS})
     message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
@@ -38,8 +39,11 @@ if(BUILD_LIBRARY)
 endif()
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/CuEVM")
-if(BUILD_LIBRARY)
+if(BUILD_PYTHON_LIBRARY)
     target_compile_definitions(CuEVM PRIVATE BUILD_LIBRARY)
+endif()
+if (BUILD_GO_LIBRARY)
+    target_compile_definitions(CuEVM PRIVATE BUILD_GO_LIBRARY)
 endif()
 if(ENABLE_EIP_3155)
     target_compile_definitions(CuEVM PRIVATE EIP_3155)
@@ -52,14 +56,8 @@ if(ENABLE_PAIRING_CODE)
 endif()
 target_compile_definitions(CuEVM PRIVATE EVM_VERSION=${EVM_VERSION})
 
-
-if(BUILD_LIBRARY)
-    # Find Python libraries
-    # find_package(PythonLibs REQUIRED)
-    # find_package(PythonLibs REQUIRED)
-    # include_directories(${PYTHON_INCLUDE_DIRS})
-
-    # Build as a shared library
+if(BUILD_PYTHON_LIBRARY)
+    # Build as a shared library for Python
     add_library(${PROJECT_NAME} SHARED
         "${PROJECT_SOURCE_DIR}/interpreter/libcuevm.cu"
         "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
@@ -74,7 +72,6 @@ if(BUILD_LIBRARY)
     if(CMAKE_BUILD_TYPE MATCHES Debug)
         target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-g>)
     endif()
-    # set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "cuevm")
     set_target_properties(${PROJECT_NAME}
     PROPERTIES
         OUTPUT_NAME "cuevm"
@@ -85,9 +82,7 @@ if(BUILD_LIBRARY)
     message(STATUS "Python include dirs: ${PYTHON_INCLUDE_DIRS}")
     message(STATUS "Python libraries: ${PYTHON_LIBRARIES}")
     # Link the library to its dependencies
-    # our own libraries first
     target_link_libraries(${PROJECT_NAME} PRIVATE CuCrypto CuBigInt CuEVM)
-    # then the external ones
     target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${Python3_LIBRARIES} ${CUDA_LIBRARIES})
 
     target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
@@ -96,8 +91,41 @@ if(BUILD_LIBRARY)
     endif()
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE EVM_VERSION=${EVM_VERSION})
-
     target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_LIBRARY)
+
+elseif(BUILD_GO_LIBRARY)
+    # Build as a shared library for Go
+    add_library(${PROJECT_NAME}_go SHARED
+        "${PROJECT_SOURCE_DIR}/interpreter/libcuevm_go.cu"
+        "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
+        $<TARGET_OBJECTS:CuEVM>
+        $<TARGET_OBJECTS:CuCrypto>
+        $<TARGET_OBJECTS:CuBigInt>
+    )
+
+    # Apply flags for library
+    target_compile_options(${PROJECT_NAME}_go PRIVATE  $<$<COMPILE_LANGUAGE:CUDA>:--shared -Xcompiler '-fPIC'>)
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
+        target_compile_options(${PROJECT_NAME}_go PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-g>)
+    endif()
+    set_target_properties(${PROJECT_NAME}_go
+    PROPERTIES
+        OUTPUT_NAME "cuevm_go"
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_RESOLVE_DEVICE_SYMBOLS ON
+        CUDA_RUNTIME_LIBRARY Shared
+    )
+    # Link the library to its dependencies
+    target_link_libraries(${PROJECT_NAME}_go PRIVATE CuCrypto CuBigInt CuEVM)
+    target_link_libraries(${PROJECT_NAME}_go PUBLIC gmp cjson ${CUDA_LIBRARIES})
+
+    target_compile_options(${PROJECT_NAME}_go PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
+    if(ENABLE_EIP_3155)
+        target_compile_definitions(${PROJECT_NAME}_go PRIVATE EIP_3155)
+    endif()
+
+    target_compile_definitions(${PROJECT_NAME}_go PRIVATE EVM_VERSION=${EVM_VERSION})
+    target_compile_definitions(${PROJECT_NAME}_go PRIVATE BUILD_GO_LIBRARY)
 
 else()
 

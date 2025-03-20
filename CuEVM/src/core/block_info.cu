@@ -200,7 +200,8 @@ __host__ cJSON *block_info_t::to_json() const {
 __host__ int32_t get_block_info(const cJSON *json) {
     // Create block info on host
     block_info_t *block_info_ptr = new block_info_t(json);
-
+    printf("Block info created on host\n");
+    block_info_ptr->print();
     // Allocate device memory for block info
     block_info_t *d_block_info;
     cudaMalloc(&d_block_info, sizeof(block_info_t));
