@@ -436,7 +436,7 @@ struct evm_call_context_t {
 
     evm_word_t from;
     evm_word_t to;
-    int32_t to_address_index;
+
     evm_word_t storage_address;
     evm_word_t value;
     uint32_t call_type; /**< The call type internal has the opcode */
@@ -444,6 +444,7 @@ struct evm_call_context_t {
     uint32_t call_data_size;
     uint8_t *byte_code; /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
     uint32_t byte_code_size;
+    int32_t bytecode_offset; // bytecode offset in the global `all_account_codes`
 
     uint32_t fixed_ret_size = 0;
     uint32_t fixed_ret_offset = 0;

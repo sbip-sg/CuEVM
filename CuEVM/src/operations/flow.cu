@@ -15,16 +15,16 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
 
         if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
 
-        int32_t address_index = call_context->to_address_index;
+        int32_t bytecode_offset = call_context->bytecode_offset;
 
-        if (address_index < 0) {
+        if (bytecode_offset < 0) {
             // Dynamically created address, not analyzed at the moment
             if ((destination_u32 >= call_context->byte_code_size) ||
                 (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
                 return ERROR_INVALID_JUMP_DESTINATION;
             }
         }else {
-            auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(address_index, destination_u32);
+            auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
             if (err) {
                 return err;
             }
@@ -56,15 +56,15 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
             simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
 #endif
 
-            int32_t  address_index = call_context->to_address_index;
-            if (address_index < 0) {
+            int32_t bytecode_offset = call_context->bytecode_offset;
+            if (bytecode_offset < 0) {
                 // Dynamically created address, not analyzed at the moment
                 if ((destination_u32 >= call_context->byte_code_size) ||
                     (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
                     return ERROR_INVALID_JUMP_DESTINATION;
                 }
             }else {
-                auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(address_index, destination_u32);
+                auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
                 if (err) {
                     return err;
                 }
