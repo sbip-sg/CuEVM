@@ -9,7 +9,6 @@
 
 
 #define GLOBAL_JUMP_TABLE_SIZE (1024 * 1024 * 1)
-#define GLOBAL_JUMP_TABLE_MAX_ADDRESSES 1024
 
 namespace CuEVM {
 
