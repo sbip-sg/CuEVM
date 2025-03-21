@@ -393,7 +393,7 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
     // new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr = memory_pool::get_call_context(current_context->depth);
 
-    if (uint256_cmp_word(&address, CuEVM::no_precompile_contracts) == -1)
+    if (uint256_cmp_word(&address, CuEVM::no_precompile_contracts) > 0)
         new_context_ptr->initiate_values(current_context, gas, current_context->from, address, current_context->to,
                                          value, OP_DELEGATECALL, nullptr, 0, byte_code, byte_code_size,
                                          uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),

@@ -42,7 +42,7 @@ namespace CuEVM {
         uint32_t bit_offset = bitmap_offset_start + pc;
 
         if (bit_offset > 8 * GLOBAL_JUMP_TABLE_SIZE) {
-            return ERROR_INVALID_JUMP_DESTINATION;
+            return JUMPTABLE_PC_EXCEED_BITMAP_SIZE;
         }
 
         return (bitmap[bit_offset / 8] & (1 << (bit_offset % 8))) ? ERROR_SUCCESS : ERROR_INVALID_JUMP_DESTINATION;
