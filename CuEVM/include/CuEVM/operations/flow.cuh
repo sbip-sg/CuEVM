@@ -3,7 +3,7 @@
 #include <CuEVM/core/stack.cuh>
 #include <CuEVM/gas_cost.cuh>
 #ifdef BUILD_LIBRARY
-#include <CuEVM/utils/python_utils.h>
+#include <CuEVM/utils/library_utils.h>
 #endif
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
@@ -28,7 +28,12 @@ namespace CuEVM::operations {
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                        evm_call_context_t *call_context);
+                        evm_call_context_t *call_context
+#ifdef BUILD_LIBRARY
+                        ,
+                        simplified_trace_data *simplified_trace_data_ptr
+#endif
+                        );
 /**
  * The JUMPI operation implementation.
  * Takes the destination and the condition from the stack and sets the program counter

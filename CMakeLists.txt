@@ -41,9 +41,11 @@ endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/CuEVM")
 if(BUILD_PYTHON_LIBRARY)
     target_compile_definitions(CuEVM PRIVATE BUILD_LIBRARY)
+    target_compile_definitions(CuEVM PRIVATE BUILD_PYTHON_LIBRARY)
 endif()
 if (BUILD_GO_LIBRARY)
     target_compile_definitions(CuEVM PRIVATE BUILD_GO_LIBRARY)
+    target_compile_definitions(CuEVM PRIVATE BUILD_LIBRARY)
 endif()
 if(ENABLE_EIP_3155)
     target_compile_definitions(CuEVM PRIVATE EIP_3155)
@@ -59,7 +61,7 @@ target_compile_definitions(CuEVM PRIVATE EVM_VERSION=${EVM_VERSION})
 if(BUILD_PYTHON_LIBRARY)
     # Build as a shared library for Python
     add_library(${PROJECT_NAME} SHARED
-        "${PROJECT_SOURCE_DIR}/interpreter/libcuevm.cu"
+        "${PROJECT_SOURCE_DIR}/interpreter/libcuevm_py.cu"
         "${PROJECT_SOURCE_DIR}/interpreter/interpreter.cu"
         "${PROJECT_SOURCE_DIR}/interpreter/python_utils.cu"
         $<TARGET_OBJECTS:CuEVM>
@@ -74,7 +76,7 @@ if(BUILD_PYTHON_LIBRARY)
     endif()
     set_target_properties(${PROJECT_NAME}
     PROPERTIES
-        OUTPUT_NAME "cuevm"
+        OUTPUT_NAME "cuevm_py"
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_RESOLVE_DEVICE_SYMBOLS ON
         CUDA_RUNTIME_LIBRARY Shared  # Ensure CUDA runtime library is shared

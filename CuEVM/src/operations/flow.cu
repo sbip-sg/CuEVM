@@ -3,7 +3,12 @@
 
 namespace CuEVM::operations {
 __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t &stack,
-                        evm_call_context_t *call_context) {
+                        evm_call_context_t *call_context
+#ifdef BUILD_LIBRARY
+                        ,
+                        simplified_trace_data *simplified_trace_data_ptr
+#endif
+                        ) {
     gas_used += GAS_MID;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -18,7 +23,9 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
             (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
             return ERROR_INVALID_JUMP_DESTINATION;
         }
-
+#ifdef BUILD_LIBRARY
+        simplified_trace_data_ptr->record_branch(pc, destination_u32, 0);
+#endif
         if (error_code == ERROR_SUCCESS) {
             pc = destination_u32 - 1;
             // TODO: implement jump destinations

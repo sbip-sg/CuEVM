@@ -21,6 +21,9 @@
 #include <CuEVM/utils/evm_utils.cuh>
 #include <CuEVM/utils/opcodes.cuh>
 #ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
+#ifdef BUILD_PYTHON_LIBRARY
 #include <CuEVM/utils/python_utils.h>
 #endif
 namespace CuEVM {

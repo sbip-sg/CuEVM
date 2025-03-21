@@ -2,131 +2,6 @@
 
 #include <sstream>
 
-#define CHECK_AND_RETURN_ON_ERROR(expr)                                                                            \
-    do {                                                                                                           \
-        auto status = (expr);                                                                                      \
-        if (status != 0) {                                                                                         \
-            std::ostringstream oss;                                                                                \
-            oss << "Error in expression: " << #expr << " (status: 0x" << std::hex << status << std::dec << ") at " \
-                << __FILE__ << ":" << __LINE__;                                                                    \
-            throw std::runtime_error(oss.str());                                                                   \
-        }                                                                                                          \
-    } while (0)
-
-void copy_dict_recursive(PyObject* read_root, PyObject* write_root);
-static PyObject* print_dict(PyObject* self, PyObject* args);
-namespace CuEVM {
-__host__ void serialized_worldstate_data::print() {
-    printf("\nPrinting serialized worldstate data\n");
-    printf("no_accounts: %d\n", no_accounts);
-    printf("no_storage_elements: %d\n", no_storage_elements);
-    for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        printf("address: %s\n", addresses[idx]);
-        printf("balance: %s\n", balance[idx]);
-        printf("nonce: %d\n", nonce[idx]);
-    }
-    for (uint32_t idx = 0; idx < no_storage_elements; idx++) {
-        printf("storage_key: %s\n", storage_keys[idx]);
-        printf("storage_value: %s\n", storage_values[idx]);
-        printf("storage_index: %d\n", storage_indexes[idx]);
-    }
-}
-
-__device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
-                                                       const CuEVM::evm_stack_t& stack_ptr) {
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    events[no_events].pc = pc;
-    events[no_events].op = op;
-    if (op != OP_INVALID && op != OP_SELFDESTRUCT) {
-        // printf("add new operation, src data %d \n", THREADIDX);
-        // printf("stack size %d\n", stack_ptr.size());
-
-        events[no_events].operand_1 = *stack_ptr.get_address_at_index(1);
-        events[no_events].operand_2 = *stack_ptr.get_address_at_index(2);
-    }
-}
-
-__device__ void simplified_trace_data::record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed) {
-    if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
-    branches[no_branches].pc_src = pc_src;
-    branches[no_branches].pc_dst = pc_dst;
-    branches[no_branches].pc_missed = pc_missed;
-    branches[no_branches].distance = last_distance;
-    // printf("record branch pc_src %u pc_dst %u distance %s\n", pc_src, pc_dst,
-    // branches[no_branches].distance.to_hex());
-    no_branches++;
-}
-
-__device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::evm_stack_t& stack_ptr) {
-    evm_word_t distance, op1, op2;
-    uint32_t stack_size = stack_ptr.size();
-
-    op1 = *stack_ptr.get_address_at_index(1);
-    op2 = *stack_ptr.get_address_at_index(2);
-
-    if (uint256_cmp(&op1, &op2) >= 1)
-        uint256_sub(&distance, &op1, &op2);
-    else
-        uint256_sub(&distance, &op2, &op1);
-
-    if (op != OP_EQ) uint256_add_word(&distance, &distance, 1);
-
-    last_distance = distance;
-}
-
-__device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t& stack_ptr, uint32_t error_code) {
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    if (events[no_events].op < OP_REVERT && events[no_events].op != OP_SSTORE)
-        events[no_events].res = *stack_ptr.get_address_at_index(1);
-    no_events++;
-}
-__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
-    assert(call_context_ptr != nullptr);
-    if (no_calls >= MAX_CALLS_TRACING) return;
-    // add address and increment current_address_idx
-    // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
-    // printf("start call simplified trace data pc %d op %d\n", pc, message_call_ptr->call_type);
-    calls[no_calls].sender = call_context_ptr->from;
-    calls[no_calls].receiver = call_context_ptr->to;
-    calls[no_calls].pc = pc;
-    calls[no_calls].op = call_context_ptr->call_type;
-    calls[no_calls].value = call_context_ptr->value;
-
-    no_calls++;
-}
-__device__ void simplified_trace_data::finish_call(uint8_t success) {
-    if (no_calls > MAX_CALLS_TRACING) return;
-
-    // printf("no_calls %u \n", no_calls);
-    for (int i = no_calls - 1; i >= 0; i--) {
-        if (calls[i].success == UINT8_MAX) {
-            calls[i].success = success;
-            break;
-        }
-    }
-}
-__host__ __device__ void simplified_trace_data::print() {
-    printf("no_events %u\n", no_events);
-    printf("no_calls %u\n", no_calls);
-    printf("events\n");
-    for (uint32_t i = 0; i < no_events; i++) {
-        printf("pc %u op %u operand_1 %s operand_2 %s res %s\n", events[i].pc, events[i].op,
-               events[i].operand_1.to_hex(), events[i].operand_2.to_hex(), events[i].res.to_hex());
-    }
-    printf("calls\n");
-    for (uint32_t i = 0; i < no_calls; i++) {
-        printf("pc %u op %u sender %s receiver %s value %s success %u\n", calls[i].pc, calls[i].op,
-               calls[i].sender.to_hex(), calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].success);
-    }
-    printf("branches\n");
-    for (uint32_t i = 0; i < no_branches; i++) {
-        printf("pc_src %u pc_dst %u distance %s\n", branches[i].pc_src, branches[i].pc_dst,
-               branches[i].distance.to_hex());
-    }
-}
-__device__ serialized_worldstate_data* global_serialized_worldstate;
-__device__ simplified_trace_data* global_simplified_trace;
-}  // namespace CuEVM
 namespace python_utils {
 
 using namespace CuEVM;
@@ -580,73 +455,6 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
     delete tmp_state_db;
 }
 
-__device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
-    // Use the global state database pointer to access the account data
-    StateDb* state = global_state_db_ptr;
-    if (state == nullptr) {
-        // Ideally, handle the error appropriately (or abort) if the state is missing.
-        return;
-    }
-
-    // Set the number of accounts in the serialized state.
-    data->no_accounts = state->num_accounts;
-    // Start with no storage elements serialized.
-    data->no_storage_elements = 0;
-
-    // uint32_t new_offset =
-    // (contract_index[address_index] * account_prealloc_keys_size + storage_size) * num_states + INSTANCE_GLOBAL_IDX;
-    // uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-    // // printf("get_value_status address_index %d, instance_idx %d instance %d\n", address_index, instance_idx,
-    // //        INSTANCE_GLOBAL_IDX);
-    // uint32_t contract_idx = contract_index[address_index];
-    // uint32_t storage_size = account_storage_size[instance_idx];
-
-    // Iterate through each account.
-    // We assume that the account data (address, balance, nonce) is stored in parallel arrays,
-    // and for simplicity we pick the first state (index 0) as the canonical view.
-    for (uint32_t acct = 0; acct < state->num_accounts; acct++) {
-        uint32_t instance_idx = acct * state->num_states + INSTANCE_GLOBAL_IDX;
-        int16_t cidx = state->contract_index[acct];
-        uint32_t storage_size = state->account_storage_size[instance_idx];
-
-        // Convert the account's address to a hex string.
-        data->addresses[acct] = state->address_list[acct];
-        // Convert the account's balance (using the snapshot at state index 0) to hex.
-        data->balance[acct] = state->account_balances[instance_idx];
-        // Copy the account's nonce (again using state index 0).
-        data->nonce[acct] = state->account_nonces[instance_idx];
-
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("address: \n");
-        //     state->address_list[acct].print();
-        //     printf("balance: \n");
-        //     state->account_balances[instance_idx].print();
-
-        //     // Get the storage size for this account (again, from the first snapshot).
-        //     printf("account %d instance %d storage size: %d\n", acct, instance_idx, storage_size);
-        // }
-
-        if (storage_size > 0) {
-            // The contract index tells us which section of the preallocated storage pool to use.
-            for (uint32_t s = 0; s < storage_size; s++) {
-                if (s > account_prealloc_keys_size) break;
-                // Compute the index into the preallocated storage arrays.
-                // (account_prealloc_keys_size * contract_index + storage_element)
-                // is multiplied by num_states because storage is stored for every state.
-                uint32_t prealloc_idx =
-                    (account_prealloc_keys_size * cidx + s) * state->num_states + INSTANCE_GLOBAL_IDX;
-
-                // Convert the storage key and value into hex strings.
-                data->storage_keys[data->no_storage_elements + s] = state->prealloc_keys_pool[prealloc_idx];
-                data->storage_values[data->no_storage_elements + s] = state->prealloc_values_pool[prealloc_idx].value;
-                // Record which account this storage element belongs to.
-                data->storage_indexes[data->no_storage_elements + s] = acct;
-            }
-        }
-        // Increment the total count of storage elements serialized.
-        data->no_storage_elements += storage_size;
-    }
-}
 
 TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances, bool reuse_state_data,
                                                  bool copy_state_data, uint32_t call_counter) {
@@ -663,7 +471,7 @@ TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t&
     }
     all_transactions = getTransactionDataFromListofPyObject(read_roots);
 
-#ifdef BUILD_LIBRARY
+
     // Simplified trace data
     CuEVM::simplified_trace_data* d_trace_data;
 
@@ -679,7 +487,7 @@ TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t&
         cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
                            sizeof(CuEVM::serialized_worldstate_data*));
     }
-#endif
+
 
     return all_transactions;
 }
@@ -1129,55 +937,6 @@ __host__ PyObject* uint256_to_py_long(const uint256* src) {
     }
     // PyObject *PyLong_FromUnsignedNativeBytes(const void *buffer, size_t n_bytes, int flags)¶
     return PyLong_FromUnsignedNativeBytes((const unsigned char*)src->words, sizeof(src->words), -1);
-}
-
-void freeTransactionList(TransactionList* d_transaction_list_ptr) {
-    if (d_transaction_list_ptr == nullptr) {
-        return;
-    }
-
-    // Create a temporary TransactionList to store device pointers
-    TransactionList temp_list;
-    CUDA_CHECK(cudaMemcpy(&temp_list, d_transaction_list_ptr, sizeof(TransactionList), cudaMemcpyDeviceToHost));
-
-    // Free all device memory allocations
-    if (temp_list.value != nullptr) {
-        CUDA_CHECK(cudaFree(temp_list.value));
-    }
-    if (temp_list.gas_limit != nullptr) {
-        CUDA_CHECK(cudaFree(temp_list.gas_limit));
-    }
-    if (temp_list.call_data != nullptr) {
-        CUDA_CHECK(cudaFree(temp_list.call_data));
-    }
-    if (temp_list.call_data_offset != nullptr) {
-        CUDA_CHECK(cudaFree(temp_list.call_data_offset));
-    }
-    if (temp_list.call_data_size != nullptr) {
-        CUDA_CHECK(cudaFree(temp_list.call_data_size));
-    }
-
-    // Finally free the TransactionList itself
-    CUDA_CHECK(cudaFree(d_transaction_list_ptr));
-}
-
-void freeTraceData(bool copy_state_data) {
-    // Free simplified trace data
-    CuEVM::simplified_trace_data* d_trace_data;
-    CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(CuEVM::simplified_trace_data*)));
-    if (d_trace_data != nullptr) {
-        CUDA_CHECK(cudaFree(d_trace_data));
-    }
-
-    // Free serialized worldstate data if it was allocated
-    if (copy_state_data) {
-        CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
-        CUDA_CHECK(cudaMemcpyFromSymbol(&d_serialized_worldstate_data, global_serialized_worldstate,
-                                        sizeof(CuEVM::serialized_worldstate_data*)));
-        if (d_serialized_worldstate_data != nullptr) {
-            CUDA_CHECK(cudaFree(d_serialized_worldstate_data));
-        }
-    }
 }
 
 }  // namespace python_utils

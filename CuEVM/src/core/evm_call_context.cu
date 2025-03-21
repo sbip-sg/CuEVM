@@ -93,13 +93,13 @@ __device__ void evm_call_context_t::clear() {
     this->gas_refund = 0;
     // this->jump_destinations = nullptr;
     if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
-        // printf("clear memory ptr %p\n", memory_ptr);
+        printf("clear memory ptr %p\n", memory_ptr);
         // clear the grow memory when return from subcontext
         // printf("clear %d bytes from memory_pool::preallocated_memory_base[%d] + %d\n",
         //        memory_prealloc_size - memory_ptr->preallocated_base_offset, INSTANCE_GLOBAL_IDX,
         //        memory_ptr->preallocated_base_offset);
         uint32_t size_to_clear = min(memory_ptr->size, memory_prealloc_size - memory_ptr->preallocated_base_offset);
-        // printf("size_to_clear %d printf memory\n", size_to_clear);
+        printf("size_to_clear %d printf memory\n", size_to_clear);
         // printf("previous size to clear %d\n", memory_prealloc_size - memory_ptr->preallocated_base_offset);
         // memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
         //                                               memory_ptr->preallocated_base_offset],

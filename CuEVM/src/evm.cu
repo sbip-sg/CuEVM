@@ -232,14 +232,13 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         }
 #endif
         // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
-        //     %lu\n",
+        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
         //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
         //            cached_call_state.gas_limit, cached_call_state.gas_used);
 
-        //     // printf("\n\n");
-        //     // cached_call_state.stack_ptr->print();
+        //     printf("\n\n");
+        //     cached_call_state.stack_ptr->print();
         // }
         // if (INSTANCE_GLOBAL_IDX == 1) {
         //     printf("\nIdx %d, pc: %d op: %d, depth %d, msize %d stksze %d gs_lmit %lu g_used %lu\n ",
@@ -254,7 +253,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         //     // }
         // }
 
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
         // comparison, arithmetic, revert/invalid
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
             global_simplified_trace[INSTANCE_GLOBAL_IDX].start_operation(cached_call_state.pc, opcode,
@@ -326,35 +325,35 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                                                                cached_call_state.stack_ptr);
                     break;
                 case OP_LT:
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::LT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_GT:
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::GT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SLT:
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SLT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_SGT:
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SGT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_EQ:
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::EQ(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -530,7 +529,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                 case OP_JUMP:
                     error_code =
                         CuEVM::operations::JUMP(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                cached_call_state.pc, *cached_call_state.stack_ptr, call_state_ptr);
+                                                cached_call_state.pc, *cached_call_state.stack_ptr, call_state_ptr
+#ifdef BUILD_LIBRARY
+                                                ,
+                                                &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                                                );
                     break;
                 case OP_JUMPI:
                     error_code =
@@ -624,8 +628,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     {
                         error_code = CuEVM::operations::LOGX(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                              *cached_call_state.stack_ptr, call_state_ptr, opcode);
-                    } else
+                    } else{
                         error_code = CuEVM::operations::INVALID();
+#ifdef BUILD_GO_LIBRARY
+                        global_simplified_trace[INSTANCE_GLOBAL_IDX].record_operation(cached_call_state.pc, opcode);
+#endif
+                    }
                     break;
             }
         }
@@ -638,7 +646,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
 
 #endif
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
             global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_operation(*cached_call_state.stack_ptr, error_code);
         }
@@ -783,7 +791,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
 #ifdef BUILD_LIBRARY
     // serialize data
     if (copy_state_data) {
-        python_utils::serialize_state_data(&global_serialized_worldstate[INSTANCE_GLOBAL_IDX]);
+        serialize_state_data(&global_serialized_worldstate[INSTANCE_GLOBAL_IDX]);
     }
 #endif
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);

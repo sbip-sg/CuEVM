@@ -112,6 +112,7 @@ __host__ void clear_memory_pool() {
     CUDA_CHECK(cudaMemcpyFromSymbol(&d_memory_pool, global_memory_pool, sizeof(memory_pool_t*)));
     memory_pool_t* memory_pool = new memory_pool_t();
     CUDA_CHECK(cudaMemcpy(memory_pool, d_memory_pool, sizeof(memory_pool_t), cudaMemcpyDeviceToHost));
+    printf("memory pool num instances: %u\n", memory_pool->num_instances);
     // Clear memory allocated in memory_pool
     CUDA_CHECK(cudaMemset(memory_pool->stack_base, 0,
                           memory_pool->num_instances * memory_pool_stack_preallocate * sizeof(evm_word_t)));
