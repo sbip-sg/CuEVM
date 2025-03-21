@@ -1410,5 +1410,14 @@ __host__ __device__ void StateDb::print() {
     }
 }
 
+    __device__ int32_t find_global_bytecode_offset(const evm_word_t *address) {
+        int32_t address_index = (address == nullptr ? -1 : global_state_db_ptr->get_address_index(address));
+        if (address_index == -1) {
+            return -1;
+        }
+        return global_state_db_ptr->account_codes_offset[address_index];
+
+    }
+
 __device__ StateDb *global_state_db_ptr;
 }  // namespace CuEVM

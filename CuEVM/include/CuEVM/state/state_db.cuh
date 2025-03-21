@@ -157,5 +157,8 @@ class StateDb {
     __host__ static StateDb *CPUFromGPU(StateDb *&state_db);
     __host__ static StateDb *GPUFromCPU(StateDb *&state_db);
 };
+
+    // Get the global bytecode offset from a prestate address
+    __device__ int32_t find_global_bytecode_offset(const evm_word_t *address);
 extern __device__ StateDb *global_state_db_ptr;
 }  // namespace CuEVM

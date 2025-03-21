@@ -46,7 +46,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
                                                     CuEVM::evm_memory_t* memory_ptr, evm_word_t from, evm_word_t to,
                                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
-                                                    uint32_t byte_code_size, evm_call_context_t* parent,
+                                                    uint32_t byte_code_size, int32_t bytecode_offset, evm_call_context_t* parent,
                                                     bool static_env, gas_t gas_refund) {
     // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, parent, this);
@@ -54,7 +54,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->parent = parent;
 
     this->depth = depth;
-    this->pc = pc;
+    this->pc = 0;
     this->gas_used = 0;
     this->gas_refund = gas_refund;
     this->gas_limit = gas_limit;
@@ -67,6 +67,7 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->call_type = call_type;
     this->call_data = call_data;
     this->call_data_size = call_data_size;
+    this->bytecode_offset = bytecode_offset;
     this->byte_code = byte_code;
     this->byte_code_size = byte_code_size;
     this->parent = parent;
@@ -76,11 +77,11 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->stack_ptr->init(CuEVM::memory_pool::global_memory_pool->stack_base);
     this->memory_ptr->init(0);  // no more prealloc after this point
 
-    auto to_address_idx = global_state_db_ptr->get_address_index(&to);
-    this->bytecode_offset = -1;
-    if (to_address_idx >= 0){
-        this->bytecode_offset = global_state_db_ptr->account_codes_offset[to_address_idx];
-    }
+    // auto to_address_idx = (byte_code == nullptr ? -1 : global_state_db_ptr->get_address_index(bytecode_address));
+    // this->bytecode_offset = -1;
+    // if (to_address_idx >= 0){
+    //     this->bytecode_offset = global_state_db_ptr->account_codes_offset[to_address_idx];
+    // }
 }
 
 __device__ void evm_call_context_t::clear() {
@@ -150,7 +151,7 @@ __device__ evm_call_context_t::~evm_call_context_t() {
 __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, gas_t gas_limit, evm_word_t from,
                                                     evm_word_t to, evm_word_t storage_address, evm_word_t value,
                                                     uint32_t call_type, uint8_t* call_data, uint32_t call_data_size,
-                                                    uint8_t* byte_code, uint32_t byte_code_size,
+                                                    uint8_t* byte_code, uint32_t byte_code_size, int32_t bytecode_offset,
                                                     uint32_t return_data_offset, uint32_t return_data_size,
                                                     bool static_env, gas_t gas_refund) {
     // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
@@ -170,6 +171,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     this->call_data_size = call_data_size;
     this->byte_code = byte_code;
     this->byte_code_size = byte_code_size;
+    this->bytecode_offset = bytecode_offset;
     this->static_env = static_env;
     this->gas_refund = gas_refund;
     // this->jump_destinations = nullptr;
@@ -204,11 +206,11 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
 
     global_state_db_ptr->init_snapshot(this, depth, &storage_address);
 
-    auto to_address_idx = global_state_db_ptr->get_address_index(&to);
-    this->bytecode_offset = -1;
-    if (to_address_idx >= 0){
-        this->bytecode_offset = global_state_db_ptr->account_codes_offset[to_address_idx];
-    }
+    // auto to_address_idx = global_state_db_ptr->get_address_index(&bytecode_address);
+    // this->bytecode_offset = -1;
+    // if (to_address_idx >= 0){
+    //     this->bytecode_offset = global_state_db_ptr->account_codes_offset[to_address_idx];
+    // }
 
     // printf("init snapshot account, depth %d snapshot state %p\n", depth, snapshot_state);
     // this->memory_ptr = new CuEVM::evm_memory_t();
