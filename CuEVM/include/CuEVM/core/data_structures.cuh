@@ -436,6 +436,7 @@ struct evm_call_context_t {
 
     evm_word_t from;
     evm_word_t to;
+
     evm_word_t storage_address;
     evm_word_t value;
     uint32_t call_type; /**< The call type internal has the opcode */
@@ -443,6 +444,7 @@ struct evm_call_context_t {
     uint32_t call_data_size;
     uint8_t *byte_code; /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
     uint32_t byte_code_size;
+    int32_t bytecode_offset; // bytecode offset in the global `all_account_codes`
 
     uint32_t fixed_ret_size = 0;
     uint32_t fixed_ret_offset = 0;
@@ -462,7 +464,7 @@ struct evm_call_context_t {
                                     CuEVM::evm_memory_t *memory_ptr, evm_word_t from, evm_word_t to,
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t *call_data, uint32_t call_data_size, uint8_t *byte_code,
-                                    uint32_t byte_code_size, evm_call_context_t *parent = nullptr,
+                                    uint32_t byte_code_size, int32_t bytecode_offset = -1, evm_call_context_t *parent = nullptr,
                                     bool static_env = false, gas_t gas_refund = 0
 
     );
@@ -473,7 +475,7 @@ struct evm_call_context_t {
     __device__ void initiate_values(evm_call_context_t *parent, gas_t gas_limit, evm_word_t from, evm_word_t to,
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t *call_data, uint32_t call_data_size, uint8_t *byte_code,
-                                    uint32_t byte_code_size, uint32_t return_data_offset = 0,
+                                    uint32_t byte_code_size, int32_t bytecode_offset = -1, uint32_t return_data_offset = 0,
                                     uint32_t return_data_size = 0, bool static_env = false, gas_t gas_refund = 0);
 
     __device__ void copy_return_data_to_memory(uint32_t memory_offset, uint32_t data_offset, uint32_t size);
