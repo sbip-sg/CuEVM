@@ -17,25 +17,28 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
         evm_word_t *destination = stack.get_address_at_index(1);
         stack.reduce_size(1);
         uint32_t destination_u32 = uint256_get_uint32_t(destination);
+
         if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
 
-        if ((destination_u32 >= call_context->byte_code_size) ||
-            (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
-            return ERROR_INVALID_JUMP_DESTINATION;
+        int32_t bytecode_offset = call_context->bytecode_offset;
+
+        if (bytecode_offset < 0) {
+            // Dynamically created address, not analyzed at the moment
+            if ((destination_u32 >= call_context->byte_code_size) ||
+                (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
+                return ERROR_INVALID_JUMP_DESTINATION;
+            }
+        } else {
+
+            auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
+            if (err) {
+                return err;
+            }
         }
 #ifdef BUILD_LIBRARY
         simplified_trace_data_ptr->record_branch(pc, destination_u32, 0);
 #endif
-        if (error_code == ERROR_SUCCESS) {
-            pc = destination_u32 - 1;
-            // TODO: implement jump destinations
-            // pc = call_context->jump_destinations->has(destination_u32) == ERROR_SUCCESS
-            //          ? destination_u32 - 1
-            //          : ([&]() -> uint32_t {
-            //                error_code = ERROR_INVALID_JUMP_DESTINATION;
-            //                return pc;
-            //            })();
-        }
+        pc = destination_u32 - 1;
     }
     return error_code;
 }
@@ -62,20 +65,20 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
             simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1);
 #endif
 
-            if ((destination_u32 >= call_context->byte_code_size) ||
-                (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
-                return ERROR_INVALID_JUMP_DESTINATION;
+            int32_t bytecode_offset = call_context->bytecode_offset;
+            if (bytecode_offset < 0) {
+                // Dynamically created address, not analyzed at the moment
+                if ((destination_u32 >= call_context->byte_code_size) ||
+                    (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
+                    return ERROR_INVALID_JUMP_DESTINATION;
+                }
+            }else {
+                auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
+                if (err) {
+                    return err;
+                }
             }
-            if (error_code == ERROR_SUCCESS) {
-                pc = destination_u32 - 1;
-                // TODO: implement jump destinations
-                // pc = call_context->jump_destinations->has(destination_u32) == ERROR_SUCCESS
-                //          ? destination_u32 - 1
-                //          : ([&]() -> uint32_t {
-                //                error_code = ERROR_INVALID_JUMP_DESTINATION;
-                //                return pc;
-                //            })();
-            }
+            pc = destination_u32 - 1;
         }
 #ifdef BUILD_LIBRARY
         else {

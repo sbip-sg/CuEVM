@@ -102,12 +102,13 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
         parent_memory_ptr->increase_memory_cost(memory_expansion_cost);
 
         if (new_context_ptr->call_type != OP_CALLCODE &&
-            new_context_ptr->call_type != OP_DELEGATECALL)  // special case: the code is set outside
-            new_context_ptr->byte_code =
-                CuEVM::global_state_db_ptr->get_code(new_context_ptr->byte_code_size, contract_address_ptr);
+            new_context_ptr->call_type != OP_DELEGATECALL) { // special case: the code is set outside
+            new_context_ptr->byte_code = CuEVM::global_state_db_ptr->get_code(new_context_ptr->byte_code_size, contract_address_ptr);
+            new_context_ptr->bytecode_offset = find_global_bytecode_offset(contract_address_ptr);
+        }
 
         uint8_t *call_data = nullptr;
-        if (args_size > 0) error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data);
+        if (uint256_cmp_word(args_size, 0) > 0) error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data);
         new_context_ptr->call_data = call_data;
         new_context_ptr->call_data_size = args_size_ui32;
     }
@@ -124,7 +125,7 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
-                                  CuEVM::evm_call_context_t *&new_context_ptr, const uint32_t opcode,
+                                  CuEVM::evm_call_context_t *&new_context_ptr, const uint32_t call_type,
                                   CuEVM::cached_evm_call_context &cached_state) {
     evm_word_t *value, *memory_offset, *length;
     if (cached_state.stack_ptr->size() < 3) return ERROR_STACK_UNDERFLOW;
@@ -152,7 +153,7 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
     CuEVM::gas_cost::initcode_cost(cached_state.gas_used, uint256_get_uint32_t(length));
     // printf("gas used %lu, length %u\n", cached_state.gas_used, uint256_get_uint32_t(length));
     evm_word_t salt;
-    if (opcode == OP_CREATE2) {
+    if (call_type == OP_CREATE2) {
         error_code |= cached_state.stack_ptr->pop(salt);
         // compute the keccak gas cost
         CuEVM::gas_cost::keccak_cost(cached_state.gas_used, uint256_get_uint32_t(length));
@@ -173,7 +174,7 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(&current_context->to);
         evm_word_t sender_nonce(sender_nonce_uint);
         // Do not get_account after this to reuse sender_account
-        if (opcode == OP_CREATE2) {
+        if (call_type == OP_CREATE2) {
             // printf("create2 %p %p %p init code size %d\n", &contract_address, &current_context->to, &salt,
             // length_ui32);
             CuEVM::utils::get_contract_address_create2(&contract_address, &current_context->to, &salt,
@@ -202,8 +203,10 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         // new_context_ptr = new CuEVM::evm_call_context_t();
         new_context_ptr = memory_pool::get_call_context(current_context->depth);
 
+        int32_t bytecode_offset = -1;
+
         new_context_ptr->initiate_values(current_context, gas_capped, current_context->to, contract_address,
-                                         contract_address, *value, opcode, nullptr, 0, initialisation_code, length_ui32,
+                                         contract_address, *value, call_type, nullptr, 0, initialisation_code, length_ui32, bytecode_offset, 0,
                                          current_context->static_env);
 
         error_code |= (current_context->static_env ? ERROR_STATIC_CALL_CONTEXT_CREATE :
@@ -292,8 +295,10 @@ __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_c
     // new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr = memory_pool::get_call_context(current_context->depth);
 
+    int32_t bytecode_offset = -1;
+
     new_context_ptr->initiate_values(current_context, gas, current_context->to, address, address, *value, OP_CALL,
-                                     nullptr, 0, nullptr, 0, uint256_get_uint32_t(ret_offset),
+                                     nullptr, 0, nullptr, 0, bytecode_offset, uint256_get_uint32_t(ret_offset),
                                      uint256_get_uint32_t(ret_size), current_context->static_env);
 
     CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, &address,
@@ -338,15 +343,16 @@ __device__ int32_t CALLCODE(CuEVM::evm_call_context_t *current_context, CuEVM::e
 
     // new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr = memory_pool::get_call_context(current_context->depth);
+    int32_t bytecode_offset = find_global_bytecode_offset(&address);
     if (uint256_cmp_word(&address, CuEVM::no_precompile_contracts) == -1)
         new_context_ptr->initiate_values(current_context, gas, current_context->to, address, current_context->to,
-                                         *value, OP_CALLCODE, nullptr, 0, byte_code, byte_code_size,
+                                         *value, OP_CALLCODE, nullptr, 0, byte_code, byte_code_size, bytecode_offset,
                                          uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
                                          current_context->static_env);
     else
         new_context_ptr->initiate_values(current_context, gas, current_context->to, current_context->to,
                                          current_context->to, *value, OP_CALLCODE, nullptr, 0, byte_code,
-                                         byte_code_size, uint256_get_uint32_t(ret_offset),
+                                         byte_code_size, bytecode_offset, uint256_get_uint32_t(ret_offset),
                                          uint256_get_uint32_t(ret_size), current_context->static_env);
 
     return generic_CALL(args_offset, args_size, current_context->memory_ptr, new_context_ptr, cached_state);
@@ -392,16 +398,17 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
     // }
     // new_context_ptr = new CuEVM::evm_call_context_t();
     new_context_ptr = memory_pool::get_call_context(current_context->depth);
+    int32_t bytecode_offset = find_global_bytecode_offset(&address);
 
     if (uint256_cmp_word(&address, CuEVM::no_precompile_contracts) == -1)
         new_context_ptr->initiate_values(current_context, gas, current_context->from, address, current_context->to,
-                                         value, OP_DELEGATECALL, nullptr, 0, byte_code, byte_code_size,
+                                         value, OP_DELEGATECALL, nullptr, 0, byte_code, byte_code_size, bytecode_offset,
                                          uint256_get_uint32_t(ret_offset), uint256_get_uint32_t(ret_size),
                                          current_context->static_env);
     else
         new_context_ptr->initiate_values(current_context, gas, current_context->from, current_context->to,
                                          current_context->to, value, OP_DELEGATECALL, nullptr, 0, byte_code,
-                                         byte_code_size, uint256_get_uint32_t(ret_offset),
+                                         byte_code_size, bytecode_offset, uint256_get_uint32_t(ret_offset),
                                          uint256_get_uint32_t(ret_size), current_context->static_env);
     // printf("new context ptr\n");
     // new_context_ptr->print();
@@ -437,7 +444,7 @@ __device__ int32_t STATICCALL(CuEVM::evm_call_context_t *current_context, CuEVM:
 
     new_context_ptr = memory_pool::get_call_context(current_context->depth);
     new_context_ptr->initiate_values(current_context, gas, current_context->to, address, address, value, OP_STATICCALL,
-                                     nullptr, 0, nullptr, 0, uint256_get_uint32_t(ret_offset),
+                                     nullptr, 0, nullptr, 0, -1, uint256_get_uint32_t(ret_offset),
                                      uint256_get_uint32_t(ret_size), true);
     // printf("new context ptr\n");
     // new_context_ptr->print();

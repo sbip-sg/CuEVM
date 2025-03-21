@@ -65,6 +65,8 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
 
     CuEVM::evm_memory_t *memory_ptr = memory_pool::get_memory(0);
 
+    int32_t bytecode_offset = -1;
+
     // new CuEVM::evm_memory_t();  // memory_pool::global_memory_pool->get_memory(threadIdx.x);
     if (transaction_list_ptr->type == SPECIAL_CREATE_TRANSACTION_TYPE) {
         uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(&transaction_list_ptr->sender);
@@ -84,14 +86,15 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                         transaction_list_ptr->sender, transaction_list_ptr->to,
                                         transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
-                                        OP_CREATE, call_data, call_data_size, call_data, call_data_size);
+                                        OP_CREATE, call_data, call_data_size, call_data, call_data_size, bytecode_offset);
     } else {
         byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
+        bytecode_offset = find_global_bytecode_offset(&transaction_list_ptr->to);
 
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                         transaction_list_ptr->sender, transaction_list_ptr->to,
                                         transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
-                                        OP_CALL, call_data, call_data_size, byte_code, byte_code_size);
+                                        OP_CALL, call_data, call_data_size, byte_code, byte_code_size, bytecode_offset);
     }
     // charge gas and validate balance
     CuEVM::gas_t gas_intrinsic;
@@ -969,7 +972,11 @@ __host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *tes
     uint32_t num_transactions = 0;
     uint32_t num_original_transactions = 0;
 
-    CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones);
+    auto err = CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones);
+    if (err){
+        printf("get_transactions failed with error %d\n", err);
+        return nullptr;
+    }
     // num_original_transactions = num_transactions;
     // num_transactions *= clones;
     // generate the evm instances
