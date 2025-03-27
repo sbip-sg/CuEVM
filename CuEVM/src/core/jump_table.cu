@@ -13,7 +13,11 @@ namespace CuEVM {
 
 
     // Analyze the bytecode and fill the jump table. Returns non-zero when failed
-    __host__ __device__ int32_t GlobalJumpTable::analyze(uint8_t* bytecode, uint32_t bitmap_offset_start, uint32_t size){
+    __host__ int32_t GlobalJumpTable::analyze(uint8_t* bytecode, uint32_t bitmap_offset_start, uint32_t size
+#ifdef BUILD_GO_LIBRARY
+    , evm_word_t contract_addr
+#endif
+    ){
         if (!size) {
             return JUMPTABLE_INVALID_BYTECODE_SIZE;
         }
@@ -21,12 +25,16 @@ namespace CuEVM {
         if (size + bitmap_offset_start > 8 * GLOBAL_JUMP_TABLE_SIZE) {
             return JUMPTABLE_BITMAP_FULL;
         }
-
+#if BUILD_GO_LIBRARY
+        contract_pcs_map[contract_addr] = std::vector<uint8_t>(size);
+#endif
         for (auto pc = 0; pc < size; pc++) {
             uint8_t opcode = bytecode[pc];
             uint8_t push_offset = opcode - 0x60;
             auto bit_offset = bitmap_offset_start + pc;
-
+#if BUILD_GO_LIBRARY
+            contract_pcs_map[contract_addr][pc] = 1;
+#endif
             if (opcode == 0x5B) {
                 bitmap[bit_offset / 8] |= 1 << (bit_offset % 8);
             } else if (push_offset < 32) { // PUSH1 - PUSH32

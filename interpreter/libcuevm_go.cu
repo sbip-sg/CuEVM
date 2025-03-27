@@ -5,6 +5,11 @@ static uint32_t g_num_accounts = 0;
 static uint32_t g_num_instances = 0;
 static CuEVM::StateDb* g_state_db_ptr = nullptr;
 static int call_counter = 0;
+// Global variable to hold persistent jump table
+CuEVM::ContractPCsMap contract_pcs_map;
+
+// Global variable to hold the last execution result
+static char* g_last_result = nullptr;
 
 // Helper function to convert bytes to hex string
 std::string bytes_to_hex(const unsigned char* data, int len) {
@@ -70,13 +75,40 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances) {
         delete g_state_db_ptr;
         g_state_db_ptr = nullptr;
     }
-
     // Initialize and store the state DB and account count globally
+    // Modify GPUfromJson to use the persistent jump table
     CuEVM::StateDb::GPUfromJson(g_state_db_ptr, world_state_json, num_transactions, g_num_accounts);
     CuEVM::get_block_info(stateJson);
     printf("Process json state GPU done, found %u accounts\n", g_num_accounts);
 
     call_counter = 0;
+    // Initialize the global jump table for coverage tracking
+
+    // Print the contract_pcs_map after processing the state
+    printf("Coverage data after processing state:\n");
+    for (const auto& entry : contract_pcs_map) {
+        // Print contract address - using proper hex conversion
+        printf("Contract ");
+        char addr_buf[70]; // Buffer large enough for 0x + 64 hex chars + null terminator
+        entry.first.to_hex(addr_buf); // Use the proper to_hex method on evm_word_t
+        printf("%s:\n", addr_buf);
+        
+        // Print coverage information
+        printf("  Bytecode size: %zu bytes\n", entry.second.size());
+        
+        // Print first few PCs (up to 20) for verification
+        printf("  First PCs with coverage: ");
+        int count = 0;
+        for (uint32_t i = 0; i < entry.second.size() && count < 20; i++) {
+            if (entry.second[i] == 1) {
+                printf("%u ", i);
+                count++;
+            }
+        }
+        printf("\n");
+    }
+    printf("Total contracts with coverage data: %zu\n", contract_pcs_map.size());
+  
 
     // Free JSON object
     cJSON_Delete(stateJson);
@@ -348,7 +380,7 @@ create_transaction_list(
 
 
 // Simplified batch transaction processing with single from/to address
-int process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr, const unsigned char* values,
+GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr, const unsigned char* values,
                                const unsigned char* callData, int callDataLen, const uint32_t* dataOffsets,
                                int dataOffsetsLen, const uint32_t* dataSizes, int dataSizesLen, int txCount) {
     printf("CuEVM Go interface: Processing batch of %d transactions, call number: %d\n", txCount, call_counter);
@@ -417,7 +449,7 @@ int process_batch_transactions(const unsigned char* fromAddr, const unsigned cha
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess) {
             printf("CUDA error: %s\n", cudaGetErrorString(err));
-            return -1;
+            return nullptr;
         }
 
         printf("GPU execution completed successfully\n");
@@ -436,6 +468,7 @@ int process_batch_transactions(const unsigned char* fromAddr, const unsigned cha
 
         // Clean up transaction lists
         // cleanup_transaction_list(d_transaction_list_ptr, callDataLen);
+        GPUExecutionResultC* result = get_gpu_execution_results();
         CuEVM::freeTransactionList(d_transaction_list_ptr);
         CuEVM::freeTraceData(copy_state_data);
         // Clean up CUDA events
@@ -445,15 +478,182 @@ int process_batch_transactions(const unsigned char* fromAddr, const unsigned cha
         // Increment call counter
         call_counter++;
         printf("Call number: %d\n", call_counter);
-
-        return 0;  // Success
+        return result;  // Success
     } catch (const std::exception& e) {
         printf("Error in process_batch_transactions: %s\n", e.what());
-        return 1;  // Error
+        return nullptr;  // Error
     } catch (...) {
         printf("Unknown error in process_batch_transactions\n");
-        return 2;  // Unknown error
+        return nullptr;  // Unknown error
     }
+}
+
+
+GPUExecutionResultC* get_gpu_execution_results() {
+    // Allocate result structure
+    GPUExecutionResultC* result = (GPUExecutionResultC*)malloc(sizeof(GPUExecutionResultC));
+    if (result == nullptr) {
+        printf("Failed to allocate memory for GPUExecutionResultC\n");
+        return nullptr;
+    }
+    
+    // Retrieve trace data from device memory - similar to print_evm_instances_results
+    CuEVM::simplified_trace_data* trace_data = new CuEVM::simplified_trace_data[g_num_instances];
+    CuEVM::simplified_trace_data* d_trace_data;
+    
+    // Retrieve the device pointers stored in the global symbols
+    CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
+    
+    // Copy the data arrays from device to host memory
+    CUDA_CHECK(cudaMemcpy(trace_data, d_trace_data, sizeof(CuEVM::simplified_trace_data) * g_num_instances,
+                          cudaMemcpyDeviceToHost));
+    
+    // Initialize return data
+    result->num_return_data = g_num_instances;
+    result->return_data = (ReturnDataEntry*)malloc(sizeof(ReturnDataEntry) * result->num_return_data);
+    if (result->return_data == nullptr) {
+        printf("Failed to allocate memory for return_data\n");
+        delete[] trace_data;
+        free(result);
+        return nullptr;
+    }
+    
+    // Initialize all return data entries as empty
+    for (uint32_t i = 0; i < result->num_return_data; i++) {
+        result->return_data[i].length = 0;
+        result->return_data[i].data = nullptr;
+    }
+    
+    // Set up coverage data for all instances
+    result->num_coverage = g_num_instances;
+    result->coverage = (CoverageDataEntry*)malloc(sizeof(CoverageDataEntry) * result->num_coverage);
+    if (result->coverage == nullptr) {
+        printf("Failed to allocate memory for coverage\n");
+        delete[] trace_data;
+        free(result->return_data);
+        free(result);
+        return nullptr;
+    }
+    
+    printf("===== Initializing Coverage Data for %u Instances =====\n", g_num_instances);
+    
+    // Process each instance's trace data
+    for (uint32_t idx = 0; idx < g_num_instances; idx++) {
+        if (trace_data[idx].no_branches > 0) {
+            result->coverage[idx].num_addresses = 1;  // One contract per instance for simplicity
+            result->coverage[idx].addresses = (char**)malloc(sizeof(char*) * result->coverage[idx].num_addresses);
+            result->coverage[idx].pc_coverage = (uint8_t**)malloc(sizeof(uint8_t*) * result->coverage[idx].num_addresses);
+            result->coverage[idx].pc_coverage_lengths = (uint32_t*)malloc(sizeof(uint32_t) * result->coverage[idx].num_addresses);
+            
+            // Use contract address from receiver of first call if available, otherwise use placeholder
+            if (trace_data[idx].no_calls > 0) {
+                char addr_buf[70];
+                trace_data[idx].calls[0].receiver.to_hex(addr_buf);
+                result->coverage[idx].addresses[0] = strdup(addr_buf);
+            } else {
+                // Use placeholder address
+                result->coverage[idx].addresses[0] = strdup("0x0000000000000000000000000000000000000000");
+            }
+            
+            // Get coverage size from the hash map of valid PCs
+            uint32_t coverage_size = 0;
+            std::vector<uint8_t> valid_pcs;
+            if (trace_data[idx].no_calls > 0) {
+                auto it = contract_pcs_map.find(trace_data[idx].calls[0].receiver);
+                if (it != contract_pcs_map.end()) {
+                    valid_pcs = it->second;
+                } else {
+                    // If contract not found in map, continue to next instance
+                    printf("Instance %u: Contract not found in PC map, skipping coverage\n", idx);
+                    result->coverage[idx].num_addresses = 0;
+                    result->coverage[idx].addresses = nullptr;
+                    result->coverage[idx].pc_coverage = nullptr;
+                    result->coverage[idx].pc_coverage_lengths = nullptr;
+                    continue;
+                }
+            }
+            coverage_size = valid_pcs.size();
+            // Store the coverage length
+            result->coverage[idx].pc_coverage_lengths[0] = coverage_size;
+            result->coverage[idx].pc_coverage[0] = (uint8_t*)malloc(coverage_size);
+            memset(result->coverage[idx].pc_coverage[0], 0, coverage_size);
+            
+            // Mark covered PCs based on branch data
+            for (uint32_t b = 0; b < trace_data[idx].no_branches; b++) {
+                uint32_t pc_src = trace_data[idx].branches[b].pc_src;
+                uint32_t pc_dst = trace_data[idx].branches[b].pc_dst;
+                
+                // Mark source and destination PCs as covered (1)
+                if (pc_src < coverage_size) {
+                    result->coverage[idx].pc_coverage[0][pc_src] = 1;
+                }
+                if (pc_dst < coverage_size) {
+                    result->coverage[idx].pc_coverage[0][pc_dst] = 1;
+                }
+                
+            }
+            
+         
+            // Debug print coverage data from trace
+            printf("Instance %u coverage (from trace):\n", idx);
+            printf("  Contract address: %s\n", result->coverage[idx].addresses[0]);
+            printf("  Bytecode size: %u bytes\n", coverage_size);
+            
+            // Count and print covered PCs
+            uint32_t covered_pcs = 0;
+            for (uint32_t i = 0; i < coverage_size; i++) {
+                if (result->coverage[idx].pc_coverage[0][i] == 1) {
+                    covered_pcs++;
+                    printf("Instance %u: Covered PC: %u\n", idx, i);
+                }
+            }
+            // printf("Instance %u: Covered PCs: %u\n", idx, covered_pcs);
+
+     
+        } else {
+            // No branch data for this instance
+            result->coverage[idx].num_addresses = 0;
+            result->coverage[idx].addresses = nullptr;
+            result->coverage[idx].pc_coverage = nullptr;
+            result->coverage[idx].pc_coverage_lengths = nullptr;
+            
+            printf("Instance %u: No branch data available for coverage\n", idx);
+        }
+    }
+    
+
+    
+    return result;
+}
+
+void free_gpu_execution_results(GPUExecutionResultC* result) {
+    if (result == nullptr) return;
+    
+    // Free return data
+    for (uint32_t i = 0; i < result->num_return_data; i++) {
+        free(result->return_data[i].data);
+    }
+    free(result->return_data);
+    
+    // Free coverage data
+    for (uint32_t i = 0; i < result->num_coverage; i++) {
+        // Free addresses
+        for (uint32_t j = 0; j < result->coverage[i].num_addresses; j++) {
+            free(result->coverage[i].addresses[j]);
+        }
+        free(result->coverage[i].addresses);
+        
+        // Free PC coverage
+        for (uint32_t j = 0; j < result->coverage[i].num_addresses; j++) {
+            free(result->coverage[i].pc_coverage[j]);
+        }
+        free(result->coverage[i].pc_coverage);
+        free(result->coverage[i].pc_coverage_lengths);
+    }
+    free(result->coverage);
+    
+    // Free the result itself
+    free(result);
 }
 
 #ifdef __cplusplus

@@ -1276,7 +1276,11 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
         byte_code.from_hex(cJSON_GetObjectItemCaseSensitive(account_json, "code")->valuestring, LITTLE_ENDIAN,
                            NO_PADDING);
         if (byte_code.size) {
-            auto err = state_db->global_jump_table->analyze(byte_code.data, bytecode_offset, byte_code.size);
+            auto err = state_db->global_jump_table->analyze(byte_code.data, bytecode_offset, byte_code.size
+#ifdef BUILD_GO_LIBRARY 
+            , state_db->address_list[idx]
+#endif
+            );
             if (err){
                 printf("Error %d: Invalid jumptable, things can be broken!\n", err);
             }
