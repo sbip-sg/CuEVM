@@ -101,15 +101,20 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     calls[no_calls].op = call_context_ptr->call_type;
     calls[no_calls].value = call_context_ptr->value;
 
+    calls[no_calls].success = UINT8_MAX;
+    calls[no_calls].last_pc = 0;
     no_calls++;
 }
-__device__ void simplified_trace_data::finish_call(uint8_t success) {
+__device__ void simplified_trace_data::finish_call(uint8_t success, uint32_t last_pc) {
     if (no_calls > MAX_CALLS_TRACING) return;
 
-    // printf("no_calls %u \n", no_calls);
     for (int i = no_calls - 1; i >= 0; i--) {
+        // Check if this call is marked as unfinished (using the sentinel value)
         if (calls[i].success == UINT8_MAX) {
+            // Found the correct call frame, update its results
+            calls[i].last_pc = last_pc;
             calls[i].success = success;
+            // Stop searching, we've updated the corresponding call
             break;
         }
     }

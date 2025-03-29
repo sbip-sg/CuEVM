@@ -534,94 +534,136 @@ GPUExecutionResultC* get_gpu_execution_results() {
         free(result);
         return nullptr;
     }
+
+
+    result->success_status = (uint8_t*)malloc(sizeof(uint8_t) * g_num_instances);
+    memset(result->success_status, 0, sizeof(uint8_t) * g_num_instances);
     
     printf("===== Initializing Coverage Data for %u Instances =====\n", g_num_instances);
     
     // Process each instance's trace data
     for (uint32_t idx = 0; idx < g_num_instances; idx++) {
-        if (trace_data[idx].no_branches > 0) {
-            result->coverage[idx].num_addresses = 1;  // One contract per instance for simplicity
-            result->coverage[idx].addresses = (char**)malloc(sizeof(char*) * result->coverage[idx].num_addresses);
-            result->coverage[idx].pc_coverage = (uint8_t**)malloc(sizeof(uint8_t*) * result->coverage[idx].num_addresses);
-            result->coverage[idx].pc_coverage_lengths = (uint32_t*)malloc(sizeof(uint32_t) * result->coverage[idx].num_addresses);
-            
-            // Use contract address from receiver of first call if available, otherwise use placeholder
-            if (trace_data[idx].no_calls > 0) {
-                char addr_buf[70];
-                trace_data[idx].calls[0].receiver.to_hex(addr_buf);
-                result->coverage[idx].addresses[0] = strdup(addr_buf);
-            } else {
-                // Use placeholder address
-                result->coverage[idx].addresses[0] = strdup("0x0000000000000000000000000000000000000000");
-            }
-            
-            // Get coverage size from the hash map of valid PCs
-            uint32_t coverage_size = 0;
-            std::vector<uint8_t> valid_pcs;
-            if (trace_data[idx].no_calls > 0) {
-                auto it = contract_pcs_map.find(trace_data[idx].calls[0].receiver);
-                if (it != contract_pcs_map.end()) {
-                    valid_pcs = it->second;
-                } else {
-                    // If contract not found in map, continue to next instance
-                    printf("Instance %u: Contract not found in PC map, skipping coverage\n", idx);
-                    result->coverage[idx].num_addresses = 0;
-                    result->coverage[idx].addresses = nullptr;
-                    result->coverage[idx].pc_coverage = nullptr;
-                    result->coverage[idx].pc_coverage_lengths = nullptr;
-                    continue;
-                }
-            }
-            coverage_size = valid_pcs.size();
-            // Store the coverage length
-            result->coverage[idx].pc_coverage_lengths[0] = coverage_size;
-            result->coverage[idx].pc_coverage[0] = (uint8_t*)malloc(coverage_size);
-            memset(result->coverage[idx].pc_coverage[0], 0, coverage_size);
-            
-            // Mark covered PCs based on branch data
-            for (uint32_t b = 0; b < trace_data[idx].no_branches; b++) {
-                uint32_t pc_src = trace_data[idx].branches[b].pc_src;
-                uint32_t pc_dst = trace_data[idx].branches[b].pc_dst;
-                
-                // Mark source and destination PCs as covered (1)
-                if (pc_src < coverage_size) {
-                    result->coverage[idx].pc_coverage[0][pc_src] = 1;
-                }
-                if (pc_dst < coverage_size) {
-                    result->coverage[idx].pc_coverage[0][pc_dst] = 1;
-                }
-                
-            }
-            
-         
-            // Debug print coverage data from trace
-            printf("Instance %u coverage (from trace):\n", idx);
-            printf("  Contract address: %s\n", result->coverage[idx].addresses[0]);
-            printf("  Bytecode size: %u bytes\n", coverage_size);
-            
-            // Count and print covered PCs
-            uint32_t covered_pcs = 0;
-            for (uint32_t i = 0; i < coverage_size; i++) {
-                if (result->coverage[idx].pc_coverage[0][i] == 1) {
-                    covered_pcs++;
-                    printf("Instance %u: Covered PC: %u\n", idx, i);
-                }
-            }
-            // printf("Instance %u: Covered PCs: %u\n", idx, covered_pcs);
-
-     
+        // Set up coverage data structure
+        result->coverage[idx].num_addresses = 1;  // One contract per instance for simplicity
+        result->coverage[idx].addresses = (char**)malloc(sizeof(char*) * result->coverage[idx].num_addresses);
+        result->coverage[idx].pc_coverage = (uint8_t**)malloc(sizeof(uint8_t*) * result->coverage[idx].num_addresses);
+        result->coverage[idx].pc_coverage_lengths = (uint32_t*)malloc(sizeof(uint32_t) * result->coverage[idx].num_addresses);
+        
+        // Use contract address from receiver of first call if available, otherwise use placeholder
+        if (trace_data[idx].no_calls > 0) {
+            char addr_buf[70];
+            trace_data[idx].calls[0].receiver.to_hex(addr_buf);
+            result->coverage[idx].addresses[0] = strdup(addr_buf);
+            result->success_status[idx] = trace_data[idx].calls[trace_data[idx].no_calls - 1].success;
         } else {
-            // No branch data for this instance
+            // Use placeholder address
+            result->coverage[idx].addresses[0] = strdup("0x0000000000000000000000000000000000000000");
+        }
+        
+        // Get valid PCs vector from the hash map
+        uint32_t coverage_size = 0;
+        std::vector<uint8_t> valid_pcs;
+        
+        if (trace_data[idx].no_calls > 0) {
+            auto it = contract_pcs_map.find(trace_data[idx].calls[0].receiver);
+            if (it != contract_pcs_map.end()) {
+                valid_pcs = it->second;
+                coverage_size = valid_pcs.size();
+            } else {
+                printf("Instance %u: Contract not found in PC map, skipping\n", idx);
+                free(result->coverage[idx].addresses[0]);
+                free(result->coverage[idx].addresses);
+                free(result->coverage[idx].pc_coverage);
+                free(result->coverage[idx].pc_coverage_lengths);
+                
+                result->coverage[idx].num_addresses = 0;
+                result->coverage[idx].addresses = nullptr;
+                result->coverage[idx].pc_coverage = nullptr;
+                result->coverage[idx].pc_coverage_lengths = nullptr;
+                continue;
+            }
+        } else {
+            printf("Instance %u: No calls available, skipping\n", idx);
+            free(result->coverage[idx].addresses[0]);
+            free(result->coverage[idx].addresses);
+            free(result->coverage[idx].pc_coverage);
+            free(result->coverage[idx].pc_coverage_lengths);
+            
             result->coverage[idx].num_addresses = 0;
             result->coverage[idx].addresses = nullptr;
             result->coverage[idx].pc_coverage = nullptr;
             result->coverage[idx].pc_coverage_lengths = nullptr;
-            
-            printf("Instance %u: No branch data available for coverage\n", idx);
+            continue;
         }
+        
+        // Store the coverage length
+        result->coverage[idx].pc_coverage_lengths[0] = coverage_size;
+        result->coverage[idx].pc_coverage[0] = (uint8_t*)malloc(coverage_size);
+        memset(result->coverage[idx].pc_coverage[0], 0, coverage_size);
+        
+        // Get the last PC from the last call (for execution termination)
+        uint32_t last_pc = 0;
+        if (trace_data[idx].no_calls > 0) {
+            last_pc = trace_data[idx].calls[trace_data[idx].no_calls - 1].last_pc;
+            printf("Instance %u: Last PC from last call: %u, success status: %u\n", idx, last_pc, result->success_status[idx]);
+        }
+        
+        // Simple linear PC execution with jumps
+        uint32_t pc = 0;
+        uint32_t jump_idx = 0;  // Current jump index
+        
+        // Process all branches/jumps
+        while (jump_idx < trace_data[idx].no_branches) {
+            // Mark current PC as covered if it's a valid PC and within coverage size
+            if (pc < coverage_size && valid_pcs[pc] == 1) {
+                result->coverage[idx].pc_coverage[0][pc] = 1;
+            }
+            
+            // Check if we need to jump
+            if (trace_data[idx].branches[jump_idx].pc_src == pc) {
+                // Jump to destination
+                pc = trace_data[idx].branches[jump_idx].pc_dst;
+                
+                // Mark the destination PC as covered immediately
+                if (pc < coverage_size && valid_pcs[pc] == 1) {
+                    result->coverage[idx].pc_coverage[0][pc] = 1;
+                }
+                
+                // Move to next jump
+                jump_idx++;
+            } else {
+                // Move to next PC
+                pc++;
+            }
+        }
+        
+        // After processing all jumps, continue execution from current PC to the last PC
+        while (pc <= last_pc && pc < coverage_size) {
+            if (valid_pcs[pc] == 1) {
+                result->coverage[idx].pc_coverage[0][pc] = 1;
+            }
+            pc++;
+        }
+        
+        // Debug print coverage info
+        printf("Instance %u coverage:\n", idx);
+        printf("  Contract address: %s\n", result->coverage[idx].addresses[0]);
+        printf("  Bytecode size: %u bytes\n", coverage_size);
+        
+        // Count covered PCs
+        uint32_t covered_count = 0;
+        for (uint32_t i = 0; i < coverage_size; i++) {
+            if (result->coverage[idx].pc_coverage[0][i] == 1) {
+                covered_count++;
+                printf("%u ", i);
+            }
+        }
+        printf("\n");
+        printf("  Total covered PCs: %u\n", covered_count);
     }
     
-
+    // Clean up trace data
+    delete[] trace_data;
     
     return result;
 }
@@ -651,7 +693,10 @@ void free_gpu_execution_results(GPUExecutionResultC* result) {
         free(result->coverage[i].pc_coverage_lengths);
     }
     free(result->coverage);
-    
+    // Free success status data
+    if (result->success_status != nullptr) {
+        free(result->success_status); // Freed because malloc was used
+    }
     // Free the result itself
     free(result);
 }

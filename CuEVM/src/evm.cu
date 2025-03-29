@@ -213,7 +213,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
     // printf("error_code start_call: %d\n", error_code);
     if (error_code != ERROR_SUCCESS) {
 #ifdef BUILD_LIBRARY
-        global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(0);
+        global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(0, 0);
 #endif
         return;  // finish call
     }
@@ -836,7 +836,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         }
     }
 #ifdef BUILD_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call((error_code == ERROR_RETURN));
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call((error_code == ERROR_RETURN), call_state_ptr->pc);
 #endif
 
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;

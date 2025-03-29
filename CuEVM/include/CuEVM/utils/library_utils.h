@@ -50,6 +50,7 @@ struct call_trace {
     evm_word_t receiver;
     evm_word_t value;
     uint8_t success = UINT8_MAX;  // 0 or 1
+    uint32_t last_pc; // the last pc of the call before returning
     // todo add more depth + result etc
 };
 struct branch_trace {
@@ -78,7 +79,7 @@ struct simplified_trace_data {
     // compbine start + finish for simple trace
     __device__ void record_operation(const uint32_t pc, const uint8_t op);
     __device__ void start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
-    __device__ void finish_call(uint8_t success);
+    __device__ void finish_call(uint8_t success, uint32_t last_pc);
     __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
     __device__ void record_distance(uint8_t op, const CuEVM::evm_stack_t& stack_ptr);
     __device__ void print();

@@ -227,7 +227,7 @@ __host__ int32_t byte_array_t::from_hex_set_be(const char *clean_hex_string, int
 __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, PaddingDirection padding) {
     char *tmp_hex_char;
     tmp_hex_char = (char *)hex_string;
-    printf("byte array from hex: %s\n", hex_string);
+    // printf("byte array from hex: %s\n", hex_string);
     int32_t length = CuEVM::utils::clean_hex_string(&tmp_hex_char);
     if (length < 0) {
         data = nullptr;
@@ -238,7 +238,7 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
         free();
     }
     size = new_size;
-    printf("size: %d\n", size);
+    // printf("size: %d\n", size);
     if (size > 0) {
         data = new uint8_t[size];
         memset(data, 0, size * sizeof(uint8_t));
@@ -257,11 +257,11 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
         data = nullptr;
         size = 0;
     }
-    printf("end of byte array from hex\n");
-    for (uint32_t idx = 0; idx < size; idx++) {
-        printf("%02x", data[idx]);
-    }
-    printf("\n");
+    // printf("end of byte array from hex\n");
+    // for (uint32_t idx = 0; idx < size; idx++) {
+    //     printf("%02x", data[idx]);
+    // }
+    // printf("\n");
     return error_code;
 }
 
