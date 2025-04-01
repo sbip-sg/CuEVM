@@ -15,7 +15,7 @@ struct evm_word_t : uint256 {
     /**
      * The default constructor.
      */
-    __host__ __device__ evm_word_t() {}
+    evm_word_t() = default;
     /**
      * The copy constructor.
      */
