@@ -30,18 +30,18 @@ extern "C" {
 #endif
 // CuEVM Go interface functions
 
-// Define in the C++ side (gpu_execution.h or similar)
-struct GPUExecutionResult {
-    // Return data for each instance
-    std::vector<std::vector<uint8_t>> returnData;
+// // Define in the C++ side (gpu_execution.h or similar)
+// struct GPUExecutionResult {
+//     // Return data for each instance
+//     std::vector<std::vector<uint8_t>> returnData;
     
-    // Coverage data for each instance
-    struct CoverageData {
-        std::vector<std::string> addresses;  // Contract addresses as hex strings
-        std::vector<std::vector<uint8_t>> pcCoverage;  // PC coverage for each address
-    };
-    std::vector<CoverageData> coverage;
-};
+//     // Coverage data for each instance
+//     struct CoverageData {
+//         std::vector<std::string> addresses;  // Contract addresses as hex strings
+//         std::vector<std::vector<uint8_t>> pcCoverage;  // PC coverage for each address
+//     };
+//     std::vector<CoverageData> coverage;
+// };
 
 // Define C-compatible structures that can be shared with Go
 typedef struct {
@@ -53,13 +53,13 @@ typedef struct {
     char** addresses;  // Array of contract addresses as strings
     uint32_t num_addresses;  // Number of addresses
     
-    uint8_t** pc_coverage;  // Array of PC coverage arrays
-    uint32_t* pc_coverage_lengths;  // Length of each PC coverage array
+    uint64_t** branch_coverage;  // Array of branch coverage arrays
+    uint32_t* branch_coverage_lengths;  // Length of each branch coverage array
 } CoverageDataEntry;
 
 typedef struct {
     ReturnDataEntry* return_data;  // Array of return data entries
-    uint32_t num_return_data;  // Number of return data entries
+    uint32_t num_return_data;  // Number of7 return data entries
     CoverageDataEntry* coverage;  // Array of coverage data entries
     uint32_t num_coverage;  // Number of coverage entries
     uint8_t* success_status; 

@@ -6,7 +6,7 @@ static uint32_t g_num_instances = 0;
 static CuEVM::StateDb* g_state_db_ptr = nullptr;
 static int call_counter = 0;
 // Global variable to hold persistent jump table
-CuEVM::ContractPCsMap contract_pcs_map;
+// CuEVM::ContractPCsMap contract_pcs_map;
 
 // Global variable to hold the last execution result
 static char* g_last_result = nullptr;
@@ -84,31 +84,6 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances) {
     call_counter = 0;
     // Initialize the global jump table for coverage tracking
 
-    // Print the contract_pcs_map after processing the state
-    printf("Coverage data after processing state:\n");
-    for (const auto& entry : contract_pcs_map) {
-        // Print contract address - using proper hex conversion
-        printf("Contract ");
-        char addr_buf[70]; // Buffer large enough for 0x + 64 hex chars + null terminator
-        entry.first.to_hex(addr_buf); // Use the proper to_hex method on evm_word_t
-        printf("%s:\n", addr_buf);
-        
-        // Print coverage information
-        printf("  Bytecode size: %zu bytes\n", entry.second.size());
-        
-        // Print first few PCs (up to 20) for verification
-        printf("  First PCs with coverage: ");
-        int count = 0;
-        for (uint32_t i = 0; i < entry.second.size() && count < 20; i++) {
-            if (entry.second[i] == 1) {
-                printf("%u ", i);
-                count++;
-            }
-        }
-        printf("\n");
-    }
-    printf("Total contracts with coverage data: %zu\n", contract_pcs_map.size());
-  
 
     // Free JSON object
     cJSON_Delete(stateJson);
@@ -546,8 +521,8 @@ GPUExecutionResultC* get_gpu_execution_results() {
         // Set up coverage data structure
         result->coverage[idx].num_addresses = 1;  // One contract per instance for simplicity
         result->coverage[idx].addresses = (char**)malloc(sizeof(char*) * result->coverage[idx].num_addresses);
-        result->coverage[idx].pc_coverage = (uint8_t**)malloc(sizeof(uint8_t*) * result->coverage[idx].num_addresses);
-        result->coverage[idx].pc_coverage_lengths = (uint32_t*)malloc(sizeof(uint32_t) * result->coverage[idx].num_addresses);
+        result->coverage[idx].branch_coverage = (uint64_t**)malloc(sizeof(uint8_t*) * result->coverage[idx].num_addresses);
+        result->coverage[idx].branch_coverage_lengths = (uint32_t*)malloc(sizeof(uint32_t) * result->coverage[idx].num_addresses);
         
         // Use contract address from receiver of first call if available, otherwise use placeholder
         if (trace_data[idx].no_calls > 0) {
@@ -561,45 +536,12 @@ GPUExecutionResultC* get_gpu_execution_results() {
         }
         
         // Get valid PCs vector from the hash map
-        uint32_t coverage_size = 0;
-        std::vector<uint8_t> valid_pcs;
-        
-        if (trace_data[idx].no_calls > 0) {
-            auto it = contract_pcs_map.find(trace_data[idx].calls[0].receiver);
-            if (it != contract_pcs_map.end()) {
-                valid_pcs = it->second;
-                coverage_size = valid_pcs.size();
-            } else {
-                printf("Instance %u: Contract not found in PC map, skipping\n", idx);
-                free(result->coverage[idx].addresses[0]);
-                free(result->coverage[idx].addresses);
-                free(result->coverage[idx].pc_coverage);
-                free(result->coverage[idx].pc_coverage_lengths);
-                
-                result->coverage[idx].num_addresses = 0;
-                result->coverage[idx].addresses = nullptr;
-                result->coverage[idx].pc_coverage = nullptr;
-                result->coverage[idx].pc_coverage_lengths = nullptr;
-                continue;
-            }
-        } else {
-            printf("Instance %u: No calls available, skipping\n", idx);
-            free(result->coverage[idx].addresses[0]);
-            free(result->coverage[idx].addresses);
-            free(result->coverage[idx].pc_coverage);
-            free(result->coverage[idx].pc_coverage_lengths);
-            
-            result->coverage[idx].num_addresses = 0;
-            result->coverage[idx].addresses = nullptr;
-            result->coverage[idx].pc_coverage = nullptr;
-            result->coverage[idx].pc_coverage_lengths = nullptr;
-            continue;
-        }
+        uint32_t coverage_size = trace_data[idx].no_branches + 2; // branches + entry + return per medusa
         
         // Store the coverage length
-        result->coverage[idx].pc_coverage_lengths[0] = coverage_size;
-        result->coverage[idx].pc_coverage[0] = (uint8_t*)malloc(coverage_size);
-        memset(result->coverage[idx].pc_coverage[0], 0, coverage_size);
+        result->coverage[idx].branch_coverage_lengths[0] = coverage_size;
+        result->coverage[idx].branch_coverage[0] = (uint64_t*)malloc(coverage_size*sizeof(uint64_t));
+        memset(result->coverage[idx].branch_coverage[0], 0, coverage_size*sizeof(uint64_t));
         
         // Get the last PC from the last call (for execution termination)
         uint32_t last_pc = 0;
@@ -608,58 +550,60 @@ GPUExecutionResultC* get_gpu_execution_results() {
             printf("Instance %u: Last PC from last call: %u, success status: %u\n", idx, last_pc, result->success_status[idx]);
         }
         
-        // Simple linear PC execution with jumps
-        uint32_t pc = 0;
-        uint32_t jump_idx = 0;  // Current jump index
+        // Constants for marker types - same as in golang
+        const uint64_t REVERT_MARKER_XOR = 0x40000000;
+        const uint64_t RETURN_MARKER_XOR = 0x80000000;
+        const uint64_t ENTER_MARKER_XOR = 0xC0000000;
         
-        // Process all branches/jumps
-        while (jump_idx < trace_data[idx].no_branches) {
-            // Mark current PC as covered if it's a valid PC and within coverage size
-            if (pc < coverage_size && valid_pcs[pc] == 1) {
-                result->coverage[idx].pc_coverage[0][pc] = 1;
-            }
+        // Branch coverage construction
+        uint32_t coverage_index = 0;
+        
+
+        result->coverage[idx].branch_coverage[0][coverage_index++] = ENTER_MARKER_XOR << 32;
+       
+        
+        // Process all branches
+        for (uint32_t branch_idx = 0; branch_idx < trace_data[idx].no_branches; branch_idx++) {
+            uint32_t src_pc = trace_data[idx].branches[branch_idx].pc_src;
+            uint32_t dst_pc = trace_data[idx].branches[branch_idx].pc_dst;
             
-            // Check if we need to jump
-            if (trace_data[idx].branches[jump_idx].pc_src == pc) {
-                // Jump to destination
-                pc = trace_data[idx].branches[jump_idx].pc_dst;
-                
-                // Mark the destination PC as covered immediately
-                if (pc < coverage_size && valid_pcs[pc] == 1) {
-                    result->coverage[idx].pc_coverage[0][pc] = 1;
-                }
-                
-                // Move to next jump
-                jump_idx++;
-            } else {
-                // Move to next PC
-                pc++;
-            }
+            // Jump marker: upper 32 bits = source PC, lower 32 bits = destination PC
+            uint64_t jump_marker = ((uint64_t)src_pc << 32) | dst_pc;
+            result->coverage[idx].branch_coverage[0][coverage_index++] = jump_marker;
         }
+        last_pc = last_pc - 1;
+        // Add termination marker (return or revert) based on success status
+        uint64_t term_marker = ((uint64_t)last_pc << 32) | REVERT_MARKER_XOR;
+        if (result->success_status[idx])
+            // Return marker: upper 32 bits = last PC, lower 32 bits = RETURN_MARKER_XOR
+            term_marker = ((uint64_t)last_pc << 32) | RETURN_MARKER_XOR;
         
-        // After processing all jumps, continue execution from current PC to the last PC
-        while (pc <= last_pc && pc < coverage_size) {
-            if (valid_pcs[pc] == 1) {
-                result->coverage[idx].pc_coverage[0][pc] = 1;
-            }
-            pc++;
-        }
-        
+        result->coverage[idx].branch_coverage[0][coverage_index++] = term_marker;
+
         // Debug print coverage info
-        printf("Instance %u coverage:\n", idx);
+        printf("CuEVM Instance %u coverage:\n", idx);
         printf("  Contract address: %s\n", result->coverage[idx].addresses[0]);
-        printf("  Bytecode size: %u bytes\n", coverage_size);
+        printf("  Coverage markers: %u\n", coverage_index);
         
-        // Count covered PCs
-        uint32_t covered_count = 0;
-        for (uint32_t i = 0; i < coverage_size; i++) {
-            if (result->coverage[idx].pc_coverage[0][i] == 1) {
-                covered_count++;
-                printf("%u ", i);
+        // Print each marker in a similar format to Go's debug output
+        for (uint32_t i = 0; i < coverage_index; i++) {
+            uint64_t marker = result->coverage[idx].branch_coverage[0][i];
+            uint32_t src = marker >> 32;
+            uint32_t dst = marker & 0xFFFFFFFF;
+            
+            printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", 
+                  i, marker, src, src, dst, dst);
+                  
+            if (src == ENTER_MARKER_XOR) {
+                printf(" (ENTER)\n");
+            } else if (dst == REVERT_MARKER_XOR) {
+                printf(" (REVERT)\n");
+            } else if (dst == RETURN_MARKER_XOR) {
+                printf(" (RETURN)\n");
+            } else {
+                printf(" (JUMP)\n");
             }
         }
-        printf("\n");
-        printf("  Total covered PCs: %u\n", covered_count);
     }
     
     // Clean up trace data
@@ -687,10 +631,10 @@ void free_gpu_execution_results(GPUExecutionResultC* result) {
         
         // Free PC coverage
         for (uint32_t j = 0; j < result->coverage[i].num_addresses; j++) {
-            free(result->coverage[i].pc_coverage[j]);
+            free(result->coverage[i].branch_coverage[j]);
         }
-        free(result->coverage[i].pc_coverage);
-        free(result->coverage[i].pc_coverage_lengths);
+        free(result->coverage[i].branch_coverage);
+        free(result->coverage[i].branch_coverage_lengths);
     }
     free(result->coverage);
     // Free success status data

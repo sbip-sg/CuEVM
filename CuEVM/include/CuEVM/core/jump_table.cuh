@@ -43,9 +43,6 @@ struct GlobalJumpTable {
 
     // Analyze the bytecode and fill the jump table. Returns non-zero when failed
     __host__ int32_t analyze(uint8_t* bytecode, uint32_t bitmap_offset_start, uint32_t size
-#ifdef BUILD_GO_LIBRARY
-    , evm_word_t contract_addr
-#endif
     );
 
     // Check if the pc is a valid jump destination, assuming the `bitmap_offset_start` contains valid value
@@ -58,6 +55,3 @@ struct GlobalJumpTable {
 };
 
 }
-#ifdef BUILD_GO_LIBRARY
-    extern CuEVM::ContractPCsMap contract_pcs_map;
-#endif
