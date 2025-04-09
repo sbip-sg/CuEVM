@@ -539,20 +539,18 @@ GPUExecutionResultC* get_gpu_execution_results() {
         }
         
         // Get valid PCs vector from the hash map
-        uint32_t coverage_size = trace_data[idx].no_branches + 2; // branches + entry + return per medusa
+        uint32_t coverage_size = trace_data[idx].no_branches + 1 + trace_data[idx].no_calls; // branches + entry + return per medusa
         
         // Store the coverage length
         result->coverage[idx].branch_coverage_lengths[0] = coverage_size;
         result->coverage[idx].branch_coverage[0] = (uint64_t*)malloc(coverage_size*sizeof(uint64_t));
         memset(result->coverage[idx].branch_coverage[0], 0, coverage_size*sizeof(uint64_t));
         
-        // Get the last PC from the last call (for execution termination)
-        uint32_t last_pc = 0;
-        if (trace_data[idx].no_calls > 0) {
-            last_pc = trace_data[idx].calls[trace_data[idx].no_calls - 1].last_pc;
-            printf("Instance %u: Last PC from last call: %u, success status: %u\n", idx, last_pc, result->success_status[idx]);
+        for (uint32_t i = 0; i < trace_data[idx].no_calls; i++) {
+            printf("Instance %u: Call %u: Last PC: %u, success status: %u\n", idx, i, trace_data[idx].calls[i].last_pc, trace_data[idx].calls[i].success);
         }
         
+            
         // Constants for marker types - same as in golang
         const uint64_t REVERT_MARKER_XOR = 0x40000000;
         const uint64_t RETURN_MARKER_XOR = 0x80000000;
@@ -562,8 +560,24 @@ GPUExecutionResultC* get_gpu_execution_results() {
         uint32_t coverage_index = 0;
         
 
-        result->coverage[idx].branch_coverage[0][coverage_index++] = ENTER_MARKER_XOR << 32;
+        for (uint32_t i = 0; i < trace_data[idx].no_calls; i++) {
+            result->coverage[idx].branch_coverage[0][coverage_index++] = ENTER_MARKER_XOR << 32;
+            uint32_t last_pc = trace_data[idx].calls[i].last_pc;
+            last_pc = last_pc - 1;
+            // Add termination marker (return or revert) based on success status
+            uint64_t term_marker = ((uint64_t)last_pc << 32) | REVERT_MARKER_XOR;
+            if (trace_data[idx].calls[i].success){
+                // Return marker: upper 32 bits = last PC, lower 32 bits = RETURN_MARKER_XOR
+                term_marker = ((uint64_t)last_pc << 32) | RETURN_MARKER_XOR;
+            }
+            result->coverage[idx].branch_coverage[0][coverage_index++] = term_marker;
+        }
+
+            
        
+        
+
+
         
         // Process all branches
         for (uint32_t branch_idx = 0; branch_idx < trace_data[idx].no_branches; branch_idx++) {
@@ -574,15 +588,7 @@ GPUExecutionResultC* get_gpu_execution_results() {
             uint64_t jump_marker = ((uint64_t)src_pc << 32) | dst_pc;
             result->coverage[idx].branch_coverage[0][coverage_index++] = jump_marker;
         }
-        last_pc = last_pc - 1;
-        // Add termination marker (return or revert) based on success status
-        uint64_t term_marker = ((uint64_t)last_pc << 32) | REVERT_MARKER_XOR;
-        if (result->success_status[idx])
-            // Return marker: upper 32 bits = last PC, lower 32 bits = RETURN_MARKER_XOR
-            term_marker = ((uint64_t)last_pc << 32) | RETURN_MARKER_XOR;
-        
-        result->coverage[idx].branch_coverage[0][coverage_index++] = term_marker;
-
+ 
         // Debug print coverage info
         printf("CuEVM Instance %u coverage:\n", idx);
         printf("  Contract address: %s\n", result->coverage[idx].addresses[0]);
