@@ -71,10 +71,13 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances) {
     uint32_t num_transactions = num_instances;
 
     // Free previous state DB if it exists
-    if (g_state_db_ptr != nullptr) {
-        delete g_state_db_ptr;
-        g_state_db_ptr = nullptr;
-    }
+    // CuEVM debug, device reset over library calls, dangling pointer
+    // TODO: more efficient state db reset mechanism 
+    g_state_db_ptr = nullptr;
+    // if (g_state_db_ptr != nullptr) {
+    //     delete g_state_db_ptr;
+    //     g_state_db_ptr = nullptr;
+    // }
     // Initialize and store the state DB and account count globally
     // Modify GPUfromJson to use the persistent jump table
     CuEVM::StateDb::GPUfromJson(g_state_db_ptr, world_state_json, num_transactions, g_num_accounts);
