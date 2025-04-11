@@ -468,12 +468,13 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
 
 
 GPUExecutionResultC* get_gpu_execution_results() {
-    // Allocate result structure
-    GPUExecutionResultC* result = (GPUExecutionResultC*)malloc(sizeof(GPUExecutionResultC));
+    // Allocate and initialize result structure
+    GPUExecutionResultC* result = (GPUExecutionResultC*)calloc(1, sizeof(GPUExecutionResultC));
     if (result == nullptr) {
         printf("Failed to allocate memory for GPUExecutionResultC\n");
         return nullptr;
     }
+    result->allocations_valid = 1;
     
     // Retrieve trace data from device memory - similar to print_evm_instances_results
     CuEVM::simplified_trace_data* trace_data = new CuEVM::simplified_trace_data[g_num_instances];
@@ -622,35 +623,50 @@ GPUExecutionResultC* get_gpu_execution_results() {
 }
 
 void free_gpu_execution_results(GPUExecutionResultC* result) {
-    if (result == nullptr) return;
+    if (result == nullptr || result->allocations_valid == 0) return;
     
     // Free return data
-    for (uint32_t i = 0; i < result->num_return_data; i++) {
-        free(result->return_data[i].data);
+    if (result->return_data != nullptr) {
+        for (uint32_t i = 0; i < result->num_return_data; i++) {
+            if (result->return_data[i].data != nullptr) {
+                free(result->return_data[i].data);
+            }
+        }
+        free(result->return_data);
     }
-    free(result->return_data);
     
     // Free coverage data
-    for (uint32_t i = 0; i < result->num_coverage; i++) {
-        // Free addresses
-        for (uint32_t j = 0; j < result->coverage[i].num_addresses; j++) {
-            free(result->coverage[i].addresses[j]);
+    if (result->coverage != nullptr) {
+        for (uint32_t i = 0; i < result->num_coverage; i++) {
+            if (result->coverage[i].addresses != nullptr) {
+                for (uint32_t j = 0; j < result->coverage[i].num_addresses; j++) {
+                    if (result->coverage[i].addresses[j] != nullptr) {
+                        free(result->coverage[i].addresses[j]);
+                    }
+                }
+                free(result->coverage[i].addresses);
+            }
+            
+            if (result->coverage[i].branch_coverage != nullptr) {
+                for (uint32_t j = 0; j < result->coverage[i].num_addresses; j++) {
+                    if (result->coverage[i].branch_coverage[j] != nullptr) {
+                        free(result->coverage[i].branch_coverage[j]);
+                    }
+                }
+                free(result->coverage[i].branch_coverage);
+            }
+            free(result->coverage[i].branch_coverage_lengths);
         }
-        free(result->coverage[i].addresses);
-        
-        // Free PC coverage
-        for (uint32_t j = 0; j < result->coverage[i].num_addresses; j++) {
-            free(result->coverage[i].branch_coverage[j]);
-        }
-        free(result->coverage[i].branch_coverage);
-        free(result->coverage[i].branch_coverage_lengths);
+        free(result->coverage);
     }
-    free(result->coverage);
+    
     // Free success status data
     if (result->success_status != nullptr) {
-        free(result->success_status); // Freed because malloc was used
+        free(result->success_status);
     }
-    // Free the result itself
+    
+    // Mark as freed and free the result itself
+    result->allocations_valid = 0;
     free(result);
 }
 
