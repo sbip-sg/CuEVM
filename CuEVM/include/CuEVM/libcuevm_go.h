@@ -59,10 +59,11 @@ typedef struct {
 
 typedef struct {
     ReturnDataEntry* return_data;  // Array of return data entries
-    uint32_t num_return_data;  // Number of7 return data entries
-    CoverageDataEntry* coverage;  // Array of coverage data entries
-    uint32_t num_coverage;  // Number of coverage entries
-    uint8_t* success_status; 
+    uint32_t num_return_data;      // Number of return data entries
+    CoverageDataEntry* coverage;   // Array of coverage data entries
+    uint32_t num_coverage;         // Number of coverage entries
+    uint8_t* success_status;
+    uint8_t allocations_valid;     // Track if allocations are valid (1) or freed (0)
 } GPUExecutionResultC;
 
 
