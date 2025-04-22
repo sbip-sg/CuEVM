@@ -1,7 +1,8 @@
 #include <CuEVM/utils/library_utils.h>
 
-#include <sstream>
+#include <CuEVM/utils/error_codes.cuh>
 #include <cassert>
+#include <sstream>
 
 #define CHECK_AND_RETURN_ON_ERROR(expr)                                                                            \
     do {                                                                                                           \
@@ -13,7 +14,6 @@
             throw std::runtime_error(oss.str());                                                                   \
         }                                                                                                          \
     } while (0)
-
 
 namespace CuEVM {
 
@@ -75,8 +75,8 @@ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::
     last_distance = distance;
 }
 
-__device__ void simplified_trace_data::record_operation(const uint32_t pc, const uint8_t op){
-    // for simple trace, no need stack content 
+__device__ void simplified_trace_data::record_operation(const uint32_t pc, const uint8_t op) {
+    // for simple trace, no need stack content
     if (no_events >= MAX_TRACE_EVENTS) return;
     events[no_events].pc = pc;
     events[no_events].op = op;
@@ -101,19 +101,22 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     calls[no_calls].op = call_context_ptr->call_type;
     calls[no_calls].value = call_context_ptr->value;
 
-    calls[no_calls].success = UINT8_MAX;
+    calls[no_calls].error_code = RESERVED_ERROR_CODE;
     calls[no_calls].last_pc = 0;
     no_calls++;
 }
-__device__ void simplified_trace_data::finish_call(uint8_t success, uint32_t last_pc) {
+__device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc) {
     if (no_calls > MAX_CALLS_TRACING) return;
 
     for (int i = no_calls - 1; i >= 0; i--) {
         // Check if this call is marked as unfinished (using the sentinel value)
-        if (calls[i].success == UINT8_MAX) {
+        if (calls[i].error_code == RESERVED_ERROR_CODE) {
             // Found the correct call frame, update its results
             calls[i].last_pc = last_pc;
-            calls[i].success = success;
+            if (error_code == ERROR_RETURN || error_code == ERROR_SUCCESS)
+                calls[i].error_code = ERROR_SUCCESS;
+            else
+                calls[i].error_code = error_code;
             // Stop searching, we've updated the corresponding call
             break;
         }
@@ -129,8 +132,8 @@ __host__ __device__ void simplified_trace_data::print() {
     }
     printf("calls\n");
     for (uint32_t i = 0; i < no_calls; i++) {
-        printf("pc %u op %u sender %s receiver %s value %s success %u\n", calls[i].pc, calls[i].op,
-               calls[i].sender.to_hex(), calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].success);
+        printf("pc %u op %u sender %s receiver %s value %s error_code %u\n", calls[i].pc, calls[i].op,
+               calls[i].sender.to_hex(), calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].error_code);
     }
     printf("branches\n");
     for (uint32_t i = 0; i < no_branches; i++) {
@@ -140,7 +143,6 @@ __host__ __device__ void simplified_trace_data::print() {
 }
 __device__ serialized_worldstate_data* global_serialized_worldstate;
 __device__ simplified_trace_data* global_simplified_trace;
-
 
 void freeTransactionList(TransactionList* d_transaction_list_ptr) {
     if (d_transaction_list_ptr == nullptr) {

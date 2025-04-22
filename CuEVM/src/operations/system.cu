@@ -102,13 +102,15 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
         parent_memory_ptr->increase_memory_cost(memory_expansion_cost);
 
         if (new_context_ptr->call_type != OP_CALLCODE &&
-            new_context_ptr->call_type != OP_DELEGATECALL) { // special case: the code is set outside
-            new_context_ptr->byte_code = CuEVM::global_state_db_ptr->get_code(new_context_ptr->byte_code_size, contract_address_ptr);
+            new_context_ptr->call_type != OP_DELEGATECALL) {  // special case: the code is set outside
+            new_context_ptr->byte_code =
+                CuEVM::global_state_db_ptr->get_code(new_context_ptr->byte_code_size, contract_address_ptr);
             new_context_ptr->bytecode_offset = find_global_bytecode_offset(contract_address_ptr);
         }
 
         uint8_t *call_data = nullptr;
-        if (uint256_cmp_word(args_size, 0) > 0) error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data);
+        if (uint256_cmp_word(args_size, 0) > 0)
+            error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data);
         new_context_ptr->call_data = call_data;
         new_context_ptr->call_data_size = args_size_ui32;
     }
@@ -206,8 +208,8 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         int32_t bytecode_offset = -1;
 
         new_context_ptr->initiate_values(current_context, gas_capped, current_context->to, contract_address,
-                                         contract_address, *value, call_type, nullptr, 0, initialisation_code, length_ui32, bytecode_offset, 0,
-                                         current_context->static_env);
+                                         contract_address, *value, call_type, nullptr, 0, initialisation_code,
+                                         length_ui32, bytecode_offset, 0, current_context->static_env);
 
         error_code |= (current_context->static_env ? ERROR_STATIC_CALL_CONTEXT_CREATE :
 #ifdef EIP_3860
@@ -543,7 +545,7 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
  * The INVALID operation.
  * @return The error code.
  */
-__device__ int32_t INVALID() { return ERROR_NOT_IMPLEMENTED; }
+__device__ int32_t INVALID() { return ERROR_INVALID_OPCODE; }
 
 /**
  * The SELFDESTRUCT operation.

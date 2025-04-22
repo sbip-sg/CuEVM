@@ -86,7 +86,8 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                         transaction_list_ptr->sender, transaction_list_ptr->to,
                                         transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
-                                        OP_CREATE, call_data, call_data_size, call_data, call_data_size, bytecode_offset);
+                                        OP_CREATE, call_data, call_data_size, call_data, call_data_size,
+                                        bytecode_offset);
     } else {
         byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
         bytecode_offset = find_global_bytecode_offset(&transaction_list_ptr->to);
@@ -235,7 +236,8 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         }
 #endif
         // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
+        //     %lu\n",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
         //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
         //            cached_call_state.gas_limit, cached_call_state.gas_used);
@@ -537,7 +539,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                                                 ,
                                                 &global_simplified_trace[INSTANCE_GLOBAL_IDX]
 #endif
-                                                );
+                        );
                     break;
                 case OP_JUMPI:
                     error_code =
@@ -631,7 +633,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     {
                         error_code = CuEVM::operations::LOGX(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                              *cached_call_state.stack_ptr, call_state_ptr, opcode);
-                    } else{
+                    } else {
                         error_code = CuEVM::operations::INVALID();
 #ifdef BUILD_GO_LIBRARY
                         global_simplified_trace[INSTANCE_GLOBAL_IDX].record_operation(cached_call_state.pc, opcode);
@@ -713,7 +715,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
     gas_t gas_value;
     const evm_word_t *beneficiary = &(global_block_info->coin_base);
     // block_info_ptr->get_coin_base(beneficiary);
-
+    printf("CuEVM Debug: finish_TRANSACTION error_code %d\n", error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         gas_t gas_left;
         // \f$T_{g} - g\f$
@@ -836,7 +838,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         }
     }
 #ifdef BUILD_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call((error_code == ERROR_RETURN), call_state_ptr->pc);
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, call_state_ptr->pc);
 #endif
 
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
@@ -973,7 +975,7 @@ __host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *tes
     uint32_t num_original_transactions = 0;
 
     auto err = CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones);
-    if (err){
+    if (err) {
         printf("get_transactions failed with error %d\n", err);
         return nullptr;
     }

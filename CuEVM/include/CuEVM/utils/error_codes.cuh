@@ -7,7 +7,7 @@
 
 // error codes
 #define ERROR_SUCCESS 0x00
-#define ERROR_FAILED 0xFF
+#define RESERVED_ERROR_CODE 0xFF
 #define ERROR_RETURN 0xFE
 #define ERROR_REVERT 0xFD
 
@@ -26,7 +26,7 @@
 #define ERROR_STORAGE_KEY_NOT_FOUND 0x0A
 
 // operation not implemented
-#define ERROR_NOT_IMPLEMENTED 0x0B
+#define ERROR_INVALID_OPCODE 0x0B
 
 // EVM error codes
 #define ERROR_MAX_DEPTH_EXCEEDED 0x0C

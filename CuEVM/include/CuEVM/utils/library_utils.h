@@ -4,6 +4,7 @@
 #include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/core/memory_pool.cuh>
+#include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
 #include <CuEVM/utils/opcodes.cuh>
 #include <unordered_set>
@@ -49,8 +50,8 @@ struct call_trace {
     evm_word_t sender;
     evm_word_t receiver;
     evm_word_t value;
-    uint8_t success = UINT8_MAX;  // 0 or 1
-    uint32_t last_pc; // the last pc of the call before returning
+    uint8_t error_code = RESERVED_ERROR_CODE;  // 0 or 1
+    uint32_t last_pc;                          // the last pc of the call before returning
     // todo add more depth + result etc
 };
 struct branch_trace {
@@ -61,6 +62,11 @@ struct branch_trace {
 
     // todo: use evm_word_t for distance
 };
+
+// struct return_data {
+//     uint8_t data_length;
+//     uint8_t data[32];  // dont support return data copy yet.
+// };
 
 struct simplified_trace_data {
     simple_event_trace events[MAX_TRACE_EVENTS];
