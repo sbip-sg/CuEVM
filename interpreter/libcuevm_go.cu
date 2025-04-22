@@ -525,7 +525,7 @@ GPUExecutionResultC* get_gpu_execution_results() {
         // Set up coverage data structure
         result->coverage[idx].num_addresses = 1;  // One contract per instance for simplicity
         result->coverage[idx].addresses = (char**)malloc(sizeof(char*) * result->coverage[idx].num_addresses);
-        result->coverage[idx].branch_coverage = (uint64_t**)malloc(sizeof(uint8_t*) * result->coverage[idx].num_addresses);
+        result->coverage[idx].branch_coverage = (uint64_t**)malloc(sizeof(uint64_t*) * result->coverage[idx].num_addresses);
         result->coverage[idx].branch_coverage_lengths = (uint32_t*)malloc(sizeof(uint32_t) * result->coverage[idx].num_addresses);
         
         // Use contract address from receiver of first call if available, otherwise use placeholder
@@ -540,8 +540,8 @@ GPUExecutionResultC* get_gpu_execution_results() {
         }
         
         // Get valid PCs vector from the hash map
-        uint32_t coverage_size = trace_data[idx].no_branches + 1 + trace_data[idx].no_calls; // branches + entry + return per medusa
-        
+        uint32_t coverage_size = 2 * trace_data[idx].no_calls + trace_data[idx].no_branches;
+
         // Store the coverage length
         result->coverage[idx].branch_coverage_lengths[0] = coverage_size;
         result->coverage[idx].branch_coverage[0] = (uint64_t*)malloc(coverage_size*sizeof(uint64_t));
