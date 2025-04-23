@@ -25,6 +25,7 @@ set(CMAKE_CUDA_ARCHITECTURES ${CUDA_COMPUTE_CAPABILITY})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 find_package(cJSON REQUIRED) # Assuming cJSON is available as a find package
+find_package(OpenMP) # Find OpenMP
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 if(DOCS)
@@ -119,6 +120,13 @@ elseif(BUILD_GO_LIBRARY)
     )
     # Link the library to its dependencies
     target_link_libraries(${PROJECT_NAME}_go PRIVATE CuCrypto CuBigInt CuEVM)
+    # Link OpenMP if found
+    if(OpenMP_FOUND)
+        target_link_libraries(${PROJECT_NAME}_go PUBLIC OpenMP::OpenMP_CXX)
+        message(STATUS "OpenMP found and linked to cuevm_go")
+    else()
+         message(WARNING "OpenMP not found, cuevm_go parallel loop will not be enabled.")
+    endif()
     target_link_libraries(${PROJECT_NAME}_go PUBLIC gmp cjson ${CUDA_LIBRARIES})
 
     target_compile_options(${PROJECT_NAME}_go PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)

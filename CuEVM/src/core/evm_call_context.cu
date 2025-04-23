@@ -46,8 +46,8 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
                                                     CuEVM::evm_memory_t* memory_ptr, evm_word_t from, evm_word_t to,
                                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
-                                                    uint32_t byte_code_size, int32_t bytecode_offset, evm_call_context_t* parent,
-                                                    bool static_env, gas_t gas_refund) {
+                                                    uint32_t byte_code_size, int32_t bytecode_offset,
+                                                    evm_call_context_t* parent, bool static_env, gas_t gas_refund) {
     // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, parent, this);
 
@@ -100,13 +100,13 @@ __device__ void evm_call_context_t::clear() {
     this->gas_refund = 0;
     // this->jump_destinations = nullptr;
     if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
-        printf("clear memory ptr %p\n", memory_ptr);
+        // printf("clear memory ptr %p\n", memory_ptr);
         // clear the grow memory when return from subcontext
         // printf("clear %d bytes from memory_pool::preallocated_memory_base[%d] + %d\n",
         //        memory_prealloc_size - memory_ptr->preallocated_base_offset, INSTANCE_GLOBAL_IDX,
         //        memory_ptr->preallocated_base_offset);
         uint32_t size_to_clear = min(memory_ptr->size, memory_prealloc_size - memory_ptr->preallocated_base_offset);
-        printf("size_to_clear %d printf memory\n", size_to_clear);
+        // printf("size_to_clear %d printf memory\n", size_to_clear);
         // printf("previous size to clear %d\n", memory_prealloc_size - memory_ptr->preallocated_base_offset);
         // memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
         //                                               memory_ptr->preallocated_base_offset],
@@ -151,9 +151,9 @@ __device__ evm_call_context_t::~evm_call_context_t() {
 __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, gas_t gas_limit, evm_word_t from,
                                                     evm_word_t to, evm_word_t storage_address, evm_word_t value,
                                                     uint32_t call_type, uint8_t* call_data, uint32_t call_data_size,
-                                                    uint8_t* byte_code, uint32_t byte_code_size, int32_t bytecode_offset,
-                                                    uint32_t return_data_offset, uint32_t return_data_size,
-                                                    bool static_env, gas_t gas_refund) {
+                                                    uint8_t* byte_code, uint32_t byte_code_size,
+                                                    int32_t bytecode_offset, uint32_t return_data_offset,
+                                                    uint32_t return_data_size, bool static_env, gas_t gas_refund) {
     // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
     //        INSTANCE_GLOBAL_IDX, parent, this);
     if (parent == nullptr) {

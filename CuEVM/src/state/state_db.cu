@@ -1,7 +1,7 @@
 #include <CuEVM/core/block_info.cuh>
+#include <CuEVM/core/jump_table.cuh>
 #include <CuEVM/state/state_db.cuh>
 #include <CuEVM/utils/error_codes.cuh>
-#include <CuEVM/core/jump_table.cuh>
 namespace CuEVM {
 
 // return snapshot storage and the offset in the page
@@ -1148,7 +1148,8 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
 
     // CUDA_CHECK(cudaMalloc(&tmp_state_db->snapshot_total_storage_size, num_states * num_accounts *
     // sizeof(uint32_t))); Grouped memory copy
-    CUDA_CHECK(cudaMemcpy(tmp_state_db->global_jump_table, state_db_cpu->global_jump_table, sizeof(GlobalJumpTable), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_state_db->global_jump_table, state_db_cpu->global_jump_table, sizeof(GlobalJumpTable),
+                          cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(tmp_state_db->address_list, state_db_cpu->address_list, num_accounts * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(tmp_state_db->contract_index, state_db_cpu->contract_index, num_accounts * sizeof(int16_t),
@@ -1277,7 +1278,7 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
                            NO_PADDING);
         if (byte_code.size) {
             auto err = state_db->global_jump_table->analyze(byte_code.data, bytecode_offset, byte_code.size);
-            if (err){
+            if (err) {
                 printf("Error %d: Invalid jumptable, things can be broken!\n", err);
             }
         }
@@ -1340,7 +1341,8 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
 
         idx++;
     }
-    state_db->print();
+    // CuEVM debug printing
+    // state_db->print();
 }
 __host__ StateDb *StateDb::GPUFromCPU(StateDb *&state_db) {
     StateDb *state_db_gpu = (StateDb *)malloc(sizeof(StateDb));
@@ -1410,14 +1412,13 @@ __host__ __device__ void StateDb::print() {
     }
 }
 
-    __device__ int32_t find_global_bytecode_offset(const evm_word_t *address) {
-        int32_t address_index = (address == nullptr ? -1 : global_state_db_ptr->get_address_index(address));
-        if (address_index == -1) {
-            return -1;
-        }
-        return global_state_db_ptr->account_codes_offset[address_index];
-
+__device__ int32_t find_global_bytecode_offset(const evm_word_t *address) {
+    int32_t address_index = (address == nullptr ? -1 : global_state_db_ptr->get_address_index(address));
+    if (address_index == -1) {
+        return -1;
     }
+    return global_state_db_ptr->account_codes_offset[address_index];
+}
 
 __device__ StateDb *global_state_db_ptr;
 }  // namespace CuEVM

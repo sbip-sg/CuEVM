@@ -1,4 +1,5 @@
 #include <CuEVM/libcuevm_go.h>
+#include <omp.h>
 
 // Global variables to track state between function calls
 static uint32_t g_num_accounts = 0;
@@ -302,8 +303,8 @@ CuEVM::transaction::TransactionList* create_transaction_list(const unsigned char
     CUDA_CHECK(cudaMemcpy(d_transaction_list_ptr, temp_transaction_list, sizeof(CuEVM::transaction::TransactionList),
                           cudaMemcpyHostToDevice));
 
-    printf("Transaction batch prepared for GPU\n");
-    host_transaction_list->print();
+    // printf("Transaction batch prepared for GPU\n");
+    // host_transaction_list->print();
 
     // trace and serialized state data
     // Simplified trace data
@@ -404,8 +405,8 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
             return nullptr;
         }
 
-        printf("GPU execution completed successfully\n");
-        print_evm_instances_results(g_num_instances, copy_state_data);
+        // printf("GPU execution completed successfully\n");
+        // print_evm_instances_results(g_num_instances, copy_state_data);
 
 #ifdef EIP_3155
         // After kernel execution, copy the buffer back to the host
@@ -469,12 +470,7 @@ GPUExecutionResultC* get_gpu_execution_results() {
         free(result);
         return nullptr;
     }
-
-    // Initialize all return data entries as empty
-    for (uint32_t i = 0; i < result->num_return_data; i++) {
-        result->return_data[i].length = 0;
-        result->return_data[i].data = nullptr;
-    }
+    memset(result->return_data, 0, sizeof(ReturnDataEntry) * result->num_return_data);
 
     // Set up coverage data for all instances
     result->num_coverage = g_num_instances;
@@ -492,7 +488,8 @@ GPUExecutionResultC* get_gpu_execution_results() {
 
     printf("===== Initializing Coverage Data for %u Instances =====\n", g_num_instances);
 
-    // Process each instance's trace data
+// Process each instance's trace data in parallel
+#pragma omp parallel for
     for (uint32_t idx = 0; idx < g_num_instances; idx++) {
         // Set up coverage data structure
         result->coverage[idx].num_addresses = 1;  // One contract per instance for simplicity
@@ -511,6 +508,8 @@ GPUExecutionResultC* get_gpu_execution_results() {
         } else {
             // Use placeholder address
             result->coverage[idx].addresses[0] = strdup("0x0000000000000000000000000000000000000000");
+            // Assuming default error code is 0 or should be set appropriately
+            result->error_codes[idx] = 0;  // Ensure error code is initialized even if no calls
         }
 
         // Get valid PCs vector from the hash map
@@ -518,12 +517,12 @@ GPUExecutionResultC* get_gpu_execution_results() {
 
         // Store the coverage length
         result->coverage[idx].branch_coverage_lengths[0] = coverage_size;
-        result->coverage[idx].branch_coverage[0] = (uint64_t*)malloc(coverage_size * sizeof(uint64_t));
-        memset(result->coverage[idx].branch_coverage[0], 0, coverage_size * sizeof(uint64_t));
-
-        for (uint32_t i = 0; i < trace_data[idx].no_calls; i++) {
-            printf("Instance %u: Call %u: Last PC: %u, error_code: %u\n", idx, i, trace_data[idx].calls[i].last_pc,
-                   trace_data[idx].calls[i].error_code);
+        // Handle case where coverage_size might be 0
+        if (coverage_size > 0) {
+            result->coverage[idx].branch_coverage[0] = (uint64_t*)malloc(coverage_size * sizeof(uint64_t));
+            memset(result->coverage[idx].branch_coverage[0], 0, coverage_size * sizeof(uint64_t));
+        } else {
+            result->coverage[idx].branch_coverage[0] = nullptr;  // Avoid malloc(0)
         }
 
         // Constants for marker types - same as in golang
@@ -534,53 +533,74 @@ GPUExecutionResultC* get_gpu_execution_results() {
         // Branch coverage construction
         uint32_t coverage_index = 0;
 
-        for (uint32_t i = 0; i < trace_data[idx].no_calls; i++) {
-            result->coverage[idx].branch_coverage[0][coverage_index++] = ENTER_MARKER_XOR << 32;
-            uint32_t last_pc = trace_data[idx].calls[i].last_pc;
-            last_pc = last_pc - 1;
-            // Add termination marker (return or revert) based on success status
-            uint64_t term_marker = ((uint64_t)last_pc << 32) | REVERT_MARKER_XOR;
-            if (trace_data[idx].calls[i].error_code == ERROR_SUCCESS) {
-                // Return marker: upper 32 bits = last PC, lower 32 bits = RETURN_MARKER_XOR
-                term_marker = ((uint64_t)last_pc << 32) | RETURN_MARKER_XOR;
+        // Check if branch_coverage[0] is allocated before accessing
+        if (result->coverage[idx].branch_coverage[0] != nullptr) {
+            for (uint32_t i = 0; i < trace_data[idx].no_calls; i++) {
+                // Ensure coverage_index does not exceed allocated size
+                if (coverage_index < coverage_size) {
+                    result->coverage[idx].branch_coverage[0][coverage_index++] = ENTER_MARKER_XOR << 32;
+                }
+                uint32_t last_pc = trace_data[idx].calls[i].last_pc;
+                // Check if last_pc is valid before decrementing
+                if (last_pc > 0) {
+                    last_pc = last_pc - 1;
+                } else {
+                    last_pc = 0;  // Handle edge case where last_pc might be 0
+                }
+
+                // Add termination marker (return or revert) based on success status
+                uint64_t term_marker = ((uint64_t)last_pc << 32) | REVERT_MARKER_XOR;
+                if (trace_data[idx].calls[i].error_code == ERROR_SUCCESS) {
+                    // Return marker: upper 32 bits = last PC, lower 32 bits = RETURN_MARKER_XOR
+                    term_marker = ((uint64_t)last_pc << 32) | RETURN_MARKER_XOR;
+                }
+                // Ensure coverage_index does not exceed allocated size
+                if (coverage_index < coverage_size) {
+                    result->coverage[idx].branch_coverage[0][coverage_index++] = term_marker;
+                }
             }
-            result->coverage[idx].branch_coverage[0][coverage_index++] = term_marker;
-        }
 
-        // Process all branches
-        for (uint32_t branch_idx = 0; branch_idx < trace_data[idx].no_branches; branch_idx++) {
-            uint32_t src_pc = trace_data[idx].branches[branch_idx].pc_src;
-            uint32_t dst_pc = trace_data[idx].branches[branch_idx].pc_dst;
+            // Process all branches
+            for (uint32_t branch_idx = 0; branch_idx < trace_data[idx].no_branches; branch_idx++) {
+                uint32_t src_pc = trace_data[idx].branches[branch_idx].pc_src;
+                uint32_t dst_pc = trace_data[idx].branches[branch_idx].pc_dst;
 
-            // Jump marker: upper 32 bits = source PC, lower 32 bits = destination PC
-            uint64_t jump_marker = ((uint64_t)src_pc << 32) | dst_pc;
-            result->coverage[idx].branch_coverage[0][coverage_index++] = jump_marker;
-        }
-
-        // Debug print coverage info
-        printf("CuEVM Instance %u coverage:\n", idx);
-        printf("  Contract address: %s\n", result->coverage[idx].addresses[0]);
-        printf("  Coverage markers: %u\n", coverage_index);
-
-        // Print each marker in a similar format to Go's debug output
-        for (uint32_t i = 0; i < coverage_index; i++) {
-            uint64_t marker = result->coverage[idx].branch_coverage[0][i];
-            uint32_t src = marker >> 32;
-            uint32_t dst = marker & 0xFFFFFFFF;
-
-            printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", i, marker, src, src, dst, dst);
-
-            if (src == ENTER_MARKER_XOR) {
-                printf(" (ENTER)\n");
-            } else if (dst == REVERT_MARKER_XOR) {
-                printf(" (REVERT)\n");
-            } else if (dst == RETURN_MARKER_XOR) {
-                printf(" (RETURN)\n");
-            } else {
-                printf(" (JUMP)\n");
+                // Jump marker: upper 32 bits = source PC, lower 32 bits = destination PC
+                uint64_t jump_marker = ((uint64_t)src_pc << 32) | dst_pc;
+                // Ensure coverage_index does not exceed allocated size
+                if (coverage_index < coverage_size) {
+                    result->coverage[idx].branch_coverage[0][coverage_index++] = jump_marker;
+                }
             }
-        }
-    }
+        }  // End check for allocated branch_coverage[0]
+
+        /*
+                // Debug print coverage info - Keep commented out for parallel execution
+                printf("CuEVM Instance %u coverage:\n", idx);
+                printf("  Contract address: %s\n", result->coverage[idx].addresses[0]);
+                printf("  Coverage markers: %u\n", coverage_index);
+
+                // Print each marker in a similar format to Go's debug output
+                for (uint32_t i = 0; i < coverage_index; i++) {
+                    uint64_t marker = result->coverage[idx].branch_coverage[0][i];
+                    uint32_t src = marker >> 32;
+                    uint32_t dst = marker & 0xFFFFFFFF;
+
+                    printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", i, marker, src, src, dst,
+           dst);
+
+                    if (src == ENTER_MARKER_XOR) {
+                        printf(" (ENTER)\n");
+                    } else if (dst == REVERT_MARKER_XOR) {
+                        printf(" (REVERT)\n");
+                    } else if (dst == RETURN_MARKER_XOR) {
+                        printf(" (RETURN)\n");
+                    } else {
+                        printf(" (JUMP)\n");
+                    }
+                }
+        */
+    }  // End of parallel loop
 
     // Clean up trace data
     delete[] trace_data;

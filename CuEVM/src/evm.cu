@@ -715,7 +715,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
     gas_t gas_value;
     const evm_word_t *beneficiary = &(global_block_info->coin_base);
     // block_info_ptr->get_coin_base(beneficiary);
-    printf("CuEVM Debug: finish_TRANSACTION error_code %d\n", error_code);
+    // printf("CuEVM Debug: finish_TRANSACTION error_code %d\n", error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         gas_t gas_left;
         // \f$T_{g} - g\f$
