@@ -29,10 +29,13 @@ struct serialized_worldstate_data {
     void print();
 };
 
+#define START_CALL_BRANCH_MARKER 0xFF000000
+#define END_CALL_BRANCH_MARKER 0xFE000000
+
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
 #define MAX_CALLS_TRACING 16
-#define MAX_BRANCHES_TRACING 32  // only track the latest 32 branches
+#define MAX_BRANCHES_TRACING 64  // only track the latest 64 branches
 struct simple_event_trace {
     // pc // op //  operand 1, operand 2, res
     uint32_t pc;

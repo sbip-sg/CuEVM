@@ -104,6 +104,15 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
     calls[no_calls].last_pc = 0;
     no_calls++;
+#ifdef BUILD_GO_LIBRARY
+    if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
+    // add extra markers for entering call
+    branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
+    branches[no_branches].pc_dst = 0;
+    branches[no_branches].pc_missed = 0;
+    branches[no_branches].distance = 0;
+    no_branches++;
+#endif
 }
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc) {
     if (no_calls > MAX_CALLS_TRACING) return;
@@ -121,6 +130,15 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
             break;
         }
     }
+#ifdef BUILD_GO_LIBRARY
+    if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
+    // add extra markers for exiting call
+    branches[no_branches].pc_src = END_CALL_BRANCH_MARKER;
+    branches[no_branches].pc_dst = 0;
+    branches[no_branches].pc_missed = 0;
+    branches[no_branches].distance = 0;
+    no_branches++;
+#endif
 }
 __host__ __device__ void simplified_trace_data::print() {
     printf("no_events %u\n", no_events);
