@@ -987,8 +987,16 @@ __host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *tes
     printf("num_transactions %d\n", num_transactions);
 
     // evm_instance_t *evm_instances = new evm_instance_t[num_transactions];
+#ifdef BUILD_GO_LIBRARY
+    CuEVM::StateDb *snapshot_state_db_ptr = nullptr;
+#endif
 
-    CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts);
+    CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts
+#ifdef BUILD_GO_LIBRARY
+                                ,
+                                snapshot_state_db_ptr
+#endif
+    );
 
     num_instances = num_transactions;
     return transaction_list_ptr;

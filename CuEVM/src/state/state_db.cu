@@ -1105,8 +1105,14 @@ __device__ bool StateDb::is_contract(const evm_word_t *address) const {
     // todo :implement
     return true;
 }
+
 __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states,
-                                   uint32_t &num_accounts) {
+                                   uint32_t &num_accounts
+#ifdef BUILD_GO_LIBRARY
+                                   ,
+                                   StateDb *&snapshot_state_db
+#endif
+) {
     StateDb *state_db_cpu = new StateDb(num_states);
     StateDb::CPUfromJson(state_db_cpu, state_json, num_states);
 
@@ -1184,6 +1190,80 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
                           num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(tmp_state_db->account_is_warm, state_db_cpu->account_is_warm,
                           num_states * num_accounts * sizeof(bool), cudaMemcpyHostToDevice));
+
+#ifdef BUILD_GO_LIBRARY
+    StateDb *tmp_snapshot_state_db = new StateDb(num_states);
+    tmp_snapshot_state_db->num_accounts = state_db_cpu->num_accounts;
+    tmp_snapshot_state_db->num_states = state_db_cpu->num_states;
+    tmp_snapshot_state_db->num_storage_elements = state_db_cpu->num_storage_elements;
+    tmp_snapshot_state_db->storage_capacity = state_db_cpu->storage_capacity;
+    tmp_snapshot_state_db->num_contracts = state_db_cpu->num_contracts;
+
+    // Grouped memory allocation
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->global_jump_table, sizeof(GlobalJumpTable)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->address_list, num_accounts * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->contract_index, num_accounts * sizeof(int16_t)));
+
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->account_balances, num_states * num_accounts * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->account_nonces, num_states * num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->account_storage_size, num_states * num_accounts * sizeof(uint32_t)));
+
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->account_codes_size, num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->account_codes_offset, num_accounts * sizeof(uint32_t)));
+
+    // prealloc storage , only num_contracts are allocated
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->prealloc_keys_pool,
+                          account_prealloc_keys_size * state_db_cpu->num_contracts * num_states * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->prealloc_values_pool,
+                          account_prealloc_keys_size * state_db_cpu->num_contracts * num_states * sizeof(ValueStatus)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->all_account_codes, code_size * sizeof(uint8_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->dynamic_storage_pages,
+                          num_states * num_accounts * sizeof(StateDbStoragePage *)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->dynamic_pool_capacity, num_states * num_accounts * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->account_is_warm, num_states * num_accounts * sizeof(bool)));
+
+    CUDA_CHECK(cudaMalloc(&tmp_snapshot_state_db->dynamic_accounts, num_states * sizeof(DynamicAccount *)));
+
+    // CUDA_CHECK(cudaMalloc(&tmp_state_db->snapshot_total_storage_size, num_states * num_accounts *
+    // sizeof(uint32_t))); Grouped memory copy
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->global_jump_table, state_db_cpu->global_jump_table,
+                          sizeof(GlobalJumpTable), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->address_list, state_db_cpu->address_list,
+                          num_accounts * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->contract_index, state_db_cpu->contract_index,
+                          num_accounts * sizeof(int16_t), cudaMemcpyHostToDevice));
+
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->account_balances, state_db_cpu->account_balances,
+                          num_states * num_accounts * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->account_nonces, state_db_cpu->account_nonces,
+                          num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->account_storage_size, state_db_cpu->account_storage_size,
+                          num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->account_codes_size, state_db_cpu->account_codes_size,
+                          num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->account_codes_offset, state_db_cpu->account_codes_offset,
+                          num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+
+    // prealloc storage , only num_contracts are allocated
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->prealloc_keys_pool, state_db_cpu->prealloc_keys_pool,
+                          account_prealloc_keys_size * state_db_cpu->num_contracts * num_states * sizeof(evm_word_t),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->prealloc_values_pool, state_db_cpu->prealloc_values_pool,
+                          account_prealloc_keys_size * state_db_cpu->num_contracts * num_states * sizeof(ValueStatus),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->all_account_codes, state_db_cpu->all_account_codes,
+                          code_size * sizeof(uint8_t), cudaMemcpyHostToDevice));
+
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->dynamic_accounts, state_db_cpu->dynamic_accounts,
+                          num_states * sizeof(DynamicAccount *), cudaMemcpyHostToDevice));
+
+    // dynamic storage
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->dynamic_pool_capacity, state_db_cpu->dynamic_pool_capacity,
+                          num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(tmp_snapshot_state_db->account_is_warm, state_db_cpu->account_is_warm,
+                          num_states * num_accounts * sizeof(bool), cudaMemcpyHostToDevice));
+
+#endif
     // CUDA_CHECK(cudaMemcpy(tmp_state_db->snapshot_total_storage_size, state_db_cpu->snapshot_total_storage_size,
     //                       num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
@@ -1197,6 +1277,13 @@ __host__ void StateDb::GPUfromJson(StateDb *&state_db, const cJSON *state_json, 
     delete state_db_cpu;
     delete tmp_state_db;
     state_db = state_db_gpu;
+#ifdef BUILD_GO_LIBRARY
+    StateDb *snapshot_state_db_gpu;
+    CUDA_CHECK(cudaMalloc(&snapshot_state_db_gpu, sizeof(StateDb)));
+    CUDA_CHECK(cudaMemcpy(snapshot_state_db_gpu, tmp_snapshot_state_db, sizeof(StateDb), cudaMemcpyHostToDevice));
+    delete tmp_snapshot_state_db;
+    snapshot_state_db = snapshot_state_db_gpu;
+#endif
 }
 // Return a pointer to the StateDb object on device memory
 __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states) {

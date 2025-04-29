@@ -73,8 +73,9 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
                                                 const uint32_t* dataSizes, int dataSizesLen, int txCount);
 
 // Updated function declaration with reset_state parameter
-int process_json_state_gpu(const char* json_state, uint32_t num_instances);
+int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false);
 
+void reset_state_db();
 // Function to get GPU execution results
 GPUExecutionResultC* get_gpu_execution_results();
 

@@ -8,6 +8,7 @@
 static uint32_t g_num_accounts = 0;
 static uint32_t g_num_instances = 0;
 static CuEVM::StateDb* g_state_db_ptr = nullptr;
+static CuEVM::StateDb* g_snapshot_state_db_ptr = nullptr;  // store original snapshot state db, not free/modified
 static int call_counter = 0;
 // Global variable to hold persistent jump table
 // CuEVM::ContractPCsMap contract_pcs_map;
@@ -37,17 +38,20 @@ using namespace CuEVM;
 // For now, just a placeholder that increments the counter and returns success
 int run_interpreter_go(const char* json_input, uint32_t skip_trace_parsing, uint32_t copy_state_data,
                        uint32_t reuse_state_data) {
-    printf("Go interface: Running interpreter with JSON input\n");
-    printf("Run configuration skip_trace_parsing: %d, copy_state_data: %d, reuse_state_data: %d\n", skip_trace_parsing,
-           copy_state_data, reuse_state_data);
+    printf("run_interpreter_go configuration skip_trace_parsing: %d, copy_state_data: %d, reuse_state_data: %d\n",
+           skip_trace_parsing, copy_state_data, reuse_state_data);
 
     // This is where we would process the JSON input and run the CUDA kernel
     // For now, just return success
     return 0;
 }
 
-int process_json_state_gpu(const char* json_state, uint32_t num_instances) {
+int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state) {
     // Reset counter when new state is processed and reset_state is true
+    if (reset_state) {
+        reset_state_db();
+        return 0;
+    }
 
     // Set larger heap size for GPU memory if not reusing state data
 
@@ -84,18 +88,108 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances) {
     // }
     // Initialize and store the state DB and account count globally
     // Modify GPUfromJson to use the persistent jump table
+#ifdef BUILD_GO_LIBRARY
+    CuEVM::StateDb::GPUfromJson(g_state_db_ptr, world_state_json, num_transactions, g_num_accounts,
+                                g_snapshot_state_db_ptr);
+#else
     CuEVM::StateDb::GPUfromJson(g_state_db_ptr, world_state_json, num_transactions, g_num_accounts);
+#endif
     CuEVM::get_block_info(stateJson);
     printf("Process json state GPU done, found %u accounts\n", g_num_accounts);
 
     call_counter = 0;
     // Initialize the global jump table for coverage tracking
-
     // Free JSON object
     cJSON_Delete(stateJson);
     return 0;
 }
-// ... existing code ...
+
+void reset_state_db() {
+    if (g_state_db_ptr != nullptr && g_snapshot_state_db_ptr != nullptr) {
+        // Create temporary host copies to read the device pointers
+        // Allocate host memory for the structs themselves
+        CuEVM::StateDb* host_state_db =
+            new CuEVM::StateDb(1);  // num_states=1 is placeholder, not used for allocation size here
+        CuEVM::StateDb* host_snapshot_state_db = new CuEVM::StateDb(1);
+
+        // Copy the StateDb structs (containing device pointers) from device to host
+        CUDA_CHECK(cudaMemcpy(host_state_db, g_state_db_ptr, sizeof(CuEVM::StateDb), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(host_snapshot_state_db, g_snapshot_state_db_ptr, sizeof(CuEVM::StateDb),
+                              cudaMemcpyDeviceToHost));
+
+        // Now host_state_db and host_snapshot_state_db contain the *device* addresses
+        // Read necessary metadata from the host copies
+        uint32_t num_accounts = host_snapshot_state_db->num_accounts;  // Use snapshot's count
+        uint32_t num_states = host_snapshot_state_db->num_states;      // Use snapshot's count
+        uint32_t num_contracts_snapshot = host_snapshot_state_db->num_contracts;
+
+        // --- Direct Device-to-Device Copies using pointers read from host structs ---
+
+        // Copy account balances, nonces, storage sizes
+        size_t balances_size = (size_t)num_states * num_accounts * sizeof(evm_word_t);
+        CUDA_CHECK(cudaMemcpy(host_state_db->account_balances, host_snapshot_state_db->account_balances, balances_size,
+                              cudaMemcpyDeviceToDevice));
+
+        size_t nonces_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
+        CUDA_CHECK(cudaMemcpy(host_state_db->account_nonces, host_snapshot_state_db->account_nonces, nonces_size,
+                              cudaMemcpyDeviceToDevice));
+
+        size_t storage_size_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
+        CUDA_CHECK(cudaMemcpy(host_state_db->account_storage_size, host_snapshot_state_db->account_storage_size,
+                              storage_size_size, cudaMemcpyDeviceToDevice));
+
+        // Copy prealloc storage pools (using snapshot's num_contracts)
+        // Ensure account_prealloc_keys_size is accessible/correct here.
+        size_t prealloc_keys_bytes =
+            (size_t)account_prealloc_keys_size * num_contracts_snapshot * num_states * sizeof(evm_word_t);
+        if (prealloc_keys_bytes > 0) {
+            CUDA_CHECK(cudaMemcpy(host_state_db->prealloc_keys_pool, host_snapshot_state_db->prealloc_keys_pool,
+                                  prealloc_keys_bytes, cudaMemcpyDeviceToDevice));
+        }
+
+        size_t prealloc_values_bytes =
+            (size_t)account_prealloc_keys_size * num_contracts_snapshot * num_states * sizeof(CuEVM::ValueStatus);
+        if (prealloc_values_bytes > 0) {
+            CUDA_CHECK(cudaMemcpy(host_state_db->prealloc_values_pool, host_snapshot_state_db->prealloc_values_pool,
+                                  prealloc_values_bytes, cudaMemcpyDeviceToDevice));
+        }
+
+        // Copy warm account flags
+        size_t warm_flags_size = (size_t)num_states * num_accounts * sizeof(bool);
+        CUDA_CHECK(cudaMemcpy(host_state_db->account_is_warm, host_snapshot_state_db->account_is_warm, warm_flags_size,
+                              cudaMemcpyDeviceToDevice));
+        // Alternative: Reset warm flags instead of copying snapshot state:
+        // CUDA_CHECK(cudaMemset(host_state_db->account_is_warm, 0, warm_flags_size));
+
+        // --- Resetting Dynamic Storage Pointers/Capacities ---
+        // IMPORTANT: See previous explanation about external memory management for dynamic pages.
+        size_t dynamic_accounts_size = (size_t)num_states * sizeof(CuEVM::DynamicAccount*);
+        CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_accounts, host_snapshot_state_db->dynamic_accounts,
+                              dynamic_accounts_size, cudaMemcpyDeviceToDevice));
+
+        size_t dynamic_pages_size = (size_t)num_states * num_accounts * sizeof(CuEVM::StateDbStoragePage*);
+        CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_storage_pages, host_snapshot_state_db->dynamic_storage_pages,
+                              dynamic_pages_size, cudaMemcpyDeviceToDevice));
+
+        size_t dynamic_capacity_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
+        CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_pool_capacity, host_snapshot_state_db->dynamic_pool_capacity,
+                              dynamic_capacity_size, cudaMemcpyDeviceToDevice));
+
+        // Reset other fields if needed
+        // No need to copy host_state_db back to g_state_db_ptr, as we modified the data *pointed to* by g_state_db_ptr.
+
+        // Update the global symbol pointer in device memory (good practice for consistency).
+        CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::global_state_db_ptr, &g_state_db_ptr, sizeof(CuEVM::StateDb*)));
+
+        // Clean up host allocations
+        delete host_state_db;
+        delete host_snapshot_state_db;
+
+        // printf("State DB reset complete\n");
+    } else {
+        printf("State DB reset error: pointers not initialized.\n");
+    }
+}
 
 void print_evm_instances_results(uint32_t num_instances, bool copy_state_data) {
     // Copy trace data from device memory
