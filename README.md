@@ -2,85 +2,94 @@
 Cuda implementation of EVM bytecode executor
 
 ## Prerequisites
-- CUDA Toolkit (Version 12.0+, because we use `--std c++20`)
+- CUDA Toolkit, Version 12.4 or above
 - A CUDA-capable GPU (CUDA compute capabilily 7+ other older GPUs compability are not tested fully)
 - A C++ compiler compatible with the CUDA Toolkit (gcc/g++ version 10+)
-- For docker image, you dont need the above but the system with docker installed
 
-## Compile and Run
-There are two methods, one requires installing all prequisited in the system, the second one use docker image:
 
-### On your own system
+## Build
 
-#### Building using docker image:
-* Build the docker image first: `docker build -f .devcontainer/Dockerfile -t cuevm`
-* Run and mount the current code folder `docker run -it -v $(pwd):/CuEVM cuevm`
-* `cd CuEVM` then `make interpreter` or for running with cpu: `make cpu_interpreter`
+### Build standalone binary
 
-#### CMake
+This builds the standalone executable binary `cuevm_GPU` inside the `build` folder:
 
-* `mkdir build`
-* `cmake -DBUILD_LIBRARY=ON -DENABLE_EIP_3155=ON -DCUDA_COMPUTE_CAPABILITY=89  cmake  -S . -B build` (Flags to turn on shared library mode and EIP3155 tracing)
-* `cmake --build build`
+``` bash
+# From the project root folder
+rm -rf build
+cmake -DBUILD_GO_LIBRARY=OFF  -DENABLE_EIP_3155=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY=86 cmake  -S . -B build
+cmake --build build -j $(nproc)
+```
 
-##### Build librarue
 
-* `rm -rf ../install/* && rm -rf ./* && cmake -DCMAKE_BUILD_TYPE=Debug .. && cmake --build . --target install`
+### Build dynamic library
 
+This builds the dynamic library `libcuevm_go.so` inside the `build` folder:
+
+``` bash
+# From the project root folder
+rm -rf build
+cmake -DBUILD_GO_LIBRARY=ON  -DENABLE_EIP_3155=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY=86 cmake  -S . -B build
+cmake --build build -j $(nproc)
+```
+
+
+### Build in Docker
+
+``` bash
+# Inside the CuEVM project folder
+docker run --rm -it -v ./:/workspace/cuevm -w /workspace/cuevm augustus/goevmlab-cuevm:20241216 /bin/bash
+# You can compile in the docker container with the same commands as above
+```
 
 ## Usage
-`{interpreter}` is `build/cuevm` for CMake build and one of the `out/cpu_interpreter` or `out/interpreter`
-#### Demo of functionality for testing transaction sequences:
-Please refer to subfolder `samples/README.md` for testing and demo how to use this CuEVM.
 
-#### Testing of the EVM using ethtest:
-Please refer to `scripts/run-ethtest-by-fork`.
+### Using the standalone binary executor
 
-`python3 scripts/run-ethtest-by-fork.py -i ./tests/GeneralStateTests -t ./tmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors --microtests`
+The executor takes an input json file and after executing it, outputs in the standard output. The input format follows the [ethereum/tests](https://github.com/ethereum/tests/) format with minor difference that only one test case is supported by CuEVM at the moment.
 
-Single test:
-`python3 scripts/run-ethtest-by-fork.py -i ./tmp/{input_test_file_dir} -t ./dtmp --runtest-bin runtest --geth gethvm --cuevm ./build/cuevm --ignore-errors --microtests`
+``` bash
+./build/cuevm_GPU --input fuzzing/eth-tests/erc20_mint.json
+```
 
-To see the results of gethvm
-`gethvm --json --noreturndata --dump statetest {input_test_file} &> geth.out`
-To see the result of cuevm
-`clear && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/cuevm  --input {input_test_file} &> cuevm.out`
+You should see the EVM execution traces in the output.
 
-## Tool usage [TODO after completion]
-* `clear && compute-sanitizer --tool memcheck --leak-check=full {gpu_interpreter} --input [input_json_file] --output [output_json_file]`
-* `clear && valgrind --leak-check=full --show-leak-kinds=all {cpu_interpreter}  --input [input_json_file] --output [output_json_file]`
-* `clear && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/cuevm  --input [input_json_file] --output [output_json_file]`
-Or for running with cpu
-* `{interpreter} --input [input_json_file] --output [output_json_file]`
-Easy test:
-* `{interpreter} --input ./input/evm_arith.json --output ./output/evm_test.json`
+### Using the dynamic library
+
+Please refer to [medusa](https://github.com/minhhn2910/medusa-backup) for usage.
+
+# Test
+
+## Test method
+
+We use goevmlab to compare the execution traces from running the
+[ethereum/tests](https://github.com/ethereum/tests/tree/shanghai) the go-ethereum
+VM executor and CuEVM.
+
+1. Install go-etheruem https://github.com/ethereum/go-ethereum  Tested with geth version 1.14.12.
+2. Install goevmlab
+   ```bash
+   git clone --depth=1 -b add-cuevm https://github.com/cassc/goevmlab
+   go install ./cmd/runtest/
+   ```
+2. Clone [ethereum/tests](https://github.com/ethereum/tests/tree/shanghai)
+   ```bash
+   git clone --depth 1 -b shanghai git@github.com:ethereum/tests.git ethereum-tests
+   ```
+3. Run all the tests in `GeneralStateTests` and compare the traces from go-ethereum and CuEVM:
+   ``` bash
+python3 scripts/run-ethtest-by-fork.py --ignore-errors --microtests --without-state-root \
+  -i ethereum-tests/GeneralStateTests \
+  -t ./tmp --runtest-bin runtest \
+  --geth geth \
+  --cuevm ./build/cuevm_GPU \
+   ```
 
 
-
-## Code structure
-TODO
-
-## Documentation
-TODO
-docygen+sphinx+breathe+exhale
-
-
-# Test results
-
-
-
-## GeneralStateTests without stateRoot comparison
+## Test results
 
 We use the test files in
 [ethereum/tests/GeneralStateTests](https://github.com/ethereum/tests/tree/develop/GeneralStateTests)
 to test whether we can get the same results with the go-ethereum. To run the tests,
-
-- build the binary with the debug flag on: `make cpu_debug_interpreter`
-- either download or build the geth binary, in this test the version [v1.13.14](https://github.com/ethereum/go-ethereum/releases/tag/v1.13.14) is used, later version will probably produce the same result
-- get the test json files from [ethereum/tests](https://github.com/ethereum/tests)
-- extract and keep the tests which targeted at the Shanghai fork
-- build the `runtest` binary from [cassc/goevmlab](https://github.com/cassc/goevmlab) which adds support for CuEVM
-- run `goevmlab/runtest` to compare the results between `geth` and `cuevm`
 
 These tests are ignored, they contain some stress tests which could crash the EVM as well as the test script itself:
 
@@ -95,144 +104,70 @@ These tests are ignored, they contain some stress tests which could crash the EV
 The tests results are collected by running the [Python script](https://gist.github.com/cassc/b300005b38d7c01461b443ef67169659) from the [ethereum](https://github.com/ethereum/tests) root folder:
 
 ``` bash
-python ./run-ethtest-without-stateroot-comparison.py -t /tmp/out --runtest-bin runtest --geth geth --cuevm cuevm  --ignore-errors
+python run-ethtest-without-stateroot-comparison.py --runtest-bin runtest --geth geth --cuevm /home/garfield/tmp/CuEVM-internal/build/cuevm_GPU --ignore-errors -t /tmp/ethtest/
 ```
 
 > Note that there can be multiple tests in one input json, the number of tests shown below can be larger than number of input files.
 
-| Test folder                          | Passed | Failed | Skipped |
-|--------------------------------------|--------|--------|---------|
-| Cancun                               | 0      | 0      | 37      |
-| Pyspecs                              | 201    | 2      | 1233    |
-| Python                               | 1      | 0      | 4       |
-| Shanghai                             | 20     | 3      | 0       |
-| stArgsZeroOneBalance                 | 95     | 1      | 0       |
-| stAttackTest                         | 0      | 2      | 0       |
-| stBadOpcode                          | 3542   | 118    | 1       |
-| stBugs                               | 9      | 0      | 0       |
-| stCallCodes                          | 75     | 10     | 1       |
-| stCallCreateCallCodeTest             | 39     | 9      | 0       |
-| stCallDelegateCodesCallCodeHomestead | 51     | 7      | 0       |
-| stCallDelegateCodesHomestead         | 51     | 7      | 0       |
-| stChainId                            | 2      | 0      | 0       |
-| stCodeCopyTest                       | 1      | 1      | 1       |
-| stCodeSizeLimit                      | 7      | 0      | 0       |
-| stCreate2                            | 124    | 16     | 3       |
-| stDelegatecallTestHomestead          | 23     | 6      | 0       |
-| stEIP150singleCodeGasPrices          | 115    | 5      | 1       |
-| stEIP150Specific                     | 24     | 1      | 0       |
-| stEIP158Specific                     | 6      | 2      | 3       |
-| stEIP1559                            | 1817   | 2      | 1       |
-| stEIP2930                            | 15     | 5      | 0       |
-| stEIP3607                            | 12     | 0      | 2       |
-| stExample                            | 34     | 4      | 0       |
-| stExtCodeHash                        | 23     | 21     | 3       |
-| stHomesteadSpecific                  | 5      | 0      | 0       |
-| stInitCodeTest                       | 20     | 2      | 0       |
-| stLogTests                           | 46     | 0      | 0       |
-| stMemExpandingEIP150Calls            | 9      | 1      | 0       |
-| stMemoryStressTest                   | 82     | 0      | 0       |
-| stMemoryTest                         | 386    | 7      | 0       |
-| stNonZeroCallsTest                   | 23     | 1      | 12      |
-| stPreCompiledContracts               | 564    | 1      | 1       |
-| stPreCompiledContracts2              | 189    | 17     | 0       |
-| stRandom                             | 305    | 9      | 0       |
-| stRandom2                            | 221    | 5      | 0       |
-| stRecursiveCreate                    | 2      | 0      | 0       |
-| stRefundTest                         | 10     | 12     | 1       |
-| stReturnDataTest                     | 57     | 10     | 0       |
-| stRevertTest                         | 185    | 10     | 11      |
-| stSelfBalance                        | 26     | 2      | 0       |
-| stShift                              | 42     | 0      | 0       |
-| stSLoadTest                          | 1      | 0      | 0       |
-| stSolidityTest                       | 23     | 0      | 0       |
-| stSpecialTest                        | 20     | 2      | 3       |
-| stSStoreTest                         | 205    | 17     | 1       |
-| stStackTests                         | 185    | 3      | 0       |
-| stStaticFlagEnabled                  | 1      | 12     | 0       |
-| stSystemOperationsTest               | 71     | 8      | 1       |
-| stTransactionTest                    | 159    | 7      | 2       |
-| stTransitionTest                     | 6      | 0      | 0       |
-| stWalletTest                         | 20     | 26     | 0       |
-| stZeroCallsRevert                    | 16     | 0      | 8       |
-| stZeroCallsTest                      | 24     | 0      | 12      |
-| stZeroKnowledge                      | 681    | 29     | 1       |
-| stZeroKnowledge2                     | 485    | 10     | 3       |
-| VMTests                              | 567    | 10     | 0       |
 
 
-
-### Test results by comparing the traces between geth and cuevm with stateRoot comparison
-
-The tests results are collected by running the [Python script](https://gist.github.com/cassc/a161177bf850dbee4b7f3b2614250108) from the [ethereum](https://github.com/ethereum/tests) root folder:
-
-``` bash
-python ./run-ethtest-with-stateroot-comparison.py -t /tmp/out --runtest-bin runtest --geth geth --cuevm cuevm  --ignore-errors
-```
-
-
-| Test folder                          | Passed | Failed | Skipped |
-|--------------------------------------|--------|--------|---------|
-| Cancun                               | 0      | 0      | 37      |
-| Pyspecs                              | 201    | 2      | 1233    |
-| Python                               | 1      | 0      | 4       |
-| Shanghai                             | 1      | 8      | 0       |
-| stArgsZeroOneBalance                 | 72     | 16     | 0       |
-| stAttackTest                         | 0      | 2      | 0       |
-| stBadOpcode                          | 27     | 119    | 1       |
-| stBugs                               | 3      | 6      | 0       |
-| stCallCodes                          | 76     | 10     | 1       |
-| stCallCreateCallCodeTest             | 41     | 14     | 0       |
-| stCallDelegateCodesCallCodeHomestead | 51     | 7      | 0       |
-| stCallDelegateCodesHomestead         | 51     | 7      | 0       |
-| stChainId                            | 2      | 0      | 0       |
-| stCodeCopyTest                       | 1      | 1      | 1       |
-| stCodeSizeLimit                      | 7      | 0      | 0       |
-| stCreate2                            | 102    | 88     | 3       |
-| stDelegatecallTestHomestead          | 22     | 9      | 0       |
-| stEIP150singleCodeGasPrices          | 337    | 3      | 1       |
-| stEIP150Specific                     | 24     | 1      | 0       |
-| stEIP158Specific                     | 7      | 1      | 3       |
-| stEIP1559                            | 1843   | 2      | 1       |
-| stEIP2930                            | 15     | 125    | 0       |
-| stEIP3607                            | 12     | 0      | 2       |
-| stExample                            | 29     | 9      | 0       |
-| stExtCodeHash                        | 39     | 30     | 3       |
-| stHomesteadSpecific                  | 5      | 0      | 0       |
-| stInitCodeTest                       | 16     | 6      | 0       |
-| stLogTests                           | 46     | 0      | 0       |
-| stMemExpandingEIP150Calls            | 8      | 2      | 0       |
-| stMemoryStressTest                   | 82     | 0      | 0       |
-| stMemoryTest                         | 564    | 14     | 0       |
-| stNonZeroCallsTest                   | 24     | 0      | 12      |
-| stPreCompiledContracts               | 929    | 31     | 1       |
-| stPreCompiledContracts2              | 223    | 25     | 0       |
-| stRandom                             | 303    | 7      | 0       |
-| stRandom2                            | 215    | 6      | 0       |
-| stRecursiveCreate                    | 0      | 2      | 0       |
-| stRefundTest                         | 26     | 0      | 1       |
-| stReturnDataTest                     | 230    | 43     | 0       |
-| stRevertTest                         | 231    | 41     | 11      |
-| stSelfBalance                        | 41     | 1      | 0       |
-| stShift                              | 40     | 2      | 0       |
-| stSLoadTest                          | 1      | 0      | 0       |
-| stSolidityTest                       | 21     | 2      | 0       |
-| stSpecialTest                        | 19     | 3      | 3       |
-| stSStoreTest                         | 189    | 286    | 1       |
-| stStackTests                         | 371    | 4      | 0       |
-| stStaticFlagEnabled                  | 34     | 0      | 0       |
-| stSystemOperationsTest               | 70     | 13     | 1       |
-| stTransactionTest                    | 253    | 7      | 2       |
-| stTransitionTest                     | 6      | 0      | 0       |
-| stWalletTest                         | 46     | 0      | 0       |
-| stZeroCallsRevert                    | 16     | 0      | 8       |
-| stZeroCallsTest                      | 24     | 0      | 12      |
-| stZeroKnowledge                      | 800    | 0      | 1       |
-| stZeroKnowledge2                     | 519    | 0      | 3       |
-| VMTests                              | 641    | 10     | 0       |
-| VMTests/vmArithmeticTest/            | 219    | 0      | 0       |
-| VMTests/vmIOandFlowOperations/       | 170    | 0      | 0       |
-| VMTests/vmBitwiseLogicOperation/     | 57     | 0      | 0       |
-| VMTests/vmLogTest/                   | 46     | 0      | 0       |
-| VMTests/vmTests/                     | 136    | 0      | 0       |
-| VMTests/vmPerformance/               | 13     | 10     | 0       |
+| Test folder                          | Passed | Failed | Skipped | Timeout |
+|--------------------------------------|--------|--------|---------|---------|
+| stNonZeroCallsTest                   | 24     | 0      | 0       | 0       |
+| stEIP3607                            | 7      | 5      | 0       | 0       |
+| stEIP150singleCodeGasPrices          | 330    | 10     | 1       | 0       |
+| stCallDelegateCodesCallCodeHomestead | 51     | 7      | 0       | 0       |
+| stArgsZeroOneBalance                 | 96     | 0      | 0       | 0       |
+| stStaticFlagEnabled                  | 25     | 0      | 0       | 9       |
+| stShift                              | 40     | 1      | 0       | 1       |
+| stEIP158Specific                     | 6      | 1      | 0       | 0       |
+| stMemoryTest                         | 522    | 56     | 0       | 0       |
+| stZeroKnowledge2                     | 519    | 0      | 0       | 0       |
+| stEIP1559                            | 1643   | 200    | 0       | 2       |
+| stReturnDataTest                     | 269    | 4      | 0       | 0       |
+| stCodeCopyTest                       | 2      | 0      | 0       | 0       |
+| stMemoryStressTest                   | 75     | 7      | 0       | 0       |
+| stInitCodeTest                       | 21     | 1      | 0       | 0       |
+| stMemExpandingEIP150Calls            | 10     | 0      | 0       | 0       |
+| stWalletTest                         | 46     | 0      | 0       | 0       |
+| stSpecialTest                        | 18     | 3      | 0       | 1       |
+| stExtCodeHash                        | 59     | 6      | 0       | 0       |
+| stTimeConsuming                      | 3807   | 1380   | 0       | 3       |
+| stCreateTest                         | 153    | 47     | 0       | 3       |
+| stRecursiveCreate                    | 1      | 0      | 0       | 1       |
+| stCallDelegateCodesHomestead         | 51     | 7      | 0       | 0       |
+| stZeroKnowledge                      | 745    | 55     | 0       | 0       |
+| stTransitionTest                     | 6      | 0      | 0       | 0       |
+| stCallCodes                          | 78     | 9      | 0       | 0       |
+| stHomesteadSpecific                  | 5      | 0      | 0       | 0       |
+| stCallCreateCallCodeTest             | 39     | 6      | 0       | 10      |
+| stSolidityTest                       | 21     | 1      | 0       | 1       |
+| stExample                            | 33     | 6      | 0       | 0       |
+| stSStoreTest                         | 471    | 4      | 0       | 0       |
+| stZeroCallsTest                      | 24     | 0      | 0       | 0       |
+| stSelfBalance                        | 41     | 0      | 0       | 1       |
+| stDelegatecallTestHomestead          | 20     | 3      | 0       | 8       |
+| stQuadraticComplexityTest            | 14     | 1      | 0       | 17      |
+| stEIP150Specific                     | 25     | 0      | 0       | 0       |
+| stStackTests                         | 247    | 128    | 0       | 0       |
+| stChainId                            | 2      | 0      | 0       | 0       |
+| stAttackTest                         | 0      | 1      | 0       | 1       |
+| stBugs                               | 9      | 0      | 0       | 0       |
+| stBadOpcode                          | 4094   | 5      | 1       | 116     |
+| stTransactionTest                    | 156    | 8      | 0       | 0       |
+| stCreate2                            | 156    | 29     | 0       | 5       |
+| stPreCompiledContracts2              | 233    | 15     | 0       | 0       |
+| stRevertTest                         | 257    | 9      | 0       | 5       |
+| stLogTests                           | 46     | 0      | 0       | 0       |
+| stRandom                             | 297    | 11     | 0       | 6       |
+| stRefundTest                         | 26     | 0      | 1       | 0       |
+| stStaticCall                         | 421    | 9      | 0       | 48      |
+| stRandom2                            | 212    | 9      | 0       | 5       |
+| Shanghai                             | 12     | 15     | 0       | 0       |
+| stCodeSizeLimit                      | 6      | 1      | 0       | 0       |
+| stZeroCallsRevert                    | 16     | 0      | 0       | 0       |
+| stPreCompiledContracts               | 897    | 31     | 0       | 32      |
+| stSystemOperationsTest               | 76     | 1      | 0       | 6       |
+| stEIP2930                            | 12     | 128    | 0       | 0       |
+| VMTests                              | 625    | 3      | 0       | 0       |
+| stSLoadTest                          | 1      | 0      | 0       | 0       |
