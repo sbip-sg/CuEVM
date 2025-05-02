@@ -2,6 +2,7 @@
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/ecc.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
+#include <vector>
 namespace CuEVM {
 
 constexpr uint32_t worldstate_addresses_size = 32;
@@ -444,7 +445,7 @@ struct evm_call_context_t {
     uint32_t call_data_size;
     uint8_t *byte_code; /**< The byte code YP: \f$b\f$ or \f$I_{b}\f$*/
     uint32_t byte_code_size;
-    int32_t bytecode_offset; // bytecode offset in the global `all_account_codes`
+    int32_t bytecode_offset;  // bytecode offset in the global `all_account_codes`
 
     uint32_t fixed_ret_size = 0;
     uint32_t fixed_ret_offset = 0;
@@ -464,8 +465,8 @@ struct evm_call_context_t {
                                     CuEVM::evm_memory_t *memory_ptr, evm_word_t from, evm_word_t to,
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t *call_data, uint32_t call_data_size, uint8_t *byte_code,
-                                    uint32_t byte_code_size, int32_t bytecode_offset = -1, evm_call_context_t *parent = nullptr,
-                                    bool static_env = false, gas_t gas_refund = 0
+                                    uint32_t byte_code_size, int32_t bytecode_offset = -1,
+                                    evm_call_context_t *parent = nullptr, bool static_env = false, gas_t gas_refund = 0
 
     );
 
@@ -475,8 +476,9 @@ struct evm_call_context_t {
     __device__ void initiate_values(evm_call_context_t *parent, gas_t gas_limit, evm_word_t from, evm_word_t to,
                                     evm_word_t storage_address, evm_word_t value, uint32_t call_type,
                                     uint8_t *call_data, uint32_t call_data_size, uint8_t *byte_code,
-                                    uint32_t byte_code_size, int32_t bytecode_offset = -1, uint32_t return_data_offset = 0,
-                                    uint32_t return_data_size = 0, bool static_env = false, gas_t gas_refund = 0);
+                                    uint32_t byte_code_size, int32_t bytecode_offset = -1,
+                                    uint32_t return_data_offset = 0, uint32_t return_data_size = 0,
+                                    bool static_env = false, gas_t gas_refund = 0);
 
     __device__ void copy_return_data_to_memory(uint32_t memory_offset, uint32_t data_offset, uint32_t size);
     __device__ void copy_return_data(uint8_t *dest, uint32_t data_offset, uint32_t size);
@@ -533,15 +535,14 @@ extern __device__ size_t *global_trace_lengths;
 /**
  * @brief Get the CPU EVM instances object
  * Get the evm instances from the json file
- * @param[in] arith The arithmetic environment
  * @param[in] test_json The json object
  * @param[out] evm_instances The evm instances
  * @param[out] num_instances The number of instances
  * @param[in] managed Whether the memory is managed
  * @return int32_t The error code, 0 if successful
  */
-__host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *test_json, uint32_t &num_instances,
-                                                                uint32_t &num_account, uint32_t clones = 1);
+__host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(
+    const cJSON *test_json, uint32_t &num_instances, uint32_t &num_account, uint32_t num_gpus = 1, uint32_t clones = 1);
 
 __global__ void kernel_evm_multiple_instances(transaction::TransactionList *transaction_list_ptr, uint32_t count,
 #ifdef EIP_3155

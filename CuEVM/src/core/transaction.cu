@@ -49,26 +49,26 @@ __host__ uint32_t no_transactions(const cJSON *json) {
     return data_counts * gas_limit_counts * value_counts;
 }
 
-__host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const cJSON *json,
-                                  uint32_t &transactions_count, uint32_t clones) {
+__host__ int32_t get_transactions(std::vector<TransactionList *> &transaction_list_ptrs, const cJSON *json,
+                                  uint32_t &transactions_count, uint32_t num_gpus, uint32_t clones) {
     cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
     uint32_t available_transactions = no_transactions(json);
-
-    transaction_list_ptr = new TransactionList();
+    transaction_list_ptrs.resize(num_gpus);
+    TransactionList *host_transaction_list_ptr = new TransactionList();
 
     uint32_t type = 0;
 
     const cJSON *nonce_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "nonce");
-    transaction_list_ptr->nonce.from_hex(nonce_json->valuestring);
+    host_transaction_list_ptr->nonce.from_hex(nonce_json->valuestring);
 
     const cJSON *gas_limit_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "gasLimit");
     uint32_t gas_limit_counts = cJSON_GetArraySize(gas_limit_json);
 
     const cJSON *sender_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "sender");
-    transaction_list_ptr->sender.from_hex(sender_json->valuestring);
+    host_transaction_list_ptr->sender.from_hex(sender_json->valuestring);
 
     const cJSON *to_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "to");
-    transaction_list_ptr->to.from_hex(to_json->valuestring);
+    host_transaction_list_ptr->to.from_hex(to_json->valuestring);
 
     const cJSON *max_fee_per_gas_json = cJSON_GetObjectItemCaseSensitive(transaction_json, "maxFeePerGas");
 
@@ -87,7 +87,12 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     original_count = data_counts;
     transactions_count = original_count * clones;
 
-    transaction_list_ptr->size = transactions_count;
+    if (transactions_count % num_gpus != 0) {
+        printf("Error: transactions_count %d is not divisible by num_gpus %d\n", transactions_count, num_gpus);
+        return -1;
+    }
+
+    host_transaction_list_ptr->size = transactions_count;
     // uint32_t access_list_counts = 0;
     // const cJSON *access_list_json = cJSON_GetObjectItem(transaction_json, "accessLists");
     // if (access_list_json != nullptr) access_list_counts = cJSON_GetArraySize(access_list_json);
@@ -97,9 +102,9 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
     if ((max_fee_per_gas_json != nullptr) && (max_priority_fee_per_gas_json != nullptr) &&
         (gas_price_json == nullptr)) {
         type = 2;
-        transaction_list_ptr->max_fee_per_gas.from_hex(max_fee_per_gas_json->valuestring);
-        transaction_list_ptr->max_priority_fee_per_gas.from_hex(max_priority_fee_per_gas_json->valuestring);
-        transaction_list_ptr->gas_price.from_uint32_t(0);
+        host_transaction_list_ptr->max_fee_per_gas.from_hex(max_fee_per_gas_json->valuestring);
+        host_transaction_list_ptr->max_priority_fee_per_gas.from_hex(max_priority_fee_per_gas_json->valuestring);
+        host_transaction_list_ptr->gas_price.from_uint32_t(0);
     } else if ((max_fee_per_gas_json == nullptr) && (max_priority_fee_per_gas_json == nullptr) &&
                (gas_price_json != nullptr)) {
         // if (access_list_json == nullptr) {
@@ -109,9 +114,9 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         // }
         type = 0;
 
-        transaction_list_ptr->max_fee_per_gas.from_uint32_t(0);
-        transaction_list_ptr->max_priority_fee_per_gas.from_uint32_t(0);
-        transaction_list_ptr->gas_price.from_hex(gas_price_json->valuestring);
+        host_transaction_list_ptr->max_fee_per_gas.from_uint32_t(0);
+        host_transaction_list_ptr->max_priority_fee_per_gas.from_uint32_t(0);
+        host_transaction_list_ptr->gas_price.from_hex(gas_price_json->valuestring);
     } else {
         printf("ERROR_TRANSACTION_TYPE\n");
         return ERROR_TRANSACTION_TYPE;
@@ -121,13 +126,13 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         type = SPECIAL_CREATE_TRANSACTION_TYPE;
     }
 
-    transaction_list_ptr->type = type;
+    host_transaction_list_ptr->type = type;
 
-    transaction_list_ptr->call_data_offset = new uint32_t[transactions_count];
-    transaction_list_ptr->call_data_size = new uint32_t[transactions_count];
-    transaction_list_ptr->gas_limit = new uint64_t[transactions_count];
-    transaction_list_ptr->value = new evm_word_t[transactions_count];
-    memset(transaction_list_ptr->value, 0, transactions_count * sizeof(evm_word_t));
+    host_transaction_list_ptr->call_data_offset = new uint32_t[transactions_count];
+    host_transaction_list_ptr->call_data_size = new uint32_t[transactions_count];
+    host_transaction_list_ptr->gas_limit = new uint64_t[transactions_count];
+    host_transaction_list_ptr->value = new evm_word_t[transactions_count];
+    memset(host_transaction_list_ptr->value, 0, transactions_count * sizeof(evm_word_t));
 
     uint32_t index, gas_limit_index, value_index, call_data_offset = 0;
     for (uint32_t idx = 0; idx < data_counts; idx++) {
@@ -146,22 +151,22 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
                            CuEVM::PaddingDirection::NO_PADDING);
 
         if (data_init.size > 0) {
-            if (transaction_list_ptr->call_data == nullptr) {
-                transaction_list_ptr->call_data = new uint8_t[data_init.size];
+            if (host_transaction_list_ptr->call_data == nullptr) {
+                host_transaction_list_ptr->call_data = new uint8_t[data_init.size];
             } else {
                 uint8_t *tmp = new uint8_t[call_data_offset + data_init.size];
-                memcpy(tmp, transaction_list_ptr->call_data, call_data_offset);
-                delete[] transaction_list_ptr->call_data;
-                transaction_list_ptr->call_data = tmp;
+                memcpy(tmp, host_transaction_list_ptr->call_data, call_data_offset);
+                delete[] host_transaction_list_ptr->call_data;
+                host_transaction_list_ptr->call_data = tmp;
             }
-            memcpy(&transaction_list_ptr->call_data[call_data_offset], data_init.data, data_init.size);
+            memcpy(&host_transaction_list_ptr->call_data[call_data_offset], data_init.data, data_init.size);
         }
-        transaction_list_ptr->call_data_offset[idx] = call_data_offset;
-        transaction_list_ptr->call_data_size[idx] = data_init.size;
+        host_transaction_list_ptr->call_data_offset[idx] = call_data_offset;
+        host_transaction_list_ptr->call_data_size[idx] = data_init.size;
         call_data_offset += data_init.size;
         evm_word_t tmp;
         tmp.from_hex(cJSON_GetArrayItem(gas_limit_json, gas_limit_index)->valuestring);
-        transaction_list_ptr->gas_limit[idx] = uint256_get_uint64_t(&tmp);
+        host_transaction_list_ptr->gas_limit[idx] = uint256_get_uint64_t(&tmp);
         // printf("gas limit uint64_t %lu\n", transaction_list_ptr->gas_limit[idx]);
         // TODO check if it is appropriate to perform here
         // if (idx == 0) {
@@ -169,58 +174,65 @@ __host__ int32_t get_transactions(TransactionList *&transaction_list_ptr, const 
         //     uint256_mul(&upfront_cost, &tmp, &transaction_list_ptr->gas_price);
         // }
 
-        transaction_list_ptr->value[idx].from_hex(cJSON_GetArrayItem(value_json, value_index)->valuestring);
+        host_transaction_list_ptr->value[idx].from_hex(cJSON_GetArrayItem(value_json, value_index)->valuestring);
 
-        transaction_list_ptr->value[idx].print();
+        host_transaction_list_ptr->value[idx].print();
     }
 
     // multiply the data
     uint32_t multiplier = transactions_count / data_counts;
     for (uint32_t idx = 1; idx < multiplier; idx++) {
-        memcpy(&transaction_list_ptr->call_data_offset[idx * data_counts], transaction_list_ptr->call_data_offset,
+        memcpy(&host_transaction_list_ptr->call_data_offset[idx * data_counts],
+               host_transaction_list_ptr->call_data_offset, data_counts * sizeof(uint32_t));
+        memcpy(&host_transaction_list_ptr->call_data_size[idx * data_counts], host_transaction_list_ptr->call_data_size,
                data_counts * sizeof(uint32_t));
-        memcpy(&transaction_list_ptr->call_data_size[idx * data_counts], transaction_list_ptr->call_data_size,
-               data_counts * sizeof(uint32_t));
-        memcpy(&transaction_list_ptr->gas_limit[idx * data_counts], transaction_list_ptr->gas_limit,
+        memcpy(&host_transaction_list_ptr->gas_limit[idx * data_counts], host_transaction_list_ptr->gas_limit,
                data_counts * sizeof(uint64_t));
-        memcpy(&transaction_list_ptr->value[idx * data_counts], transaction_list_ptr->value,
+        memcpy(&host_transaction_list_ptr->value[idx * data_counts], host_transaction_list_ptr->value,
                data_counts * sizeof(evm_word_t));
     }
 
-    uint32_t call_data_size = transaction_list_ptr->call_data_offset[transactions_count - 1] +
-                              transaction_list_ptr->call_data_size[transactions_count - 1];
+    uint32_t call_data_size = host_transaction_list_ptr->call_data_offset[transactions_count - 1] +
+                              host_transaction_list_ptr->call_data_size[transactions_count - 1];
     // printf("call_data_size %d\n", call_data_size);
-    TransactionList *d_transaction_list_ptr;
+    // TransactionList *d_transaction_list_ptr;
+    uint32_t transaction_per_gpu = transactions_count / num_gpus;
+    for (uint32_t i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        TransactionList *temp_transaction_list_ptr = new TransactionList();
+        memcpy(temp_transaction_list_ptr, host_transaction_list_ptr, sizeof(TransactionList));
+        temp_transaction_list_ptr->size = transaction_per_gpu;
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->value, transaction_per_gpu * sizeof(evm_word_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->gas_limit, transaction_per_gpu * sizeof(gas_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->call_data, call_data_size * sizeof(uint8_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->call_data_offset, transaction_per_gpu * sizeof(uint32_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->call_data_size, transaction_per_gpu * sizeof(uint32_t)));
 
-    TransactionList *temp_transaction_list_ptr = new TransactionList();
-    memcpy(temp_transaction_list_ptr, transaction_list_ptr, sizeof(TransactionList));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->value, transactions_count * sizeof(evm_word_t)));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->gas_limit, transactions_count * sizeof(gas_t)));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->call_data, call_data_size * sizeof(uint8_t)));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->call_data_offset, transactions_count * sizeof(uint32_t)));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list_ptr->call_data_size, transactions_count * sizeof(uint32_t)));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->value,
+                              host_transaction_list_ptr->value + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->gas_limit,
+                              host_transaction_list_ptr->gas_limit + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(gas_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->call_data, host_transaction_list_ptr->call_data,
+                              call_data_size * sizeof(uint8_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->call_data_offset,
+                              host_transaction_list_ptr->call_data_offset + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->call_data_size,
+                              host_transaction_list_ptr->call_data_size + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->value, transaction_list_ptr->value,
-                          transactions_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->gas_limit, transaction_list_ptr->gas_limit,
-                          transactions_count * sizeof(gas_t), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->call_data, transaction_list_ptr->call_data,
-                          call_data_size * sizeof(uint8_t), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->call_data_offset, transaction_list_ptr->call_data_offset,
-                          transactions_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list_ptr->call_data_size, transaction_list_ptr->call_data_size,
-                          transactions_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
-
-    CUDA_CHECK(cudaMalloc(&d_transaction_list_ptr, sizeof(TransactionList)));
-    CUDA_CHECK(
-        cudaMemcpy(d_transaction_list_ptr, temp_transaction_list_ptr, sizeof(TransactionList), cudaMemcpyHostToDevice));
-
+        CUDA_CHECK(cudaMalloc(&transaction_list_ptrs[i], sizeof(TransactionList)));
+        CUDA_CHECK(cudaMemcpy(transaction_list_ptrs[i], temp_transaction_list_ptr, sizeof(TransactionList),
+                              cudaMemcpyHostToDevice));
+        delete temp_transaction_list_ptr;
+    }
     // printf("transaction on host\n");
     // transaction_list_ptr->print();
 
-    delete temp_transaction_list_ptr;
     // delete transaction_list_ptr;
-    transaction_list_ptr = d_transaction_list_ptr;
+    // transaction_list_ptr = d_transaction_list_ptr;
     return ERROR_SUCCESS;
 }
 

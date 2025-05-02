@@ -9,31 +9,46 @@
 #include <CuEVM/utils/evm_utils.cuh>
 #include <chrono>
 #include <fstream>
+#include <vector>
 
 void run_interpreter(char *read_json_filename, char *write_json_filename, size_t clones, bool verbose = false) {
     // CuEVM::evm_instance_t *instances_data;
 
     printf("Running the interpreter\n");
 
-    CUDA_CHECK(cudaSetDevice(0));
-    CUDA_CHECK(cudaDeviceReset());
-    printf("Running on GPU\n");
-    cudaEvent_t start, stop;
-    float milliseconds = 0;
+    int num_gpus = 0;
+    cudaError_t err = cudaGetDeviceCount(&num_gpus);
+    if (err != cudaSuccess || num_gpus <= 0) {
+        printf("Error getting GPU count or no GPUs found: %s. Defaulting to 1 GPU.\n", cudaGetErrorString(err));
+        num_gpus = 1;  // Fallback to 1 GPU if detection fails
+    }
+    printf("Found %d GPUs.\n", num_gpus);
+    std::vector<cudaEvent_t> start_events(0);
+    std::vector<cudaEvent_t> stop_events(0);
+    for (int i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CUDA_CHECK(cudaDeviceReset());
+        printf("Running on GPU %d\n", i);
 
-    size_t size_value;
-    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    printf("current stack size %zu\n", size_value);
-    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    printf("current heap size %zu\n", size_value);
-    size_t heap_size = (size_t(1) << 32);  // 4GB
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
-    cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
-    // printf("current stack size %zu\n", size_value);
-    CUDA_CHECK(cudaDeviceSynchronize());
-    // CUDA_CHECK(cudaEventCreate(&start));
-    // CUDA_CHECK(cudaEventCreate(&stop));
+        cudaEvent_t start, stop;
+        CUDA_CHECK(cudaEventCreate(&start));
+        CUDA_CHECK(cudaEventCreate(&stop));
+        start_events.push_back(start);
+        stop_events.push_back(stop);
+        float milliseconds = 0;
+
+        size_t size_value;
+        cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+        printf("current stack size %zu\n", size_value);
+        cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+        printf("current heap size %zu\n", size_value);
+        size_t heap_size = (size_t(1) << 32);  // 4GB
+        CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
+        CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
+        cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
+        // printf("current stack size %zu\n", size_value);
+        CUDA_CHECK(cudaDeviceSynchronize());
+    }
 
     // read the json file with the global state
     cJSON *read_root = CuEVM::utils::get_json_from_file(read_json_filename);
@@ -53,46 +68,79 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 // tracer
 #ifdef EIP_3155
     const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
-    char *d_buffer;
-    cudaMalloc(&d_buffer, BUFFER_SIZE);
+    // char *d_buffer;
+    std::vector<char *> d_buffers(num_gpus);
+    for (int i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CUDA_CHECK(cudaMalloc(&d_buffers[i], BUFFER_SIZE));
+    }
 #endif
-    if (test_json != nullptr) {
-        auto start_cpu = std::chrono::high_resolution_clock::now();
-        uint32_t num_accounts = 0;
+    if (test_json == nullptr) {
+        exit(EXIT_FAILURE);
+    }
+    auto start_cpu = std::chrono::high_resolution_clock::now();
+    uint32_t num_accounts = 0;
 
-        CuEVM::transaction::TransactionList *transaction_list_ptr =
-            CuEVM::get_evm_instances(test_json, num_instances, num_accounts, clones);
+    auto transaction_list_ptrs = CuEVM::get_evm_instances(test_json, num_instances, num_accounts, num_gpus, clones);
+
+    // Move CPU timing end point here to measure only setup time
+    auto end_cpu = std::chrono::high_resolution_clock::now();
+    auto duration_cpu = std::chrono::duration_cast<std::chrono::milliseconds>(end_cpu - start_cpu);
+    printf("CPU setup time: %lld milliseconds\n", duration_cpu.count());
+
+    // Launch kernels on each GPU with proper timing
+    for (int i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
         CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
         printf("num_accounts: %d\n", num_accounts);
-        auto end_cpu = std::chrono::high_resolution_clock::now();
-        auto duration_cpu = std::chrono::duration_cast<std::chrono::milliseconds>(end_cpu - start_cpu);
-        printf("CPU setup time: %lld milliseconds\n", duration_cpu.count());
-        // CuEVM::memory_pool::preallocate_stack(num_instances);
+
         uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
         printf("\n\n ----------\n\n");
-        printf("Running %d instances on GPU, num blocks %d, threads per block %d\n", num_instances, num_blocks,
+        printf("Running %d instances on GPU %d, num blocks %d, threads per block %d\n", num_instances, i, num_blocks,
                INSTANCES_PER_BLOCK);
-        // run the evm
-        cudaEventCreate(&start);
-        cudaEventCreate(&stop);
-        cudaEventRecord(start);
 
-        CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(transaction_list_ptr, num_instances
+        // Record start event on current device
+        CUDA_CHECK(cudaEventRecord(start_events[i]));
+
+        // Launch kernel on current GPU
+        CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(transaction_list_ptrs[i],
+                                                                                  num_instances
 #ifdef EIP_3155
                                                                                   ,
-                                                                                  d_buffer, BUFFER_SIZE
+                                                                                  d_buffers[i], BUFFER_SIZE
 #endif
         );
 
-        cudaEventRecord(stop);
-        cudaEventSynchronize(stop);
-
-        cudaEventElapsedTime(&milliseconds, start, stop);
-        printf("Kernel execution time: %f milliseconds\n", milliseconds);
-
-        CUDA_CHECK(cudaGetLastError());
-        printf("GPU kernel finished\n");
+        // Record stop event on current device
+        CUDA_CHECK(cudaEventRecord(stop_events[i]));
     }
+
+    // Wait for all GPUs to finish and measure times
+    float max_time = 0.0f;
+    for (int i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CUDA_CHECK(cudaEventSynchronize(stop_events[i]));
+
+        float milliseconds = 0;
+        CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start_events[i], stop_events[i]));
+        printf("Kernel execution time on GPU %d: %f milliseconds\n", i, milliseconds);
+
+        if (milliseconds > max_time) {
+            max_time = milliseconds;
+        }
+    }
+
+    printf("Total execution time (longest GPU): %f milliseconds\n", max_time);
+
+    // Clean up CUDA events
+    for (int i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CUDA_CHECK(cudaEventDestroy(start_events[i]));
+        CUDA_CHECK(cudaEventDestroy(stop_events[i]));
+    }
+
+    CUDA_CHECK(cudaGetLastError());
+    printf("GPU kernel finished\n");
 
     printf("Freeing the memory ...\n");
     // CuEVM::free_evm_instances(instances_data, num_instances);
@@ -100,21 +148,22 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
 #ifdef EIP_3155
     // After kernel execution, copy the buffer back to the host
     char *h_buffer = new char[BUFFER_SIZE];
-    cudaMemcpy(h_buffer, d_buffer, BUFFER_SIZE, cudaMemcpyDeviceToHost);
-    // printf("h_buffer: %p\n", h_buffer);
-    // uint32_t *buffer_as_uint = (uint32_t *)h_buffer;
-    // for (int i = 0; i < 20; i++) {
-    //     printf("buffer[%d]: %x\n", i, buffer_as_uint[i]);
-    // }
-    // Parse and print the data (implemented later)
-    CuEVM::utils::print_tracer_data(h_buffer);
+    for (int i = 0; i < num_gpus; i++) {
+        cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
+        // printf("h_buffer: %p\n", h_buffer);
+        // uint32_t *buffer_as_uint = (uint32_t *)h_buffer;
+        // for (int i = 0; i < 20; i++) {
+        //     printf("buffer[%d]: %x\n", i, buffer_as_uint[i]);
+        // }
+        // Parse and print the data (implemented later)
+        CuEVM::utils::print_tracer_data(h_buffer);
+        cudaFree(d_buffers[i]);
+    }
 
     // Clean up
     delete[] h_buffer;
-    cudaFree(d_buffer);
-#endif
 
-    CUDA_CHECK(cudaDeviceReset());
+#endif
 
     cJSON_Delete(read_root);
     if (write_json_filename != nullptr) {

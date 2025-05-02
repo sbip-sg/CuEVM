@@ -953,11 +953,14 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     return ERROR_SUCCESS;
 }
 
-__host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *test_json, uint32_t &num_instances,
-                                                                uint32_t &num_accounts, uint32_t clones) {
+__host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(const cJSON *test_json,
+                                                                              uint32_t &num_instances,
+                                                                              uint32_t &num_accounts, uint32_t num_gpus,
+                                                                              uint32_t clones) {
     // get the world state
-
-    CuEVM::StateDb *state_db_ptr = nullptr;
+    // Default constructor initializes with 0 elements
+    std::vector<CuEVM::StateDb *> state_db_ptrs(num_gpus, nullptr);
+    std::vector<CuEVM::StateDb *> snapshot_state_db_ptrs(num_gpus, nullptr);
     const cJSON *world_state_json = NULL;  // the json for the world state
     // get the world state json
     if (cJSON_IsObject(test_json))
@@ -965,41 +968,52 @@ __host__ CuEVM::transaction::TransactionList *get_evm_instances(const cJSON *tes
     else if (cJSON_IsArray(test_json))
         world_state_json = test_json;
     else
-        return nullptr;
+        return std::vector<CuEVM::transaction::TransactionList *>();
 
     CuEVM::get_block_info(test_json);
 
     // get the transaction
-    CuEVM::transaction::TransactionList *transaction_list_ptr = nullptr;
+    std::vector<CuEVM::transaction::TransactionList *> transaction_list_ptrs(num_gpus, nullptr);
     uint32_t num_transactions = 0;
-    uint32_t num_original_transactions = 0;
 
-    auto err = CuEVM::transaction::get_transactions(transaction_list_ptr, test_json, num_transactions, clones);
+    auto err =
+        CuEVM::transaction::get_transactions(transaction_list_ptrs, test_json, num_transactions, num_gpus, clones);
     if (err) {
         printf("get_transactions failed with error %d\n", err);
-        return nullptr;
+        return transaction_list_ptrs;
     }
+
+    if (num_transactions % num_gpus != 0) {
+        printf("Error: num_transactions %d is not divisible by num_gpus %d\n", num_transactions, num_gpus);
+        return transaction_list_ptrs;
+    }
+    uint32_t num_transactions_per_gpu = num_transactions / num_gpus;
     // num_original_transactions = num_transactions;
     // num_transactions *= clones;
     // generate the evm instances
 
     // CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
-    printf("num_transactions %d\n", num_transactions);
+    printf("num_transactions %d, num_transactions_per_gpu %d\n", num_transactions, num_transactions_per_gpu);
 
     // evm_instance_t *evm_instances = new evm_instance_t[num_transactions];
-#ifdef BUILD_GO_LIBRARY
+
     CuEVM::StateDb *snapshot_state_db_ptr = nullptr;
-#endif
 
-    CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts
-#ifdef BUILD_GO_LIBRARY
-                                ,
-                                snapshot_state_db_ptr
-#endif
+    // CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts
+    // for multiGPU version
+    CuEVM::StateDb::GPUfromJsonMultiGPU(
+        state_db_ptrs, world_state_json, num_transactions, num_accounts, snapshot_state_db_ptrs
+
     );
+    //     CuEVM::StateDb::GPUfromJsonMultiple(state_db_ptrs, world_state_json, num_transactions, num_accounts,
+    //     num_gpus,
+    // #ifdef BUILD_GO_LIBRARY
+    //                                         snapshot_state_db_ptr
+    // #endif
+    //     );
 
-    num_instances = num_transactions;
-    return transaction_list_ptr;
+    num_instances = num_transactions_per_gpu;
+    return transaction_list_ptrs;
 }
 
 __host__ void free_evm_instances(evm_instance_t *&evm_instances, uint32_t num_instances) {
