@@ -31,10 +31,10 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CGBN_TPI "32" CACHE STRING "Thread per instance for CGBN")
 
-find_package(GMP REQUIRED)
+#find_package(GMP REQUIRED)
 find_package(cJSON REQUIRED) # Assuming cJSON is available as a find package
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-include_directories(${GMP_INCLUDE_DIR})
+#include_directories(${GMP_INCLUDE_DIR})
 
 add_subdirectory(libraries)
 
@@ -69,7 +69,7 @@ target_include_directories(${PROJECT_NAME}
 # our own libraries first
 target_link_libraries(${PROJECT_NAME} PRIVATE CuCrypto CuBigInt)
 # then the external ones
-target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${CUDA_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PUBLIC cjson ${CUDA_LIBRARIES})
 
 
 # Add specific NVCC flags using target_compile_options (if necessary)

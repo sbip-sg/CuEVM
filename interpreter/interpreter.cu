@@ -149,7 +149,8 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     // After kernel execution, copy the buffer back to the host
     char *h_buffer = new char[BUFFER_SIZE];
     for (int i = 0; i < num_gpus; i++) {
-        cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
+        CUDA_CHECK(cudaSetDevice(i));
+    	cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
         // printf("h_buffer: %p\n", h_buffer);
         // uint32_t *buffer_as_uint = (uint32_t *)h_buffer;
         // for (int i = 0; i < 20; i++) {
@@ -215,7 +216,7 @@ int main(int argc, char *argv[]) {  // getting the input
         fprintf(stdout, "--input argument is required\n");
         exit(EXIT_FAILURE);
     }
-    if (clones < 32) clones = 32;
+    if (clones < 32 && clones > 1) clones = 32;
     // check if the file exists
     std::ifstream file(read_json_filename);
     if (!file) {

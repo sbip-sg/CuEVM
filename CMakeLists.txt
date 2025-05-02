@@ -86,7 +86,7 @@ if(BUILD_PYTHON_LIBRARY)
     message(STATUS "Python libraries: ${PYTHON_LIBRARIES}")
     # Link the library to its dependencies
     target_link_libraries(${PROJECT_NAME} PRIVATE CuCrypto CuBigInt CuEVM)
-    target_link_libraries(${PROJECT_NAME} PUBLIC gmp cjson ${Python3_LIBRARIES} ${CUDA_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} PUBLIC cjson ${Python3_LIBRARIES} ${CUDA_LIBRARIES})
 
     target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
     if(ENABLE_EIP_3155)
@@ -127,7 +127,7 @@ elseif(BUILD_GO_LIBRARY)
     else()
          message(WARNING "OpenMP not found, cuevm_go parallel loop will not be enabled.")
     endif()
-    target_link_libraries(${PROJECT_NAME}_go PUBLIC gmp cjson ${CUDA_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME}_go PUBLIC cjson ${CUDA_LIBRARIES})
 
     target_compile_options(${PROJECT_NAME}_go PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
     if(ENABLE_EIP_3155)
@@ -159,7 +159,7 @@ else()
     # our own libraries first
     target_link_libraries(${GPU_INTERPRETER} PRIVATE CuCrypto CuBigInt CuEVM)
     # then the external ones
-    target_link_libraries(${GPU_INTERPRETER} PUBLIC gmp cjson ${CUDA_LIBRARIES})
+    target_link_libraries(${GPU_INTERPRETER} PUBLIC cjson ${CUDA_LIBRARIES})
 
     target_compile_options(${GPU_INTERPRETER} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo --std=c++20 -rdc=true --expt-relaxed-constexpr>)
     if(ENABLE_EIP_3155)
