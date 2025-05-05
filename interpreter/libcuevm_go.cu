@@ -411,8 +411,8 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     std::vector<CuEVM::transaction::TransactionList*> d_transaction_list_ptrs;
     uint32_t transaction_per_gpu = txCount / g_num_gpus;
     for (int i = 0; i < g_num_gpus; i++) {
-	printf("\n CuEVM: allocation %d txs on GPU %d \n", transaction_per_gpu, i);
-	CUDA_CHECK(cudaSetDevice(i));
+        printf("\n CuEVM: allocation %d txs on GPU %d \n", transaction_per_gpu, i);
+        CUDA_CHECK(cudaSetDevice(i));
         // Now we need to allocate GPU memory and transfer data
         CuEVM::transaction::TransactionList* d_transaction_list_ptr;
         CuEVM::transaction::TransactionList* temp_transaction_list = new CuEVM::transaction::TransactionList();
@@ -432,13 +432,16 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         }
 
         // Copy data from host to GPU
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->value, host_transaction_list->value + i * transaction_per_gpu, transaction_per_gpu * sizeof(evm_word_t),
-                              cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->gas_limit, host_transaction_list->gas_limit + i * transaction_per_gpu,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->value, host_transaction_list->value + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->gas_limit,
+                              host_transaction_list->gas_limit + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_offset, host_transaction_list->call_data_offset + i * transaction_per_gpu,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_offset,
+                              host_transaction_list->call_data_offset + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_size, host_transaction_list->call_data_size i * transaction_per_gpu,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_size,
+                              host_transaction_list->call_data_size + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
         // Allocate memory for the transaction list on GPU and copy the structure
@@ -459,8 +462,10 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 
         if (copy_state_data) {
             CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
-            CUDA_CHECK(cudaMalloc(&d_serialized_worldstate_data, transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data)));
-            cudaMemset(d_serialized_worldstate_data, 0, transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data));
+            CUDA_CHECK(cudaMalloc(&d_serialized_worldstate_data,
+                                  transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data)));
+            cudaMemset(d_serialized_worldstate_data, 0,
+                       transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data));
             cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
                                sizeof(CuEVM::serialized_worldstate_data*));
         }
@@ -483,7 +488,8 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
                                                 const unsigned char* values, const unsigned char* callData,
                                                 int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
                                                 const uint32_t* dataSizes, int dataSizesLen, int txCount) {
-    printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount, g_num_instances_per_device, call_counter);
+    printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount,
+           g_num_instances_per_device, call_counter);
 
     try {
         // Update global num_instances if provided
@@ -606,7 +612,7 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
         // cleanup_transaction_list(d_transaction_list_ptr, callDataLen);
         GPUExecutionResultC* result = get_gpu_execution_results();
         for (int i = 0; i < g_num_gpus; i++) {
-	    CUDA_CHECK(cudaSetDevice(i));
+            CUDA_CHECK(cudaSetDevice(i));
             CuEVM::freeTransactionList(d_transaction_list_ptrs[i]);
             CuEVM::freeTraceData(copy_state_data);
         }
