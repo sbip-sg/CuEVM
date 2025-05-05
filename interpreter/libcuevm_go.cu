@@ -528,8 +528,13 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
         // tracer
 #ifdef EIP_3155
         const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
-        char* d_buffer;
-        cudaMalloc(&d_buffer, BUFFER_SIZE);
+        std::vector<char*> d_buffer;
+        for (int i = 0; i < g_num_gpus; i++) {
+            char* d_buffer;
+            CUDA_CHECK(cudaSetDevice(i));
+            CUDA_CHECK(cudaMalloc(&d_buffer, BUFFER_SIZE));
+            d_buffer.push_back(d_buffer);
+        }
 #endif
         // Configure kernel launch parameters
         uint32_t num_blocks = (g_num_instances_per_device + INSTANCES_PER_BLOCK - 1) / INSTANCES_PER_BLOCK;
@@ -556,7 +561,7 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
                                                                                       g_num_instances_per_device
 #ifdef EIP_3155
                                                                                       ,
-                                                                                      d_buffer, BUFFER_SIZE
+                                                                                      d_buffer[i], BUFFER_SIZE
 #endif
                                                                                       ,
                                                                                       copy_state_data);
