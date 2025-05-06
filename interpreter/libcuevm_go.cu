@@ -1,20 +1,24 @@
 #include <CuEVM/libcuevm_go.h>
 #include <omp.h>
 
+#include <cassert>
 #include <unordered_map>
 #include <vector>
 
 // Global variables to track state between function calls
 static uint32_t g_num_accounts = 0;
-static uint32_t g_num_instances = 0;
-static CuEVM::StateDb* g_state_db_ptr = nullptr;
-static CuEVM::StateDb* g_snapshot_state_db_ptr = nullptr;  // store original snapshot state db, not free/modified
+static uint32_t g_num_instances_per_device;
+// static uint32_t g_num_instances;
+static std::vector<CuEVM::StateDb*> g_state_db_ptr;
+static std::vector<CuEVM::StateDb*> g_snapshot_state_db_ptr;  // store original snapshot state db, not free/modified
 static int call_counter = 0;
 // Global variable to hold persistent jump table
 // CuEVM::ContractPCsMap contract_pcs_map;
 
 // Global variable to hold the last execution result
 static char* g_last_result = nullptr;
+
+static int g_num_gpus = 1;
 
 // Helper function to convert bytes to hex string
 std::string bytes_to_hex(const unsigned char* data, int len) {
@@ -54,15 +58,31 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
     }
 
     // Set larger heap size for GPU memory if not reusing state data
-
-    CUDA_CHECK(cudaSetDevice(0));
-    CUDA_CHECK(cudaDeviceReset());
-    printf("Initializing GPU device\n");
-    size_t heap_size = (size_t(1) << 32);  // 4GB
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
-    CUDA_CHECK(cudaDeviceSynchronize());
-
+    cudaError_t err = cudaGetDeviceCount(&g_num_gpus);
+    if (err != cudaSuccess || g_num_gpus <= 0) {
+        printf("Error getting GPU count or no GPUs found: %s\n", cudaGetErrorString(err));
+        g_num_gpus = 0;
+        return -1;
+    }
+    printf("Found %d GPUs.\n", g_num_gpus);
+    for (int i = 0; i < g_num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CUDA_CHECK(cudaDeviceReset());
+        printf("Initializing GPU device\n");
+        size_t heap_size = (size_t(1) << 32);  // 4GB
+        CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
+        CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
+        CUDA_CHECK(cudaDeviceSynchronize());
+    }
+    // Include <cassert> header at the top of the file for this to work.
+    // Standard assert takes only one argument (the condition).
+    if (num_instances % g_num_gpus != 0) {
+        printf("Error: Number of instances (%u) must be a multiple of the number of GPUs (%d).\n", num_instances,
+               g_num_gpus);
+        printf("Please adjust the number of instances/workers or number of available GPUs in your configuration.\n");
+        // Optionally, return an error code or exit if this is a fatal condition
+        return -1;  // Indicate an error
+    }
     printf("Resetting call counter\n");
 
     cJSON* stateJson = cJSON_Parse(json_state);
@@ -75,26 +95,40 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
     cJSON* world_state_json = cJSON_GetObjectItemCaseSensitive(stateJson, "pre");
 
     // Store the num_instances value globally
-    g_num_instances = num_instances;
-    uint32_t num_transactions = num_instances;
-
+    g_num_instances_per_device = num_instances / g_num_gpus;
+    // g_num_instances = num_instances;
     // Free previous state DB if it exists
     // CuEVM debug, device reset over library calls, dangling pointer
     // TODO: more efficient state db reset mechanism
-    g_state_db_ptr = nullptr;
+    for (int i = 0; i < g_num_gpus; i++) {
+        if (g_state_db_ptr.size() <= i) {
+            g_state_db_ptr.push_back(nullptr);
+        } else {
+            // cudaDeviceReset invalidates pointers, so just set to nullptr
+            g_state_db_ptr[i] = nullptr;
+        }
+
+        if (g_snapshot_state_db_ptr.size() <= i) {
+            g_snapshot_state_db_ptr.push_back(nullptr);
+        } else {
+            // cudaDeviceReset invalidates pointers, so just set to nullptr
+            g_snapshot_state_db_ptr[i] = nullptr;
+        }
+    }
     // if (g_state_db_ptr != nullptr) {
     //     delete g_state_db_ptr;
     //     g_state_db_ptr = nullptr;
     // }
     // Initialize and store the state DB and account count globally
     // Modify GPUfromJson to use the persistent jump table
-#ifdef BUILD_GO_LIBRARY
-    CuEVM::StateDb::GPUfromJson(g_state_db_ptr, world_state_json, num_transactions, g_num_accounts,
-                                g_snapshot_state_db_ptr);
-#else
-    CuEVM::StateDb::GPUfromJson(g_state_db_ptr, world_state_json, num_transactions, g_num_accounts);
-#endif
-    CuEVM::get_block_info(stateJson);
+
+    CuEVM::StateDb::GPUfromJsonMultiGPU(g_state_db_ptr, world_state_json, g_num_instances_per_device, g_num_accounts,
+                                        g_snapshot_state_db_ptr);
+
+    for (int i = 0; i < g_num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CuEVM::get_block_info(stateJson);
+    }
     printf("Process json state GPU done, found %u accounts\n", g_num_accounts);
 
     call_counter = 0;
@@ -105,119 +139,129 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
 }
 
 void reset_state_db() {
-    if (g_state_db_ptr != nullptr && g_snapshot_state_db_ptr != nullptr) {
-        // Create temporary host copies to read the device pointers
-        // Allocate host memory for the structs themselves
-        CuEVM::StateDb* host_state_db =
-            new CuEVM::StateDb(1);  // num_states=1 is placeholder, not used for allocation size here
-        CuEVM::StateDb* host_snapshot_state_db = new CuEVM::StateDb(1);
+    for (int i = 0; i < g_num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        if (g_state_db_ptr[i] != nullptr && g_snapshot_state_db_ptr[i] != nullptr) {
+            // Create temporary host copies to read the device pointers
+            // Allocate host memory for the structs themselves
+            CuEVM::StateDb* host_state_db =
+                new CuEVM::StateDb(1);  // num_states=1 is placeholder, not used for allocation size here
+            CuEVM::StateDb* host_snapshot_state_db = new CuEVM::StateDb(1);
 
-        // Copy the StateDb structs (containing device pointers) from device to host
-        CUDA_CHECK(cudaMemcpy(host_state_db, g_state_db_ptr, sizeof(CuEVM::StateDb), cudaMemcpyDeviceToHost));
-        CUDA_CHECK(cudaMemcpy(host_snapshot_state_db, g_snapshot_state_db_ptr, sizeof(CuEVM::StateDb),
-                              cudaMemcpyDeviceToHost));
+            // Copy the StateDb structs (containing device pointers) from device to host
+            CUDA_CHECK(cudaMemcpy(host_state_db, g_state_db_ptr[i], sizeof(CuEVM::StateDb), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaMemcpy(host_snapshot_state_db, g_snapshot_state_db_ptr[i], sizeof(CuEVM::StateDb),
+                                  cudaMemcpyDeviceToHost));
 
-        // Now host_state_db and host_snapshot_state_db contain the *device* addresses
-        // Read necessary metadata from the host copies
-        uint32_t num_accounts = host_snapshot_state_db->num_accounts;  // Use snapshot's count
-        uint32_t num_states = host_snapshot_state_db->num_states;      // Use snapshot's count
-        uint32_t num_contracts_snapshot = host_snapshot_state_db->num_contracts;
+            // Now host_state_db and host_snapshot_state_db contain the *device* addresses
+            // Read necessary metadata from the host copies
+            uint32_t num_accounts = host_snapshot_state_db->num_accounts;  // Use snapshot's count
+            uint32_t num_states = host_snapshot_state_db->num_states;      // Use snapshot's count
+            uint32_t num_contracts_snapshot = host_snapshot_state_db->num_contracts;
 
-        // --- Direct Device-to-Device Copies using pointers read from host structs ---
+            // --- Direct Device-to-Device Copies using pointers read from host structs ---
 
-        // Copy account balances, nonces, storage sizes
-        size_t balances_size = (size_t)num_states * num_accounts * sizeof(evm_word_t);
-        CUDA_CHECK(cudaMemcpy(host_state_db->account_balances, host_snapshot_state_db->account_balances, balances_size,
-                              cudaMemcpyDeviceToDevice));
+            // Copy account balances, nonces, storage sizes
+            size_t balances_size = (size_t)num_states * num_accounts * sizeof(evm_word_t);
+            CUDA_CHECK(cudaMemcpy(host_state_db->account_balances, host_snapshot_state_db->account_balances,
+                                  balances_size, cudaMemcpyDeviceToDevice));
 
-        size_t nonces_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
-        CUDA_CHECK(cudaMemcpy(host_state_db->account_nonces, host_snapshot_state_db->account_nonces, nonces_size,
-                              cudaMemcpyDeviceToDevice));
+            size_t nonces_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
+            CUDA_CHECK(cudaMemcpy(host_state_db->account_nonces, host_snapshot_state_db->account_nonces, nonces_size,
+                                  cudaMemcpyDeviceToDevice));
 
-        size_t storage_size_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
-        CUDA_CHECK(cudaMemcpy(host_state_db->account_storage_size, host_snapshot_state_db->account_storage_size,
-                              storage_size_size, cudaMemcpyDeviceToDevice));
+            size_t storage_size_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
+            CUDA_CHECK(cudaMemcpy(host_state_db->account_storage_size, host_snapshot_state_db->account_storage_size,
+                                  storage_size_size, cudaMemcpyDeviceToDevice));
 
-        // Copy prealloc storage pools (using snapshot's num_contracts)
-        // Ensure account_prealloc_keys_size is accessible/correct here.
-        size_t prealloc_keys_bytes =
-            (size_t)account_prealloc_keys_size * num_contracts_snapshot * num_states * sizeof(evm_word_t);
-        if (prealloc_keys_bytes > 0) {
-            CUDA_CHECK(cudaMemcpy(host_state_db->prealloc_keys_pool, host_snapshot_state_db->prealloc_keys_pool,
-                                  prealloc_keys_bytes, cudaMemcpyDeviceToDevice));
+            // Copy prealloc storage pools (using snapshot's num_contracts)
+            // Ensure account_prealloc_keys_size is accessible/correct here.
+            size_t prealloc_keys_bytes =
+                (size_t)account_prealloc_keys_size * num_contracts_snapshot * num_states * sizeof(evm_word_t);
+            if (prealloc_keys_bytes > 0) {
+                CUDA_CHECK(cudaMemcpy(host_state_db->prealloc_keys_pool, host_snapshot_state_db->prealloc_keys_pool,
+                                      prealloc_keys_bytes, cudaMemcpyDeviceToDevice));
+            }
+
+            size_t prealloc_values_bytes =
+                (size_t)account_prealloc_keys_size * num_contracts_snapshot * num_states * sizeof(CuEVM::ValueStatus);
+            if (prealloc_values_bytes > 0) {
+                CUDA_CHECK(cudaMemcpy(host_state_db->prealloc_values_pool, host_snapshot_state_db->prealloc_values_pool,
+                                      prealloc_values_bytes, cudaMemcpyDeviceToDevice));
+            }
+
+            // Copy warm account flags
+            size_t warm_flags_size = (size_t)num_states * num_accounts * sizeof(bool);
+            CUDA_CHECK(cudaMemcpy(host_state_db->account_is_warm, host_snapshot_state_db->account_is_warm,
+                                  warm_flags_size, cudaMemcpyDeviceToDevice));
+            // Alternative: Reset warm flags instead of copying snapshot state:
+            // CUDA_CHECK(cudaMemset(host_state_db->account_is_warm, 0, warm_flags_size));
+
+            // --- Resetting Dynamic Storage Pointers/Capacities ---
+            // IMPORTANT: See previous explanation about external memory management for dynamic pages.
+            size_t dynamic_accounts_size = (size_t)num_states * sizeof(CuEVM::DynamicAccount*);
+            CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_accounts, host_snapshot_state_db->dynamic_accounts,
+                                  dynamic_accounts_size, cudaMemcpyDeviceToDevice));
+
+            size_t dynamic_pages_size = (size_t)num_states * num_accounts * sizeof(CuEVM::StateDbStoragePage*);
+            CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_storage_pages, host_snapshot_state_db->dynamic_storage_pages,
+                                  dynamic_pages_size, cudaMemcpyDeviceToDevice));
+
+            size_t dynamic_capacity_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
+            CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_pool_capacity, host_snapshot_state_db->dynamic_pool_capacity,
+                                  dynamic_capacity_size, cudaMemcpyDeviceToDevice));
+
+            // Reset other fields if needed
+            // No need to copy host_state_db back to g_state_db_ptr, as we modified the data *pointed to* by
+            // g_state_db_ptr.
+
+            // Update the global symbol pointer in device memory (good practice for consistency).
+            CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::global_state_db_ptr, &g_state_db_ptr[i], sizeof(CuEVM::StateDb*)));
+
+            // Clean up host allocations
+            delete host_state_db;
+            delete host_snapshot_state_db;
+
+            // printf("State DB reset complete\n");
+        } else {
+            printf("State DB reset error: pointers not initialized.\n");
         }
-
-        size_t prealloc_values_bytes =
-            (size_t)account_prealloc_keys_size * num_contracts_snapshot * num_states * sizeof(CuEVM::ValueStatus);
-        if (prealloc_values_bytes > 0) {
-            CUDA_CHECK(cudaMemcpy(host_state_db->prealloc_values_pool, host_snapshot_state_db->prealloc_values_pool,
-                                  prealloc_values_bytes, cudaMemcpyDeviceToDevice));
-        }
-
-        // Copy warm account flags
-        size_t warm_flags_size = (size_t)num_states * num_accounts * sizeof(bool);
-        CUDA_CHECK(cudaMemcpy(host_state_db->account_is_warm, host_snapshot_state_db->account_is_warm, warm_flags_size,
-                              cudaMemcpyDeviceToDevice));
-        // Alternative: Reset warm flags instead of copying snapshot state:
-        // CUDA_CHECK(cudaMemset(host_state_db->account_is_warm, 0, warm_flags_size));
-
-        // --- Resetting Dynamic Storage Pointers/Capacities ---
-        // IMPORTANT: See previous explanation about external memory management for dynamic pages.
-        size_t dynamic_accounts_size = (size_t)num_states * sizeof(CuEVM::DynamicAccount*);
-        CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_accounts, host_snapshot_state_db->dynamic_accounts,
-                              dynamic_accounts_size, cudaMemcpyDeviceToDevice));
-
-        size_t dynamic_pages_size = (size_t)num_states * num_accounts * sizeof(CuEVM::StateDbStoragePage*);
-        CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_storage_pages, host_snapshot_state_db->dynamic_storage_pages,
-                              dynamic_pages_size, cudaMemcpyDeviceToDevice));
-
-        size_t dynamic_capacity_size = (size_t)num_states * num_accounts * sizeof(uint32_t);
-        CUDA_CHECK(cudaMemcpy(host_state_db->dynamic_pool_capacity, host_snapshot_state_db->dynamic_pool_capacity,
-                              dynamic_capacity_size, cudaMemcpyDeviceToDevice));
-
-        // Reset other fields if needed
-        // No need to copy host_state_db back to g_state_db_ptr, as we modified the data *pointed to* by g_state_db_ptr.
-
-        // Update the global symbol pointer in device memory (good practice for consistency).
-        CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::global_state_db_ptr, &g_state_db_ptr, sizeof(CuEVM::StateDb*)));
-
-        // Clean up host allocations
-        delete host_state_db;
-        delete host_snapshot_state_db;
-
-        // printf("State DB reset complete\n");
-    } else {
-        printf("State DB reset error: pointers not initialized.\n");
     }
 }
 
-void print_evm_instances_results(uint32_t num_instances, bool copy_state_data) {
+void print_evm_instances_results(bool copy_state_data) {
     // Copy trace data from device memory
-    CuEVM::simplified_trace_data* trace_data = new CuEVM::simplified_trace_data[num_instances];
-    CuEVM::simplified_trace_data* d_trace_data;
+    CuEVM::simplified_trace_data* trace_data =
+        new CuEVM::simplified_trace_data[g_num_instances_per_device * g_num_gpus];
 
-    // Retrieve the device pointers stored in the global symbols
-    CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
+    for (int i = 0; i < g_num_gpus; i++) {
+        CuEVM::simplified_trace_data* d_trace_data;
 
-    // Copy the data arrays from device to host memory
-    CUDA_CHECK(cudaMemcpy(trace_data, d_trace_data, sizeof(CuEVM::simplified_trace_data) * num_instances,
-                          cudaMemcpyDeviceToHost));
+        // Retrieve the device pointers stored in the global symbols
+        CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
 
+        // Copy the data arrays from device to host memory
+        CUDA_CHECK(cudaMemcpy(&trace_data[i * g_num_instances_per_device], d_trace_data,
+                              sizeof(CuEVM::simplified_trace_data) * g_num_instances_per_device,
+                              cudaMemcpyDeviceToHost));
+    }
     // Copy world state data if requested
     CuEVM::serialized_worldstate_data* world_data = nullptr;
     if (copy_state_data) {
         CuEVM::serialized_worldstate_data* d_world_data;
-        world_data = new CuEVM::serialized_worldstate_data[num_instances];
+        world_data = new CuEVM::serialized_worldstate_data[g_num_instances_per_device * g_num_gpus];
 
-        CUDA_CHECK(cudaMemcpyFromSymbol(&d_world_data, global_serialized_worldstate, sizeof(d_world_data)));
-        CUDA_CHECK(cudaMemcpy(world_data, d_world_data, sizeof(CuEVM::serialized_worldstate_data) * num_instances,
-                              cudaMemcpyDeviceToHost));
+        for (int i = 0; i < g_num_gpus; i++) {
+            CUDA_CHECK(cudaMemcpyFromSymbol(&d_world_data, global_serialized_worldstate, sizeof(d_world_data)));
+            CUDA_CHECK(cudaMemcpy(&world_data[i * g_num_instances_per_device], d_world_data,
+                                  sizeof(CuEVM::serialized_worldstate_data) * g_num_instances_per_device,
+                                  cudaMemcpyDeviceToHost));
+        }
     }
-
-    printf("===== Printing results for %u EVM instances =====\n", num_instances);
+    printf("===== Printing results for %u EVM instances =====\n", g_num_instances_per_device * g_num_gpus);
 
     // Print information for each instance
-    for (uint32_t idx = 0; idx < num_instances; idx++) {
+    for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
         printf("\n----- Instance %u -----\n", idx);
 
         // Print trace data
@@ -314,12 +358,10 @@ void print_evm_instances_results(uint32_t num_instances, bool copy_state_data) {
 }
 // Creates transaction list on both host and device
 
-CuEVM::transaction::TransactionList* create_transaction_list(const unsigned char* fromAddr, const unsigned char* toAddr,
-                                                             const unsigned char* values, const unsigned char* callData,
-                                                             int callDataLen, const uint32_t* dataOffsets,
-                                                             int dataOffsetsLen, const uint32_t* dataSizes,
-                                                             int dataSizesLen, int txCount,
-                                                             bool copy_state_data = false) {
+std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
+    const unsigned char* fromAddr, const unsigned char* toAddr, const unsigned char* values,
+    const unsigned char* callData, int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
+    const uint32_t* dataSizes, int dataSizesLen, int txCount, bool copy_state_data = false) {
     // Create TransactionList on host
     CuEVM::transaction::TransactionList* host_transaction_list = new CuEVM::transaction::TransactionList();
     host_transaction_list->size = txCount;
@@ -366,57 +408,68 @@ CuEVM::transaction::TransactionList* create_transaction_list(const unsigned char
 
     // Set transaction type (default to 0)
     host_transaction_list->type = 0;
+    std::vector<CuEVM::transaction::TransactionList*> d_transaction_list_ptrs;
+    uint32_t transaction_per_gpu = txCount / g_num_gpus;
+    for (int i = 0; i < g_num_gpus; i++) {
+        printf("\n CuEVM: allocation %d txs on GPU %d \n", transaction_per_gpu, i);
+        CUDA_CHECK(cudaSetDevice(i));
+        // Now we need to allocate GPU memory and transfer data
+        CuEVM::transaction::TransactionList* d_transaction_list_ptr;
+        CuEVM::transaction::TransactionList* temp_transaction_list = new CuEVM::transaction::TransactionList();
+        memcpy(temp_transaction_list, host_transaction_list, sizeof(CuEVM::transaction::TransactionList));
 
-    // Now we need to allocate GPU memory and transfer data
-    CuEVM::transaction::TransactionList* d_transaction_list_ptr;
-    CuEVM::transaction::TransactionList* temp_transaction_list = new CuEVM::transaction::TransactionList();
-    memcpy(temp_transaction_list, host_transaction_list, sizeof(CuEVM::transaction::TransactionList));
+        // Allocate GPU memory for transaction data
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->value, transaction_per_gpu * sizeof(evm_word_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->gas_limit, transaction_per_gpu * sizeof(uint64_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_offset, transaction_per_gpu * sizeof(uint32_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_size, transaction_per_gpu * sizeof(uint32_t)));
 
-    // Allocate GPU memory for transaction data
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list->value, txCount * sizeof(evm_word_t)));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list->gas_limit, txCount * sizeof(uint64_t)));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_offset, txCount * sizeof(uint32_t)));
-    CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_size, txCount * sizeof(uint32_t)));
+        // Allocate GPU memory for call data if needed
+        if (callDataLen > 0) {
+            CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data, callDataLen * sizeof(uint8_t)));
+            CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data, host_call_data, callDataLen * sizeof(uint8_t),
+                                  cudaMemcpyHostToDevice));
+        }
 
-    // Allocate GPU memory for call data if needed
-    if (callDataLen > 0) {
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data, callDataLen * sizeof(uint8_t)));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data, host_call_data, callDataLen * sizeof(uint8_t),
-                              cudaMemcpyHostToDevice));
-    }
+        // Copy data from host to GPU
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->value, host_transaction_list->value + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->gas_limit,
+                              host_transaction_list->gas_limit + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_offset,
+                              host_transaction_list->call_data_offset + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_size,
+                              host_transaction_list->call_data_size + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    // Copy data from host to GPU
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list->value, host_transaction_list->value, txCount * sizeof(evm_word_t),
-                          cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list->gas_limit, host_transaction_list->gas_limit,
-                          txCount * sizeof(uint64_t), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_offset, host_transaction_list->call_data_offset,
-                          txCount * sizeof(uint32_t), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_size, host_transaction_list->call_data_size,
-                          txCount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        // Allocate memory for the transaction list on GPU and copy the structure
+        CUDA_CHECK(cudaMalloc(&d_transaction_list_ptr, sizeof(CuEVM::transaction::TransactionList)));
+        CUDA_CHECK(cudaMemcpy(d_transaction_list_ptr, temp_transaction_list,
+                              sizeof(CuEVM::transaction::TransactionList), cudaMemcpyHostToDevice));
 
-    // Allocate memory for the transaction list on GPU and copy the structure
-    CUDA_CHECK(cudaMalloc(&d_transaction_list_ptr, sizeof(CuEVM::transaction::TransactionList)));
-    CUDA_CHECK(cudaMemcpy(d_transaction_list_ptr, temp_transaction_list, sizeof(CuEVM::transaction::TransactionList),
-                          cudaMemcpyHostToDevice));
+        // printf("Transaction batch prepared for GPU\n");
+        // host_transaction_list->print();
 
-    // printf("Transaction batch prepared for GPU\n");
-    // host_transaction_list->print();
+        // trace and serialized state data
+        // Simplified trace data
+        CuEVM::simplified_trace_data* d_trace_data;
 
-    // trace and serialized state data
-    // Simplified trace data
-    CuEVM::simplified_trace_data* d_trace_data;
+        CUDA_CHECK(cudaMalloc(&d_trace_data, transaction_per_gpu * sizeof(CuEVM::simplified_trace_data)));
+        cudaMemset(d_trace_data, 0, transaction_per_gpu * sizeof(CuEVM::simplified_trace_data));
+        cudaMemcpyToSymbol(global_simplified_trace, &d_trace_data, sizeof(CuEVM::simplified_trace_data*));
 
-    CUDA_CHECK(cudaMalloc(&d_trace_data, txCount * sizeof(CuEVM::simplified_trace_data)));
-    cudaMemset(d_trace_data, 0, txCount * sizeof(CuEVM::simplified_trace_data));
-    cudaMemcpyToSymbol(global_simplified_trace, &d_trace_data, sizeof(CuEVM::simplified_trace_data*));
-
-    if (copy_state_data) {
-        CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
-        CUDA_CHECK(cudaMalloc(&d_serialized_worldstate_data, txCount * sizeof(CuEVM::serialized_worldstate_data)));
-        cudaMemset(d_serialized_worldstate_data, 0, txCount * sizeof(CuEVM::serialized_worldstate_data));
-        cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
-                           sizeof(CuEVM::serialized_worldstate_data*));
+        if (copy_state_data) {
+            CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
+            CUDA_CHECK(cudaMalloc(&d_serialized_worldstate_data,
+                                  transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data)));
+            cudaMemset(d_serialized_worldstate_data, 0,
+                       transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data));
+            cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
+                               sizeof(CuEVM::serialized_worldstate_data*));
+        }
+        d_transaction_list_ptrs.push_back(d_transaction_list_ptr);
     }
     // Free host memory
     delete[] host_transaction_list->gas_limit;
@@ -427,7 +480,7 @@ CuEVM::transaction::TransactionList* create_transaction_list(const unsigned char
         delete[] host_transaction_list->call_data;
     }
     delete host_transaction_list;
-    return d_transaction_list_ptr;
+    return d_transaction_list_ptrs;
 }
 
 // Simplified batch transaction processing with single from/to address
@@ -435,96 +488,155 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
                                                 const unsigned char* values, const unsigned char* callData,
                                                 int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
                                                 const uint32_t* dataSizes, int dataSizesLen, int txCount) {
-    printf("CuEVM Go interface: Processing batch of %d transactions, call number: %d\n", txCount, call_counter);
-
+    // printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount,
+    //        g_num_instances_per_device, call_counter);
+    std::vector<cudaStream_t> streams;  // TODO move streams to global
     try {
         // Update global num_instances if provided
         if (txCount > 0) {
-            g_num_instances = txCount;
+            if (txCount != g_num_instances_per_device * g_num_gpus) {
+                printf("txCount: %u, g_num_instances_per_device: %u\n", txCount, g_num_instances_per_device);
+                assert(txCount == g_num_instances_per_device * g_num_gpus);
+            }
+
+            // g_num_instances = txCount;
+            // g_num_instances_per_device = txCount / g_num_gpus;
         }
         bool copy_state_data = false;
         // Create and transfer transaction list to GPU
-        CuEVM::transaction::TransactionList* d_transaction_list_ptr =
+        auto d_transaction_list_ptrs =
             create_transaction_list(fromAddr, toAddr, values, callData, callDataLen, dataOffsets, dataOffsetsLen,
                                     dataSizes, dataSizesLen, txCount, copy_state_data);
 
         // Initialize memory pool using the globally stored account count
         // Only create memory pool if not reusing state or first call
-        if (call_counter == 0) {
-            printf("Creating memory pool with %u accounts and %u instances\n", g_num_accounts, g_num_instances);
-            CuEVM::memory_pool::create_memory_pool(g_num_instances, g_num_accounts);
-        } else {
-            printf("Reusing existing memory pool\n");
-            printf("Clearing memory pool\n");
-            printf("g_num_instances: %u\n", g_num_instances);
-            printf("g_num_accounts: %u\n", g_num_accounts);
-
-            CuEVM::memory_pool::clear_memory_pool();
-        }
-// tracer
+        if (call_counter == 0)
+            CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts, g_num_gpus);
+        else
+            CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
+            /*
+            for (int i = 0; i < g_num_gpus; i++) {
+                // CUDA_CHECK(cudaSetDevice(i));
+                if (call_counter == 0) {
+                    printf("Creating memory pool with %u accounts and %u instances\n", g_num_accounts,
+                           g_num_instances_per_device);
+                    CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts);
+                } else {
+                    printf("Reusing existing memory pool\n");
+                    printf("Clearing memory pool\n");
+                    printf("g_num_instances_per_device: %u\n", g_num_instances_per_device);
+                    printf("g_num_accounts: %u\n", g_num_accounts);
+                    CUDA_CHECK(cudaSetDevice(i));
+                    CuEVM::memory_pool::clear_memory_pool();
+                }
+            }
+        */
+            // tracer
 #ifdef EIP_3155
         const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
-        char* d_buffer;
-        cudaMalloc(&d_buffer, BUFFER_SIZE);
+        std::vector<char*> d_buffers;
+        for (int i = 0; i < g_num_gpus; i++) {
+            char* d_buffer;
+            CUDA_CHECK(cudaSetDevice(i));
+            CUDA_CHECK(cudaMalloc(&d_buffer, BUFFER_SIZE));
+            d_buffers.push_back(d_buffer);
+        }
 #endif
         // Configure kernel launch parameters
-        uint32_t num_blocks = (g_num_instances + INSTANCES_PER_BLOCK - 1) / INSTANCES_PER_BLOCK;
-        printf("Running %d instances on GPU, blocks: %d, threads per block: %d\n", g_num_instances, num_blocks,
-               INSTANCES_PER_BLOCK);
+        uint32_t num_blocks = (g_num_instances_per_device + INSTANCES_PER_BLOCK - 1) / INSTANCES_PER_BLOCK;
+        printf("Running %d instances on GPU, blocks: %d, threads per block: %d\n", g_num_instances_per_device,
+               num_blocks, INSTANCES_PER_BLOCK);
 
-        // Create CUDA timing events
-        cudaEvent_t start, stop;
-        float milliseconds = 0;
-        cudaEventCreate(&start);
-        cudaEventCreate(&stop);
-        cudaEventRecord(start);
+        // Create timing variables and arrays for events
+        float total_milliseconds = 0;
+        cudaEvent_t* start_events = new cudaEvent_t[g_num_gpus];
+        cudaEvent_t* stop_events = new cudaEvent_t[g_num_gpus];
+        std::vector<cudaStream_t> streams;
 
-        // Execute the GPU kernel with the device pointer, not the host pointer
-        CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(d_transaction_list_ptr,
-                                                                                  g_num_instances
+        // First: create events and launch all kernels (non-blocking)
+        for (int i = 0; i < g_num_gpus; i++) {
+            // Set device
+            CUDA_CHECK(cudaSetDevice(i));
+            // Create CUDA timing events for this device
+            cudaEventCreate(&start_events[i]);
+            cudaEventCreate(&stop_events[i]);
+
+            // Create CUDA streams for truly asynchronous execution
+            cudaStream_t stream;
+            CUDA_CHECK(cudaStreamCreate(&stream));
+
+            cudaEventRecord(start_events[i], stream);
+
+            // Execute the GPU kernel with the device pointer for this GPU in its own stream
+            CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK, 0, stream>>>(
+                d_transaction_list_ptrs[i], g_num_instances_per_device
 #ifdef EIP_3155
-                                                                                  ,
-                                                                                  d_buffer, BUFFER_SIZE
+                ,
+                d_buffers[i], BUFFER_SIZE
 #endif
-                                                                                  ,
-                                                                                  copy_state_data);
+                ,
+                copy_state_data);
 
-        // Record timing and synchronize
-        cudaEventRecord(stop);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&milliseconds, start, stop);
-        printf("GPU kernel execution time: %f milliseconds\n", milliseconds);
+            // Record the stop event but don't synchronize yet (non-blocking)
+            cudaEventRecord(stop_events[i], stream);
 
-        // Check for errors
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("CUDA error: %s\n", cudaGetErrorString(err));
-            return nullptr;
+            // Store stream for later cleanup
+            streams.push_back(stream);
         }
 
-        // printf("GPU execution completed successfully\n");
-        // print_evm_instances_results(g_num_instances, copy_state_data);
+        // Second: wait for all GPUs to finish and collect timings
+        for (int i = 0; i < g_num_gpus; i++) {
+            // Set device
+            CUDA_CHECK(cudaSetDevice(i));
+
+            // Wait for this GPU to finish
+            cudaEventSynchronize(stop_events[i]);
+
+            // Check for errors on this GPU
+            cudaError_t err = cudaGetLastError();
+            if (err != cudaSuccess) printf("CUDA error on GPU %d: %s\n", i, cudaGetErrorString(err));
+
+            // Get timing for this GPU
+            float milliseconds = 0;
+            cudaEventElapsedTime(&milliseconds, start_events[i], stop_events[i]);
+            total_milliseconds = std::max(total_milliseconds, milliseconds);
+
+            // Clean up events for this GPU
+            cudaEventDestroy(start_events[i]);
+            cudaEventDestroy(stop_events[i]);
+            cudaStreamDestroy(streams[i]);
+        }
 
 #ifdef EIP_3155
         // After kernel execution, copy the buffer back to the host
         char* h_buffer = new char[BUFFER_SIZE];
-        cudaMemcpy(h_buffer, d_buffer, BUFFER_SIZE, cudaMemcpyDeviceToHost);
-        CuEVM::utils::print_tracer_data(h_buffer);
+        for (int i = 0; i < g_num_gpus; i++) {
+            CUDA_CHECK(cudaSetDevice(i));
+            cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
+            CuEVM::utils::print_tracer_data(h_buffer);
+            cudaFree(d_buffers[i]);
+        }
 
         // Clean up
         delete[] h_buffer;
-        cudaFree(d_buffer);
+
 #endif
+        printf("GPU kernel execution time: %f milliseconds (max across all GPUs)\n", total_milliseconds);
+
+        // Clean up event arrays
+        delete[] start_events;
+        delete[] stop_events;
+
+        // ... rest of the function ...
 
         // Clean up transaction lists
         // cleanup_transaction_list(d_transaction_list_ptr, callDataLen);
         GPUExecutionResultC* result = get_gpu_execution_results();
-        CuEVM::freeTransactionList(d_transaction_list_ptr);
-        CuEVM::freeTraceData(copy_state_data);
-        // Clean up CUDA events
-        cudaEventDestroy(start);
-        cudaEventDestroy(stop);
-
+        for (int i = 0; i < g_num_gpus; i++) {
+            CUDA_CHECK(cudaSetDevice(i));
+            CuEVM::freeTransactionList(d_transaction_list_ptrs[i]);
+            CuEVM::freeTraceData(copy_state_data);
+        }
         // Increment call counter
         call_counter++;
         printf("Call number: %d\n", call_counter);
@@ -548,18 +660,22 @@ GPUExecutionResultC* get_gpu_execution_results() {
     result->allocations_valid = 1;
 
     // Retrieve trace data from device memory - similar to print_evm_instances_results
-    CuEVM::simplified_trace_data* trace_data = new CuEVM::simplified_trace_data[g_num_instances];
-    CuEVM::simplified_trace_data* d_trace_data;
+    CuEVM::simplified_trace_data* trace_data =
+        new CuEVM::simplified_trace_data[g_num_instances_per_device * g_num_gpus];
+    for (int i = 0; i < g_num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CuEVM::simplified_trace_data* d_trace_data;
+        // Retrieve the device pointers stored in the global symbols
+        CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
 
-    // Retrieve the device pointers stored in the global symbols
-    CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
-
-    // Copy the data arrays from device to host memory
-    CUDA_CHECK(cudaMemcpy(trace_data, d_trace_data, sizeof(CuEVM::simplified_trace_data) * g_num_instances,
-                          cudaMemcpyDeviceToHost));
+        // Copy the data arrays from device to host memory
+        CUDA_CHECK(cudaMemcpy(&trace_data[i * g_num_instances_per_device], d_trace_data,
+                              sizeof(CuEVM::simplified_trace_data) * g_num_instances_per_device,
+                              cudaMemcpyDeviceToHost));
+    }
 
     // Initialize return data
-    result->num_return_data = g_num_instances;
+    result->num_return_data = g_num_instances_per_device * g_num_gpus;
     result->return_data = (ReturnDataEntry*)malloc(sizeof(ReturnDataEntry) * result->num_return_data);
     if (result->return_data == nullptr) {
         printf("Failed to allocate memory for return_data\n");
@@ -570,7 +686,7 @@ GPUExecutionResultC* get_gpu_execution_results() {
     memset(result->return_data, 0, sizeof(ReturnDataEntry) * result->num_return_data);
 
     // Set up coverage data for all instances
-    result->num_coverage = g_num_instances;
+    result->num_coverage = g_num_instances_per_device * g_num_gpus;
     result->coverage = (CoverageDataEntry*)malloc(sizeof(CoverageDataEntry) * result->num_coverage);
     if (result->coverage == nullptr) {
         printf("Failed to allocate memory for coverage\n");
@@ -580,18 +696,18 @@ GPUExecutionResultC* get_gpu_execution_results() {
         return nullptr;
     }
 
-    result->error_codes = (uint8_t*)malloc(sizeof(uint8_t) * g_num_instances);
-    memset(result->error_codes, 0, sizeof(uint8_t) * g_num_instances);
+    result->error_codes = (uint8_t*)malloc(sizeof(uint8_t) * g_num_instances_per_device * g_num_gpus);
+    memset(result->error_codes, 0, sizeof(uint8_t) * g_num_instances_per_device * g_num_gpus);
 
-    printf("===== Initializing Coverage Data for %u Instances =====\n", g_num_instances);
+    printf("===== Initializing Coverage Data for %u Instances =====\n", g_num_instances_per_device * g_num_gpus);
     // Constants for marker types
     const uint64_t REVERT_MARKER_XOR = 0x40000000;
     const uint64_t RETURN_MARKER_XOR = 0x80000000;
     const uint64_t ENTER_MARKER_XOR = 0xC0000000;
 
-// Process each instance's trace data in parallel
+    // Process each instance's trace data in parallel
 #pragma omp parallel for
-    for (uint32_t idx = 0; idx < g_num_instances; idx++) {
+    for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
         // Create hashmap to track unique addresses and their indices
         std::unordered_map<std::string, uint32_t> address_to_index;
         std::vector<std::string> unique_addresses;

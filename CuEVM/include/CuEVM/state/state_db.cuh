@@ -157,6 +157,13 @@ class StateDb {
                                      StateDb *&snapshot_state_db
 #endif
     );
+    // for multiGPU version
+    __host__ static void GPUfromJsonMultiGPU(std::vector<StateDb *> &state_db, const cJSON *state_json,
+                                             uint32_t num_states, uint32_t &num_accounts,
+                                             std::vector<StateDb *> &snapshot_state_db
+
+    );
+
     __host__ static void CPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states);
 
     __host__ static StateDb *CPUFromGPU(StateDb *&state_db);
