@@ -510,28 +510,28 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
 
         // Initialize memory pool using the globally stored account count
         // Only create memory pool if not reusing state or first call
-	if (call_counter == 0) 
-		CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts);
-	else 
-		CuEVM::memory_pool::clear_memory_pool();
-	/*
-        for (int i = 0; i < g_num_gpus; i++) {
-            // CUDA_CHECK(cudaSetDevice(i));
-            if (call_counter == 0) {
-                printf("Creating memory pool with %u accounts and %u instances\n", g_num_accounts,
-                       g_num_instances_per_device);
-                CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts);
-            } else {
-                printf("Reusing existing memory pool\n");
-                printf("Clearing memory pool\n");
-                printf("g_num_instances_per_device: %u\n", g_num_instances_per_device);
-                printf("g_num_accounts: %u\n", g_num_accounts);
-                CUDA_CHECK(cudaSetDevice(i));
-                CuEVM::memory_pool::clear_memory_pool();
+        if (call_counter == 0)
+            CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts, g_num_gpus);
+        else
+            CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
+            /*
+            for (int i = 0; i < g_num_gpus; i++) {
+                // CUDA_CHECK(cudaSetDevice(i));
+                if (call_counter == 0) {
+                    printf("Creating memory pool with %u accounts and %u instances\n", g_num_accounts,
+                           g_num_instances_per_device);
+                    CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts);
+                } else {
+                    printf("Reusing existing memory pool\n");
+                    printf("Clearing memory pool\n");
+                    printf("g_num_instances_per_device: %u\n", g_num_instances_per_device);
+                    printf("g_num_accounts: %u\n", g_num_accounts);
+                    CUDA_CHECK(cudaSetDevice(i));
+                    CuEVM::memory_pool::clear_memory_pool();
+                }
             }
-        }
-	*/
-        // tracer
+        */
+            // tracer
 #ifdef EIP_3155
         const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
         std::vector<char*> d_buffers;
@@ -611,17 +611,17 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
             cudaEventDestroy(stop_events[i]);
         }
 #ifdef EIP_3155
-    // After kernel execution, copy the buffer back to the host
-    char *h_buffer = new char[BUFFER_SIZE];
-    for (int i = 0; i < g_num_gpus; i++) {
-        CUDA_CHECK(cudaSetDevice(i));
-    	cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
-        CuEVM::utils::print_tracer_data(h_buffer);
-        cudaFree(d_buffers[i]);
-    }
+        // After kernel execution, copy the buffer back to the host
+        char* h_buffer = new char[BUFFER_SIZE];
+        for (int i = 0; i < g_num_gpus; i++) {
+            CUDA_CHECK(cudaSetDevice(i));
+            cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
+            CuEVM::utils::print_tracer_data(h_buffer);
+            cudaFree(d_buffers[i]);
+        }
 
-    // Clean up
-    delete[] h_buffer;
+        // Clean up
+        delete[] h_buffer;
 
 #endif
         printf("GPU kernel execution time: %f milliseconds (max across all GPUs)\n", total_milliseconds);

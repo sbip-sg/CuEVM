@@ -96,6 +96,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
 
     for (int i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
         printf("\n ----------\n");
         printf("Running %d instances on GPU %d, num blocks %d, threads per block %d\n", num_instances, i, num_blocks,
                INSTANCES_PER_BLOCK);

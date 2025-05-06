@@ -262,7 +262,7 @@ __device__ int32_t evm_memory_t::copy(uint32_t index, uint32_t length, uint8_t *
 // If 'src' is nullptr, it simply zeroes the destination.
 __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint32_t src_available, uint32_t bytes) {
     uint32_t to_copy = (src != nullptr) ? ((src_available < bytes) ? src_available : bytes) : 0;
-    // printf("copy_with_padding thread %d to_copy %d bytes %d\n", THREADIDX, to_copy, bytes);
+    printf("copy_with_padding thread %d to_copy %d bytes %d\n", THREADIDX, to_copy, bytes);
     if (src != nullptr && to_copy > 0) {
         // memcpy(dest, src, to_copy);
         CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
@@ -301,6 +301,7 @@ __device__ int32_t evm_memory_t::set(uint8_t *data_, uint32_t data_size, const u
     // Write into the preallocated region.
     uint8_t *prealloc_dest =
         &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
+    printf("prealloc_dest %p data_size %d prealloc_bytes %d\n", prealloc_dest, data_size, prealloc_bytes);
     copy_with_padding(prealloc_dest, data_, data_size, prealloc_bytes);
 
     // Write into the dynamic region if needed.
@@ -308,6 +309,7 @@ __device__ int32_t evm_memory_t::set(uint8_t *data_, uint32_t data_size, const u
         uint32_t dynamic_offset = (total_offset + prealloc_bytes) - memory_prealloc_size;
         uint8_t *dynamic_dest = dynamic_data + dynamic_offset;
         uint32_t remaining_source = (data_size > prealloc_bytes) ? (data_size - prealloc_bytes) : 0;
+        printf("dynamic_dest %p remaining_source %d dynamic_bytes %d\n", dynamic_dest, remaining_source, dynamic_bytes);
         copy_with_padding(dynamic_dest, data_ + prealloc_bytes, remaining_source, dynamic_bytes);
     }
     return error_code;
