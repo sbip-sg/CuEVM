@@ -25,6 +25,8 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("Found %d GPUs.\n", num_gpus);
     std::vector<cudaEvent_t> start_events(0);
     std::vector<cudaEvent_t> stop_events(0);
+    std::vector<cudaStream_t> streams(0);
+
     for (int i = 0; i < num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
         CUDA_CHECK(cudaDeviceReset());
@@ -101,8 +103,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         printf("Running %d instances on GPU %d, num blocks %d, threads per block %d\n", num_instances, i, num_blocks,
                INSTANCES_PER_BLOCK);
 
-        // Record start event on current device
-        CUDA_CHECK(cudaEventRecord(start_events[i]));
+        cudaStream_t stream;
+        CUDA_CHECK(cudaStreamCreate(&stream));
+        streams.push_back(stream);
+
+        // Record start event on current device with the stream
+        CUDA_CHECK(cudaEventRecord(start_events[i], stream));
 
         // Launch kernel on current GPU
         CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(transaction_list_ptrs[i],
@@ -114,7 +120,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         );
 
         // Record stop event on current device
-        CUDA_CHECK(cudaEventRecord(stop_events[i]));
+        CUDA_CHECK(cudaEventRecord(stop_events[i], stream));
     }
     // Wait for all GPUs to finish and measure times
     float max_time = 0.0f;
@@ -138,6 +144,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         CUDA_CHECK(cudaSetDevice(i));
         CUDA_CHECK(cudaEventDestroy(start_events[i]));
         CUDA_CHECK(cudaEventDestroy(stop_events[i]));
+        CUDA_CHECK(cudaStreamDestroy(streams[i]));
     }
 
     CUDA_CHECK(cudaGetLastError());

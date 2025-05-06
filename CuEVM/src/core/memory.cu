@@ -11,27 +11,13 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
     unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
 
-    // Debug: Print thread information and input parameters
-    if (lane_id == 0) {
-        printf("[DEBUG][Thread %d.%d] warp_cooperative_set: active_mask=0x%08x, active_threads=%d\n", blockIdx.x,
-               threadIdx.x, active_mask, num_active_threads);
-        printf("[DEBUG][Thread %d.%d] dst_ptr=%p, src_ptr=%p, length=%u\n", blockIdx.x, threadIdx.x, ptr1, ptr2,
-               length);
-    }
-
     // TODO : interleaving inactive threads
     // Iterate over each thread in the warp
 #pragma unroll
     for (int i = 0; i < num_active_threads; i++) {
-    	// Cast pointers to unsigned long long for shuffling
+        // Cast pointers to unsigned long long for shuffling
         unsigned long long ptr1_int = reinterpret_cast<unsigned long long>(ptr1);
         unsigned long long ptr2_int = reinterpret_cast<unsigned long long>(ptr2);
-
-        // Debug: Print raw pointer values (as integers)
-        if (lane_id == 0) {
-            printf("[DEBUG][Thread %d.%d][Iter %d] Raw pointers: dst=0x%llx, src=0x%llx\n", blockIdx.x, threadIdx.x, i,
-                   ptr1_int, ptr2_int);
-        }
 
         // Broadcast values using __shfl_sync
         unsigned long long current_ptr1_int = __shfl_sync(active_mask, ptr1_int, i);
@@ -41,10 +27,6 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
         // Cast back to pointers
         uint8_t *current_ptr1 = reinterpret_cast<uint8_t *>(current_ptr1_int);
         const uint8_t *current_ptr2 = reinterpret_cast<const uint8_t *>(current_ptr2_int);
-
-        // Debug: Print the shuffled values received by each thread
-        printf("[DEBUG][Thread %d.%d][Iter %d] After shuffle: dst_ptr=%p, src_ptr=%p, length=%u\n", blockIdx.x,
-               threadIdx.x, i, current_ptr1, current_ptr2, current_length);
 
         // Only proceed if there's data to process
         if (current_length > 0) {
@@ -56,12 +38,6 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
                 }
             }
         }
-    }
-
-    // Final synchronization to ensure all debug prints complete before function returns
-    __syncwarp(active_mask);
-    if (lane_id == 0) {
-        printf("[DEBUG][Thread %d.%d] warp_cooperative_set completed\n", blockIdx.x, threadIdx.x);
     }
 }
 
@@ -264,20 +240,21 @@ __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint
     uint32_t to_copy = (src != nullptr) ? ((src_available < bytes) ? src_available : bytes) : 0;
     unsigned active_mask = __activemask();
     uint32_t num_active_threads = __popc(active_mask);
-    printf("copy_with_padding thread %d num_active_threads %d to_copy %d bytes %d\n", THREADIDX, num_active_threads, to_copy, bytes);
+    // printf("copy_with_padding thread %d num_active_threads %d to_copy %d bytes %d\n", THREADIDX, num_active_threads,
+    // to_copy, bytes);
     if (src != nullptr && to_copy > 0) {
         // memcpy(dest, src, to_copy);
-	if (num_active_threads == 32)
-          CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
-	else
-	  memcpy(dest, src, to_copy);
+        if (num_active_threads == 32)
+            CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
+        else
+            memcpy(dest, src, to_copy);
     }
     if (to_copy < bytes) {
         // memset(dest + to_copy, 0, bytes - to_copy);
-	if (num_active_threads == 32)
-          CuEVM::memory::warp_cooperative_setzero(dest + to_copy, bytes - to_copy);
-	else 
-	  memset(dest + to_copy, 0, bytes - to_copy);
+        if (num_active_threads == 32)
+            CuEVM::memory::warp_cooperative_setzero(dest + to_copy, bytes - to_copy);
+        else
+            memset(dest + to_copy, 0, bytes - to_copy);
     }
 }
 
@@ -309,7 +286,7 @@ __device__ int32_t evm_memory_t::set(uint8_t *data_, uint32_t data_size, const u
     // Write into the preallocated region.
     uint8_t *prealloc_dest =
         &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
-    printf("prealloc_dest %p data_size %d prealloc_bytes %d\n", prealloc_dest, data_size, prealloc_bytes);
+
     copy_with_padding(prealloc_dest, data_, data_size, prealloc_bytes);
 
     // Write into the dynamic region if needed.
@@ -317,7 +294,7 @@ __device__ int32_t evm_memory_t::set(uint8_t *data_, uint32_t data_size, const u
         uint32_t dynamic_offset = (total_offset + prealloc_bytes) - memory_prealloc_size;
         uint8_t *dynamic_dest = dynamic_data + dynamic_offset;
         uint32_t remaining_source = (data_size > prealloc_bytes) ? (data_size - prealloc_bytes) : 0;
-        printf("dynamic_dest %p remaining_source %d dynamic_bytes %d\n", dynamic_dest, remaining_source, dynamic_bytes);
+
         copy_with_padding(dynamic_dest, data_ + prealloc_bytes, remaining_source, dynamic_bytes);
     }
     return error_code;

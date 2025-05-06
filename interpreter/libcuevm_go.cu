@@ -488,9 +488,9 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
                                                 const unsigned char* values, const unsigned char* callData,
                                                 int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
                                                 const uint32_t* dataSizes, int dataSizesLen, int txCount) {
-    printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount,
-           g_num_instances_per_device, call_counter);
-
+    // printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount,
+    //        g_num_instances_per_device, call_counter);
+    std::vector<cudaStream_t> streams;  // TODO move streams to global
     try {
         // Update global num_instances if provided
         if (txCount > 0) {
@@ -551,29 +551,37 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
         float total_milliseconds = 0;
         cudaEvent_t* start_events = new cudaEvent_t[g_num_gpus];
         cudaEvent_t* stop_events = new cudaEvent_t[g_num_gpus];
+        std::vector<cudaStream_t> streams;
 
         // First: create events and launch all kernels (non-blocking)
         for (int i = 0; i < g_num_gpus; i++) {
             // Set device
             CUDA_CHECK(cudaSetDevice(i));
-
             // Create CUDA timing events for this device
             cudaEventCreate(&start_events[i]);
             cudaEventCreate(&stop_events[i]);
-            cudaEventRecord(start_events[i]);
 
-            // Execute the GPU kernel with the device pointer for this GPU (non-blocking)
-            CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK>>>(d_transaction_list_ptrs[i],
-                                                                                      g_num_instances_per_device
+            // Create CUDA streams for truly asynchronous execution
+            cudaStream_t stream;
+            CUDA_CHECK(cudaStreamCreate(&stream));
+
+            cudaEventRecord(start_events[i], stream);
+
+            // Execute the GPU kernel with the device pointer for this GPU in its own stream
+            CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK, 0, stream>>>(
+                d_transaction_list_ptrs[i], g_num_instances_per_device
 #ifdef EIP_3155
-                                                                                      ,
-                                                                                      d_buffers[i], BUFFER_SIZE
+                ,
+                d_buffers[i], BUFFER_SIZE
 #endif
-                                                                                      ,
-                                                                                      copy_state_data);
+                ,
+                copy_state_data);
 
             // Record the stop event but don't synchronize yet (non-blocking)
-            cudaEventRecord(stop_events[i]);
+            cudaEventRecord(stop_events[i], stream);
+
+            // Store stream for later cleanup
+            streams.push_back(stream);
         }
 
         // Second: wait for all GPUs to finish and collect timings
@@ -586,20 +594,7 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
 
             // Check for errors on this GPU
             cudaError_t err = cudaGetLastError();
-            if (err != cudaSuccess) {
-                printf("CUDA error on GPU %d: %s\n", i, cudaGetErrorString(err));
-
-                // Clean up events before returning
-                for (int j = 0; j < g_num_gpus; j++) {
-                    cudaSetDevice(j);
-                    cudaEventDestroy(start_events[j]);
-                    cudaEventDestroy(stop_events[j]);
-                }
-                delete[] start_events;
-                delete[] stop_events;
-
-                return nullptr;
-            }
+            if (err != cudaSuccess) printf("CUDA error on GPU %d: %s\n", i, cudaGetErrorString(err));
 
             // Get timing for this GPU
             float milliseconds = 0;
@@ -609,7 +604,9 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
             // Clean up events for this GPU
             cudaEventDestroy(start_events[i]);
             cudaEventDestroy(stop_events[i]);
+            cudaStreamDestroy(streams[i]);
         }
+
 #ifdef EIP_3155
         // After kernel execution, copy the buffer back to the host
         char* h_buffer = new char[BUFFER_SIZE];
