@@ -17,8 +17,8 @@ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts, 
         memory_pool->num_instances = num_instances;
 
         cudaMalloc(&memory_pool->stack_base, num_instances * memory_pool_stack_preallocate * sizeof(evm_word_t));
-        printf("host: allocated stack base %p size %d\n", memory_pool->stack_base,
-               num_instances * memory_pool_stack_preallocate);
+        // printf("host: allocated stack base %p size %d\n", memory_pool->stack_base,
+        //        num_instances * memory_pool_stack_preallocate);
 
         CUDA_CHECK(cudaMalloc(&memory_pool->call_context,
                               num_instances * memory_pool_call_context_preallocate * sizeof(evm_call_context_t)));
@@ -29,12 +29,12 @@ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts, 
         CUDA_CHECK(cudaMalloc(&memory_pool->prealloc_mem_instances,
                               num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t)));
 
-        printf("host: allocated memory instances  %p size %d\n", &memory_pool->prealloc_mem_instances,
-               num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t));
+        // printf("host: allocated memory instances  %p size %d\n", &memory_pool->prealloc_mem_instances,
+        //        num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t));
         CUDA_CHECK(cudaMalloc(&memory_pool->return_data_base,
                               num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t)));
-        printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base,
-               num_instances * memory_pool_return_data_preallocate);
+        // printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base,
+        //        num_instances * memory_pool_return_data_preallocate);
 
         cudaMalloc(&memory_pool->snapshot_states_pool,
                    snapshot_account_pool_size * num_instances * sizeof(CuEVM::SnapshotState));
@@ -64,8 +64,8 @@ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts, 
         cudaMalloc(&d_preallocated_memory_base, num_instances * memory_prealloc_size * sizeof(uint8_t));
         cudaMemset(d_preallocated_memory_base, 0, num_instances * memory_prealloc_size * sizeof(uint8_t));
 
-        printf("host: allocated memory instances  %p size %d\n", d_preallocated_memory_base,
-               num_instances * memory_prealloc_size * sizeof(uint8_t));
+        // printf("host: allocated memory instances  %p size %d\n", d_preallocated_memory_base,
+        //        num_instances * memory_prealloc_size * sizeof(uint8_t));
         // copy pointer to preallocated stack base
         cudaMemcpyToSymbol(preallocated_stack_base, &memory_pool->stack_base, sizeof(evm_word_t*));
         cudaMemcpyToSymbol(preallocated_return_data_base, &memory_pool->return_data_base, sizeof(uint8_t*));
@@ -126,7 +126,6 @@ __host__ void clear_memory_pool(uint32_t num_devices) {
         CUDA_CHECK(cudaMemcpyFromSymbol(&d_memory_pool, global_memory_pool, sizeof(memory_pool_t*)));
         memory_pool_t* memory_pool = new memory_pool_t();
         CUDA_CHECK(cudaMemcpy(memory_pool, d_memory_pool, sizeof(memory_pool_t), cudaMemcpyDeviceToHost));
-        printf("memory pool num instances: %u\n", memory_pool->num_instances);
         // Clear memory allocated in memory_pool
         CUDA_CHECK(cudaMemset(memory_pool->stack_base, 0,
                               memory_pool->num_instances * memory_pool_stack_preallocate * sizeof(evm_word_t)));
