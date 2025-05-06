@@ -235,16 +235,15 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                                         cached_call_state.gas_limit, cached_call_state.gas_used);
         }
 #endif
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
-        //     %lu\n",
-        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
-        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
-        //            cached_call_state.gas_limit, cached_call_state.gas_used);
+         if (INSTANCE_GLOBAL_IDX == 0) {
+             printf("\nInstance %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+                    INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+                    call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+                    cached_call_state.gas_limit, cached_call_state.gas_used);
 
-        //     printf("\n\n");
-        //     cached_call_state.stack_ptr->print();
-        // }
+             printf("\n\n");
+             cached_call_state.stack_ptr->print();
+         }
         // if (INSTANCE_GLOBAL_IDX == 1) {
         //     printf("\nIdx %d, pc: %d op: %d, depth %d, msize %d stksze %d gs_lmit %lu g_used %lu\n ",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,

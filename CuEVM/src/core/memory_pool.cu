@@ -11,6 +11,8 @@ __device__ ValueStatus** preallocated_snapshot_restore_ptr = nullptr;
 __device__ uint8_t* preallocated_memory_base = nullptr;
 __device__ CuEVM::EccConstants* ecc_constants_ptr = nullptr;
 __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) {
+   for (int i = 0 ; i < 1 ; i ++ ){
+    CUDA_CHECK(cudaSetDevice(i));
     memory_pool_t* memory_pool = new memory_pool_t();
     memory_pool->num_instances = num_instances;
 
@@ -27,6 +29,8 @@ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) 
     CUDA_CHECK(cudaMalloc(&memory_pool->prealloc_mem_instances,
                           num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t)));
 
+    printf("host: allocated memory instances  %p size %d\n", &memory_pool->prealloc_mem_instances,
+            num_instances * memory_pool_call_context_preallocate * sizeof(evm_memory_t));
     CUDA_CHECK(cudaMalloc(&memory_pool->return_data_base,
                           num_instances * memory_pool_return_data_preallocate * sizeof(uint8_t)));
     printf("host: allocated return data base %p size %d\n", memory_pool->return_data_base,
@@ -59,6 +63,9 @@ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) 
     uint8_t* d_preallocated_memory_base;
     cudaMalloc(&d_preallocated_memory_base, num_instances * memory_prealloc_size * sizeof(uint8_t));
     cudaMemset(d_preallocated_memory_base, 0, num_instances * memory_prealloc_size * sizeof(uint8_t));
+
+    printf("host: allocated memory instances  %p size %d\n", d_preallocated_memory_base,
+            num_instances * memory_prealloc_size * sizeof(uint8_t));
     // copy pointer to preallocated stack base
     cudaMemcpyToSymbol(preallocated_stack_base, &memory_pool->stack_base, sizeof(evm_word_t*));
     cudaMemcpyToSymbol(preallocated_return_data_base, &memory_pool->return_data_base, sizeof(uint8_t*));
@@ -74,6 +81,8 @@ __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts) 
     cudaMemcpy(d_ecc_constants_ptr, host_ecc_constants_ptr, sizeof(CuEVM::EccConstants), cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(ecc_constants_ptr, &d_ecc_constants_ptr, sizeof(CuEVM::EccConstants*));
     delete host_ecc_constants_ptr;
+
+   }
 }
 
 __host__ void free_memory_pool() {
@@ -107,6 +116,8 @@ __host__ void free_memory_pool() {
     CUDA_CHECK(cudaFree(d_ecc_constants));
 }
 __host__ void clear_memory_pool() {
+	for (int i = 0 ; i < 1 ; i ++ ){
+    CUDA_CHECK(cudaSetDevice(i));
     // Get the memory_pool pointer from device
     memory_pool_t* d_memory_pool = global_memory_pool;
     CUDA_CHECK(cudaMemcpyFromSymbol(&d_memory_pool, global_memory_pool, sizeof(memory_pool_t*)));
@@ -147,6 +158,7 @@ __host__ void clear_memory_pool() {
                           memory_pool->num_instances * memory_pool_snapshot_preallocate_slots * sizeof(ValueStatus*)));
     CUDA_CHECK(
         cudaMemset(d_preallocated_memory_base, 0, memory_pool->num_instances * memory_prealloc_size * sizeof(uint8_t)));
+	}
 }
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth) {
