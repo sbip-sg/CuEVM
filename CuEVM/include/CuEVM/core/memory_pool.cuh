@@ -5,7 +5,7 @@
 
 namespace CuEVM::memory_pool {
 
-__host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts);
+__host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts, uint32_t num_devices = 1);
 
 __device__ evm_call_context_t* get_call_context(uint16_t depth);
 __device__ evm_stack_t* get_stack(uint16_t depth);
@@ -16,7 +16,7 @@ __device__ uint32_t get_next_snapshot_offset();
 __device__ void reset_snapshot_slot_offset(uint32_t offset);
 __device__ void reset_snapshot_account_offset(uint32_t offset);
 
-__host__ void free_memory_pool();
-__host__ void clear_memory_pool();
+__host__ void free_memory_pool(uint32_t num_devices = 1);
+__host__ void clear_memory_pool(uint32_t num_devices = 1);
 
 }  // namespace CuEVM::memory_pool

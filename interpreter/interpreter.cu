@@ -89,13 +89,14 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     printf("CPU setup time: %lld milliseconds\n", duration_cpu.count());
 
     // Launch kernels on each GPU with proper timing
-    for (int i = 0; i < num_gpus; i++) {
-        CUDA_CHECK(cudaSetDevice(i));
-        CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts);
-        printf("num_accounts: %d\n", num_accounts);
 
-        uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
-        printf("\n\n ----------\n\n");
+    CuEVM::memory_pool::create_memory_pool(num_instances, num_accounts, num_gpus);
+    printf("num_accounts: %d\n", num_accounts);
+
+    uint32_t num_blocks = (num_instances + INSTANCES_PER_BLOCK - 1) / (INSTANCES_PER_BLOCK);
+
+    for (int i = 0; i < num_gpus; i++) {
+        printf("\n ----------\n");
         printf("Running %d instances on GPU %d, num blocks %d, threads per block %d\n", num_instances, i, num_blocks,
                INSTANCES_PER_BLOCK);
 
@@ -114,7 +115,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         // Record stop event on current device
         CUDA_CHECK(cudaEventRecord(stop_events[i]));
     }
-
     // Wait for all GPUs to finish and measure times
     float max_time = 0.0f;
     for (int i = 0; i < num_gpus; i++) {
@@ -150,7 +150,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     char *h_buffer = new char[BUFFER_SIZE];
     for (int i = 0; i < num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
-    	cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
         // printf("h_buffer: %p\n", h_buffer);
         // uint32_t *buffer_as_uint = (uint32_t *)h_buffer;
         // for (int i = 0; i < 20; i++) {

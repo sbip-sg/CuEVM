@@ -8,9 +8,17 @@ namespace CuEVM::memory {
 __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_t length) {
     // Get the lane ID within the warp (0 to 31)
     uint32_t lane_id = threadIdx.x % 32;
-    unsigned active_mask = __activemask();  // Bitmask of active threads
+    unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
-    printf("active mask %x num active threads %d\n", active_mask, num_active_threads);
+
+    // Debug: Print thread information and input parameters
+    if (lane_id == 0) {
+        printf("[DEBUG][Thread %d.%d] warp_cooperative_set: active_mask=0x%08x, active_threads=%d\n", blockIdx.x,
+               threadIdx.x, active_mask, num_active_threads);
+        printf("[DEBUG][Thread %d.%d] dst_ptr=%p, src_ptr=%p, length=%u\n", blockIdx.x, threadIdx.x, ptr1, ptr2,
+               length);
+    }
+
     // TODO : interleaving inactive threads
     // Iterate over each thread in the warp
 #pragma unroll
@@ -18,8 +26,13 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
         // Cast pointers to unsigned long long for shuffling
         unsigned long long ptr1_int = reinterpret_cast<unsigned long long>(ptr1);
         unsigned long long ptr2_int = reinterpret_cast<unsigned long long>(ptr2);
-	printf("\nptr src 1 %x \n", ptr1_int);
-	printf("\nptr src 2 %x \n", ptr2_int);
+
+        // Debug: Print raw pointer values (as integers)
+        if (lane_id == 0) {
+            printf("[DEBUG][Thread %d.%d][Iter %d] Raw pointers: dst=0x%llx, src=0x%llx\n", blockIdx.x, threadIdx.x, i,
+                   ptr1_int, ptr2_int);
+        }
+
         // Broadcast values using __shfl_sync
         unsigned long long current_ptr1_int = __shfl_sync(active_mask, ptr1_int, i);
         unsigned long long current_ptr2_int = __shfl_sync(active_mask, ptr2_int, i);
@@ -27,9 +40,12 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
 
         // Cast back to pointers
         uint8_t *current_ptr1 = reinterpret_cast<uint8_t *>(current_ptr1_int);
-        uint8_t *current_ptr2 = reinterpret_cast<uint8_t *>(current_ptr2_int);
-	printf("\nptr cast 1 %p \n", current_ptr1);
-        printf("\nptr cast 2 %p \n", current_ptr2);
+        const uint8_t *current_ptr2 = reinterpret_cast<const uint8_t *>(current_ptr2_int);
+
+        // Debug: Print the shuffled values received by each thread
+        printf("[DEBUG][Thread %d.%d][Iter %d] After shuffle: dst_ptr=%p, src_ptr=%p, length=%u\n", blockIdx.x,
+               threadIdx.x, i, current_ptr1, current_ptr2, current_length);
+
         // Only proceed if there's data to process
         if (current_length > 0) {
             // Each thread handles a portion of the memory operation
@@ -41,12 +57,18 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
             }
         }
     }
+
+    // Final synchronization to ensure all debug prints complete before function returns
+    __syncwarp(active_mask);
+    if (lane_id == 0) {
+        printf("[DEBUG][Thread %d.%d] warp_cooperative_set completed\n", blockIdx.x, threadIdx.x);
+    }
 }
 
 __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
     // Get the lane ID within the warp (0 to 31)
     uint32_t lane_id = threadIdx.x % 32;
-    unsigned active_mask = __activemask();  // Bitmask of active threads
+    unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
 
     // TODO : interleaving inactive threads
