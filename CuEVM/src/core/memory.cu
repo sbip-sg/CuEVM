@@ -23,7 +23,7 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
     // Iterate over each thread in the warp
 #pragma unroll
     for (int i = 0; i < num_active_threads; i++) {
-        // Cast pointers to unsigned long long for shuffling
+    	// Cast pointers to unsigned long long for shuffling
         unsigned long long ptr1_int = reinterpret_cast<unsigned long long>(ptr1);
         unsigned long long ptr2_int = reinterpret_cast<unsigned long long>(ptr2);
 
@@ -262,14 +262,22 @@ __device__ int32_t evm_memory_t::copy(uint32_t index, uint32_t length, uint8_t *
 // If 'src' is nullptr, it simply zeroes the destination.
 __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint32_t src_available, uint32_t bytes) {
     uint32_t to_copy = (src != nullptr) ? ((src_available < bytes) ? src_available : bytes) : 0;
-    printf("copy_with_padding thread %d to_copy %d bytes %d\n", THREADIDX, to_copy, bytes);
+    unsigned active_mask = __activemask();
+    uint32_t num_active_threads = __popc(active_mask);
+    printf("copy_with_padding thread %d num_active_threads %d to_copy %d bytes %d\n", THREADIDX, num_active_threads, to_copy, bytes);
     if (src != nullptr && to_copy > 0) {
         // memcpy(dest, src, to_copy);
-        CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
+	if (num_active_threads == 32)
+          CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
+	else
+	  memcpy(dest, src, to_copy);
     }
     if (to_copy < bytes) {
         // memset(dest + to_copy, 0, bytes - to_copy);
-        CuEVM::memory::warp_cooperative_setzero(dest + to_copy, bytes - to_copy);
+	if (num_active_threads == 32)
+          CuEVM::memory::warp_cooperative_setzero(dest + to_copy, bytes - to_copy);
+	else 
+	  memset(dest + to_copy, 0, bytes - to_copy);
     }
 }
 
