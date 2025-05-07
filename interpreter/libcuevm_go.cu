@@ -775,10 +775,22 @@ GPUExecutionResultC* get_gpu_execution_results() {
 
             if (branch_pc == START_CALL_BRANCH_MARKER) {
                 current_call_idx += 1;
+                if (current_call_idx >= trace_data[idx].no_calls) {
+                    printf("CuEVM Warning: current_call_idx %d >= trace_data[idx].no_calls %d\n", current_call_idx,
+                           trace_data[idx].no_calls);
+                    current_call_idx -= 1;
+                    continue;
+                }
                 trace_data[idx].calls[current_call_idx].receiver.to_hex(current_address);
                 current_address_idx = address_to_index[current_address];
                 markers[current_address_idx].push_back(ENTER_MARKER_XOR << 32);
             } else if (branch_pc == END_CALL_BRANCH_MARKER) {
+                if (current_call_idx >= trace_data[idx].no_calls) {
+                    printf("CuEVM Warning: current_call_idx %d >= trace_data[idx].no_calls %d\n", current_call_idx,
+                           trace_data[idx].no_calls);
+                    current_call_idx -= 1;
+                    continue;
+                }
                 trace_data[idx].calls[current_call_idx].receiver.to_hex(current_address);
                 uint32_t last_pc = trace_data[idx].calls[current_call_idx].last_pc;
                 if (last_pc > 0) {
@@ -788,9 +800,11 @@ GPUExecutionResultC* get_gpu_execution_results() {
                 }
 
                 uint64_t term_marker = ((uint64_t)last_pc << 32) | REVERT_MARKER_XOR;
-                if (trace_data[idx].calls[i].error_code == ERROR_SUCCESS) {
+
+                if (trace_data[idx].calls[current_call_idx].error_code == ERROR_SUCCESS) {
                     term_marker = ((uint64_t)last_pc << 32) | RETURN_MARKER_XOR;
                 }
+
                 markers[current_address_idx].push_back(term_marker);
 
                 // Go back to the previous call
