@@ -20,7 +20,7 @@ namespace CuEVM::operations {
  * @param[inout] gas_used The gas used.
  * @param[inout] stack The stack.
  * @param[in] state_db The state db.
- * @param[in] message The message that started the execution.
+ * @param[in] call_context The call context.
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, CuEVM::StateDb *state_db,
@@ -39,7 +39,7 @@ __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_sta
  * @param[inout] gas_refund The gas refund.
  * @param[in] stack The stack.
  * @param[out] state_db The state db.
- * @param[in] message The message that started the execution.
+ * @param[in] call_context The call context.
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t SSTORE(const gas_t &gas_limit, gas_t &gas_used, gas_t &gas_refund, CuEVM::evm_stack_t &stack,
