@@ -54,6 +54,16 @@ You should see the EVM execution traces in the output.
 
 Please refer to [medusa](https://github.com/minhhn2910/medusa-backup) for example usage.
 
+### Multi-GPU mode
+
+If your system has multiple GPUs, CuEVM can automatically distribute the workload (N transactions) evenly across all available GPUs for improved performance.
+
+By default, CuEVM detects and utilizes all available GPUs without additional configuration. If you want to limit or specify which GPUs to use, set the `CUDA_VISIBLE_DEVICES` environment variable.
+
+For example, to use only GPU 0 and GPU 2 on a system with 4 GPUs:
+
+  * `CUDA_VISIBLE_DEVICES=0,2 ./build/cuevm_GPU  --input fuzzing/eth-tests/erc20_mint.json `
+  * `CUDA_VISIBLE_DEVICES=0,2 medusa fuzz --config medusa.json`
 # Testing
 
 ## Testing Methodology
