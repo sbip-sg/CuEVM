@@ -1,8 +1,7 @@
 #pragma once
 #include <CuEVM/core/block_info.cuh>
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
-#include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/stack.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/state_db.cuh>

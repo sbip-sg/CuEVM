@@ -1,6 +1,6 @@
 #pragma once
 
-#include <CuEVM/core/memory.cuh>
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/state/state_db.cuh>
 #include <CuEVM/utils/evm_defines.cuh>

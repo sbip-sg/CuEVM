@@ -1,7 +1,10 @@
 #include <cuda_runtime.h>
 
-#include <CuEVM/core/memory.cuh>
+#include <CuEVM/core/byte_array.cuh>
+#include <CuEVM/core/data_structures.cuh>
+#include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/error_codes.cuh>
+#include <CuEVM/utils/evm_defines.cuh>
 namespace CuEVM::memory {
 
 // experimental, not used

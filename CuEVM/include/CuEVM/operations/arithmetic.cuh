@@ -1,5 +1,5 @@
 #pragma once
-#include <CuEVM/core/stack.cuh>
+#include <CuEVM/core/data_structures.cuh>
 
 /**
  * The arithmetic operations.

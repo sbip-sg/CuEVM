@@ -1,5 +1,7 @@
 #pragma once
-#include <CuEVM/core/stack.cuh>
+#include <CuEVM/core/data_structures.cuh>
+#include <CuEVM/utils/cuda_utils.cuh>
+#include <CuEVM/utils/evm_defines.cuh>
 
 /**
  * The stack operations class.

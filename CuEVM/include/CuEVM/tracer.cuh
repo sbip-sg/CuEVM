@@ -3,8 +3,6 @@
 
 #include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
-#include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/stack.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
 #include <iostream>

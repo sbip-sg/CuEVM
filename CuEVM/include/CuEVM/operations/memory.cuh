@@ -1,8 +1,7 @@
 #ifndef _CUEVM_MEMORY_OP_H_
 #define _CUEVM_MEMORY_OP_H_
 
-#include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/stack.cuh>
+#include <CuEVM/core/data_structures.cuh>
 
 /**
  * 50s: Memory Operations:

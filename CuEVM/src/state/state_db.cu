@@ -1629,27 +1629,6 @@ __host__ StateDb *StateDb::GPUFromCPU(StateDb *&state_db) {
     memcpy(state_db_gpu, state_db, sizeof(StateDb));
     return state_db_gpu;
 }
-__host__ StateDb *StateDb::CPUFromGPU(StateDb *&state_db) {
-    StateDb *state_db_cpu = (StateDb *)malloc(sizeof(StateDb));
-    /*
-        memcpy(state_db_cpu, state_db, sizeof(StateDb));
-        // copy other inner data
-        uint32_t num_accounts = state_db_cpu->num_accounts;
-        uint32_t num_storage_elements = state_db_cpu->num_storage_elements;
-        uint32_t num_states = state_db_cpu->num_states;
-        uint32_t storage_capacity = state_db_cpu->storage_capacity;
-        // memcopy other inner data
-        memcpy(state_db_cpu->address_list, state_db->address_list, sizeof(evm_word_t) * num_accounts);
-        memcpy(state_db_cpu->account_balances, state_db->account_balances, sizeof(evm_word_t) * num_accounts);
-        memcpy(state_db_cpu->account_nonces, state_db->account_nonces, sizeof(uint32_t) * num_accounts);
-        // double check
-        memcpy(state_db_cpu->prealloc_keys_pool, state_db->prealloc_keys_pool,
-               sizeof(evm_word_t) * account_prealloc_keys_size * num_accounts * num_states);
-        memcpy(state_db_cpu->prealloc_values_pool, state_db->prealloc_values_pool,
-               sizeof(ValueStatus) * account_prealloc_keys_size * num_accounts * num_states);
-               */
-    return state_db_cpu;
-}
 
 __host__ __device__ void StateDb::print() {
     printf("num_accounts: %d\n", num_accounts);

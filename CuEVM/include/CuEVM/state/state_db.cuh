@@ -473,13 +473,6 @@ class StateDb {
     __host__ static void CPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states);
 
     /**
-     * @brief Create a CPU state database from a GPU state database.
-     * @param[in] state_db The GPU state database.
-     * @return The CPU state database.
-     */
-    __host__ static StateDb *CPUFromGPU(StateDb *&state_db);
-
-    /**
      * @brief Create a GPU state database from a CPU state database.
      * @param[in] state_db The CPU state database.
      * @return The GPU state database.

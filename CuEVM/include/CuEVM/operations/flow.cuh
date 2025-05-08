@@ -1,6 +1,6 @@
 #pragma once
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
-#include <CuEVM/core/stack.cuh>
 #include <CuEVM/gas_cost.cuh>
 #ifdef BUILD_LIBRARY
 #include <CuEVM/utils/library_utils.h>
@@ -33,7 +33,7 @@ __device__ int32_t JUMP(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, C
                         ,
                         simplified_trace_data *simplified_trace_data_ptr
 #endif
-                        );
+);
 /**
  * The JUMPI operation implementation.
  * Takes the destination and the condition from the stack and sets the program counter

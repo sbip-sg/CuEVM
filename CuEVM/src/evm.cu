@@ -12,24 +12,14 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
-#ifdef BUILD_LIBRARY
-    // printf("global_simplified_trace: %p\n", global_simplified_trace);
-    // assert(global_simplified_trace != nullptr);
-    // printf("transaction_list_ptr: %p\n", transaction_list_ptr);
-    // if (THREADIDX == 1) transaction_list_ptr->print();
+#ifdef DEBUG
+    if (THREADIDX == 1) transaction_list_ptr->print();
 #endif
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
     evm.run(cached_call_state, copy_state_data);
 
 #ifdef EIP_3155
-    // if (instance == 0) {
-    //     evm.tracer_ptr->print_err();
-    // }
     __syncthreads();
-    // if (instance == 1) {
-    //     printf("\n\ninstance 10\n\n");
-    //     evm.tracer_ptr->print_err();
-    // }
     if (instance == 1) {
         uint32_t offset = sizeof(uint32_t);
         printf("evm instance call serialize buffer %p size %d offset %d\n", d_buffer, buffer_size, offset);
@@ -106,9 +96,7 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
 
     uint256_mul(&upfront_cost, &upfront_cost, &transaction_list_ptr->gas_price);
     global_state_db_ptr->deduct_balance_sender(&transaction_list_ptr->sender, &upfront_cost);
-    // global_state_db_ptr->set_warm_account(&global_block_info->coin_base);
-    // printf("\n\ncall state ptr created %p\n\n", call_state_ptr);
-    // call_state_ptr->print();
+
 #ifdef EIP_3155
     this->tracer_ptr = new CuEVM::utils::tracer_t();
 #endif
@@ -123,9 +111,11 @@ __device__ evm_t::~evm_t() {
 }
 
 __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state) {
-    // printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
-    // call_state_ptr->from.print();
-    // call_state_ptr->to.print();
+#ifdef DEBUG
+    printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
+    call_state_ptr->from.print();
+    call_state_ptr->to.print();
+#endif
 
     const evm_word_t *sender = &call_state_ptr->from;
     const evm_word_t *recipient = &call_state_ptr->to;
@@ -136,7 +126,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
              : ERROR_SUCCESS);
 
     if (error_code != ERROR_SUCCESS) return error_code;
-    // printf("After transfer\n");
+
     // warmup the accounts
 
     // Go-ethereum: check depth > 1024 before increase -> depth > 1025 after increase
@@ -188,8 +178,6 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
             }
         } else {
             // operation stop
-            // TODO: fix this
-            // CuEVM::byte_array_t::reset_return_data(call_state_ptr->return_data_ptr);
             call_state_ptr->dynamic_ret_size = 0;
 
             return ERROR_RETURN;
@@ -200,10 +188,6 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 
     return error_code;
 }
-// __device__ void evm_t::run() {
-//     cached_evm_call_context cached_call_state(call_state_ptr);
-//     run(cached_call_state);
-// }
 
 __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy_state_data) {
 #ifdef BUILD_LIBRARY
@@ -235,15 +219,16 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                                         cached_call_state.gas_limit, cached_call_state.gas_used);
         }
 #endif
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
-        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
-        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
-        //            cached_call_state.gas_limit, cached_call_state.gas_used);
+#ifdef DEBUG
+        if (INSTANCE_GLOBAL_IDX == 0) {
+            printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+                   INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+                   call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+                   cached_call_state.gas_limit, cached_call_state.gas_used);
 
-        //     printf("\n\n");
-        //     cached_call_state.stack_ptr->print();
-        // }
+            printf("\n\n");
+            cached_call_state.stack_ptr->print();
+        }
         // if (INSTANCE_GLOBAL_IDX == 1) {
         //     printf("\nId %d, pc: %d op: %d, depth %d, msize %d stksze %d gs_lmit %lu g_used %lu\n ",
         //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
@@ -256,7 +241,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         //     //     call_state_ptr->memory_ptr->print();
         //     // }
         // }
-
+#endif
 #ifdef BUILD_PYTHON_LIBRARY
         // comparison, arithmetic, revert/invalid
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
@@ -811,10 +796,9 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
         gas_t gas_left = call_state_ptr->gas_limit - call_state_ptr->gas_used;
-        // printf("gas left %lu\n", gas_left);
-        // printf("gas used %lu\n", call_state_ptr->gas_used);
-        // printf("gas limit %lu\n", call_state_ptr->gas_limit);
-        // if (call_state_ptr->parent != nullptr) printf("parent gas used %lu\n", call_state_ptr->parent->gas_used);
+#ifdef DEBUG
+        printf("Gasleft %lu Gasused %lu Gaslimit %lu\n", gas_left, call_state_ptr->gas_used, call_state_ptr->gas_limit);
+#endif
         if (call_state_ptr->parent != nullptr) {
             call_state_ptr->parent->gas_used -= gas_left;
         }
@@ -857,8 +841,10 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         uint32_t ret_size = call_state_ptr->fixed_ret_size;
         // change the call state to the parent
         CuEVM::evm_call_context_t *parent_call_state_ptr = call_state_ptr->parent;
-        // printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,
-        //        call_state_ptr, parent_call_state_ptr);
+#ifdef DEBUG
+        printf("finish_CALL thread %d, call state ptr %p, parent call state ptr %p\n", INSTANCE_GLOBAL_IDX,
+               call_state_ptr, parent_call_state_ptr);
+#endif
 
         SnapshotState *snapshot_state = call_state_ptr->snapshot_state;
         // printf("Finish call, set parent snapshot state, current state %p\n", snapshot_state);
@@ -896,8 +882,10 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         // Free previous memory first before copy return data to memory
         // write the return data in the memory
         parent_call_state_ptr->memory_ptr->grow(ret_offset + ret_size);
-        // printf("return data size %d\n", ret_size);
-        // printf("return data offset %d\n", ret_offset);
+#ifdef DEBUG
+        printf("return data size %d\n", ret_size);
+        printf("return data offset %d\n", ret_offset);
+#endif
         // have to clear memory first before copy return data to memory // due to shared memory between depths
         parent_call_state_ptr->copy_return_data_to_memory(ret_offset, 0, ret_size);
 
@@ -987,8 +975,6 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
         return transaction_list_ptrs;
     }
     uint32_t num_transactions_per_gpu = num_transactions / num_gpus;
-    // num_original_transactions = num_transactions;
-    // num_transactions *= clones;
     // generate the evm instances
 
     // CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
@@ -1004,12 +990,6 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
         state_db_ptrs, world_state_json, num_transactions, num_accounts, snapshot_state_db_ptrs
 
     );
-    //     CuEVM::StateDb::GPUfromJsonMultiple(state_db_ptrs, world_state_json, num_transactions, num_accounts,
-    //     num_gpus,
-    // #ifdef BUILD_GO_LIBRARY
-    //                                         snapshot_state_db_ptr
-    // #endif
-    //     );
 
     num_instances = num_transactions_per_gpu;
     return transaction_list_ptrs;

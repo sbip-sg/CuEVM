@@ -1,3 +1,26 @@
+/**
+ * @file uint256.cuh
+ * @brief CUDA-compatible 256-bit unsigned integer implementation
+ *
+ * This header file provides a fixed-size 256-bit unsigned integer implementation
+ * that works both on CPU (host) and GPU (device) for CUDA applications. It
+ * includes data structures and a comprehensive set of operations for big integer
+ * arithmetic needed for blockchain and cryptographic applications.
+ *
+ * Key features:
+ * - Fixed-size uint256 and uint512 structures
+ * - Arithmetic operations (add, subtract, multiply, divide, modulo)
+ * - Bitwise operations (and, or, xor, not)
+ * - Bit manipulation and shifting
+ * - Comparison functions
+ * - Modular arithmetic (addmod, mulmod, powmod)
+ * - Conversion functions (to/from hex, bytes)
+ * - Support for both unsigned and signed operations
+ *
+ * This library is designed for high-performance blockchain computations,
+ * particularly for Ethereum Virtual Machine (EVM) implementations on CUDA.
+ */
+
 #pragma once
 #include <cuda.h>
 #include <stdint.h>

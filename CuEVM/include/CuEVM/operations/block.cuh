@@ -1,7 +1,7 @@
 #pragma once
 
 #include <CuEVM/core/block_info.cuh>
-#include <CuEVM/core/stack.cuh>
+#include <CuEVM/core/data_structures.cuh>
 
 // 40s: Block Information
 

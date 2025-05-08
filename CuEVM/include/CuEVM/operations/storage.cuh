@@ -1,6 +1,6 @@
 #pragma once
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
-#include <CuEVM/core/stack.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/state_db.cuh>
 /**

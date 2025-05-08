@@ -1,5 +1,7 @@
 
-#include <CuEVM/core/stack.cuh>
+#include <CuEVM/core/evm_word.cuh>
+#include <CuEVM/utils/cuda_utils.cuh>
+#include <CuEVM/utils/evm_defines.cuh>
 // avoid circular dependency
 #include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/utils/error_codes.cuh>

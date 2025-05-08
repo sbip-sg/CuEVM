@@ -5,8 +5,8 @@
 #include <CuCrypto/keccak.cuh>
 #include <CuCrypto/ripemd160.cuh>
 #include <CuCrypto/sha256.cuh>
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
-#include <CuEVM/core/memory.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/utils/ecc.cuh>
