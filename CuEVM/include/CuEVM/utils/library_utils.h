@@ -9,12 +9,26 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <unordered_set>
 
+/**
+ * @file library_utils.h
+ * @brief Utility functions and data structures for library integration.
+ *
+ * This file contains structures and utilities for data transfer between host and device,
+ * execution tracing, and state serialization for the CuEVM library.
+ */
+
 // for convenient data transfer between host and device. set a fixed maximum size for the number of addresses to be
 // transferred
 // todo : optimize this later
 namespace CuEVM {
 using CuEVM::transaction::TransactionList;
 
+/**
+ * @brief Structure for serialized world state data transfer between host and device.
+ *
+ * Contains account data including addresses, balances, nonces, and storage elements
+ * with fixed maximum sizes for efficient transfer.
+ */
 struct serialized_worldstate_data {
     uint32_t no_accounts;
     uint32_t no_storage_elements;
@@ -26,6 +40,10 @@ struct serialized_worldstate_data {
     evm_word_t storage_values[serialized_worldstate_storage_slots];
     // currently dont support copy back the bytecode hex string
     // TODO: use 1 large preallocated buffer for bytecode
+
+    /**
+     * @brief Print the serialized world state data.
+     */
     void print();
 };
 
@@ -36,6 +54,12 @@ struct serialized_worldstate_data {
 #define MAX_ADDRESSES_TRACING 16
 #define MAX_CALLS_TRACING 16
 #define MAX_BRANCHES_TRACING 64  // only track the latest 64 branches
+
+/**
+ * @brief Structure for tracing simple EVM events.
+ *
+ * Records program counter, operation, operands, and result for each traced event.
+ */
 struct simple_event_trace {
     // pc // op //  operand 1, operand 2, res
     uint32_t pc;
@@ -46,6 +70,12 @@ struct simple_event_trace {
     evm_word_t operand_2;
     evm_word_t res;  // blank in some cases
 };
+
+/**
+ * @brief Structure for tracing call operations.
+ *
+ * Records details of call operations including sender, receiver, value, and result.
+ */
 struct call_trace {
     uint32_t pc;
     uint8_t op;
@@ -57,6 +87,12 @@ struct call_trace {
     uint32_t last_pc;                          // the last pc of the call before returning
     // todo add more depth + result etc
 };
+
+/**
+ * @brief Structure for tracing branching operations.
+ *
+ * Records source and destination program counters, missed branches, and distance metrics.
+ */
 struct branch_trace {
     uint32_t pc_src;
     uint32_t pc_dst;
@@ -71,6 +107,12 @@ struct branch_trace {
 //     uint8_t data[32];  // dont support return data copy yet.
 // };
 
+/**
+ * @brief Structure for simplified execution tracing.
+ *
+ * Contains arrays of events, calls, and branches for execution tracing,
+ * with methods to record various execution events.
+ */
 struct simplified_trace_data {
     simple_event_trace events[MAX_TRACE_EVENTS];
     // evm_word_t addresses[MAX_ADDRESSES_TRACING];
@@ -83,27 +125,107 @@ struct simplified_trace_data {
     uint32_t no_branches = 0;
     evm_word_t last_distance;  // use to track branch distance by comparison opcodes
 
+    /**
+     * @brief Begin recording an operation in the trace.
+     * @param[in] pc The program counter.
+     * @param[in] op The operation code.
+     * @param[in] stack_ptr The stack pointer.
+     */
     __device__ void start_operation(const uint32_t pc, const uint8_t op, const CuEVM::evm_stack_t& stack_ptr);
+
+    /**
+     * @brief Complete recording an operation in the trace.
+     * @param[in] stack_ptr The stack pointer.
+     * @param[in] error_code The error code.
+     */
     __device__ void finish_operation(const CuEVM::evm_stack_t& stack_ptr, uint32_t error_code);
-    // compbine start + finish for simple trace
+
+    /**
+     * @brief Record a simple operation in the trace (no need to record stack content).
+     * @param[in] pc The program counter.
+     * @param[in] op The operation code.
+     */
     __device__ void record_operation(const uint32_t pc, const uint8_t op);
+
+    /**
+     * @brief Start recording a call operation.
+     * @param[in] pc The program counter.
+     * @param[in] call_context_ptr The call context pointer.
+     */
     __device__ void start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
+
+    /**
+     * @brief Complete recording a call operation.
+     * @param[in] success The success flag.
+     * @param[in] last_pc The last program counter.
+     */
     __device__ void finish_call(uint8_t success, uint32_t last_pc);
+
+    /**
+     * @brief Record a branch operation.
+     * @param[in] pc_src The source program counter.
+     * @param[in] pc_dst The destination program counter.
+     * @param[in] pc_missed The missed program counter.
+     */
     __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
+
+    /**
+     * @brief Record the distance metric for a branch operation.
+     * @param[in] op The operation code.
+     * @param[in] stack_ptr The stack pointer.
+     */
     __device__ void record_distance(uint8_t op, const CuEVM::evm_stack_t& stack_ptr);
+
+    /**
+     * @brief Print the simplified trace data.
+     */
     __device__ void print();
 };
 
+/**
+ * @brief Global serialized world state data.
+ */
 extern __device__ serialized_worldstate_data* global_serialized_worldstate;
+
+/**
+ * @brief Global simplified trace data.
+ */
 extern __device__ simplified_trace_data* global_simplified_trace;
+
+/**
+ * @brief Serialize state data from world state to the given data structure.
+ * @param[out] data The data structure to serialize into.
+ */
 __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data);
 
+/**
+ * @brief Free transaction list resources.
+ * @param[in] d_transaction_list_ptr Pointer to the transaction list.
+ */
 void freeTransactionList(CuEVM::transaction::TransactionList* d_transaction_list_ptr);
+
+/**
+ * @brief Free trace data resources.
+ * @param[in] copy_state_data Flag to indicate whether to copy state data.
+ */
 void freeTraceData(bool copy_state_data);
 }  // namespace CuEVM
 
+/**
+ * @brief Macro for getting string from python dictionary with default value.
+ * @param dict The dictionary.
+ * @param key The key to look up.
+ * @param default_value The default value if key is not found.
+ */
 #define GET_STR_FROM_DICT_WITH_DEFAULT(dict, key, default_value) \
     (PyDict_GetItemString(dict, key) ? PyUnicode_AsUTF8(PyDict_GetItemString(dict, key)) : default_value)
+
+/**
+ * @brief Namespace containing default block values.
+ *
+ * Provides default values for block parameters used when specific values
+ * are not provided by the caller.
+ */
 namespace DefaultBlock {
 constexpr char BaseFee[] = "0x0a";
 constexpr char CoinBase[] = "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba";

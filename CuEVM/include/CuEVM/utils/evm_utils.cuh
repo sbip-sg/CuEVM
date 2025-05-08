@@ -11,7 +11,6 @@ namespace CuEVM::utils {
 /**
  * Get the contract address from the sender address and the sender nonce.
  * For the simple CREATE operation.
- * @param[in] arith The arithmetic environment
  * @param[out] contract_address The contract address
  * @param[in] sender_address The sender address
  * @param[in] sender_nonce The sender nonce
@@ -22,7 +21,6 @@ __host__ __device__ int32_t get_contract_address_create(evm_word_t *contract_add
 /**
  * Get the contract address from the sender address and the sender nonce.
  * For the simple CREATE operation.
- * @param[in] arith The arithmetic environment
  * @param[out] contract_address The contract address
  * @param[in] sender_address The sender address
  * @param[in] sender_nonce The sender nonce
@@ -32,7 +30,6 @@ __host__ __device__ int32_t get_contract_address_create_word(evm_word_t *contrac
 /**
  * Get the contract address from the sender address, the salt, and the init
  * code. For the CREATE2 operation.
- * @param[in] arith The arithmetic environment
  * @param[out] contract_address The contract address
  * @param[in] sender_address The sender address
  * @param[in] salt The salt

@@ -1,9 +1,8 @@
 #ifndef _CUEVM_LOG_OP_H_
 #define _CUEVM_LOG_OP_H_
 
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
-#include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/stack.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/logs.cuh>
 #include <CuEVM/utils/error_codes.cuh>

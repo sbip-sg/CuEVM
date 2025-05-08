@@ -1,5 +1,7 @@
 #pragma once
-#include <CuEVM/core/stack.cuh>
+#include <CuEVM/core/data_structures.cuh>
+#include <CuEVM/utils/cuda_utils.cuh>
+#include <CuEVM/utils/evm_defines.cuh>
 
 /**
  * The stack operations class.
@@ -40,6 +42,7 @@ __device__ int32_t PUSH0(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_sta
  * @param[inout] pc The program counter.
  * @param[inout] stack The stack.
  * @param[in] byte_code The bytecode.
+ * @param[in] byte_code_size The size of the bytecode.
  * @param[in] opcode The opcode.
  */
 __device__ int32_t PUSHX(const gas_t &gas_limit, gas_t &gas_used, uint32_t &pc, CuEVM::evm_stack_t *stack,

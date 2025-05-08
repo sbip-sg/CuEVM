@@ -1,8 +1,7 @@
 #pragma once
 #include <CuEVM/core/block_info.cuh>
+#include <CuEVM/core/data_structures.cuh>
 #include <CuEVM/core/evm_call_context.cuh>
-#include <CuEVM/core/memory.cuh>
-#include <CuEVM/core/stack.cuh>
 #include <CuEVM/core/transaction.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/state_db.cuh>
@@ -55,10 +54,10 @@ __device__ int32_t SHA3(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stac
  * Pushes on the stack the address of currently executing account.
  * The executing account is consider the current context, so it can be
  * different than the owner of the code.
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[out] stack The stack.
- * @param[in] message The message.
+ * @param[in] call_context The call context containing stack and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t ADDRESS(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -69,10 +68,10 @@ __device__ int32_t ADDRESS(const gas_t &gas_limit, gas_t &gas_used, const CuEVM:
  * account with that address.
  * Gas is charged for accessing the account if it is warm
  * or cold access.
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[inout] stack The stack.
- * @param[in] touch_state The touch state object.
+ * @param[in] call_context The call context containing stack and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t BALANCE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -81,10 +80,11 @@ __device__ int32_t BALANCE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM:
  * The ORIGIN operation implementation.
  * Pushes on the stack the address of the sender of the transaction
  * that started the execution.
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] transaction The transaction.
+ * @param[in] transaction_list The transaction list.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t ORIGIN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
@@ -94,10 +94,10 @@ __device__ int32_t ORIGIN(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_st
  * The CALLER operation implementation.
  * Pushes on the stack the address of the sender of the message
  * that started the execution.
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[out] stack The stack.
- * @param[in] message The message.
+ * @param[in] call_context The call context containing stack and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLER(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -105,10 +105,10 @@ __device__ int32_t CALLER(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::
 /**
  * The CALLVALUE operation implementation.
  * Pushes on the stack the value of the message that started the execution.
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[out] stack The stack.
- * @param[in] message The message.
+ * @param[in] call_context The call context containing stack and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLVALUE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -120,10 +120,10 @@ __device__ int32_t CALLVALUE(const gas_t &gas_limit, gas_t &gas_used, const CuEV
  * The data pushed is a evm word.
  * If the call data has less bytes than neccessay to fill the evm word,
  * the remaining bytes are filled with zeros. (the least significant bytes)
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[inout] stack The stack.
- * @param[in] message The message.
+ * @param[in] call_context The call context containing stack and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLDATALOAD(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -131,10 +131,10 @@ __device__ int32_t CALLDATALOAD(const gas_t &gas_limit, gas_t &gas_used, const C
 /**
  * The CALLDATASIZE operation implementation.
  * Pushes on the stack the size of the message call data.
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[out] stack The stack.
- * @param[in] message The message.
+ * @param[in] call_context The call context containing stack and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLDATASIZE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -153,9 +153,7 @@ __device__ int32_t CALLDATASIZE(const gas_t &gas_limit, gas_t &gas_used, const C
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[inout] stack The stack.
- * @param[in] message The message.
- * @param[out] memory The memory.
+ * @param[in] call_context The call context containing stack, memory and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CALLDATACOPY(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -166,8 +164,7 @@ __device__ int32_t CALLDATACOPY(const gas_t &gas_limit, gas_t &gas_used, const C
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[out] stack The stack.
- * @param[in] message The message.
+ * @param[in] call_context The call context containing stack and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -186,10 +183,7 @@ __device__ int32_t CODESIZE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[inout] stack The stack.
- * @param[in] message The message.
- * @param[in] touch_state The touch state object. The executing world state.
- * @param[out] memory The memory.
+ * @param[in] call_context The call context containing stack, memory and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t CODECOPY(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -202,8 +196,8 @@ __device__ int32_t CODECOPY(const gas_t &gas_limit, gas_t &gas_used, const CuEVM
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
- * @param[in] block The block.
- * @param[in] transaction The transaction.
+ * @param[in] block The block information.
+ * @param[in] transaction_list The transaction list.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t GASPRICE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
@@ -219,8 +213,7 @@ __device__ int32_t GASPRICE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[inout] stack The stack.
- * @param[in] state_db The state db.
+ * @param[in] call_context The call context containing stack, state_db and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t EXTCODESIZE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -241,9 +234,7 @@ __device__ int32_t EXTCODESIZE(const gas_t &gas_limit, gas_t &gas_used, const Cu
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[in] stack The stack.
- * @param[in] state_db The state db.
- * @param[out] memory The memory.
+ * @param[in] call_context The call context containing stack, memory, state_db and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t EXTCODECOPY(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -254,8 +245,7 @@ __device__ int32_t EXTCODECOPY(const gas_t &gas_limit, gas_t &gas_used, const Cu
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[out] stack The stack.
- * @param[in] return_data The return data.
+ * @param[in] call_context The call context containing stack and return data information.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t RETURNDATASIZE(const gas_t &gas_limit, gas_t &gas_used,
@@ -275,9 +265,7 @@ __device__ int32_t RETURNDATASIZE(const gas_t &gas_limit, gas_t &gas_used,
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[in] stack The stack.
- * @param[out] memory The memory.
- * @param[in] return_data The return data.
+ * @param[inout] call_context The call context containing stack, memory and return data information.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t RETURNDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_call_context_t *call_context);
@@ -293,8 +281,7 @@ __device__ int32_t RETURNDATACOPY(const gas_t &gas_limit, gas_t &gas_used, CuEVM
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[inout] stack The stack.
- * @param[in] state_db The state db.
+ * @param[in] call_context The call context containing stack, state_db and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t EXTCODEHASH(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
@@ -302,6 +289,7 @@ __device__ int32_t EXTCODEHASH(const gas_t &gas_limit, gas_t &gas_used, const Cu
 /**
  * The GAS operation implementation.
  * Pushes the gas left to the stack after this operation.
+ *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
  * @param[out] stack The stack.
@@ -317,9 +305,7 @@ __device__ int32_t GAS(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack
  *
  * @param[in] gas_limit The gas limit.
  * @param[inout] gas_used The gas used.
- * @param[out] stack The stack.
- * @param[in] state_db The state db.
- * @param[in] transaction The transaction.
+ * @param[in] call_context The call context containing stack, state_db and other execution state.
  * @return The error code. 0 if no error.
  */
 __device__ int32_t SELFBALANCE(const gas_t &gas_limit, gas_t &gas_used, const CuEVM::evm_call_context_t *call_context);
