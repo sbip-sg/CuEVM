@@ -1607,7 +1607,7 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
             cJSON *storage_element_json = cJSON_GetArrayItem(storage_json, i);
             uint32_t contract_idx = state_db->num_contracts - 1;
             uint32_t pre_alloc_keys_idx = (account_prealloc_keys_size * contract_idx + i) * num_states;
-            printf(" contract_idx: %d, pre_alloc_keys_idx: %d\n", contract_idx, pre_alloc_keys_idx);
+            // printf(" contract_idx: %d, pre_alloc_keys_idx: %d\n", contract_idx, pre_alloc_keys_idx);
             state_db->prealloc_keys_pool[pre_alloc_keys_idx].from_hex(storage_element_json->string);
             state_db->prealloc_values_pool[pre_alloc_keys_idx].from_hex(storage_element_json->valuestring);
 

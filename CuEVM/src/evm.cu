@@ -957,7 +957,10 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
     else
         return std::vector<CuEVM::transaction::TransactionList *>();
 
-    CuEVM::get_block_info(test_json);
+    for (int i = 0; i < num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+        CuEVM::get_block_info(test_json);
+    }
 
     // get the transaction
     std::vector<CuEVM::transaction::TransactionList *> transaction_list_ptrs(num_gpus, nullptr);
