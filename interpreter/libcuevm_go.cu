@@ -361,7 +361,7 @@ void print_evm_instances_results(bool copy_state_data) {
 std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     const unsigned char* fromAddr, const unsigned char* toAddr, const unsigned char* values,
     const unsigned char* callData, int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
-    const uint32_t* dataSizes, int dataSizesLen, int txCount, bool copy_state_data = false) {
+    const uint32_t* dataSizes, int dataSizesLen, int txCount) {
     // Create TransactionList on host
     CuEVM::transaction::TransactionList* host_transaction_list = new CuEVM::transaction::TransactionList();
     host_transaction_list->size = txCount;
@@ -460,15 +460,6 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         cudaMemset(d_trace_data, 0, transaction_per_gpu * sizeof(CuEVM::simplified_trace_data));
         cudaMemcpyToSymbol(global_simplified_trace, &d_trace_data, sizeof(CuEVM::simplified_trace_data*));
 
-        if (copy_state_data) {
-            CuEVM::serialized_worldstate_data* d_serialized_worldstate_data;
-            CUDA_CHECK(cudaMalloc(&d_serialized_worldstate_data,
-                                  transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data)));
-            cudaMemset(d_serialized_worldstate_data, 0,
-                       transaction_per_gpu * sizeof(CuEVM::serialized_worldstate_data));
-            cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
-                               sizeof(CuEVM::serialized_worldstate_data*));
-        }
         d_transaction_list_ptrs.push_back(d_transaction_list_ptr);
     }
     // Free host memory
@@ -486,161 +477,155 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 // Simplified batch transaction processing with single from/to address
 GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
                                                 const unsigned char* values, const unsigned char* callData,
-                                                int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
-                                                const uint32_t* dataSizes, int dataSizesLen, int txCount) {
+                                                int callDataLen, const uint32_t* dataOffsets, const uint32_t* dataSizes,
+                                                int txBatchCount, int sequenceLength) {
     // printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount,
     //        g_num_instances_per_device, call_counter);
     std::vector<cudaStream_t> streams;  // TODO move streams to global
     try {
         // Update global num_instances if provided
-        if (txCount > 0) {
-            if (txCount != g_num_instances_per_device * g_num_gpus) {
-                printf("txCount: %u, g_num_instances_per_device: %u\n", txCount, g_num_instances_per_device);
-                assert(txCount == g_num_instances_per_device * g_num_gpus);
+        if (txBatchCount > 0) {
+            if (txBatchCount != g_num_instances_per_device * g_num_gpus) {
+                printf("txBatchCount: %u, g_num_instances_per_device: %u\n", txBatchCount, g_num_instances_per_device);
+                assert(txBatchCount == g_num_instances_per_device * g_num_gpus);
             }
 
             // g_num_instances = txCount;
             // g_num_instances_per_device = txCount / g_num_gpus;
         }
-        bool copy_state_data = false;
-        // Create and transfer transaction list to GPU
-        auto d_transaction_list_ptrs =
-            create_transaction_list(fromAddr, toAddr, values, callData, callDataLen, dataOffsets, dataOffsetsLen,
-                                    dataSizes, dataSizesLen, txCount, copy_state_data);
+        uint32_t current_calldata_offset = 0;
+        for (int sequenceIdx = 0; sequenceIdx < sequenceLength; sequenceIdx++) {
+            uint32_t current_idx = sequenceIdx * txBatchCount;
 
-        // Initialize memory pool using the globally stored account count
-        // Only create memory pool if not reusing state or first call
-        if (call_counter == 0)
-            CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts, g_num_gpus);
-        else
-            CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
-            /*
-            for (int i = 0; i < g_num_gpus; i++) {
-                // CUDA_CHECK(cudaSetDevice(i));
-                if (call_counter == 0) {
-                    printf("Creating memory pool with %u accounts and %u instances\n", g_num_accounts,
-                           g_num_instances_per_device);
-                    CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts);
-                } else {
-                    printf("Reusing existing memory pool\n");
-                    printf("Clearing memory pool\n");
-                    printf("g_num_instances_per_device: %u\n", g_num_instances_per_device);
-                    printf("g_num_accounts: %u\n", g_num_accounts);
-                    CUDA_CHECK(cudaSetDevice(i));
-                    CuEVM::memory_pool::clear_memory_pool();
-                }
+            if (current_idx != 0) {
+                current_calldata_offset += dataOffsets[current_idx - 1] + dataSizes[current_idx - 1];
             }
-        */
-            // tracer
+            callDataLen = dataOffsets[current_idx + txBatchCount - 1] + dataSizes[current_idx + txBatchCount - 1];
+            printf("current_idx: %u, current_calldata_offset: %u, callDataLen: %u\n", current_idx,
+                   current_calldata_offset, callDataLen);
+            // Create and transfer transaction list to GPU
+            auto d_transaction_list_ptrs =
+                create_transaction_list(fromAddr, toAddr, values, callData + current_calldata_offset, callDataLen,
+                                        dataOffsets, txBatchCount, dataSizes, txBatchCount, txBatchCount);
+
+            // Initialize memory pool using the globally stored account count
+            // Only create memory pool if not reusing state or first call
+            if (call_counter == 0)
+                CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts, g_num_gpus);
+            else
+                CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
+                // tracer
 #ifdef EIP_3155
-        const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
-        std::vector<char*> d_buffers;
-        for (int i = 0; i < g_num_gpus; i++) {
-            char* d_buffer;
-            CUDA_CHECK(cudaSetDevice(i));
-            CUDA_CHECK(cudaMalloc(&d_buffer, BUFFER_SIZE));
-            d_buffers.push_back(d_buffer);
-        }
+            const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
+            std::vector<char*> d_buffers;
+            for (int i = 0; i < g_num_gpus; i++) {
+                char* d_buffer;
+                CUDA_CHECK(cudaSetDevice(i));
+                CUDA_CHECK(cudaMalloc(&d_buffer, BUFFER_SIZE));
+                d_buffers.push_back(d_buffer);
+            }
 #endif
-        // Configure kernel launch parameters
-        uint32_t num_blocks = (g_num_instances_per_device + INSTANCES_PER_BLOCK - 1) / INSTANCES_PER_BLOCK;
-        printf("Running %d instances on GPU, blocks: %d, threads per block: %d\n", g_num_instances_per_device,
-               num_blocks, INSTANCES_PER_BLOCK);
+            // Configure kernel launch parameters
+            uint32_t num_blocks = (g_num_instances_per_device + INSTANCES_PER_BLOCK - 1) / INSTANCES_PER_BLOCK;
+            printf("Running %d instances on GPU, blocks: %d, threads per block: %d\n", g_num_instances_per_device,
+                   num_blocks, INSTANCES_PER_BLOCK);
 
-        // Create timing variables and arrays for events
-        float total_milliseconds = 0;
-        cudaEvent_t* start_events = new cudaEvent_t[g_num_gpus];
-        cudaEvent_t* stop_events = new cudaEvent_t[g_num_gpus];
-        std::vector<cudaStream_t> streams;
+            // Create timing variables and arrays for events
+            float total_milliseconds = 0;
+            cudaEvent_t* start_events = new cudaEvent_t[g_num_gpus];
+            cudaEvent_t* stop_events = new cudaEvent_t[g_num_gpus];
+            std::vector<cudaStream_t> streams;
 
-        // First: create events and launch all kernels (non-blocking)
-        for (int i = 0; i < g_num_gpus; i++) {
-            // Set device
-            CUDA_CHECK(cudaSetDevice(i));
-            // Create CUDA timing events for this device
-            cudaEventCreate(&start_events[i]);
-            cudaEventCreate(&stop_events[i]);
+            // First: create events and launch all kernels (non-blocking)
+            for (int i = 0; i < g_num_gpus; i++) {
+                // Set device
+                CUDA_CHECK(cudaSetDevice(i));
+                // Create CUDA timing events for this device
+                cudaEventCreate(&start_events[i]);
+                cudaEventCreate(&stop_events[i]);
 
-            // Create CUDA streams for truly asynchronous execution
-            cudaStream_t stream;
-            CUDA_CHECK(cudaStreamCreate(&stream));
+                // Create CUDA streams for truly asynchronous execution
+                cudaStream_t stream;
+                CUDA_CHECK(cudaStreamCreate(&stream));
 
-            cudaEventRecord(start_events[i], stream);
+                cudaEventRecord(start_events[i], stream);
 
-            // Execute the GPU kernel with the device pointer for this GPU in its own stream
-            CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK, 0, stream>>>(
-                d_transaction_list_ptrs[i], g_num_instances_per_device
+                // Execute the GPU kernel with the device pointer for this GPU in its own stream
+                CuEVM::kernel_evm_multiple_instances<<<num_blocks, INSTANCES_PER_BLOCK, 0, stream>>>(
+                    d_transaction_list_ptrs[i], g_num_instances_per_device
 #ifdef EIP_3155
-                ,
-                d_buffers[i], BUFFER_SIZE
+                    ,
+                    d_buffers[i], BUFFER_SIZE
 #endif
-                ,
-                copy_state_data);
+                    ,
+                    false);
 
-            // Record the stop event but don't synchronize yet (non-blocking)
-            cudaEventRecord(stop_events[i], stream);
+                // Record the stop event but don't synchronize yet (non-blocking)
+                cudaEventRecord(stop_events[i], stream);
 
-            // Store stream for later cleanup
-            streams.push_back(stream);
-        }
+                // Store stream for later cleanup
+                streams.push_back(stream);
+            }
 
-        // Second: wait for all GPUs to finish and collect timings
-        for (int i = 0; i < g_num_gpus; i++) {
-            // Set device
-            CUDA_CHECK(cudaSetDevice(i));
+            // Second: wait for all GPUs to finish and collect timings
+            for (int i = 0; i < g_num_gpus; i++) {
+                // Set device
+                CUDA_CHECK(cudaSetDevice(i));
 
-            // Wait for this GPU to finish
-            cudaEventSynchronize(stop_events[i]);
+                // Wait for this GPU to finish
+                cudaEventSynchronize(stop_events[i]);
 
-            // Check for errors on this GPU
-            cudaError_t err = cudaGetLastError();
-            if (err != cudaSuccess) printf("CUDA error on GPU %d: %s\n", i, cudaGetErrorString(err));
+                // Check for errors on this GPU
+                cudaError_t err = cudaGetLastError();
+                if (err != cudaSuccess) printf("CUDA error on GPU %d: %s\n", i, cudaGetErrorString(err));
 
-            // Get timing for this GPU
-            float milliseconds = 0;
-            cudaEventElapsedTime(&milliseconds, start_events[i], stop_events[i]);
-            total_milliseconds = std::max(total_milliseconds, milliseconds);
+                // Get timing for this GPU
+                float milliseconds = 0;
+                cudaEventElapsedTime(&milliseconds, start_events[i], stop_events[i]);
+                total_milliseconds = std::max(total_milliseconds, milliseconds);
 
-            // Clean up events for this GPU
-            cudaEventDestroy(start_events[i]);
-            cudaEventDestroy(stop_events[i]);
-            cudaStreamDestroy(streams[i]);
-        }
+                // Clean up events for this GPU
+                cudaEventDestroy(start_events[i]);
+                cudaEventDestroy(stop_events[i]);
+                cudaStreamDestroy(streams[i]);
+            }
 
 #ifdef EIP_3155
-        // After kernel execution, copy the buffer back to the host
-        char* h_buffer = new char[BUFFER_SIZE];
-        for (int i = 0; i < g_num_gpus; i++) {
-            CUDA_CHECK(cudaSetDevice(i));
-            cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
-            CuEVM::utils::print_tracer_data(h_buffer);
-            cudaFree(d_buffers[i]);
-        }
+            // After kernel execution, copy the buffer back to the host
+            char* h_buffer = new char[BUFFER_SIZE];
+            for (int i = 0; i < g_num_gpus; i++) {
+                CUDA_CHECK(cudaSetDevice(i));
+                cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
+                CuEVM::utils::print_tracer_data(h_buffer);
+                cudaFree(d_buffers[i]);
+            }
 
-        // Clean up
-        delete[] h_buffer;
+            // Clean up
+            delete[] h_buffer;
 
 #endif
-        printf("GPU kernel execution time: %f milliseconds (max across all GPUs)\n", total_milliseconds);
+            printf("GPU kernel execution time: %f milliseconds (max across all GPUs)\n", total_milliseconds);
 
-        // Clean up event arrays
-        delete[] start_events;
-        delete[] stop_events;
+            // Clean up event arrays
+            delete[] start_events;
+            delete[] stop_events;
 
-        // ... rest of the function ...
+            // ... rest of the function ...
 
-        // Clean up transaction lists
-        // cleanup_transaction_list(d_transaction_list_ptr, callDataLen);
-        GPUExecutionResultC* result = get_gpu_execution_results();
-        for (int i = 0; i < g_num_gpus; i++) {
-            CUDA_CHECK(cudaSetDevice(i));
-            CuEVM::freeTransactionList(d_transaction_list_ptrs[i]);
-            CuEVM::freeTraceData(copy_state_data);
+            // Clean up transaction lists
+            // cleanup_transaction_list(d_transaction_list_ptr, callDataLen);
+            GPUExecutionResultC* result = get_gpu_execution_results_optimized();
+            for (int i = 0; i < g_num_gpus; i++) {
+                CUDA_CHECK(cudaSetDevice(i));
+                CuEVM::freeTransactionList(d_transaction_list_ptrs[i]);
+                CuEVM::freeTraceData(false);
+            }
+            // Increment call counter
+            call_counter++;
+            printf("Call number: %d\n", call_counter);
         }
-        // Increment call counter
-        call_counter++;
-        printf("Call number: %d\n", call_counter);
-        return result;  // Success
+        // Debug
+        return nullptr;  // Success
     } catch (const std::exception& e) {
         printf("Error in process_batch_transactions: %s\n", e.what());
         return nullptr;  // Error
@@ -650,6 +635,10 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
     }
 }
 
+// Minimalized version of get_gpu_execution_results
+GPUExecutionResultC* get_gpu_execution_results_optimized() {
+    // TODO
+}
 GPUExecutionResultC* get_gpu_execution_results() {
     // Allocate and initialize result structure
     GPUExecutionResultC* result = (GPUExecutionResultC*)calloc(1, sizeof(GPUExecutionResultC));

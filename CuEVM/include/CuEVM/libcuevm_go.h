@@ -98,16 +98,15 @@ int run_interpreter_go(const char* json_input, unsigned int skip_trace_parsing, 
  * @param[in] callData Combined call data for all transactions
  * @param[in] callDataLen Length of the combined call data
  * @param[in] dataOffsets Array of offsets into the call data for each transaction
- * @param[in] dataOffsetsLen Length of the dataOffsets array
  * @param[in] dataSizes Array of sizes for each transaction's call data
- * @param[in] dataSizesLen Length of the dataSizes array
- * @param[in] txCount Number of transactions in the batch
+ * @param[in] txBatchCount Number of transactions in each batch
+ * @param[in] sequenceLength Length of each sequence of transactions
  * @return GPUExecutionResultC* Pointer to the execution results structure
  */
 GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
                                                 const unsigned char* values, const unsigned char* callData,
-                                                int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
-                                                const uint32_t* dataSizes, int dataSizesLen, int txCount);
+                                                int callDataLen, const uint32_t* dataOffsets, const uint32_t* dataSizes,
+                                                int txBatchCount, int sequenceLength);
 
 /**
  * @brief Process JSON state data on the GPU.
