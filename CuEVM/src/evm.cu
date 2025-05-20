@@ -783,6 +783,10 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
         serialize_state_data(&global_serialized_worldstate[INSTANCE_GLOBAL_IDX]);
     }
 #endif
+
+#ifdef BUILD_GO_LIBRARY
+    finalize_coverage_bitmap();
+#endif
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
     // printf("updated final world state\n");
 

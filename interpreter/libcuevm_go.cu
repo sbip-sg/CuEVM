@@ -2,6 +2,7 @@
 #include <omp.h>
 
 #include <cassert>
+#include <sstream>
 #include <unordered_map>
 #include <vector>
 
@@ -65,6 +66,7 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         return -1;
     }
     printf("Found %d GPUs.\n", g_num_gpus);
+    printf("Resetting GPU devices\n");
     for (int i = 0; i < g_num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
         CUDA_CHECK(cudaDeviceReset());
@@ -73,6 +75,12 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         CUDA_CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, heap_size));
         CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 4 * 1024));
         CUDA_CHECK(cudaDeviceSynchronize());
+
+        // create and set the coverage bitmap once for each fuzzing campaign
+        uint32_t* d_coverage_bitmap;
+        CUDA_CHECK(cudaMalloc(&d_coverage_bitmap, BITMAP_SIZE_IN_INTS * sizeof(uint32_t)));
+        CUDA_CHECK(cudaMemset(d_coverage_bitmap, 0, BITMAP_SIZE_IN_INTS * sizeof(uint32_t)));
+        CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::g_coverage_bitmap, &d_coverage_bitmap, sizeof(uint32_t*)));
     }
     // Include <cassert> header at the top of the file for this to work.
     // Standard assert takes only one argument (the condition).
@@ -139,6 +147,7 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
 }
 
 void reset_state_db() {
+    printf("Resetting state DB\n");
     for (int i = 0; i < g_num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
         if (g_state_db_ptr[i] != nullptr && g_snapshot_state_db_ptr[i] != nullptr) {
@@ -475,10 +484,10 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 }
 
 // Simplified batch transaction processing with single from/to address
-GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
-                                                const unsigned char* values, const unsigned char* callData,
-                                                int callDataLen, const uint32_t* dataOffsets, const uint32_t* dataSizes,
-                                                int txBatchCount, int sequenceLength) {
+SimplifiedGPUResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
+                                                 const unsigned char* values, const unsigned char* callData,
+                                                 int callDataLen, const uint32_t* dataOffsets,
+                                                 const uint32_t* dataSizes, int txBatchCount, int sequenceLength) {
     // printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount,
     //        g_num_instances_per_device, call_counter);
     std::vector<cudaStream_t> streams;  // TODO move streams to global
@@ -494,6 +503,9 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
             // g_num_instances_per_device = txCount / g_num_gpus;
         }
         uint32_t current_calldata_offset = 0;
+        SimplifiedGPUResultC* final_result = new SimplifiedGPUResultC();
+        final_result->results = new SimplifiedGPUResultSingleBatchC[sequenceLength];
+        final_result->num_results = sequenceLength;
         for (int sequenceIdx = 0; sequenceIdx < sequenceLength; sequenceIdx++) {
             uint32_t current_idx = sequenceIdx * txBatchCount;
 
@@ -514,7 +526,38 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
                 CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts, g_num_gpus);
             else
                 CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
-                // tracer
+
+            // create new coverage tracking variables
+            uint32_t* d_new_branches;
+            uint32_t* d_new_count;
+            CUDA_CHECK(cudaMalloc(&d_new_branches, MAX_NEW_BRANCHES * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMalloc(&d_new_count, sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemset(d_new_branches, 0, MAX_NEW_BRANCHES * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemset(d_new_count, 0, sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_idx, &d_new_branches, sizeof(uint32_t*)));
+            CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_count, &d_new_count, sizeof(uint32_t*)));
+
+            // Bug tracker
+            uint32_t* d_new_bug_idx;
+            uint32_t* d_new_bug_pc;
+            uint32_t* d_new_bug_count;
+            CUDA_CHECK(cudaMalloc(&d_new_bug_idx, MAX_NEW_BUGS * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMalloc(&d_new_bug_pc, MAX_NEW_BUGS * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMalloc(&d_new_bug_count, sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemset(d_new_bug_idx, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemset(d_new_bug_pc, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemset(d_new_bug_count, 0, sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_idx, &d_new_bug_idx, sizeof(uint32_t*)));
+            CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_pc, &d_new_bug_pc, sizeof(uint32_t*)));
+            CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_count, &d_new_bug_count, sizeof(uint32_t*)));
+
+            uint32_t* d_new_coverage_bitmap;
+            uint32_t num_integer_elements_bitmap = (txBatchCount + 31) / 32;
+            printf("num_integer_elements_bitmap: %u\n", num_integer_elements_bitmap);
+            CUDA_CHECK(cudaMalloc(&d_new_coverage_bitmap, num_integer_elements_bitmap * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemset(d_new_coverage_bitmap, 0, num_integer_elements_bitmap * sizeof(uint32_t)));
+            CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_bitmap, &d_new_coverage_bitmap, sizeof(uint32_t*)));
+
 #ifdef EIP_3155
             const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
             std::vector<char*> d_buffers;
@@ -614,7 +657,7 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
 
             // Clean up transaction lists
             // cleanup_transaction_list(d_transaction_list_ptr, callDataLen);
-            GPUExecutionResultC* result = get_gpu_execution_results_optimized();
+            get_gpu_execution_results_optimized(&final_result->results[sequenceIdx]);
             for (int i = 0; i < g_num_gpus; i++) {
                 CUDA_CHECK(cudaSetDevice(i));
                 CuEVM::freeTransactionList(d_transaction_list_ptrs[i]);
@@ -625,7 +668,7 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
             printf("Call number: %d\n", call_counter);
         }
         // Debug
-        return nullptr;  // Success
+        return final_result;  // Success
     } catch (const std::exception& e) {
         printf("Error in process_batch_transactions: %s\n", e.what());
         return nullptr;  // Error
@@ -636,9 +679,115 @@ GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, c
 }
 
 // Minimalized version of get_gpu_execution_results
-GPUExecutionResultC* get_gpu_execution_results_optimized() {
-    // TODO
+void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result) {
+    // Arrays to store counts from each GPU
+    std::vector<uint32_t> coverage_counts(g_num_gpus);
+    std::vector<uint32_t> bug_counts(g_num_gpus);
+    uint32_t total_num_new_coverage = 0;
+    uint32_t total_num_new_bug = 0;
+
+    // First pass: count total new coverage and bugs across all GPUs
+    for (int i = 0; i < g_num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+
+        // Get the count of new branches
+        uint32_t* host_counter_ptr = nullptr;
+        CUDA_CHECK(cudaMemcpyFromSymbol(&host_counter_ptr, g_new_coverage_count, sizeof(uint32_t*)));
+        CUDA_CHECK(cudaMemcpy(&coverage_counts[i], host_counter_ptr, sizeof(uint32_t), cudaMemcpyDeviceToHost));
+
+        total_num_new_coverage += coverage_counts[i];
+
+        // Get the count of new bugs
+        CUDA_CHECK(cudaMemcpyFromSymbol(&host_counter_ptr, g_new_bug_count, sizeof(uint32_t*)));
+        CUDA_CHECK(cudaMemcpy(&bug_counts[i], host_counter_ptr, sizeof(uint32_t), cudaMemcpyDeviceToHost));
+
+        total_num_new_bug += bug_counts[i];
+    }
+
+    printf("Total new coverage branches: %u, total new bugs: %u\n", total_num_new_coverage, total_num_new_bug);
+
+    // Allocate memory for result arrays once we know the total sizes
+    result->num_new_coverage = total_num_new_coverage;
+    result->num_new_bugs = total_num_new_bug;
+
+    if (total_num_new_coverage > 0) {
+        result->new_coverage_idx = new uint32_t[total_num_new_coverage];
+    } else {
+        result->new_coverage_idx = nullptr;
+    }
+
+    if (total_num_new_bug > 0) {
+        result->new_bug_idx = new uint32_t[total_num_new_bug];
+        result->new_bug_pc = new uint32_t[total_num_new_bug];
+    } else {
+        result->new_bug_idx = nullptr;
+        result->new_bug_pc = nullptr;
+    }
+
+    // Second pass: copy the actual data
+    uint32_t coverage_offset = 0;
+    uint32_t bug_offset = 0;
+
+    for (int i = 0; i < g_num_gpus; i++) {
+        CUDA_CHECK(cudaSetDevice(i));
+
+        // Copy new branches data - use stored count from first pass
+        if (coverage_counts[i] > 0) {
+            uint32_t* d_new_branches = nullptr;
+            CUDA_CHECK(cudaMemcpyFromSymbol(&d_new_branches, g_new_coverage_idx, sizeof(uint32_t*)));
+            CUDA_CHECK(cudaMemcpy(&result->new_coverage_idx[coverage_offset], d_new_branches,
+                                  coverage_counts[i] * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+
+            // adjust the idx from the offset
+            if (coverage_offset != 0) {
+                for (uint32_t j = 0; j < coverage_counts[i]; j++) {
+                    result->new_coverage_idx[coverage_offset + j] += i * g_num_instances_per_device;
+                }
+            }
+
+            // Debug output
+            for (uint32_t j = 0; j < coverage_counts[i]; j++) {
+                printf("GPU %d: new_branches[%d]: %d\n", i, j, result->new_coverage_idx[coverage_offset + j]);
+            }
+
+            coverage_offset += coverage_counts[i];
+        }
+
+        // Copy new bugs data - use stored count from first pass
+        if (bug_counts[i] > 0) {
+            uint32_t* d_new_bug_idx = nullptr;
+            uint32_t* d_new_bug_pc = nullptr;
+            CUDA_CHECK(cudaMemcpyFromSymbol(&d_new_bug_idx, g_new_bug_idx, sizeof(uint32_t*)));
+            CUDA_CHECK(cudaMemcpyFromSymbol(&d_new_bug_pc, g_new_bug_pc, sizeof(uint32_t*)));
+
+            CUDA_CHECK(cudaMemcpy(&result->new_bug_idx[bug_offset], d_new_bug_idx, bug_counts[i] * sizeof(uint32_t),
+                                  cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaMemcpy(&result->new_bug_pc[bug_offset], d_new_bug_pc, bug_counts[i] * sizeof(uint32_t),
+                                  cudaMemcpyDeviceToHost));
+
+            // adjust the idx from the offset
+            if (bug_offset != 0) {
+                for (uint32_t j = 0; j < bug_counts[i]; j++) {
+                    result->new_bug_idx[bug_offset + j] += i * g_num_instances_per_device;
+                }
+            }
+
+            // Debug output
+            for (uint32_t j = 0; j < bug_counts[i]; j++) {
+                printf("GPU %d: new_bugs[%d]: idx=%d, pc=%d\n", i, j, result->new_bug_idx[bug_offset + j],
+                       result->new_bug_pc[bug_offset + j]);
+            }
+
+            bug_offset += bug_counts[i];
+        }
+    }
+
+    printf("Finished merging coverage data from all GPUs\n");
 }
+
+// For debugging, tracking unique marker patterns
+std::unordered_map<std::string, std::vector<uint32_t>> unique_marker_patterns;
+
 GPUExecutionResultC* get_gpu_execution_results() {
     // Allocate and initialize result structure
     GPUExecutionResultC* result = (GPUExecutionResultC*)calloc(1, sizeof(GPUExecutionResultC));
@@ -827,41 +976,69 @@ GPUExecutionResultC* get_gpu_execution_results() {
 
     }  // End of parallel loop
 
-    /*
-        for (uint32_t idx = 0; idx < g_num_instances; idx++) {
-            // Debug print coverage info - Keep commented out for parallel execution
-            printf("CuEVM Instance %u coverage:\n", idx);
-            for (uint32_t i = 0; i < result->coverage[idx].num_addresses; i++) {
-                printf("  Contract address: %s\n", result->coverage[idx].addresses[i]);
+    for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
+        // Debug print coverage info - Keep commented out for parallel execution
+        printf("CuEVM Instance %u coverage:\n", idx);
 
-                // Print each marker in a similar format to Go's debug output
-                for (uint32_t j = 0; j < result->coverage[idx].branch_coverage_lengths[i]; j++) {
-                    uint64_t marker = result->coverage[idx].branch_coverage[i][j];
-                    uint32_t src = marker >> 32;
-                    uint32_t dst = marker & 0xFFFFFFFF;
+        // Create a serialized representation of this instance's markers for hashing
+        std::stringstream marker_hash;
 
-                    printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", j, marker, src, src, dst,
-                           dst);
+        for (uint32_t i = 0; i < result->coverage[idx].num_addresses; i++) {
+            // printf("  Contract address: %s\n", result->coverage[idx].addresses[i]);
 
-                    if (src == ENTER_MARKER_XOR) {
-                        printf(" (ENTER)\n");
-                    } else if (dst == REVERT_MARKER_XOR) {
-                        printf(" (REVERT)\n");
-                    } else if (dst == RETURN_MARKER_XOR) {
-                        printf(" (RETURN)\n");
-                    } else {
-                        printf(" (JUMP)\n");
-                    }
-                }
+            // Add address and marker count to hash
+            // marker_hash << result->coverage[idx].addresses[i] << ":" <<
+            // result->coverage[idx].branch_coverage_lengths[i]
+            //             << ";";
+
+            // Print each marker in a similar format to Go's debug output
+            for (uint32_t j = 0; j < result->coverage[idx].branch_coverage_lengths[i]; j++) {
+                uint64_t marker = result->coverage[idx].branch_coverage[i][j];
+                uint32_t src = marker >> 32;
+                uint32_t dst = marker & 0xFFFFFFFF;
+
+                // Add marker to hash
+                marker_hash << std::hex << "0x" << std::setw(16) << std::setfill('0') << marker << std::dec << ",";
+
+                // printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", j, marker, src, src, dst,
+                //        dst);
+
+                // if (src == ENTER_MARKER_XOR) {
+                //     printf(" (ENTER)\n");
+                // } else if (dst == REVERT_MARKER_XOR) {
+                //     printf(" (REVERT)\n");
+                // } else if (dst == RETURN_MARKER_XOR) {
+                //     printf(" (RETURN)\n");
+                // } else {
+                //     printf(" (JUMP)\n");
+                // }
             }
         }
-    */
+
+        // Check if this marker pattern is new
+        std::string pattern_key = marker_hash.str();
+        if (unique_marker_patterns.find(pattern_key) == unique_marker_patterns.end()) {
+            // First time seeing this pattern
+            printf("NEW UNIQUE MARKER PATTERN at idx %u\n", idx);
+            printf("pattern_key: %s\n", pattern_key.c_str());
+            unique_marker_patterns[pattern_key] = std::vector<uint32_t>{idx};
+        } else {
+            // Pattern seen before
+            unique_marker_patterns[pattern_key].push_back(idx);
+        }
+    }
+
     // Clean up trace data
     delete[] trace_data;
 
     return result;
 }
+void free_simplified_gpu_result(SimplifiedGPUResultC* result) {
+    // TODO: Implement this
+    // if (result == nullptr || result->allocations_valid == 0) return;
 
+    // free_gpu_execution_results(result->results);
+}
 void free_gpu_execution_results(GPUExecutionResultC* result) {
     if (result == nullptr || result->allocations_valid == 0) return;
 

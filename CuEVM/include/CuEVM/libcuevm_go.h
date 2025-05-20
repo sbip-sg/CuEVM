@@ -73,6 +73,19 @@ typedef struct {
     uint8_t allocations_valid;    /**< Track if allocations are valid (1) or freed (0) */
 } GPUExecutionResultC;
 
+typedef struct {
+    uint32_t* new_coverage_idx; /**< Array of new coverage indices */
+    uint32_t num_new_coverage;  /**< Number of new coverage entries for each batch, size is tx_sequence size*/
+    uint32_t* new_bug_idx;      /**< Array of new bug indices */
+    uint32_t* new_bug_pc;       /**< Array of new bug PCs */
+    uint32_t num_new_bugs;      /**< Number of new bug entries for each batch, size is tx_sequence size*/
+} SimplifiedGPUResultSingleBatchC;
+
+typedef struct {
+    SimplifiedGPUResultSingleBatchC* results;
+    uint32_t num_results;
+} SimplifiedGPUResultC;
+
 /**
  * @brief Run the EVM interpreter from a JSON input (deprecated).
  *
@@ -101,12 +114,12 @@ int run_interpreter_go(const char* json_input, unsigned int skip_trace_parsing, 
  * @param[in] dataSizes Array of sizes for each transaction's call data
  * @param[in] txBatchCount Number of transactions in each batch
  * @param[in] sequenceLength Length of each sequence of transactions
- * @return GPUExecutionResultC* Pointer to the execution results structure
+ * @return SimplifiedGPUResultC* Pointer to the execution results structure
  */
-GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
-                                                const unsigned char* values, const unsigned char* callData,
-                                                int callDataLen, const uint32_t* dataOffsets, const uint32_t* dataSizes,
-                                                int txBatchCount, int sequenceLength);
+SimplifiedGPUResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
+                                                 const unsigned char* values, const unsigned char* callData,
+                                                 int callDataLen, const uint32_t* dataOffsets,
+                                                 const uint32_t* dataSizes, int txBatchCount, int sequenceLength);
 
 /**
  * @brief Process JSON state data on the GPU.
@@ -136,8 +149,26 @@ void reset_state_db();
  */
 GPUExecutionResultC* get_gpu_execution_results();
 
+/**
+ * @brief Get the results of the most recent GPU execution.
+ *
+ * Retrieves execution results, including return data and code coverage information.
+ *
+ * @return SimplifiedGPUExecutionResultC* Pointer to the execution results structure
+ */
+void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result);
 // // Function to free GPU execution results
 // void free_gpu_execution_results(GPUExecutionResultC* result);
+
+/**
+ * @brief Free the memory allocated for a SimplifiedGPUResultC structure.
+ *
+ * This function frees the memory allocated for a SimplifiedGPUResultC structure,
+ * including the arrays and the structure itself.
+ *
+ * @param[in] result Pointer to the SimplifiedGPUResultC structure to be freed
+ */
+void free_simplified_gpu_result(SimplifiedGPUResultC* result);
 
 #ifdef __cplusplus
 }

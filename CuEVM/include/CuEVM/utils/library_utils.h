@@ -23,6 +23,24 @@
 namespace CuEVM {
 using CuEVM::transaction::TransactionList;
 
+// #ifdef BUILD_GO_LIBRARY
+// Constants
+constexpr CONSTANT uint32_t BITMAP_SIZE_IN_BITS = 262144;                    // 2^18 bits, ~32 KB
+constexpr CONSTANT uint32_t BITMAP_SIZE_IN_INTS = BITMAP_SIZE_IN_BITS / 32;  // 8192 unsigned ints
+constexpr CONSTANT uint32_t MAX_NEW_BRANCHES = 5000;
+constexpr CONSTANT uint32_t MAX_NEW_BUGS = 100;
+extern __device__ uint32_t* g_coverage_bitmap;
+extern __device__ uint32_t* g_new_coverage_bitmap;  // for each thread to set a flag if they encounter a new branch or a
+                                                    // bug (interesting)
+extern __device__ uint32_t* g_new_coverage_idx;
+extern __device__ uint32_t* g_new_coverage_count;
+// for bug detection tracking
+extern __device__ uint32_t* g_new_bug_idx;
+extern __device__ uint32_t* g_new_bug_pc;
+extern __device__ uint32_t* g_new_bug_count;
+
+// Max new branches to record per execution
+// #endif
 /**
  * @brief Structure for serialized world state data transfer between host and device.
  *
@@ -126,6 +144,12 @@ struct simplified_trace_data {
     evm_word_t last_distance;  // use to track branch distance by comparison opcodes
 
     /**
+     * @brief Check if coverage exists.
+     * @return True if coverage exists, false otherwise.
+     */
+    __device__ void update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug = false);
+
+    /**
      * @brief Begin recording an operation in the trace.
      * @param[in] pc The program counter.
      * @param[in] op The operation code.
@@ -181,6 +205,11 @@ struct simplified_trace_data {
      */
     __device__ void print();
 };
+
+/**
+ * @brief Finalize the coverage bitmap.
+ */
+__device__ void finalize_coverage_bitmap();
 
 /**
  * @brief Global serialized world state data.
