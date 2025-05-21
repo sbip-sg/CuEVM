@@ -73,9 +73,9 @@ __device__ void simplified_trace_data::update_coverage_bitmap(uint32_t pc_src, u
         int bitmap_idx = INSTANCE_GLOBAL_IDX / 32;
         int bit_pos = INSTANCE_GLOBAL_IDX % 32;
         atomicOr(&g_new_coverage_bitmap[bitmap_idx], 1 << bit_pos);
-        printf("thread %d bitmap_idx %d bit_pos %d  new branch or bug \n", threadIdx.x, bitmap_idx, bit_pos);
+        // printf("thread %d bitmap_idx %d bit_pos %d  new branch or bug \n", INSTANCE_GLOBAL_IDX, bitmap_idx, bit_pos);
         if (is_bug) {
-            printf("thread %d is bug, add to bug list \n", threadIdx.x);
+            // printf("thread %d is bug, add to bug list \n", threadIdx.x);
             int idx = atomicAdd(g_new_bug_count, 1);
             if (idx < CuEVM::MAX_NEW_BUGS) {
                 g_new_bug_idx[idx] = INSTANCE_GLOBAL_IDX;

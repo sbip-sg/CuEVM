@@ -516,9 +516,9 @@ SimplifiedGPUResultC* process_batch_transactions(const unsigned char* fromAddr, 
             printf("current_idx: %u, current_calldata_offset: %u, callDataLen: %u\n", current_idx,
                    current_calldata_offset, callDataLen);
             // Create and transfer transaction list to GPU
-            auto d_transaction_list_ptrs =
-                create_transaction_list(fromAddr, toAddr, values, callData + current_calldata_offset, callDataLen,
-                                        dataOffsets, txBatchCount, dataSizes, txBatchCount, txBatchCount);
+            auto d_transaction_list_ptrs = create_transaction_list(
+                fromAddr, toAddr, values, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
+                txBatchCount, dataSizes + current_idx, txBatchCount, txBatchCount);
 
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call
@@ -744,12 +744,12 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
                     result->new_coverage_idx[coverage_offset + j] += i * g_num_instances_per_device;
                 }
             }
-
+#ifdef DEBUG
             // Debug output
-            for (uint32_t j = 0; j < coverage_counts[i]; j++) {
-                printf("GPU %d: new_branches[%d]: %d\n", i, j, result->new_coverage_idx[coverage_offset + j]);
-            }
-
+            // for (uint32_t j = 0; j < coverage_counts[i]; j++) {
+            //     printf("GPU %d: new_branches[%d]: %d\n", i, j, result->new_coverage_idx[coverage_offset + j]);
+            // }
+#endif
             coverage_offset += coverage_counts[i];
         }
 
@@ -773,16 +773,17 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
             }
 
             // Debug output
+#ifdef DEBUG
             for (uint32_t j = 0; j < bug_counts[i]; j++) {
                 printf("GPU %d: new_bugs[%d]: idx=%d, pc=%d\n", i, j, result->new_bug_idx[bug_offset + j],
                        result->new_bug_pc[bug_offset + j]);
             }
-
+#endif
             bug_offset += bug_counts[i];
         }
     }
 
-    printf("Finished merging coverage data from all GPUs\n");
+    // printf("Finished merging coverage data from all GPUs\n");
 }
 
 // For debugging, tracking unique marker patterns
