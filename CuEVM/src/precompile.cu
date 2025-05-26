@@ -354,10 +354,12 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
     gas_used += GAS_PRECOMPILE_ECRECOVER;
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+#ifdef DEBUG
     printf("has gas %d\n", error_code);
     printf("gas limit %ld\n", gas_limit);
     printf("gas used %ld\n", gas_used);
     printf("data size %d\n", call_context->call_data_size);
+#endif
 
     if (error_code == ERROR_SUCCESS) {
         // complete with zeroes the remaing bytes
@@ -377,6 +379,7 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
         signature->r = r;
         signature->s = s;
         signature->v = uint256_get_uint32_t(&v);
+#ifdef DEBUG
         printf("Sig.s \n");
         signature->s.print();
         printf("Sig.r \n");
@@ -384,16 +387,24 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
         printf("v %d\n", signature->v);
         printf("msg_hash \n");
         signature->msg_hash.print();
-
+#endif
         // TODO: is not 27 and 28, only?
         if (signature->v == 28 || signature->v == 27) {
             uint8_t *output = new uint8_t[32];
+#ifdef BUILD_GO_LIBRARY
+            // bypass fuzzing mode
+            // TODO: make it configurable
+            size_t res = ERROR_SUCCESS;
+#else
             size_t res = ecc::ec_recover(constants, signature, &signer);
+#endif
 
             if (res == ERROR_SUCCESS) {
                 uint256_to_bytes(output, &signer, 32);
+#ifdef DEBUG
                 printf("signer \n");
                 signer.print();
+#endif
                 error_code = ERROR_RETURN;
                 call_context->set_parent_return_data(output, 32);
             } else {
@@ -415,7 +426,7 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
 
 __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
                                    CuEVM::evm_call_context_t *call_context) {
-    printf("ecAdd\n");
+
     int32_t error_code = ERROR_SUCCESS;
     gas_used += GAS_PRECOMPILE_ECADD;
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
@@ -429,13 +440,15 @@ __device__ int32_t operation_ecAdd(CuEVM::EccConstants *constants, CuEVM::gas_t 
         uint256_from_bytes(&y1, input + 32, 32);
         uint256_from_bytes(&x2, input + 64, 32);
         uint256_from_bytes(&y2, input + 96, 32);
-        // print
-        // printf("x1: %s\n", ecc::bnt_to_string(arith._env, x1));
-        // printf("y1: %s\n", ecc::bnt_to_string(arith._env, y1));
-        // printf("x2: %s\n", ecc::bnt_to_string(arith._env, x2));
-        // printf("y2: %s\n", ecc::bnt_to_string(arith._env, y2));
+
         uint8_t *output = new uint8_t[64];
+#ifdef BUILD_GO_LIBRARY
+        // bypass fuzzing mode
+        // TODO: make it configurable
+        int res = 0;
+#else
         int res = ecc::ec_add(constants->alt_BN128, &x1, &y1, &x1, &y1, &x2, &y2);
+#endif
         if (res == 0) {
             uint256_to_bytes(output, &x1, 32);
             uint256_to_bytes(output + 32, &y1, 32);
@@ -466,16 +479,16 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t 
         uint256_from_bytes(&x, input, 32);
         uint256_from_bytes(&y, input + 32, 32);
         uint256_from_bytes(&k, input + 64, 32);
-        // print
-        // printf("mul x: %s\n", ecc::bnt_to_string(arith._env, x));
-        // printf("mul y: %s\n", ecc::bnt_to_string(arith._env, y));
-        // printf("k: %s\n", ecc::bnt_to_string(arith._env, k));
 
         uint8_t *output = new uint8_t[64];
+#ifdef BUILD_GO_LIBRARY
+        // bypass fuzzing mode
+        // TODO: make it configurable
+        int res = 0;
+#else
         int res = ecc::ec_mul(constants->alt_BN128, &x, &y, &x, &y, &k);
-        // print result
-        // printf("xres: %s\n", ecc::bnt_to_string(arith._env, x));
-        // printf("yres: %s\n", ecc::bnt_to_string(arith._env, y));
+#endif
+
         if (res == 0) {
             uint256_to_bytes(output, &x, 32);
             uint256_to_bytes(output + 32, &y, 32);
@@ -506,8 +519,13 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
             error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
         } else {
             // 0 inputs is valid and returns 1.
-            int res =
-                0;  // message->data->size == 0 ? 1 : ecc::pairing_multiple(constants, input.data, message->data->size);
+#ifdef BUILD_GO_LIBRARY
+            // bypass fuzzing mode
+            // TODO: make it configurable
+            int res = 0;
+#else
+            int res = ecc::pairing_multiple(constants, input.data, call_context->call_data_size);
+#endif
 
             printf("res: %d, idx %d \n", res, threadIdx.x);
 
