@@ -65,10 +65,13 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
-        uint8_t data[UINT256_BYTES];
+        // WARNING: Because of warp_cooperative_set, we need to allocate shared or global mem so other threads can access
+        // TODO: optimize later to shared memory if neccessary
+        uint8_t* data = new uint8_t[UINT256_BYTES];
         uint256_to_bytes(data, &value, UINT256_BYTES);
 
         error_code |= memory.set(data, UINT256_BYTES, memory_offset_u32, UINT256_BYTES);
+        delete[] data;
     }
     return error_code;
 }
