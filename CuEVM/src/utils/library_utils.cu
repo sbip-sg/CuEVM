@@ -164,22 +164,38 @@ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t
         events[no_events].res = *stack_ptr.get_address_at_index(1);
     no_events++;
 }
-__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
+__device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
     assert(call_context_ptr != nullptr);
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
-    // printf("start call simplified trace data pc %d op %d\n", pc, message_call_ptr->call_type);
+    // printf("start call simplified trace data pc %d no calls %d\n", pc, no_calls);
     calls[no_calls].sender = call_context_ptr->from;
     calls[no_calls].receiver = call_context_ptr->to;
     calls[no_calls].pc = pc;
     calls[no_calls].op = call_context_ptr->call_type;
     calls[no_calls].value = call_context_ptr->value;
-
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
     calls[no_calls].last_pc = 0;
     no_calls++;
+    if (no_calls > MAX_RECURSION) {
+        // printf("\nThread %d: No calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
+        uint8_t loop_found = 0;
+        // loop back 10 calls and check if we found loops
+        for (int i = no_calls - 2; i >= no_calls - MAX_RECURSION; i--) {
+            if (calls[i].receiver == calls[no_calls - 1].receiver) {
+                loop_found++;
+            }
+        }
+        // printf("Thread %d: Loop found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
+
+        if (loop_found >= MAX_RECURSION / 2) {
+            // printf("\nThread %d: Reentrancy detected, loop_found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
+            return ERROR_REENTRANCY;
+        }
+    }
 #ifdef BUILD_GO_LIBRARY
+
     if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
     // add extra markers for entering call
     branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
@@ -188,6 +204,7 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     branches[no_branches].distance = 0;
     no_branches++;
 #endif
+    return ERROR_SUCCESS;
 }
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc) {
     if (no_calls > MAX_CALLS_TRACING) return;

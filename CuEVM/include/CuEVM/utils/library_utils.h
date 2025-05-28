@@ -70,9 +70,12 @@ struct serialized_worldstate_data {
 
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
-#define MAX_CALLS_TRACING 16
+#define MAX_CALLS_TRACING 32
 #define MAX_BRANCHES_TRACING 64  // only track the latest 64 branches
-
+// In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
+#define MAX_GAS_FUZZING 1000000
+// In fuzzing mode, Reentrancy is permitted and may be detected but will raise error flag after this amount
+#define MAX_RECURSION 8
 /**
  * @brief Structure for tracing simple EVM events.
  *
@@ -175,8 +178,9 @@ struct simplified_trace_data {
      * @brief Start recording a call operation.
      * @param[in] pc The program counter.
      * @param[in] call_context_ptr The call context pointer.
+     * @return The error code.
      */
-    __device__ void start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
+    __device__ int start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
 
     /**
      * @brief Complete recording a call operation.

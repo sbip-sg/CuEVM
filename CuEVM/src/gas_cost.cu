@@ -84,14 +84,14 @@ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
     //      msb = (exponent_bit_length_bn > 0) ? (exponent_bit_length_bn - 1) : 0
     // The adjusted exponent (i.e. iteration count) is then:
     //      adjusted_exponent = max(extra_exponent + msb, 1)
-
+#ifdef DEBUG
     printf("exponent_size ");
     print_uint256(&exponent_size);
     printf("exponent_bit_length_bn ");
     print_uint256(&exponent_bit_length_bn);
     printf("multiplication_complexity ");
     print_uint256(&multiplication_complexity);
-
+#endif
     evm_word_t extra_exponent = 0;
     const evm_word_t multiplier_for_extra = 8;
     if (uint256_cmp_word(&exponent_size, 32) > 0) {
@@ -113,9 +113,10 @@ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
         adjusted_exponent = 1;
     }
 
+#ifdef DEBUG
     printf("adjusted_exponent ");
     print_uint256(&adjusted_exponent);
-
+#endif
     // Compute dynamic gas cost using the EIP-198 formula:
     //      dynamic_gas = floor((multiplication_complexity * adjusted_exponent) / 3)
     // with a minimum cost of 200.
@@ -128,9 +129,10 @@ __device__ int32_t modexp_cost(gas_t &gas_used, const evm_word_t &exponent_size,
         dynamic_gas = 200;
     }
 
+#ifdef DEBUG
     printf("dynamic_gas ");
     print_uint256(&dynamic_gas);
-
+#endif
     gas_used += uint256_get_uint64_t(&dynamic_gas);
     return ERROR_SUCCESS;
 }

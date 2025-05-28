@@ -383,7 +383,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     // Use fixed gas limit for all transactions
     host_transaction_list->gas_limit = new uint64_t[txCount];
     for (int i = 0; i < txCount; i++) {
-        host_transaction_list->gas_limit[i] = 30000000;  // Fixed gas limit
+        host_transaction_list->gas_limit[i] = 1000000;  // Fixed gas limit
     }
 
     // Copy data offsets and sizes

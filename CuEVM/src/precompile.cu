@@ -113,6 +113,12 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
     uint256_from_bytes(&exponent_size, all_input_data + 32, 32);
     uint256_from_bytes(&modulus_size, all_input_data + 64, 32);
 
+#ifdef BUILD_GO_LIBRARY
+    // bypass fuzzing mode
+    // TODO: make it configurable or allow max exp len
+    return ERROR_RETURN;
+#endif
+
     int32_t error = ERROR_SUCCESS;
 
     uint32_t base_len, exp_len, mod_len, data_len;
@@ -145,22 +151,29 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 
     bool exp_is_zero = true;
 
-    printf("data len %d\n", data_len);
+    
 
-    // get a pointer to available bytes (call_exponent_size) of exponen
-    // send through call data the remaining bytes are consider
-    // 0 value bytes. The bytes of the call data are the most
-    // significant bytes of the exponent
+    // Safe allocation: ensure at least 1 byte to avoid malloc(0)
+    uint32_t safe_exp_len = (exp_len == 0) ? 1 : exp_len;
+    if (safe_exp_len > data_len) {
+        safe_exp_len = data_len;
+    }
+    uint8_t *e_data = new uint8_t[safe_exp_len];
 
-    uint8_t *e_data = new uint8_t[exp_len];
+    // Initialize with zeros if exp_len was 0
+    if (exp_len == 0) {
+        e_data[0] = 0;
+    }
 
     for (uint32_t i = 0; i < exp_len; i++) {
         uint32_t idx = 96 + base_len + i;
-
         if (idx < data_len) {
             e_data[i] = call_context->call_data[idx];
         } else {
-            e_data[i] = 0;
+            if (i < safe_exp_len)
+                e_data[i] = 0;
+            else
+                break;
         }
 
         if (e_data[i] != 0) {
@@ -207,13 +220,30 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 
     bool base_is_zero = true;
 
-    uint8_t *base_data = new uint8_t[base_len];
+    // Safe allocation for base_data
+    uint32_t safe_base_len = (base_len == 0) ? 1 : base_len;
+    // This is a safe condition to avoid large memory allocation
+    // To be checked with max gas limit and the max len supported.
+    // TODO: adjust by checking correctness with eth-tests
+    if (safe_base_len > data_len) {
+        safe_base_len = data_len;
+    }
+    uint8_t *base_data = new uint8_t[safe_base_len];
+
+    // Initialize with zeros if base_len was 0
+    if (base_len == 0) {
+        base_data[0] = 0;
+    }
+
     for (uint32_t i = 0; i < base_len; i++) {
         auto idx = 96 + i;
         if (idx < data_len) {
             base_data[i] = call_context->call_data[idx];
         } else {
-            base_data[i] = 0;
+            if (i < safe_base_len)
+                base_data[i] = 0;
+            else
+                break;
         }
 
         if (base_data[i] != 0) {
@@ -221,18 +251,32 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
         }
     }
 
-    if (error) {
-        return error;
+    // Safe allocation for mod_data
+    uint32_t safe_mod_len = (mod_len == 0) ? 1 : mod_len;
+    if (safe_mod_len > data_len) {
+        safe_mod_len = data_len;
+    }
+    uint8_t *mod_data = new uint8_t[safe_mod_len];
+
+    // Initialize with zeros if mod_len was 0
+    if (mod_len == 0) {
+        mod_data[0] = 0;
     }
 
-    // uint8_t *mod_data = new uint8_t[mod_len];
-    uint8_t *mod_data = new uint8_t[mod_len];
     // loop and check for zero, if zero, then return 0
     bool mod_is_one = true;
     bool mod_is_zero = true;
     for (uint32_t i = 0; i < mod_len; i++) {
         auto idx = 96 + base_len + exp_len + i;
-        mod_data[i] = (idx < data_len) ? call_context->call_data[idx] : 0;
+        // mod_data[i] = (idx < data_len) ? call_context->call_data[idx] : 0;
+        if (idx < data_len) {
+            mod_data[i] = call_context->call_data[idx];
+        } else {
+            if (i < safe_mod_len)
+                mod_data[i] = 0;
+            else
+                break;
+        }
 
         if (mod_data[i] != 0) {
             mod_is_zero = false;
@@ -243,29 +287,6 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
             mod_is_one = false;
         }
     }
-    // #ifdef __CUDA_ARCH__
-
-    //     printf("mod data\n");
-    //     for (int i = 0; i < mod_len; i++) {
-    //         printf("%d ", mod_data.data[i]);
-    //     }
-    //     printf("\n");
-    //     printf("base data\n");
-    //     for (int i = 0; i < base_len; i++) {
-    //         printf("%d ", base_data.data[i]);
-    //     }
-    //     printf("\n");
-    //     printf("exp data\n");
-    //     for (int i = 0; i < exp_len; i++) {
-    //         printf("%d ", e_data.data[i]);
-    //     }
-    //     printf("\n");
-
-    //     printf("thread idx %d mod_is_zero %d, base_is_zero %d, exp_is_zero %d, mod_is_one %d\n", threadIdx.x,
-    //     mod_is_zero,
-    //            base_is_zero, exp_is_zero, mod_is_one);
-    // #endif
-    // uint8_t result[32] = {0};
 
     // early return special cases
     if (mod_is_zero) {
@@ -525,7 +546,7 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
             int res = 1;
 #else
             // TODO: fix this
-            int res = 1; // ecc::pairing_multiple(constants, input.data, call_context->call_data_size);
+            int res = 1;  // ecc::pairing_multiple(constants, input.data, call_context->call_data_size);
 #endif
 
             printf("res: %d, idx %d \n", res, threadIdx.x);

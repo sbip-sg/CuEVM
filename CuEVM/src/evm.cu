@@ -136,7 +136,9 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 
     if (call_state_ptr->byte_code_size == 0) {
         if (call_state_ptr->to.is_precompile()) {
+#ifdef DEBUG
             printf("precompile %d \n", call_state_ptr->to.words[0]);
+#endif
             switch (call_state_ptr->to.words[0]) {
                 case 0x01:
                     return CuEVM::precompile_operations::operation_ecRecover(
@@ -242,6 +244,11 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         //     // }
         // }
 #endif
+
+        // printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+        //            cached_call_state.gas_limit, cached_call_state.gas_used);
 #ifdef BUILD_PYTHON_LIBRARY
         // comparison, arithmetic, revert/invalid
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
@@ -650,7 +657,8 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                 cached_call_state = cached_evm_call_context(call_state_ptr);
                 error_code = start_CALL(cached_call_state);
 #ifdef BUILD_LIBRARY
-                global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(call_state_ptr->parent->pc, call_state_ptr);
+                error_code =
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(call_state_ptr->parent->pc, call_state_ptr);
 #endif
             } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                 // Logic: when op_create or create2 does not succeed,
@@ -699,7 +707,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
     gas_t gas_value;
     const evm_word_t *beneficiary = &(global_block_info->coin_base);
     // block_info_ptr->get_coin_base(beneficiary);
-    // printf("CuEVM Debug: finish_TRANSACTION error_code %d\n", error_code);
+    // printf("CuEVM Debug: thread %d finish_TRANSACTION error_code %d\n", INSTANCE_GLOBAL_IDX, error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         gas_t gas_left;
         // \f$T_{g} - g\f$
