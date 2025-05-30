@@ -13,7 +13,7 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     if (instance >= count) return;
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef DEBUG
-    if (THREADIDX == 1) transaction_list_ptr->print();
+    if (instance == 1) transaction_list_ptr->print();
 #endif
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
     evm.run(cached_call_state, copy_state_data);
@@ -55,14 +55,19 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
 
     CuEVM::evm_memory_t *memory_ptr = memory_pool::get_memory(0);
 
+#ifdef BUILD_GO_LIBRARY
+    evm_word_t* sender = &transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX];
+#else
+    evm_word_t* sender = &transaction_list_ptr->sender;
+#endif
     int32_t bytecode_offset = -1;
 
     // new CuEVM::evm_memory_t();  // memory_pool::global_memory_pool->get_memory(threadIdx.x);
     if (transaction_list_ptr->type == SPECIAL_CREATE_TRANSACTION_TYPE) {
-        uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(&transaction_list_ptr->sender);
+        uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(sender);
         evm_word_t sender_nonce(sender_nonce_uint);
 
-        CuEVM::utils::get_contract_address_create(&transaction_list_ptr->to, &transaction_list_ptr->sender,
+        CuEVM::utils::get_contract_address_create(&transaction_list_ptr->to, sender,
                                                   &sender_nonce);
         // special case ? Tests allow create to acc with storage
         // TODO: simplify this
@@ -74,7 +79,7 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         }
 
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
-                                        transaction_list_ptr->sender, transaction_list_ptr->to,
+                                        *sender, transaction_list_ptr->to,
                                         transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
                                         OP_CREATE, call_data, call_data_size, call_data, call_data_size,
                                         bytecode_offset);
@@ -83,7 +88,7 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         bytecode_offset = find_global_bytecode_offset(&transaction_list_ptr->to);
 
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
-                                        transaction_list_ptr->sender, transaction_list_ptr->to,
+                                        *sender, transaction_list_ptr->to,
                                         transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
                                         OP_CALL, call_data, call_data_size, byte_code, byte_code_size, bytecode_offset);
     }
@@ -95,7 +100,7 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
     evm_word_t upfront_cost = transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX];
 
     uint256_mul(&upfront_cost, &upfront_cost, &transaction_list_ptr->gas_price);
-    global_state_db_ptr->deduct_balance_sender(&transaction_list_ptr->sender, &upfront_cost);
+    global_state_db_ptr->deduct_balance_sender(sender, &upfront_cost);
 
 #ifdef EIP_3155
     this->tracer_ptr = new CuEVM::utils::tracer_t();

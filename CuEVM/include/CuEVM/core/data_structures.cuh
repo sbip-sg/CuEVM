@@ -147,7 +147,12 @@ class TransactionList {
     uint32_t size;
     // shared among all transactions (eth-tests)
     evm_word_t nonce;
+    // allow different sender in fuzzing mode
+#ifdef BUILD_GO_LIBRARY
+    evm_word_t *sender;
+#else
     evm_word_t sender;
+#endif
     evm_word_t to;
     evm_word_t max_fee_per_gas;
     evm_word_t max_priority_fee_per_gas;

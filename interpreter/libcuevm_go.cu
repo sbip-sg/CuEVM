@@ -380,6 +380,11 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     host_transaction_list->call_data_offset = new uint32_t[txCount];
     host_transaction_list->call_data_size = new uint32_t[txCount];
 
+#ifdef BUILD_GO_LIBRARY
+    // Allocate memory for sender array when using GO library
+    host_transaction_list->sender = new evm_word_t[txCount];
+#endif
+
     // Use fixed gas limit for all transactions
     host_transaction_list->gas_limit = new uint64_t[txCount];
     for (int i = 0; i < txCount; i++) {
@@ -390,8 +395,12 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     memcpy(host_transaction_list->call_data_offset, dataOffsets, txCount * sizeof(uint32_t));
     memcpy(host_transaction_list->call_data_size, dataSizes, txCount * sizeof(uint32_t));
 
-    // Handle sender (common for all transactions)
+
+
+#ifndef BUILD_GO_LIBRARY
+    // Handle single sender (common for all transactions)
     uint256_from_bytes(&host_transaction_list->sender, fromAddr, 32);
+#endif
 
     // Handle recipient (common for all transactions)
     uint256_from_bytes(&host_transaction_list->to, toAddr, 32);
@@ -402,6 +411,9 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 
     // Handle values for each transaction
     for (int i = 0; i < txCount; i++) {
+        #ifdef BUILD_GO_LIBRARY
+        uint256_from_bytes(&host_transaction_list->sender[i], &fromAddr[i * 32], 32);
+        #endif 
         uint256_from_bytes(&host_transaction_list->value[i], &values[i * 32], 32);
     }
 
@@ -433,6 +445,11 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_offset, transaction_per_gpu * sizeof(uint32_t)));
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_size, transaction_per_gpu * sizeof(uint32_t)));
 
+#ifdef BUILD_GO_LIBRARY
+        // Allocate GPU memory for sender array
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->sender, transaction_per_gpu * sizeof(evm_word_t)));
+#endif
+
         // Allocate GPU memory for call data if needed
         if (callDataLen > 0) {
             CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data, callDataLen * sizeof(uint8_t)));
@@ -453,6 +470,13 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
                               host_transaction_list->call_data_size + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
+#ifdef BUILD_GO_LIBRARY
+        // Copy sender array from host to GPU
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->sender,
+                              host_transaction_list->sender + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+#endif
+
         // Allocate memory for the transaction list on GPU and copy the structure
         CUDA_CHECK(cudaMalloc(&d_transaction_list_ptr, sizeof(CuEVM::transaction::TransactionList)));
         CUDA_CHECK(cudaMemcpy(d_transaction_list_ptr, temp_transaction_list,
@@ -460,6 +484,9 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 
         // printf("Transaction batch prepared for GPU\n");
         // host_transaction_list->print();
+
+        // Clean up temporary transaction list
+        delete temp_transaction_list;
 
         // trace and serialized state data
         // Simplified trace data
@@ -476,6 +503,9 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     delete[] host_transaction_list->value;
     delete[] host_transaction_list->call_data_offset;
     delete[] host_transaction_list->call_data_size;
+#ifdef BUILD_GO_LIBRARY
+    delete[] host_transaction_list->sender;
+#endif
     if (host_transaction_list->call_data != nullptr) {
         delete[] host_transaction_list->call_data;
     }

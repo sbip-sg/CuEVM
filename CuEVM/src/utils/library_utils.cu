@@ -285,6 +285,12 @@ void freeTransactionList(TransactionList* d_transaction_list_ptr) {
     if (temp_list.call_data_size != nullptr) {
         CUDA_CHECK(cudaFree(temp_list.call_data_size));
     }
+#ifdef BUILD_GO_LIBRARY
+    // Free sender array when using GO library
+    if (temp_list.sender != nullptr) {
+        CUDA_CHECK(cudaFree(temp_list.sender));
+    }
+#endif
 
     // Finally free the TransactionList itself
     CUDA_CHECK(cudaFree(d_transaction_list_ptr));
