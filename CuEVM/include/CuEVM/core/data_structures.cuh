@@ -166,6 +166,11 @@ class TransactionList {
     uint32_t *call_data_size;
     // TODO: access list
 
+    // different for each transaction (go library)
+#ifdef BUILD_GO_LIBRARY
+    gas_t *block_number;
+    gas_t *time_stamp;
+#endif
     __host__ __device__ void print();
 };
 }  // namespace transaction

@@ -39,18 +39,6 @@ extern "C" {
 using namespace CuEVM;
 // Process state data on GPU - initialize StateDB and print data
 
-// In the future, we would implement the run_interpreter_go function similar to run_interpreter_pyobject
-// For now, just a placeholder that increments the counter and returns success
-int run_interpreter_go(const char* json_input, uint32_t skip_trace_parsing, uint32_t copy_state_data,
-                       uint32_t reuse_state_data) {
-    printf("run_interpreter_go configuration skip_trace_parsing: %d, copy_state_data: %d, reuse_state_data: %d\n",
-           skip_trace_parsing, copy_state_data, reuse_state_data);
-
-    // This is where we would process the JSON input and run the CUDA kernel
-    // For now, just return success
-    return 0;
-}
-
 int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state) {
     // Reset counter when new state is processed and reset_state is true
     if (reset_state) {
@@ -368,7 +356,7 @@ void print_evm_instances_results(bool copy_state_data) {
 // Creates transaction list on both host and device
 
 std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
-    const unsigned char* fromAddr, const unsigned char* toAddr, const unsigned char* values,
+    const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr, const unsigned char* values,
     const unsigned char* callData, int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
     const uint32_t* dataSizes, int dataSizesLen, int txCount) {
     // Create TransactionList on host
@@ -383,6 +371,8 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 #ifdef BUILD_GO_LIBRARY
     // Allocate memory for sender array when using GO library
     host_transaction_list->sender = new evm_word_t[txCount];
+    host_transaction_list->block_number = new uint64_t[txCount];
+    host_transaction_list->time_stamp = new uint64_t[txCount];
 #endif
 
     // Use fixed gas limit for all transactions
@@ -394,8 +384,11 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     // Copy data offsets and sizes
     memcpy(host_transaction_list->call_data_offset, dataOffsets, txCount * sizeof(uint32_t));
     memcpy(host_transaction_list->call_data_size, dataSizes, txCount * sizeof(uint32_t));
-
-
+#ifdef BUILD_GO_LIBRARY
+    memcpy(host_transaction_list->block_number, blockNumber, txCount * sizeof(uint64_t));
+    memcpy(host_transaction_list->time_stamp, timeStamp, txCount * sizeof(uint64_t));
+#endif
+    // TODO optimize this pattern (set pointers directly)
 
 #ifndef BUILD_GO_LIBRARY
     // Handle single sender (common for all transactions)
@@ -448,6 +441,8 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 #ifdef BUILD_GO_LIBRARY
         // Allocate GPU memory for sender array
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->sender, transaction_per_gpu * sizeof(evm_word_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->block_number, transaction_per_gpu * sizeof(uint64_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
 #endif
 
         // Allocate GPU memory for call data if needed
@@ -475,6 +470,12 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->sender,
                               host_transaction_list->sender + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->block_number,
+                              host_transaction_list->block_number + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->time_stamp,
+                              host_transaction_list->time_stamp + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
 #endif
 
         // Allocate memory for the transaction list on GPU and copy the structure
@@ -482,8 +483,6 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         CUDA_CHECK(cudaMemcpy(d_transaction_list_ptr, temp_transaction_list,
                               sizeof(CuEVM::transaction::TransactionList), cudaMemcpyHostToDevice));
 
-        // printf("Transaction batch prepared for GPU\n");
-        // host_transaction_list->print();
 
         // Clean up temporary transaction list
         delete temp_transaction_list;
@@ -505,6 +504,8 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     delete[] host_transaction_list->call_data_size;
 #ifdef BUILD_GO_LIBRARY
     delete[] host_transaction_list->sender;
+    delete[] host_transaction_list->block_number;
+    delete[] host_transaction_list->time_stamp;
 #endif
     if (host_transaction_list->call_data != nullptr) {
         delete[] host_transaction_list->call_data;
@@ -514,7 +515,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 }
 
 // Simplified batch transaction processing with single from/to address
-SimplifiedGPUResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
+SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
                                                  const unsigned char* values, const unsigned char* callData,
                                                  int callDataLen, const uint32_t* dataOffsets,
                                                  const uint32_t* dataSizes, int txBatchCount, int sequenceLength) {
@@ -546,10 +547,13 @@ SimplifiedGPUResultC* process_batch_transactions(const unsigned char* fromAddr, 
             printf("current_idx: %u, current_calldata_offset: %u, callDataLen: %u\n", current_idx,
                    current_calldata_offset, callDataLen);
             // Create and transfer transaction list to GPU
+    
+            const unsigned char* newFromAddr = fromAddr + 32 * current_idx;
             auto d_transaction_list_ptrs = create_transaction_list(
-                fromAddr, toAddr, values, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
+                blockNumber + current_idx, timeStamp + current_idx,
+                newFromAddr, toAddr, values, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
                 txBatchCount, dataSizes + current_idx, txBatchCount, txBatchCount);
-
+   
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call
             if (call_counter == 0)
@@ -776,9 +780,9 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
             }
 #ifdef DEBUG
             // Debug output
-            // for (uint32_t j = 0; j < coverage_counts[i]; j++) {
-            //     printf("GPU %d: new_branches[%d]: %d\n", i, j, result->new_coverage_idx[coverage_offset + j]);
-            // }
+            for (uint32_t j = 0; j < coverage_counts[i]; j++) {
+                printf("GPU %d: new_branches[%d]: %d\n", i, j, result->new_coverage_idx[coverage_offset + j]);
+            }
 #endif
             coverage_offset += coverage_counts[i];
         }

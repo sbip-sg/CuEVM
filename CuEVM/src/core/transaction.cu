@@ -32,6 +32,8 @@ __host__ __device__ void TransactionList::print() {
         #ifdef BUILD_GO_LIBRARY
         printf("sender[%d]: ", i);
         sender[i].print();
+        printf("block_number[%d]: %lu\n", i, block_number[i]);
+        printf("time_stamp[%d]: %lu\n", i, time_stamp[i]);
         #endif
         printf("gas_limit[%d]: %lu\n", i, gas_limit[i]);
         printf("call_data_offset[%d]: %d\n", i, call_data_offset[i]);

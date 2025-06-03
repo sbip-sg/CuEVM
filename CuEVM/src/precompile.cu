@@ -409,23 +409,30 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
         printf("msg_hash \n");
         signature->msg_hash.print();
 #endif
+#ifdef BUILD_GO_LIBRARY
+        // bypass fuzzing mode
+        // TODO: make it configurable
+        if (signature->v % 2 == 0) {
+            uint8_t *output = new uint8_t[32];
+
+            size_t res = ERROR_SUCCESS;
+            if (call_context->parent != nullptr) {
+                signer = call_context->parent->from;
+            }
+#else
         // TODO: is not 27 and 28, only?
         if (signature->v == 28 || signature->v == 27) {
             uint8_t *output = new uint8_t[32];
-#ifdef BUILD_GO_LIBRARY
-            // bypass fuzzing mode
-            // TODO: make it configurable
-            size_t res = ERROR_SUCCESS;
-            signer = call_context->from;
-#else
             size_t res = ecc::ec_recover(constants, signature, &signer);
 #endif
 
             if (res == ERROR_SUCCESS) {
                 uint256_to_bytes(output, &signer, 32);
 #ifdef DEBUG
-                printf("signer \n");
+            if (threadIdx.x == 0) {
+                printf(" THREAD %d signer \n", threadIdx.x);
                 signer.print();
+            }
 #endif
                 error_code = ERROR_RETURN;
                 call_context->set_parent_return_data(output, 32);

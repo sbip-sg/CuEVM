@@ -7,9 +7,9 @@ __device__ block_info_t::block_info_t() {
     coin_base.from_uint32_t(0);
     difficulty.from_uint32_t(0);
     prevrandao.from_uint32_t(0);
-    number.from_uint32_t(0);
+    number = 0;
     gas_limit.from_uint32_t(0);
-    time_stamp.from_uint32_t(0);
+    time_stamp = 0;
     base_fee.from_uint32_t(0);
     chain_id.from_uint32_t(0);
     for (size_t idx = 0; idx < 256; idx++) {
@@ -32,12 +32,14 @@ __host__ int32_t block_info_t::from_json(const cJSON *json) {
 
     element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentCoinbase");
     coin_base.from_hex(element_json->valuestring);
-
+    evm_word_t temp_value;
     element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentTimestamp");
-    time_stamp.from_hex(element_json->valuestring);
+    temp_value.from_hex(element_json->valuestring);
+    time_stamp = uint256_get_uint64_t(&temp_value);
 
     element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentNumber");
-    number.from_hex(element_json->valuestring);
+    temp_value.from_hex(element_json->valuestring);
+    number = uint256_get_uint64_t(&temp_value);
 
     element_json = cJSON_GetObjectItemCaseSensitive(block_json, "currentDifficulty");
     difficulty.from_hex(element_json->valuestring);
@@ -94,7 +96,7 @@ __host__ int32_t block_info_t::from_json(const cJSON *json) {
 
 __device__ int32_t block_info_t::get_previous_hash(evm_word_t &previous_hash, const evm_word_t &previous_number) const {
     uint32_t idx = 0;
-    uint32_t number_uint = this->number.get_uint32_t();
+    uint32_t number_uint = this->number;
     uint32_t previous_number_uint = previous_number.get_uint32_t();
     // if the rquest number is greater than the current block number
     if (number_uint < previous_number_uint) {
@@ -118,10 +120,8 @@ __device__ void block_info_t::print() const {
     printf("BLOCK: \n");
     printf("COINBASE: ");
     coin_base.print();
-    printf("TIMESTAMP: ");
-    time_stamp.print();
-    printf("NUMBER: ");
-    number.print();
+    printf("TIMESTAMP: %d\n", time_stamp);
+    printf("NUMBER: %d\n", number);
     printf("DIFICULTY: ");
     difficulty.print();
     printf("GASLIMIT: ");
@@ -143,59 +143,6 @@ __device__ void block_info_t::print() const {
     }
 }
 
-__host__ cJSON *block_info_t::to_json() const {
-    uint32_t idx = 0;
-    char *hex_string_ptr = new char[CuEVM::word_size * 2 + 3];
-    cJSON *block_json = nullptr;
-    cJSON *previous_blocks_json = nullptr;
-    cJSON *previous_block_json = nullptr;
-
-    block_json = cJSON_CreateObject();
-
-    hex_string_ptr = coin_base.to_hex(hex_string_ptr, 0, 5);
-    cJSON_AddStringToObject(block_json, "currentCoinbase", hex_string_ptr);
-
-    hex_string_ptr = time_stamp.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(block_json, "currentTimestamp", hex_string_ptr);
-
-    hex_string_ptr = number.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(block_json, "currentNumber", hex_string_ptr);
-
-    hex_string_ptr = difficulty.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(block_json, "currentDifficulty", hex_string_ptr);
-
-    hex_string_ptr = prevrandao.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(block_json, "currentGasLimit", hex_string_ptr);
-
-    hex_string_ptr = gas_limit.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(block_json, "currentChainId", hex_string_ptr);
-
-    hex_string_ptr = base_fee.to_hex(hex_string_ptr);
-    cJSON_AddStringToObject(block_json, "currentBaseFee", hex_string_ptr);
-
-    previous_blocks_json = cJSON_CreateArray();
-    for (idx = 0; idx < 256; idx++) {
-        previous_block_json = cJSON_CreateObject();
-
-        hex_string_ptr = previous_blocks[idx].number.to_hex(hex_string_ptr);
-        cJSON_AddStringToObject(previous_block_json, "number", hex_string_ptr);
-
-        hex_string_ptr = previous_blocks[idx].hash.to_hex(hex_string_ptr);
-        cJSON_AddStringToObject(previous_block_json, "hash", hex_string_ptr);
-
-        cJSON_AddItemToArray(previous_blocks_json, previous_block_json);
-
-        if (previous_blocks[idx].number == 0) {
-            break;
-        }
-    }
-
-    cJSON_AddItemToObject(block_json, "previousHashes", previous_blocks_json);
-
-    delete[] hex_string_ptr;
-    hex_string_ptr = nullptr;
-    return block_json;
-}
 
 __host__ int32_t get_block_info(const cJSON *json) {
     // Create block info on host

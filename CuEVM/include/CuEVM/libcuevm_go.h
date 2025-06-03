@@ -86,25 +86,14 @@ typedef struct {
     uint32_t num_results;
 } SimplifiedGPUResultC;
 
-/**
- * @brief Run the EVM interpreter from a JSON input (deprecated).
- *
- * Executes transactions described in JSON format on the CuEVM engine.
- *
- * @param[in] json_input JSON string containing the transaction and state information
- * @param[in] skip_trace_parsing Flag to skip parsing trace output (1 to skip, 0 to parse)
- * @param[in] copy_state_data Flag to copy state data (1 to copy, 0 to not copy)
- * @param[in] reuse_state_data Flag to reuse state data from previous execution (1 to reuse, 0 for fresh state)
- * @return int Error code (0 for success, non-zero for error)
- */
-int run_interpreter_go(const char* json_input, unsigned int skip_trace_parsing, unsigned int copy_state_data,
-                       unsigned int reuse_state_data);
 
 /**
  * @brief Process a batch of transactions on the GPU.
  *
  * Executes multiple Ethereum transactions in parallel on the GPU.
  *
+ * @param[in] blockNumber Array of block numbers
+ * @param[in] timeStamp Array of timestamps
  * @param[in] fromAddr Array of sender addresses in byte format
  * @param[in] toAddr Array of recipient addresses in byte format
  * @param[in] values Array of transaction values
@@ -116,10 +105,12 @@ int run_interpreter_go(const char* json_input, unsigned int skip_trace_parsing, 
  * @param[in] sequenceLength Length of each sequence of transactions
  * @return SimplifiedGPUResultC* Pointer to the execution results structure
  */
-SimplifiedGPUResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
+ #ifdef BUILD_GO_LIBRARY
+SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
                                                  const unsigned char* values, const unsigned char* callData,
                                                  int callDataLen, const uint32_t* dataOffsets,
                                                  const uint32_t* dataSizes, int txBatchCount, int sequenceLength);
+#endif
 
 /**
  * @brief Process JSON state data on the GPU.
