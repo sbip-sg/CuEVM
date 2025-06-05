@@ -549,9 +549,10 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
             // Create and transfer transaction list to GPU
     
             const unsigned char* newFromAddr = fromAddr + 32 * current_idx;
+            const unsigned char* newValues = values + 32 * current_idx;
             auto d_transaction_list_ptrs = create_transaction_list(
                 blockNumber + current_idx, timeStamp + current_idx,
-                newFromAddr, toAddr, values, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
+                newFromAddr, toAddr, newValues, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
                 txBatchCount, dataSizes + current_idx, txBatchCount, txBatchCount);
    
             // Initialize memory pool using the globally stored account count

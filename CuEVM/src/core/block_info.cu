@@ -115,7 +115,7 @@ __device__ int32_t block_info_t::get_previous_hash(evm_word_t &previous_hash, co
     return ERROR_SUCCESS;
 }
 
-__device__ void block_info_t::print() const {
+__host__ __device__ void block_info_t::print() const {
     uint32_t idx = 0;
     printf("BLOCK: \n");
     printf("COINBASE: ");
