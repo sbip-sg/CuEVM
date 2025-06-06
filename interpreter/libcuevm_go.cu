@@ -125,6 +125,9 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         CUDA_CHECK(cudaSetDevice(i));
         CuEVM::get_block_info(stateJson);
     }
+
+    CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts, g_num_gpus);
+
     printf("Process json state GPU done, found %u accounts\n", g_num_accounts);
 
     call_counter = 0;
@@ -224,6 +227,7 @@ void reset_state_db() {
             printf("State DB reset error: pointers not initialized.\n");
         }
     }
+    CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
 }
 
 void print_evm_instances_results(bool copy_state_data) {
@@ -557,10 +561,6 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
    
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call
-            if (call_counter == 0)
-                CuEVM::memory_pool::create_memory_pool(g_num_instances_per_device, g_num_accounts, g_num_gpus);
-            else
-                CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
 
             // create new coverage tracking variables
             uint32_t* d_new_branches;
