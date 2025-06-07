@@ -8,7 +8,7 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
                         ,
                         simplified_trace_data *simplified_trace_data_ptr
 #endif
-                        ) {
+) {
     gas_used += GAS_MID;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
@@ -29,14 +29,15 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
                 return ERROR_INVALID_JUMP_DESTINATION;
             }
         } else {
-
-            auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
+            auto err =
+                CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
             if (err) {
                 return err;
             }
         }
 #ifdef BUILD_LIBRARY
         simplified_trace_data_ptr->record_branch(pc, destination_u32, 0);
+        if (gas_used > MAX_GAS_FUZZING) error_code = ERROR_OUT_OF_GAS;
 #endif
         pc = destination_u32 - 1;
     }
@@ -72,8 +73,9 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
                     (call_context->byte_code[destination_u32] != OP_JUMPDEST)) {
                     return ERROR_INVALID_JUMP_DESTINATION;
                 }
-            }else {
-                auto err = CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
+            } else {
+                auto err =
+                    CuEVM::global_state_db_ptr->global_jump_table->validate_jumpdest(bytecode_offset, destination_u32);
                 if (err) {
                     return err;
                 }
@@ -84,6 +86,7 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
         else {
             simplified_trace_data_ptr->record_branch(pc, pc + 1, destination_u32);
         }
+        if (gas_used > MAX_GAS_FUZZING) error_code = ERROR_OUT_OF_GAS;
 #endif
     }
     return error_code;

@@ -12,8 +12,10 @@ namespace transaction {
 __host__ __device__ void TransactionList::print() {
     printf("TransactionList:\n");
     printf("nonce: %lu\n", nonce);
+    #ifndef BUILD_GO_LIBRARY
     printf("sender: ");
     sender.print();
+    #endif
     printf("to: ");
     to.print();
     printf("max_fee_per_gas: ");
@@ -27,6 +29,12 @@ __host__ __device__ void TransactionList::print() {
     for (uint32_t i = 0; i < size; i++) {
         printf("value[%d]: ", i);
         value[i].print();
+        #ifdef BUILD_GO_LIBRARY
+        printf("sender[%d]: ", i);
+        sender[i].print();
+        printf("block_number[%d]: %lu\n", i, block_number[i]);
+        printf("time_stamp[%d]: %lu\n", i, time_stamp[i]);
+        #endif
         printf("gas_limit[%d]: %lu\n", i, gas_limit[i]);
         printf("call_data_offset[%d]: %d\n", i, call_data_offset[i]);
         printf("call_data_size[%d]: %d\n", i, call_data_size[i]);
@@ -51,6 +59,9 @@ __host__ uint32_t no_transactions(const cJSON *json) {
 
 __host__ int32_t get_transactions(std::vector<TransactionList *> &transaction_list_ptrs, const cJSON *json,
                                   uint32_t &transactions_count, uint32_t num_gpus, uint32_t clones) {
+#ifdef BUILD_GO_LIBRARY
+    return ERROR_SUCCESS;
+#else
     cJSON *transaction_json = cJSON_GetObjectItemCaseSensitive(json, "transaction");
     uint32_t available_transactions = no_transactions(json);
     transaction_list_ptrs.resize(num_gpus);
@@ -234,6 +245,7 @@ __host__ int32_t get_transactions(std::vector<TransactionList *> &transaction_li
     // delete transaction_list_ptr;
     // transaction_list_ptr = d_transaction_list_ptr;
     return ERROR_SUCCESS;
+#endif
 }
 
 }  // namespace transaction

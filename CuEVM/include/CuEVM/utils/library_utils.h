@@ -23,6 +23,24 @@
 namespace CuEVM {
 using CuEVM::transaction::TransactionList;
 
+// #ifdef BUILD_GO_LIBRARY
+// Constants
+constexpr CONSTANT uint32_t BITMAP_SIZE_IN_BITS = 262144;                    // 2^18 bits, ~32 KB
+constexpr CONSTANT uint32_t BITMAP_SIZE_IN_INTS = BITMAP_SIZE_IN_BITS / 32;  // 8192 unsigned ints
+constexpr CONSTANT uint32_t MAX_NEW_BRANCHES = 5000;
+constexpr CONSTANT uint32_t MAX_NEW_BUGS = 100;
+extern __device__ uint32_t* g_coverage_bitmap;
+extern __device__ uint32_t* g_new_coverage_bitmap;  // for each thread to set a flag if they encounter a new branch or a
+                                                    // bug (interesting)
+extern __device__ uint32_t* g_new_coverage_idx;
+extern __device__ uint32_t* g_new_coverage_count;
+// for bug detection tracking
+extern __device__ uint32_t* g_new_bug_idx;
+extern __device__ uint32_t* g_new_bug_pc;
+extern __device__ uint32_t* g_new_bug_count;
+
+// Max new branches to record per execution
+// #endif
 /**
  * @brief Structure for serialized world state data transfer between host and device.
  *
@@ -52,9 +70,12 @@ struct serialized_worldstate_data {
 
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
-#define MAX_CALLS_TRACING 16
+#define MAX_CALLS_TRACING 32
 #define MAX_BRANCHES_TRACING 64  // only track the latest 64 branches
-
+// In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
+#define MAX_GAS_FUZZING 1000000
+// In fuzzing mode, Reentrancy is permitted and may be detected but will raise error flag after this amount
+#define MAX_RECURSION 8
 /**
  * @brief Structure for tracing simple EVM events.
  *
@@ -126,6 +147,12 @@ struct simplified_trace_data {
     evm_word_t last_distance;  // use to track branch distance by comparison opcodes
 
     /**
+     * @brief Check if coverage exists.
+     * @return True if coverage exists, false otherwise.
+     */
+    __device__ void update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug = false);
+
+    /**
      * @brief Begin recording an operation in the trace.
      * @param[in] pc The program counter.
      * @param[in] op The operation code.
@@ -151,8 +178,9 @@ struct simplified_trace_data {
      * @brief Start recording a call operation.
      * @param[in] pc The program counter.
      * @param[in] call_context_ptr The call context pointer.
+     * @return The error code.
      */
-    __device__ void start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
+    __device__ int start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
 
     /**
      * @brief Complete recording a call operation.
@@ -181,6 +209,11 @@ struct simplified_trace_data {
      */
     __device__ void print();
 };
+
+/**
+ * @brief Finalize the coverage bitmap.
+ */
+__device__ void finalize_coverage_bitmap();
 
 /**
  * @brief Global serialized world state data.

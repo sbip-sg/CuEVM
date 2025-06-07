@@ -17,6 +17,14 @@
 
 namespace CuEVM {
 
+__device__ uint32_t* g_coverage_bitmap = nullptr;
+__device__ uint32_t* g_new_coverage_bitmap = nullptr;
+__device__ uint32_t* g_new_coverage_count = nullptr;
+__device__ uint32_t* g_new_coverage_idx = nullptr;
+__device__ uint32_t* g_new_bug_pc = nullptr;
+__device__ uint32_t* g_new_bug_count = nullptr;
+__device__ uint32_t* g_new_bug_idx = nullptr;
+
 __host__ void serialized_worldstate_data::print() {
     printf("\nPrinting serialized worldstate data\n");
     printf("no_accounts: %d\n", no_accounts);
@@ -33,6 +41,70 @@ __host__ void serialized_worldstate_data::print() {
     }
 }
 
+__device__ void simplified_trace_data::update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug) {
+    // printf("thread %d update_coverage_bitmap pc_src %u pc_dst %u\n", threadIdx.x, pc_src, pc_dst);
+    uint32_t branch_id = (static_cast<uint32_t>(pc_src) << 16) | pc_dst;
+    // printf("thread %d branch_id %x\n", threadIdx.x, branch_id);
+    uint32_t h1 = 2166136261U;
+    h1 = (h1 ^ (branch_id & 0xFF)) * 16777619U;
+    h1 = (h1 ^ ((branch_id >> 8) & 0xFF)) * 16777619U;
+    h1 = (h1 ^ ((branch_id >> 16) & 0xFF)) * 16777619U;
+    h1 = (h1 ^ (branch_id >> 24)) * 16777619U;
+
+    uint32_t h2 = (branch_id * 2654435761U) & 0xFFFFFFFF;
+    bool is_new = false;
+
+    // Double hashing for k=2
+    // TODO: double check
+    for (int i = 0; i < 2; ++i) {
+        uint32_t hash_i = (h1 + i * h2) & 0x3FFFF;  // 2^18 - 1
+        uint32_t index = hash_i >> 5;               // Divide by 32
+        uint32_t bit_pos = hash_i & 31;             // Modulo 32
+        unsigned int mask = 1U << bit_pos;
+
+        // Set bit and check if it was newly set
+        unsigned int old = atomicOr(&g_coverage_bitmap[index], mask);
+        if (!(old & mask)) {
+            is_new = true;
+        }
+    }
+    // Record new branch
+    if (is_new) {
+        int bitmap_idx = INSTANCE_GLOBAL_IDX / 32;
+        int bit_pos = INSTANCE_GLOBAL_IDX % 32;
+        atomicOr(&g_new_coverage_bitmap[bitmap_idx], 1 << bit_pos);
+        // printf("thread %d bitmap_idx %d bit_pos %d  new branch or bug \n", INSTANCE_GLOBAL_IDX, bitmap_idx, bit_pos);
+        if (is_bug) {
+            // printf("thread %d is bug, add to bug list \n", threadIdx.x);
+            int idx = atomicAdd(g_new_bug_count, 1);
+            if (idx < CuEVM::MAX_NEW_BUGS) {
+                g_new_bug_idx[idx] = INSTANCE_GLOBAL_IDX;
+                g_new_bug_pc[idx] = pc_src;
+            }
+        }
+    }
+}
+__device__ void finalize_coverage_bitmap() {
+    int bitmap_idx = INSTANCE_GLOBAL_IDX / 32;
+    int bit_pos = INSTANCE_GLOBAL_IDX % 32;
+    uint32_t mask = 1U << bit_pos;
+
+    // Check if this thread's bit is set in the new coverage bitmap
+    if (g_new_coverage_bitmap[bitmap_idx] & mask) {
+        // Atomically increment the counter and get the previous value
+        int idx = atomicAdd(g_new_coverage_count, 1);
+
+        // If we haven't exceeded the maximum number of new branches to track
+        if (idx < CuEVM::MAX_NEW_BRANCHES) {
+            // Record this thread's global index in the coverage index array
+            g_new_coverage_idx[idx] = INSTANCE_GLOBAL_IDX;
+        }
+
+        // printf("g_new_coverage_bitmap[idx] %d\n", g_new_coverage_bitmap[idx]);
+    }
+
+    // printf("g_new_coverage_count %d\n", g_new_coverage_count[0]);
+}
 __device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
                                                        const CuEVM::evm_stack_t& stack_ptr) {
     if (no_events >= MAX_TRACE_EVENTS) return;
@@ -55,6 +127,9 @@ __device__ void simplified_trace_data::record_branch(uint32_t pc_src, uint32_t p
     branches[no_branches].distance = last_distance;
     // printf("record branch pc_src %u pc_dst %u distance %s\n", pc_src, pc_dst,
     // branches[no_branches].distance.to_hex());
+#ifdef BUILD_GO_LIBRARY
+    update_coverage_bitmap(pc_src, pc_dst);
+#endif
     no_branches++;
 }
 
@@ -89,22 +164,38 @@ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t
         events[no_events].res = *stack_ptr.get_address_at_index(1);
     no_events++;
 }
-__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
+__device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
     assert(call_context_ptr != nullptr);
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
-    // printf("start call simplified trace data pc %d op %d\n", pc, message_call_ptr->call_type);
+    // printf("start call simplified trace data pc %d no calls %d\n", pc, no_calls);
     calls[no_calls].sender = call_context_ptr->from;
     calls[no_calls].receiver = call_context_ptr->to;
     calls[no_calls].pc = pc;
     calls[no_calls].op = call_context_ptr->call_type;
     calls[no_calls].value = call_context_ptr->value;
-
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
     calls[no_calls].last_pc = 0;
     no_calls++;
+    if (no_calls > MAX_RECURSION) {
+        // printf("\nThread %d: No calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
+        uint8_t loop_found = 0;
+        // loop back 10 calls and check if we found loops
+        for (int i = no_calls - 2; i >= no_calls - MAX_RECURSION; i--) {
+            if (calls[i].receiver == calls[no_calls - 1].receiver) {
+                loop_found++;
+            }
+        }
+        // printf("Thread %d: Loop found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
+
+        if (loop_found >= MAX_RECURSION / 2) {
+            // printf("\nThread %d: Reentrancy detected, loop_found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
+            return ERROR_REENTRANCY;
+        }
+    }
 #ifdef BUILD_GO_LIBRARY
+
     if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
     // add extra markers for entering call
     branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
@@ -113,11 +204,12 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     branches[no_branches].distance = 0;
     no_branches++;
 #endif
+    return ERROR_SUCCESS;
 }
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc) {
     if (no_calls > MAX_CALLS_TRACING) return;
-
-    for (int i = no_calls - 1; i >= 0; i--) {
+    int i;
+    for (i = no_calls - 1; i >= 0; i--) {
         // Check if this call is marked as unfinished (using the sentinel value)
         if (calls[i].error_code == RESERVED_ERROR_CODE) {
             // Found the correct call frame, update its results
@@ -138,6 +230,12 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
     branches[no_branches].pc_missed = 0;
     branches[no_branches].distance = 0;
     no_branches++;
+#endif
+
+#ifdef BUILD_GO_LIBRARY
+    if (error_code == ERROR_INVALID_OPCODE) {
+        update_coverage_bitmap(last_pc, 0, true);
+    }
 #endif
 }
 __host__ __device__ void simplified_trace_data::print() {
@@ -187,6 +285,12 @@ void freeTransactionList(TransactionList* d_transaction_list_ptr) {
     if (temp_list.call_data_size != nullptr) {
         CUDA_CHECK(cudaFree(temp_list.call_data_size));
     }
+#ifdef BUILD_GO_LIBRARY
+    // Free sender array when using GO library
+    if (temp_list.sender != nullptr) {
+        CUDA_CHECK(cudaFree(temp_list.sender));
+    }
+#endif
 
     // Finally free the TransactionList itself
     CUDA_CHECK(cudaFree(d_transaction_list_ptr));

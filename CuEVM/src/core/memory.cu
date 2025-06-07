@@ -13,7 +13,9 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
     uint32_t lane_id = threadIdx.x % 32;
     unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
-
+    
+    // printf("warp_cooperative_set thread %d, num_active_threads %u, length %u ptr1 %p ptr2 %p\n", INSTANCE_GLOBAL_IDX, num_active_threads, length, ptr1, ptr2);
+    
     // TODO : interleaving inactive threads
     // Iterate over each thread in the warp
 #pragma unroll

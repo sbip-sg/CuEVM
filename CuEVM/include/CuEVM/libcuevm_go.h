@@ -73,41 +73,44 @@ typedef struct {
     uint8_t allocations_valid;    /**< Track if allocations are valid (1) or freed (0) */
 } GPUExecutionResultC;
 
-/**
- * @brief Run the EVM interpreter from a JSON input (deprecated).
- *
- * Executes transactions described in JSON format on the CuEVM engine.
- *
- * @param[in] json_input JSON string containing the transaction and state information
- * @param[in] skip_trace_parsing Flag to skip parsing trace output (1 to skip, 0 to parse)
- * @param[in] copy_state_data Flag to copy state data (1 to copy, 0 to not copy)
- * @param[in] reuse_state_data Flag to reuse state data from previous execution (1 to reuse, 0 for fresh state)
- * @return int Error code (0 for success, non-zero for error)
- */
-int run_interpreter_go(const char* json_input, unsigned int skip_trace_parsing, unsigned int copy_state_data,
-                       unsigned int reuse_state_data);
+typedef struct {
+    uint32_t* new_coverage_idx; /**< Array of new coverage indices */
+    uint32_t num_new_coverage;  /**< Number of new coverage entries for each batch, size is tx_sequence size*/
+    uint32_t* new_bug_idx;      /**< Array of new bug indices */
+    uint32_t* new_bug_pc;       /**< Array of new bug PCs */
+    uint32_t num_new_bugs;      /**< Number of new bug entries for each batch, size is tx_sequence size*/
+} SimplifiedGPUResultSingleBatchC;
+
+typedef struct {
+    SimplifiedGPUResultSingleBatchC* results;
+    uint32_t num_results;
+} SimplifiedGPUResultC;
+
 
 /**
  * @brief Process a batch of transactions on the GPU.
  *
  * Executes multiple Ethereum transactions in parallel on the GPU.
  *
+ * @param[in] blockNumber Array of block numbers
+ * @param[in] timeStamp Array of timestamps
  * @param[in] fromAddr Array of sender addresses in byte format
  * @param[in] toAddr Array of recipient addresses in byte format
  * @param[in] values Array of transaction values
  * @param[in] callData Combined call data for all transactions
  * @param[in] callDataLen Length of the combined call data
  * @param[in] dataOffsets Array of offsets into the call data for each transaction
- * @param[in] dataOffsetsLen Length of the dataOffsets array
  * @param[in] dataSizes Array of sizes for each transaction's call data
- * @param[in] dataSizesLen Length of the dataSizes array
- * @param[in] txCount Number of transactions in the batch
- * @return GPUExecutionResultC* Pointer to the execution results structure
+ * @param[in] txBatchCount Number of transactions in each batch
+ * @param[in] sequenceLength Length of each sequence of transactions
+ * @return SimplifiedGPUResultC* Pointer to the execution results structure
  */
-GPUExecutionResultC* process_batch_transactions(const unsigned char* fromAddr, const unsigned char* toAddr,
-                                                const unsigned char* values, const unsigned char* callData,
-                                                int callDataLen, const uint32_t* dataOffsets, int dataOffsetsLen,
-                                                const uint32_t* dataSizes, int dataSizesLen, int txCount);
+ #ifdef BUILD_GO_LIBRARY
+SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
+                                                 const unsigned char* values, const unsigned char* callData,
+                                                 int callDataLen, const uint32_t* dataOffsets,
+                                                 const uint32_t* dataSizes, int txBatchCount, int sequenceLength);
+#endif
 
 /**
  * @brief Process JSON state data on the GPU.
@@ -137,8 +140,26 @@ void reset_state_db();
  */
 GPUExecutionResultC* get_gpu_execution_results();
 
+/**
+ * @brief Get the results of the most recent GPU execution.
+ *
+ * Retrieves execution results, including return data and code coverage information.
+ *
+ * @return SimplifiedGPUExecutionResultC* Pointer to the execution results structure
+ */
+void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result);
 // // Function to free GPU execution results
 // void free_gpu_execution_results(GPUExecutionResultC* result);
+
+/**
+ * @brief Free the memory allocated for a SimplifiedGPUResultC structure.
+ *
+ * This function frees the memory allocated for a SimplifiedGPUResultC structure,
+ * including the arrays and the structure itself.
+ *
+ * @param[in] result Pointer to the SimplifiedGPUResultC structure to be freed
+ */
+void free_simplified_gpu_result(SimplifiedGPUResultC* result);
 
 #ifdef __cplusplus
 }

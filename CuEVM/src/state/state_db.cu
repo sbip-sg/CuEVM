@@ -765,8 +765,10 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
                                        const evm_word_t *address) {
     uint32_t address_index = get_address_index(address);
     if (address_index == -1) {
+#ifdef DEBUG_PERF
         printf("init_snapshot address not found in state db\n");
         address->print();
+#endif
         SnapshotState *tmp = CuEVM::memory_pool::get_snapshot_state();
         tmp->address = *address;
         tmp->storage_size = 0;
