@@ -563,35 +563,40 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
             // Only create memory pool if not reusing state or first call
 
             // create new coverage tracking variables
-            uint32_t* d_new_branches;
-            uint32_t* d_new_count;
-            CUDA_CHECK(cudaMalloc(&d_new_branches, MAX_NEW_BRANCHES * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMalloc(&d_new_count, sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemset(d_new_branches, 0, MAX_NEW_BRANCHES * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemset(d_new_count, 0, sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_idx, &d_new_branches, sizeof(uint32_t*)));
-            CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_count, &d_new_count, sizeof(uint32_t*)));
+            for (int i = 0; i < g_num_gpus; i++) {
+                // Set device
+                CUDA_CHECK(cudaSetDevice(i));
+                uint32_t* d_new_branches;
+                uint32_t* d_new_count;
+                CUDA_CHECK(cudaMalloc(&d_new_branches, MAX_NEW_BRANCHES * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMalloc(&d_new_count, sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemset(d_new_branches, 0, MAX_NEW_BRANCHES * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemset(d_new_count, 0, sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_idx, &d_new_branches, sizeof(uint32_t*)));
+                CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_count, &d_new_count, sizeof(uint32_t*)));
 
-            // Bug tracker
-            uint32_t* d_new_bug_idx;
-            uint32_t* d_new_bug_pc;
-            uint32_t* d_new_bug_count;
-            CUDA_CHECK(cudaMalloc(&d_new_bug_idx, MAX_NEW_BUGS * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMalloc(&d_new_bug_pc, MAX_NEW_BUGS * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMalloc(&d_new_bug_count, sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemset(d_new_bug_idx, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemset(d_new_bug_pc, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemset(d_new_bug_count, 0, sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_idx, &d_new_bug_idx, sizeof(uint32_t*)));
-            CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_pc, &d_new_bug_pc, sizeof(uint32_t*)));
-            CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_count, &d_new_bug_count, sizeof(uint32_t*)));
+                // Bug tracker
+                uint32_t* d_new_bug_idx;
+                uint32_t* d_new_bug_pc;
+                uint32_t* d_new_bug_count;
+                CUDA_CHECK(cudaMalloc(&d_new_bug_idx, MAX_NEW_BUGS * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMalloc(&d_new_bug_pc, MAX_NEW_BUGS * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMalloc(&d_new_bug_count, sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemset(d_new_bug_idx, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemset(d_new_bug_pc, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemset(d_new_bug_count, 0, sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_idx, &d_new_bug_idx, sizeof(uint32_t*)));
+                CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_pc, &d_new_bug_pc, sizeof(uint32_t*)));
+                CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_count, &d_new_bug_count, sizeof(uint32_t*)));
 
-            uint32_t* d_new_coverage_bitmap;
-            uint32_t num_integer_elements_bitmap = (txBatchCount + 31) / 32;
-            printf("num_integer_elements_bitmap: %u\n", num_integer_elements_bitmap);
-            CUDA_CHECK(cudaMalloc(&d_new_coverage_bitmap, num_integer_elements_bitmap * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemset(d_new_coverage_bitmap, 0, num_integer_elements_bitmap * sizeof(uint32_t)));
-            CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_bitmap, &d_new_coverage_bitmap, sizeof(uint32_t*)));
+                uint32_t* d_new_coverage_bitmap;
+                // TODO: do we need txBatchCount or g_num_instances_per_device?
+                uint32_t num_integer_elements_bitmap = (txBatchCount + 31) / 32;
+                printf("num_integer_elements_bitmap: %u\n", num_integer_elements_bitmap);
+                CUDA_CHECK(cudaMalloc(&d_new_coverage_bitmap, num_integer_elements_bitmap * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemset(d_new_coverage_bitmap, 0, num_integer_elements_bitmap * sizeof(uint32_t)));
+                CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_bitmap, &d_new_coverage_bitmap, sizeof(uint32_t*)));
+            }
 
 #ifdef EIP_3155
             const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
