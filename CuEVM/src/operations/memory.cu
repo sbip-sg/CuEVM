@@ -65,13 +65,10 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
-        // WARNING: Because of warp_cooperative_set, we need to allocate shared or global mem so other threads can access
-        // TODO: optimize later to shared memory if neccessary
-        uint8_t* data = new uint8_t[UINT256_BYTES];
-        uint256_to_bytes(data, &value, UINT256_BYTES);
+        __shared__ uint8_t data[INSTANCES_PER_BLOCK][UINT256_BYTES];
+        uint256_to_bytes(data[threadIdx.x], &value, UINT256_BYTES);
+        error_code |= memory.set(data[threadIdx.x], UINT256_BYTES, memory_offset_u32, UINT256_BYTES);
 
-        error_code |= memory.set(data, UINT256_BYTES, memory_offset_u32, UINT256_BYTES);
-        delete[] data;
     }
     return error_code;
 }
@@ -96,10 +93,11 @@ __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
-        uint8_t *data = new uint8_t[1];
-        data[0] = value.words[0] & 0xFF;
-        error_code |= memory.set(data, 1, memory_offset_u32, 1);
-        delete[] data;
+        // uint8_ *data = new uint8_t[1];
+        __shared__ uint8_t data[INSTANCES_PER_BLOCK][1];
+        data[threadIdx.x][0] = value.words[0] & 0xFF;
+        error_code |= memory.set(data[threadIdx.x], 1, memory_offset_u32, 1);
+        // delete[] data;
     }
     return error_code;
 }

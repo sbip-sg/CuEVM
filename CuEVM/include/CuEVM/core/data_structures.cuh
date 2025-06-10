@@ -7,23 +7,26 @@ namespace CuEVM {
 
 constexpr uint32_t worldstate_addresses_size = 32;
 constexpr uint32_t worldstate_storage_values_size = 1024;
-constexpr uint32_t account_prealloc_keys_size = 128;  // configurable keys per account for "pre state"
-constexpr uint32_t value_page_size = 16;
-constexpr uint32_t account_page_size = 16;
-// constexpr uint32_t memory_prealloc_size = 512;  // prealloc 1 page + page size for all dynamic pages
-constexpr uint32_t memory_prealloc_size = 8096;          // prealloc 1 page + page size for all dynamic pages
-constexpr uint32_t memory_pool_stack_preallocate = 128;  // 16 elements times num_instances
-// heuristic size for the bytecode hex string to keep everything within 1MB
-constexpr uint32_t byte_code_hex_size = 32 * max_code_size;
-constexpr uint32_t snapshot_account_pool_size = 32;  // multiply by num_states
+#ifdef BUILD_GO_LIBRARY
+constexpr uint32_t account_prealloc_keys_size = 128;  // configurable keys per account for "pre state"  
+#else 
+constexpr uint32_t account_prealloc_keys_size = 32;  // configurable keys per account for "pre state"
+#endif
+constexpr uint32_t memory_prealloc_size = 8096;          // memory (bytes) preallocated for each instance
+constexpr uint32_t memory_pool_stack_preallocate = 128;  // number of stack elements preallocated for each instance
 
-constexpr uint32_t memory_pool_call_context_preallocate = 8;     // 2 call contexts times num_instances
-constexpr uint32_t memory_pool_return_data_preallocate = 128;    // 32 bytes times num_instances
-constexpr uint32_t memory_pool_snapshot_preallocate_slots = 128;  // 32 elements for each instance
+constexpr uint32_t memory_pool_call_context_preallocate = 8;     // number of call contexts for each instance
+constexpr uint32_t memory_pool_return_data_preallocate = 128;    // number of return data bytes for each instance
+constexpr uint32_t memory_pool_snapshot_preallocate_slots = 32;  // number of snapshot slots for each instance
+
+constexpr uint32_t value_page_size = 16; // number of storage slots per page when expanding storage
+constexpr uint32_t snapshot_account_pool_size = 32;  // number of snapshot accounts for each instance
 constexpr uint32_t snapshot_page_size = 8;
 // each snapshot state keeps track of the touched accounts warming up in the context
-constexpr uint32_t preallocated_touched_accounts_size = 8;
-constexpr uint32_t preallocated_touched_storage_keys_size = 128;
+constexpr uint32_t preallocated_touched_accounts_size = 4;
+constexpr uint32_t preallocated_touched_storage_keys_size = account_prealloc_keys_size/2;
+
+
 
 constexpr CONSTANT uint32_t serialized_worldstate_addresses_size = 32;
 constexpr CONSTANT uint32_t serialized_worldstate_storage_slots = 512;
