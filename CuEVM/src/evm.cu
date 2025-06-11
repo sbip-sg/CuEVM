@@ -11,10 +11,6 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
                                               bool copy_state_data) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
-    if (instance == 0) {
-        printf("CuEVM debug evm instance %d global_statepointer %p\n", instance, CuEVM::global_state_db_ptr);
-        global_state_db_ptr->print();
-    }
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef DEBUG
     if (instance == 1) transaction_list_ptr->print();
