@@ -11,6 +11,10 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
                                               bool copy_state_data) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
+    if (instance == 0) {
+        printf("CuEVM debug evm instance %d global_statepointer %p\n", instance, CuEVM::global_state_db_ptr);
+        global_state_db_ptr->print();
+    }
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef DEBUG
     if (instance == 1) transaction_list_ptr->print();
@@ -56,9 +60,9 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
     CuEVM::evm_memory_t *memory_ptr = memory_pool::get_memory(0);
 
 #ifdef BUILD_GO_LIBRARY
-    evm_word_t* sender = &transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX];
+    evm_word_t *sender = &transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX];
 #else
-    evm_word_t* sender = &transaction_list_ptr->sender;
+    evm_word_t *sender = &transaction_list_ptr->sender;
 #endif
     int32_t bytecode_offset = -1;
 
@@ -67,8 +71,7 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(sender);
         evm_word_t sender_nonce(sender_nonce_uint);
 
-        CuEVM::utils::get_contract_address_create(&transaction_list_ptr->to, sender,
-                                                  &sender_nonce);
+        CuEVM::utils::get_contract_address_create(&transaction_list_ptr->to, sender, &sender_nonce);
         // special case ? Tests allow create to acc with storage
         // TODO: simplify this
 
@@ -79,18 +82,17 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         }
 
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
-                                        *sender, transaction_list_ptr->to,
-                                        transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
-                                        OP_CREATE, call_data, call_data_size, call_data, call_data_size,
-                                        bytecode_offset);
+                                        *sender, transaction_list_ptr->to, transaction_list_ptr->to,
+                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CREATE, call_data,
+                                        call_data_size, call_data, call_data_size, bytecode_offset);
     } else {
         byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
         bytecode_offset = find_global_bytecode_offset(&transaction_list_ptr->to);
 
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
-                                        *sender, transaction_list_ptr->to,
-                                        transaction_list_ptr->to, transaction_list_ptr->value[INSTANCE_GLOBAL_IDX],
-                                        OP_CALL, call_data, call_data_size, byte_code, byte_code_size, bytecode_offset);
+                                        *sender, transaction_list_ptr->to, transaction_list_ptr->to,
+                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CALL, call_data,
+                                        call_data_size, byte_code, byte_code_size, bytecode_offset);
     }
     // charge gas and validate balance
     CuEVM::gas_t gas_intrinsic;
@@ -250,10 +252,6 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         // }
 #endif
 
-        // printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
-        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
-        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
-        //            cached_call_state.gas_limit, cached_call_state.gas_used);
 #ifdef BUILD_PYTHON_LIBRARY
         // comparison, arithmetic, revert/invalid
         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
@@ -477,17 +475,19 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     error_code = CuEVM::operations::TIMESTAMP(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                               *cached_call_state.stack_ptr
 #ifdef BUILD_GO_LIBRARY
-                                                              ,transaction_list_ptr
+                                                              ,
+                                                              transaction_list_ptr
 #endif
-                                                              );
+                    );
                     break;
                 case OP_NUMBER:
                     error_code = CuEVM::operations::NUMBER(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                            *cached_call_state.stack_ptr
 #ifdef BUILD_GO_LIBRARY
-                                                           ,transaction_list_ptr
+                                                           ,
+                                                           transaction_list_ptr
 #endif
-                                                           );
+                    );
                     break;
                 case OP_DIFFICULTY:
                     error_code = CuEVM::operations::PREVRANDAO(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -1014,10 +1014,8 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
 
     // CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts
     // for multiGPU version
-    CuEVM::StateDb::GPUfromJsonMultiGPU(
-        state_db_ptrs, world_state_json, num_transactions, num_accounts, snapshot_state_db_ptrs
-
-    );
+    CuEVM::StateDb::GPUfromJsonMultiGPU(state_db_ptrs, world_state_json, num_transactions_per_gpu, num_accounts,
+                                        snapshot_state_db_ptrs);
 
     num_instances = num_transactions_per_gpu;
     return transaction_list_ptrs;
