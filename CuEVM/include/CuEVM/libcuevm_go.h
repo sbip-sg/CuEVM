@@ -109,7 +109,9 @@ typedef struct {
 SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
                                                  const unsigned char* values, const unsigned char* callData,
                                                  int callDataLen, const uint32_t* dataOffsets,
-                                                 const uint32_t* dataSizes, int txBatchCount, int sequenceLength);
+                                                 const uint32_t* dataSizes, const uint32_t* markerOffsets,
+                                                 const uint32_t* markerCounts, const uint32_t* markerData,
+                                                 int markerDataLen, int txBatchCount, int sequenceLength);
 #endif
 
 /**
@@ -122,7 +124,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
  * @param[in] reset_state Flag to reset the state before processing (true to reset, false to keep existing state)
  * @return int Error code (0 for success, non-zero for error)
  */
-int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false);
+int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false, uint32_t skipTxSize = 1);
 
 /**
  * @brief Reset the state database to its initial state.

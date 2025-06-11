@@ -11,10 +11,15 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
                                               bool copy_state_data) {
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
+#ifdef BUILD_GO_LIBRARY
+    mutate_transaction_data(transaction_list_ptr);
+#endif
+
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef DEBUG
     if (instance == 1) transaction_list_ptr->print();
 #endif
+    // if (instance == 1) transaction_list_ptr->print();
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
     evm.run(cached_call_state, copy_state_data);
 

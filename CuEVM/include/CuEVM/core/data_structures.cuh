@@ -8,8 +8,8 @@ namespace CuEVM {
 constexpr uint32_t worldstate_addresses_size = 32;
 constexpr uint32_t worldstate_storage_values_size = 1024;
 #ifdef BUILD_GO_LIBRARY
-constexpr uint32_t account_prealloc_keys_size = 128;  // configurable keys per account for "pre state"  
-#else 
+constexpr uint32_t account_prealloc_keys_size = 128;  // configurable keys per account for "pre state"
+#else
 constexpr uint32_t account_prealloc_keys_size = 32;  // configurable keys per account for "pre state"
 #endif
 constexpr uint32_t memory_prealloc_size = 8096;          // memory (bytes) preallocated for each instance
@@ -19,14 +19,12 @@ constexpr uint32_t memory_pool_call_context_preallocate = 8;     // number of ca
 constexpr uint32_t memory_pool_return_data_preallocate = 128;    // number of return data bytes for each instance
 constexpr uint32_t memory_pool_snapshot_preallocate_slots = 32;  // number of snapshot slots for each instance
 
-constexpr uint32_t value_page_size = 16; // number of storage slots per page when expanding storage
+constexpr uint32_t value_page_size = 16;             // number of storage slots per page when expanding storage
 constexpr uint32_t snapshot_account_pool_size = 32;  // number of snapshot accounts for each instance
 constexpr uint32_t snapshot_page_size = 8;
 // each snapshot state keeps track of the touched accounts warming up in the context
 constexpr uint32_t preallocated_touched_accounts_size = 4;
-constexpr uint32_t preallocated_touched_storage_keys_size = account_prealloc_keys_size/2;
-
-
+constexpr uint32_t preallocated_touched_storage_keys_size = account_prealloc_keys_size / 2;
 
 constexpr CONSTANT uint32_t serialized_worldstate_addresses_size = 32;
 constexpr CONSTANT uint32_t serialized_worldstate_storage_slots = 512;
@@ -173,6 +171,9 @@ class TransactionList {
 #ifdef BUILD_GO_LIBRARY
     gas_t *block_number;
     gas_t *time_stamp;
+    uint32_t *marker_offset;  // offset of the mutation marker
+    uint32_t *marker_size;    // size of the mutation marker
+    uint32_t *marker_data;    // raw data of the mutation marker
 #endif
     __host__ __device__ void print();
 };

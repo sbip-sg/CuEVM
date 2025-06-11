@@ -315,6 +315,123 @@ void freeTraceData(bool copy_state_data) {
     }
 }
 
+#ifdef BUILD_GO_LIBRARY
+// LCG parameters (commonly used for a 32-bit generator)
+
+// seed = (a * seed + c) % m;
+
+__device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* transaction_list_ptr) {
+    const unsigned int a = 1664525;
+    const unsigned int c = 1013904223;
+    const unsigned int m = 0xFFFFFFFF; // 2^32 - 1
+    const unsigned int chance_to_create_new = 2; //  chance to create new value
+    unsigned int seed = INSTANCE_GLOBAL_IDX;
+
+    uint32_t marker_idx = INSTANCE_GLOBAL_IDX / 8;
+    uint32_t marker_size = transaction_list_ptr->marker_size[marker_idx];
+    if (marker_size == 0) return;
+    uint32_t current_marker_offset = transaction_list_ptr->marker_offset[marker_idx];
+    uint8_t* call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
+    for (int j = 0; j < marker_size; j++) {
+
+        uint32_t element_offset = transaction_list_ptr->marker_data[current_marker_offset + j * 3];
+        uint32_t element_type = transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1];
+        uint32_t element_length = transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2];
+        
+        if (element_type != 0 && element_type != 1){
+            uint32_t byte_length = element_type/8;
+            // randomize the marker data
+            seed = (a * seed + c) % m;
+            bool create_new = (seed % chance_to_create_new) == 1;
+            seed = (a * seed + c) % m;
+            uint8_t mutated_byte = seed % byte_length;
+            if (create_new) {
+                // printf("thread %d create_new %d mutated_byte %d\n", INSTANCE_GLOBAL_IDX, create_new, mutated_byte);
+                // clear call data before mutated byte
+                for (int i = 0; i < element_length - mutated_byte; i++) {
+                    call_data[element_offset + i] = 0;
+                }
+            }
+            uint8_t* start_offset = call_data + element_offset + element_length - mutated_byte;
+            for (int mutate_byte_index = 0; mutate_byte_index < mutated_byte; mutate_byte_index++) {
+                seed = (a * seed + c) % m;
+                uint8_t random_byte = seed & 0xFF; // Extract least significant byte
+                start_offset[mutate_byte_index] = random_byte;
+                // printf("thread %d marker_type %d mutated_byte %d random_byte %d\n", INSTANCE_GLOBAL_IDX, element_type, mutated_byte, random_byte);
+            }
+
+        }
+    }
+    
+ 
+/*
+    uint32_t instance = INSTANCE_GLOBAL_IDX;
+    if (instance == 0) {
+        printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8, transaction_list_ptr->marker_size[instance/8]);
+
+        uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
+        for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
+            printf("marker data %d: offset %d type %d length %d \n", j ,
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
+        }
+    }
+    __syncthreads();
+    if (instance == 1) {
+        printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8, transaction_list_ptr->marker_size[instance/8]);
+
+        uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
+        for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
+            printf("marker data %d: offset %d type %d length %d \n", j, 
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
+        }
+    }
+    __syncthreads();
+    if (instance == 10) {
+        printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8, transaction_list_ptr->marker_size[instance/8]);
+
+        uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
+        for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
+            printf("marker data %d: offset %d type %d length %d \n", j, 
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
+        }
+    }
+
+    __syncthreads();
+    if (instance == 16) {
+        printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8, transaction_list_ptr->marker_size[instance/8]);
+
+        uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
+        for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
+            printf("marker data %d: offset %d type %d length %d \n", j, 
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
+        }
+    }
+
+       __syncthreads();
+    if (instance == 31) {
+        printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8, transaction_list_ptr->marker_size[instance/8]);
+
+        uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
+        for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
+            printf("marker data %d: offset %d type %d length %d \n", j, 
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
+                   transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
+        }
+    }
+*/
+
+}
+#endif
+
 __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
     // Use the global state database pointer to access the account data
     StateDb* state = global_state_db_ptr;

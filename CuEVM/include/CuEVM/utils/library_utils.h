@@ -231,6 +231,10 @@ extern __device__ simplified_trace_data* global_simplified_trace;
  */
 __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data);
 
+
+#ifdef BUILD_GO_LIBRARY
+__device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* transaction_list_ptr);
+#endif
 /**
  * @brief Free transaction list resources.
  * @param[in] d_transaction_list_ptr Pointer to the transaction list.
