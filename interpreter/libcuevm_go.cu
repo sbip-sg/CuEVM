@@ -451,8 +451,10 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
 
         // initialize marker data
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->marker_size, transaction_per_gpu/g_skipTxSize * sizeof(uint32_t)));
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->marker_offset, transaction_per_gpu/g_skipTxSize * sizeof(uint32_t)));
+        CUDA_CHECK(
+            cudaMalloc(&temp_transaction_list->marker_size, transaction_per_gpu / g_skipTxSize * sizeof(uint32_t)));
+        CUDA_CHECK(
+            cudaMalloc(&temp_transaction_list->marker_offset, transaction_per_gpu / g_skipTxSize * sizeof(uint32_t)));
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->marker_data, markerDataLen * sizeof(uint32_t)));
 #endif
 
@@ -488,10 +490,10 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
                               transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
 
         // Copy marker data from host to GPU
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset, markerOffsets, transaction_per_gpu/g_skipTxSize * sizeof(uint32_t),
-                              cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_size, markerCounts, transaction_per_gpu/g_skipTxSize * sizeof(uint32_t),
-                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset, markerOffsets,
+                              transaction_per_gpu / g_skipTxSize * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_size, markerCounts,
+                              transaction_per_gpu / g_skipTxSize * sizeof(uint32_t), cudaMemcpyHostToDevice));
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_data, markerData, markerDataLen * sizeof(uint32_t),
                               cudaMemcpyHostToDevice));
 
@@ -556,14 +558,14 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
             // g_num_instances = txCount;
             // g_num_instances_per_device = txCount / g_num_gpus;
         }
-        
-        for (int i = 0; i < markerDataLen; i++) {
-            printf("markerData[%d]: %u\n", i, markerData[i]);
-        }
-        printf("g_skipTxSize: %u\n", g_skipTxSize);
-        for (int i = 0; i< txBatchCount/g_skipTxSize; i++){
-            printf("markerOffsets[%d]: %u, markerCounts[%d]: %u\n", i, markerOffsets[i], i, markerCounts[i]);
-        }
+
+        // for (int i = 0; i < markerDataLen; i++) {
+        //     printf("markerData[%d]: %u\n", i, markerData[i]);
+        // }
+        // printf("g_skipTxSize: %u\n", g_skipTxSize);
+        // for (int i = 0; i< txBatchCount/g_skipTxSize; i++){
+        //     printf("markerOffsets[%d]: %u, markerCounts[%d]: %u\n", i, markerOffsets[i], i, markerCounts[i]);
+        // }
 
         uint32_t current_calldata_offset = 0;
         uint32_t current_marker_offset = 0;
@@ -572,15 +574,16 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
         final_result->num_results = sequenceLength;
         for (int sequenceIdx = 0; sequenceIdx < sequenceLength; sequenceIdx++) {
             uint32_t current_idx = sequenceIdx * txBatchCount;
-            uint32_t current_marker_offset_idx = current_idx/g_skipTxSize;
+            uint32_t current_marker_offset_idx = current_idx / g_skipTxSize;
             if (current_idx != 0) {
                 current_calldata_offset += dataOffsets[current_idx - 1] + dataSizes[current_idx - 1];
-                current_marker_offset += markerOffsets[current_marker_offset_idx - 1] + markerCounts[current_marker_offset_idx - 1] * 3;
+                current_marker_offset +=
+                    markerOffsets[current_marker_offset_idx - 1] + markerCounts[current_marker_offset_idx - 1] * 3;
             }
             callDataLen = dataOffsets[current_idx + txBatchCount - 1] + dataSizes[current_idx + txBatchCount - 1];
             // June debug, check this
-            markerDataLen = markerOffsets[current_marker_offset_idx + txBatchCount/g_skipTxSize - 1] +
-             markerCounts[current_marker_offset_idx + txBatchCount/g_skipTxSize - 1] * 3;
+            markerDataLen = markerOffsets[current_marker_offset_idx + txBatchCount / g_skipTxSize - 1] +
+                            markerCounts[current_marker_offset_idx + txBatchCount / g_skipTxSize - 1] * 3;
             printf("current_idx: %u, current_calldata_offset: %u, callDataLen: %u\n", current_idx,
                    current_calldata_offset, callDataLen);
 
@@ -592,8 +595,8 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
             auto d_transaction_list_ptrs = create_transaction_list(
                 blockNumber + current_idx, timeStamp + current_idx, newFromAddr, toAddr, newValues,
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
-                dataSizes + current_idx, txBatchCount, markerOffsets + current_idx/g_skipTxSize, markerCounts + current_idx/g_skipTxSize,
-                markerData + current_marker_offset, markerDataLen);
+                dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,
+                markerCounts + current_idx / g_skipTxSize, markerData + current_marker_offset, markerDataLen);
 
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call
@@ -733,7 +736,9 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
 
             // Clean up transaction lists
             // cleanup_transaction_list(d_transaction_list_ptr, callDataLen);
-            get_gpu_execution_results_optimized(&final_result->results[sequenceIdx]);
+            get_gpu_execution_results_optimized(&final_result->results[sequenceIdx], d_transaction_list_ptrs,
+                                                callData + current_calldata_offset, dataOffsets + current_idx,
+                                                dataSizes + current_idx);
             for (int i = 0; i < g_num_gpus; i++) {
                 CUDA_CHECK(cudaSetDevice(i));
                 CuEVM::freeTransactionList(d_transaction_list_ptrs[i]);
@@ -753,15 +758,18 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
         return nullptr;  // Unknown error
     }
 }
-
+#define DEBUG
 // Minimalized version of get_gpu_execution_results
-void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result) {
+void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result,
+                                         std::vector<CuEVM::transaction::TransactionList*> d_transaction_list_ptrs,
+                                         const uint8_t* callData, const uint32_t* dataOffsets,
+                                         const uint32_t* dataSizes) {
     // Arrays to store counts from each GPU
     std::vector<uint32_t> coverage_counts(g_num_gpus);
     std::vector<uint32_t> bug_counts(g_num_gpus);
     uint32_t total_num_new_coverage = 0;
     uint32_t total_num_new_bug = 0;
-
+    std::vector<CuEVM::transaction::TransactionList*> host_transaction_list_ptrs(g_num_gpus);
     // First pass: count total new coverage and bugs across all GPUs
     for (int i = 0; i < g_num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
@@ -778,6 +786,15 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
         CUDA_CHECK(cudaMemcpy(&bug_counts[i], host_counter_ptr, sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
         total_num_new_bug += bug_counts[i];
+        if (coverage_counts[i] == 0 && bug_counts[i] == 0) {
+            printf("\n\nGPU %d has no new coverage or bugs\n\n", i);
+            continue;
+        }
+
+        // copy the transaction list to the host
+        host_transaction_list_ptrs[i] = new CuEVM::transaction::TransactionList();
+        CUDA_CHECK(cudaMemcpy(host_transaction_list_ptrs[i], d_transaction_list_ptrs[i],
+                              sizeof(CuEVM::transaction::TransactionList), cudaMemcpyDeviceToHost));
     }
 
     printf("Total new coverage branches: %u, total new bugs: %u\n", total_num_new_coverage, total_num_new_bug);
@@ -788,22 +805,32 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
 
     if (total_num_new_coverage > 0) {
         result->new_coverage_idx = new uint32_t[total_num_new_coverage];
+        result->branch_call_data_offsets = new uint32_t[total_num_new_coverage];
+        result->branch_call_data_sizes = new uint32_t[total_num_new_coverage];
     } else {
         result->new_coverage_idx = nullptr;
+        result->branch_call_data_offsets = nullptr;
+        result->branch_call_data_sizes = nullptr;
     }
 
     if (total_num_new_bug > 0) {
         result->new_bug_idx = new uint32_t[total_num_new_bug];
         result->new_bug_pc = new uint32_t[total_num_new_bug];
+        result->bug_call_data_offsets = new uint32_t[total_num_new_bug];
+        result->bug_call_data_sizes = new uint32_t[total_num_new_bug];
     } else {
         result->new_bug_idx = nullptr;
         result->new_bug_pc = nullptr;
+        result->bug_call_data_offsets = nullptr;
+        result->bug_call_data_sizes = nullptr;
     }
 
     // Second pass: copy the actual data
     uint32_t coverage_offset = 0;
     uint32_t bug_offset = 0;
 
+    uint32_t total_branch_call_data_size = 0;
+    uint32_t total_bug_call_data_size = 0;
     for (int i = 0; i < g_num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
 
@@ -819,6 +846,13 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
                 for (uint32_t j = 0; j < coverage_counts[i]; j++) {
                     result->new_coverage_idx[coverage_offset + j] += i * g_num_instances_per_device;
                 }
+            }
+            for (uint32_t j = 0; j < coverage_counts[i]; j++) {
+                result->branch_call_data_offsets[coverage_offset + j] =
+                    dataOffsets[result->new_coverage_idx[coverage_offset + j]];
+                result->branch_call_data_sizes[coverage_offset + j] =
+                    dataSizes[result->new_coverage_idx[coverage_offset + j]];
+                total_branch_call_data_size += dataSizes[result->new_coverage_idx[coverage_offset + j]];
             }
 #ifdef DEBUG
             // Debug output
@@ -847,7 +881,11 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
                     result->new_bug_idx[bug_offset + j] += i * g_num_instances_per_device;
                 }
             }
-
+            for (uint32_t j = 0; j < bug_counts[i]; j++) {
+                result->bug_call_data_offsets[bug_offset + j] = dataOffsets[result->new_bug_idx[bug_offset + j]];
+                result->bug_call_data_sizes[bug_offset + j] = dataSizes[result->new_bug_idx[bug_offset + j]];
+                total_bug_call_data_size += dataSizes[result->new_bug_idx[bug_offset + j]];
+            }
             // Debug output
 #ifdef DEBUG
             for (uint32_t j = 0; j < bug_counts[i]; j++) {
@@ -857,9 +895,48 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
 #endif
             bug_offset += bug_counts[i];
         }
+        // TODO June check how to deal with multiple GPUs host_transaction_list_ptrs
+        // construct the call data
+        result->branch_call_data = nullptr;
+        result->bug_call_data = nullptr;
+        if (total_branch_call_data_size > 0) {
+            uint32_t running_offset = 0;
+            result->branch_call_data = new uint8_t[total_branch_call_data_size];
+            for (int i = 0; i < total_num_new_coverage; i++) {
+                printf("copying branch call data for  dst %p, size %d\n", result->branch_call_data + running_offset,
+                       result->branch_call_data_sizes[i]);
+
+                printf("src data %p\n", host_transaction_list_ptrs[0]->call_data);
+                CUDA_CHECK(cudaMemcpy(result->branch_call_data + running_offset,
+                                      host_transaction_list_ptrs[0]->call_data + result->branch_call_data_offsets[i],
+                                      result->branch_call_data_sizes[i], cudaMemcpyDeviceToHost));
+                // reset the offset to start from 0 following running_offset
+                result->branch_call_data_offsets[i] = running_offset;
+                running_offset += result->branch_call_data_sizes[i];
+            }
+        }
+        if (total_bug_call_data_size > 0) {
+            uint32_t running_offset = 0;
+            result->bug_call_data = new uint8_t[total_bug_call_data_size];
+            for (int i = 0; i < total_num_new_bug; i++) {
+                CUDA_CHECK(cudaMemcpy(result->bug_call_data + running_offset,
+                                      host_transaction_list_ptrs[0]->call_data + result->bug_call_data_offsets[i],
+                                      result->bug_call_data_sizes[i], cudaMemcpyDeviceToHost));
+                running_offset += result->bug_call_data_sizes[i];
+            }
+            // printf("Finished merging coverage data from all GPUs\n");
+        }
     }
 
-    // printf("Finished merging coverage data from all GPUs\n");
+    // Print debug info on the call data
+    // for (int i = 0; i < total_num_new_coverage; i++) {
+    //     printf("\n Branch call data offset: %d, size: %d\n", result->branch_call_data_offsets[i],
+    //            result->branch_call_data_sizes[i]);
+    // }
+    // for (int i = 0; i < total_num_new_bug; i++) {
+    //     printf("\n Bug call data offset: %d, size: %d\n", result->bug_call_data_offsets[i],
+    //            result->bug_call_data_sizes[i]);
+    // }
 }
 
 // For debugging, tracking unique marker patterns
@@ -1077,7 +1154,8 @@ GPUExecutionResultC* get_gpu_execution_results() {
                 // Add marker to hash
                 marker_hash << std::hex << "0x" << std::setw(16) << std::setfill('0') << marker << std::dec << ",";
 
-                // printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", j, marker, src, src, dst,
+                // printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", j, marker, src, src,
+                // dst,
                 //        dst);
 
                 // if (src == ENTER_MARKER_XOR) {

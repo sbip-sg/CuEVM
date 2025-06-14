@@ -327,7 +327,7 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
     const unsigned int chance_to_create_new = 2; //  chance to create new value
     unsigned int seed = INSTANCE_GLOBAL_IDX;
 
-    uint32_t marker_idx = INSTANCE_GLOBAL_IDX / 8;
+    uint32_t marker_idx = INSTANCE_GLOBAL_IDX / CUEVM_MUTATE_GROUP_SIZE;
     uint32_t marker_size = transaction_list_ptr->marker_size[marker_idx];
     if (marker_size == 0) return;
     uint32_t current_marker_offset = transaction_list_ptr->marker_offset[marker_idx];

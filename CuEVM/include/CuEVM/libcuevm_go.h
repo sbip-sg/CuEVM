@@ -74,18 +74,23 @@ typedef struct {
 } GPUExecutionResultC;
 
 typedef struct {
-    uint32_t* new_coverage_idx; /**< Array of new coverage indices */
-    uint32_t num_new_coverage;  /**< Number of new coverage entries for each batch, size is tx_sequence size*/
-    uint32_t* new_bug_idx;      /**< Array of new bug indices */
-    uint32_t* new_bug_pc;       /**< Array of new bug PCs */
-    uint32_t num_new_bugs;      /**< Number of new bug entries for each batch, size is tx_sequence size*/
+    uint32_t* new_coverage_idx;         /**< Array of new coverage indices */
+    uint32_t num_new_coverage;          /**< Number of new coverage entries for each batch, size is tx_sequence size*/
+    uint32_t* new_bug_idx;              /**< Array of new bug indices */
+    uint32_t* new_bug_pc;               /**< Array of new bug PCs */
+    uint32_t num_new_bugs;              /**< Number of new bug entries for each batch, size is tx_sequence size*/
+    uint8_t* branch_call_data;          /**< Array of branch call data */
+    uint32_t* branch_call_data_sizes;   /**< Size of the branch call data */
+    uint32_t* branch_call_data_offsets; /**< Offset of the branch call data */
+    uint8_t* bug_call_data;             /**< Array of bug call data */
+    uint32_t* bug_call_data_sizes;      /**< Size of the bug call data */
+    uint32_t* bug_call_data_offsets;    /**< Offset of the bug call data */
 } SimplifiedGPUResultSingleBatchC;
 
 typedef struct {
     SimplifiedGPUResultSingleBatchC* results;
     uint32_t num_results;
 } SimplifiedGPUResultC;
-
 
 /**
  * @brief Process a batch of transactions on the GPU.
@@ -105,8 +110,9 @@ typedef struct {
  * @param[in] sequenceLength Length of each sequence of transactions
  * @return SimplifiedGPUResultC* Pointer to the execution results structure
  */
- #ifdef BUILD_GO_LIBRARY
-SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
+#ifdef BUILD_GO_LIBRARY
+SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp,
+                                                 const unsigned char* fromAddr, const unsigned char* toAddr,
                                                  const unsigned char* values, const unsigned char* callData,
                                                  int callDataLen, const uint32_t* dataOffsets,
                                                  const uint32_t* dataSizes, const uint32_t* markerOffsets,
@@ -124,7 +130,8 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
  * @param[in] reset_state Flag to reset the state before processing (true to reset, false to keep existing state)
  * @return int Error code (0 for success, non-zero for error)
  */
-int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false, uint32_t skipTxSize = 1);
+int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false,
+                           uint32_t skipTxSize = 1);
 
 /**
  * @brief Reset the state database to its initial state.
@@ -149,7 +156,10 @@ GPUExecutionResultC* get_gpu_execution_results();
  *
  * @return SimplifiedGPUExecutionResultC* Pointer to the execution results structure
  */
-void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result);
+void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result,
+                                         std::vector<CuEVM::transaction::TransactionList*> d_transaction_list_ptrs,
+                                         const uint8_t* callData, const uint32_t* dataOffsets,
+                                         const uint32_t* dataSizes);
 // // Function to free GPU execution results
 // void free_gpu_execution_results(GPUExecutionResultC* result);
 

@@ -9,6 +9,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <unordered_set>
 
+#define CUEVM_MUTATE_GROUP_SIZE 16 // same as fuzzer SkipSequenceSize
 /**
  * @file library_utils.h
  * @brief Utility functions and data structures for library integration.
