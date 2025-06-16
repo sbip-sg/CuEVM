@@ -149,6 +149,7 @@ void reset_state_db();
  */
 GPUExecutionResultC* get_gpu_execution_results();
 
+uint32_t get_num_instances_per_device();
 /**
  * @brief Get the results of the most recent GPU execution.
  *
@@ -156,10 +157,8 @@ GPUExecutionResultC* get_gpu_execution_results();
  *
  * @return SimplifiedGPUExecutionResultC* Pointer to the execution results structure
  */
-void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result,
-                                         std::vector<CuEVM::transaction::TransactionList*> d_transaction_list_ptrs,
-                                         const uint8_t* callData, const uint32_t* dataOffsets,
-                                         const uint32_t* dataSizes);
+void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result, const uint8_t* callData,
+                                         const uint32_t* dataOffsets, const uint32_t* dataSizes);
 // // Function to free GPU execution results
 // void free_gpu_execution_results(GPUExecutionResultC* result);
 

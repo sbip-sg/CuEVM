@@ -151,6 +151,7 @@ class TransactionList {
     // allow different sender in fuzzing mode
 #ifdef BUILD_GO_LIBRARY
     evm_word_t *sender;
+    uint32_t start_seed;
 #else
     evm_word_t sender;
 #endif
