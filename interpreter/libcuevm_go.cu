@@ -547,14 +547,14 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp,
                                                  const unsigned char* fromAddr, const unsigned char* toAddr,
                                                  const unsigned char* values, const unsigned char* callData,
-                                                 int callDataLen, const uint32_t* dataOffsets,
+                                                 uint32_t callDataLen, const uint32_t* dataOffsets,
                                                  const uint32_t* dataSizes,
                                                  // June: added marker data
                                                  const uint32_t* markerOffsets, const uint32_t* markerCounts,
-                                                 const uint32_t* markerData, int markerDataLen, int txBatchCount,
-                                                 int sequenceLength) {
-    // printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, call number: %d\n", txCount,
-    //        g_num_instances_per_device, call_counter);
+                                                 const uint32_t* markerData, uint32_t markerDataLen,
+                                                 uint32_t txBatchCount, uint32_t sequenceLength, uint32_t start_seed) {
+    printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, sequence length: %d\n",
+           txBatchCount, g_num_instances_per_device, sequenceLength);
     std::vector<cudaStream_t> streams;  // TODO move streams to global
     try {
         // Update global num_instances if provided
@@ -606,7 +606,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
                 dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,
                 markerCounts + current_idx / g_skipTxSize, markerData + current_marker_offset, markerDataLen,
-                sequenceIdx);
+                start_seed + sequenceIdx);
 
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call
@@ -706,6 +706,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
 
                 // Wait for this GPU to finish
                 cudaEventSynchronize(stop_events[i]);
+                cudaStreamSynchronize(streams[i]);
 
                 // Check for errors on this GPU
                 cudaError_t err = cudaGetLastError();
@@ -736,7 +737,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
             delete[] h_buffer;
 
 #endif
-            printf("GPU kernel execution time: %f milliseconds (max across all GPUs)\n", total_milliseconds);
+            printf("\n\nGPU kernel execution time: %f milliseconds (max across all GPUs)\n", total_milliseconds);
 
             // Clean up event arrays
             delete[] start_events;

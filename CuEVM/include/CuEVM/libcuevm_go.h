@@ -111,13 +111,11 @@ typedef struct {
  * @return SimplifiedGPUResultC* Pointer to the execution results structure
  */
 #ifdef BUILD_GO_LIBRARY
-SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp,
-                                                 const unsigned char* fromAddr, const unsigned char* toAddr,
-                                                 const unsigned char* values, const unsigned char* callData,
-                                                 int callDataLen, const uint32_t* dataOffsets,
-                                                 const uint32_t* dataSizes, const uint32_t* markerOffsets,
-                                                 const uint32_t* markerCounts, const uint32_t* markerData,
-                                                 int markerDataLen, int txBatchCount, int sequenceLength);
+SimplifiedGPUResultC* process_batch_transactions(
+    const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
+    const unsigned char* values, const unsigned char* callData, uint32_t callDataLen, const uint32_t* dataOffsets,
+    const uint32_t* dataSizes, const uint32_t* markerOffsets, const uint32_t* markerCounts, const uint32_t* markerData,
+    uint32_t markerDataLen, uint32_t txBatchCount, uint32_t sequenceLength, uint32_t start_seed);
 #endif
 
 /**

@@ -343,7 +343,7 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
             seed = (a * seed + c) % m;
             bool create_new = (seed % chance_to_create_new) == 1;
             seed = (a * seed + c) % m;
-            uint8_t mutated_byte = seed % byte_length;
+            uint8_t mutated_byte = seed % (byte_length + 1);
             if (create_new) {
                 // printf("thread %d create_new %d mutated_byte %d\n", INSTANCE_GLOBAL_IDX, create_new, mutated_byte);
                 // clear call data before mutated byte
@@ -355,6 +355,9 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
             for (int mutate_byte_index = 0; mutate_byte_index < mutated_byte; mutate_byte_index++) {
                 seed = (a * seed + c) % m;
                 uint8_t random_byte = seed & 0xFF;  // Extract least significant byte
+
+                // printf("instance %d mutated byte %d mutate_byte_index %d random_byte %x\n", INSTANCE_GLOBAL_IDX,
+                //        start_offset[mutate_byte_index], mutate_byte_index, random_byte);
                 start_offset[mutate_byte_index] = random_byte;
                 // printf("thread %d marker_type %d mutated_byte %d random_byte %d\n", INSTANCE_GLOBAL_IDX,
                 // element_type, mutated_byte, random_byte);

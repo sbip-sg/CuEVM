@@ -19,7 +19,7 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
 #ifdef DEBUG
     if (instance == 1) transaction_list_ptr->print();
 #endif
-    if (instance == 1) transaction_list_ptr->print();
+    // if (instance == 1) transaction_list_ptr->print();
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
     evm.run(cached_call_state, copy_state_data);
 
