@@ -9,7 +9,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <unordered_set>
 
-#define CUEVM_MUTATE_GROUP_SIZE 16 // same as fuzzer SkipSequenceSize
+#define CUEVM_MUTATE_GROUP_SIZE 16  // same as fuzzer SkipSequenceSize
 /**
  * @file library_utils.h
  * @brief Utility functions and data structures for library integration.
@@ -40,6 +40,15 @@ extern __device__ uint32_t* g_new_bug_idx;
 extern __device__ uint32_t* g_new_bug_pc;
 extern __device__ uint32_t* g_new_bug_count;
 
+struct fuzzing_constants {
+    uint8_t* address_constants;
+    uint32_t address_constants_count;  // number of address constants
+    uint8_t* integer_constants;
+    uint32_t integer_constants_count;  // number of uint256 constants
+    __host__ __device__ void print();
+};
+// for fuzzing utilities
+extern __device__ fuzzing_constants* g_fuzzing_constants;
 // Max new branches to record per execution
 // #endif
 /**
@@ -231,7 +240,6 @@ extern __device__ simplified_trace_data* global_simplified_trace;
  * @param[out] data The data structure to serialize into.
  */
 __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data);
-
 
 #ifdef BUILD_GO_LIBRARY
 __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* transaction_list_ptr);

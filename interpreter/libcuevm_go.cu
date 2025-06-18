@@ -43,7 +43,8 @@ uint32_t get_num_instances_per_device() { return g_num_instances_per_device; }
 
 // Process state data on GPU - initialize StateDB and print data
 
-int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state, uint32_t skipTxSize) {
+int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state, uint32_t skipTxSize,
+                           const char* fuzzing_constants) {
     // Reset counter when new state is processed and reset_state is true
     if (reset_state) {
         reset_state_db();
@@ -73,6 +74,8 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         CUDA_CHECK(cudaMalloc(&d_coverage_bitmap, BITMAP_SIZE_IN_INTS * sizeof(uint32_t)));
         CUDA_CHECK(cudaMemset(d_coverage_bitmap, 0, BITMAP_SIZE_IN_INTS * sizeof(uint32_t)));
         CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::g_coverage_bitmap, &d_coverage_bitmap, sizeof(uint32_t*)));
+
+        setup_fuzzing_constants(fuzzing_constants);
     }
     // Include <cassert> header at the top of the file for this to work.
     // Standard assert takes only one argument (the condition).
@@ -139,6 +142,83 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
     // Free JSON object
     cJSON_Delete(stateJson);
     return 0;
+}
+
+void setup_fuzzing_constants(const char* fuzzing_constants) {
+    printf("Setting up fuzzing constants\n");
+    if (fuzzing_constants == nullptr) {
+        printf("No fuzzing constants provided\n");
+        return;
+    }
+
+    cJSON* constantsJson = cJSON_Parse(fuzzing_constants);
+    if (constantsJson == NULL) {
+        printf("Error parsing fuzzing constants\n");
+        return;
+    }
+
+    cJSON* address_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "address");
+    cJSON* integer_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "integer");
+
+    if (!cJSON_IsArray(address_constants) || !cJSON_IsArray(integer_constants)) {
+        printf("Error: address or integer is not an array\n");
+        cJSON_Delete(constantsJson);
+        return;
+    }
+    int address_count = cJSON_GetArraySize(address_constants);
+    int integer_count = cJSON_GetArraySize(integer_constants);
+    printf("Address count: %d\n", address_count);
+    printf("Integer count: %d\n", integer_count);
+
+    // Allocate host arrays
+    uint8_t* host_address_constants = new uint8_t[address_count * 32];
+    uint8_t* host_integer_constants = new uint8_t[integer_count * 32];
+    CuEVM::fuzzing_constants* host_fuzzing_constants = new CuEVM::fuzzing_constants();
+    host_fuzzing_constants->address_constants_count = address_count;
+    host_fuzzing_constants->integer_constants_count = integer_count;
+    evm_word_t temp_word;
+    // Parse address constants
+    for (int i = 0; i < address_count; ++i) {
+        cJSON* item = cJSON_GetArrayItem(address_constants, i);
+        if (cJSON_IsString(item) && item->valuestring) {
+            printf("  Address constant[%d]: %s\n", i, item->valuestring);
+            temp_word.from_hex(item->valuestring);
+            uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
+        }
+    }
+
+    // Parse integer constants
+    for (int i = 0; i < integer_count; ++i) {
+        cJSON* item = cJSON_GetArrayItem(integer_constants, i);
+        if (cJSON_IsString(item) && item->valuestring) {
+            printf("  Integer constant[%d]: %s\n", i, item->valuestring);
+            temp_word.from_hex(item->valuestring);
+            uint256_to_bytes(host_integer_constants + i * 32, &temp_word, 32);
+        }
+    }
+    uint8_t* d_address_constants;
+    uint8_t* d_integer_constants;
+    CUDA_CHECK(cudaMalloc(&d_address_constants, address_count * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&d_integer_constants, integer_count * sizeof(evm_word_t)));
+    printf("Copying address constants to device address array size: %d %d\n", address_count * sizeof(evm_word_t),
+           address_count * 32 * sizeof(uint8_t));
+    printf("Copying integer constants to device integer array size: %d %d\n", integer_count * sizeof(evm_word_t),
+           integer_count * 32 * sizeof(uint8_t));
+    CUDA_CHECK(cudaMemcpy(d_address_constants, host_address_constants, address_count * sizeof(evm_word_t),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_integer_constants, host_integer_constants, integer_count * sizeof(evm_word_t),
+                          cudaMemcpyHostToDevice));
+    host_fuzzing_constants->address_constants = d_address_constants;
+    host_fuzzing_constants->integer_constants = d_integer_constants;
+    CuEVM::fuzzing_constants* d_fuzzing_constants;
+    CUDA_CHECK(cudaMalloc(&d_fuzzing_constants, sizeof(CuEVM::fuzzing_constants)));
+    CUDA_CHECK(cudaMemcpy(d_fuzzing_constants, host_fuzzing_constants, sizeof(CuEVM::fuzzing_constants),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::g_fuzzing_constants, &d_fuzzing_constants, sizeof(CuEVM::fuzzing_constants*)));
+
+    cJSON_Delete(constantsJson);
+    delete[] host_address_constants;
+    delete[] host_integer_constants;
 }
 
 void reset_state_db() {
@@ -1128,6 +1208,7 @@ GPUExecutionResultC* get_gpu_execution_results() {
 
     return result;
 }
+
 void free_simplified_gpu_result(SimplifiedGPUResultC* result) {
     // TODO: Implement this
     // if (result == nullptr || result->allocations_valid == 0) return;

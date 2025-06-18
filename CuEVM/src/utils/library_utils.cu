@@ -25,6 +25,24 @@ __device__ uint32_t* g_new_bug_pc = nullptr;
 __device__ uint32_t* g_new_bug_count = nullptr;
 __device__ uint32_t* g_new_bug_idx = nullptr;
 
+__device__ fuzzing_constants* g_fuzzing_constants = nullptr;
+
+__host__ __device__ void fuzzing_constants::print() {
+    printf("address_constants_count: %d\n", address_constants_count);
+    printf("integer_constants_count: %d\n", integer_constants_count);
+    for (uint32_t i = 0; i < address_constants_count; i++) {
+        for (uint32_t j = 0; j < 32; j++) {
+            printf("%x", address_constants[i * 32 + j]);
+        }
+        printf("\n");
+    }
+    for (uint32_t i = 0; i < integer_constants_count; i++) {
+        for (uint32_t j = 0; j < 32; j++) {
+            printf("%x", integer_constants[i * 32 + j]);
+        }
+        printf("\n");
+    }
+}
 __host__ void serialized_worldstate_data::print() {
     printf("\nPrinting serialized worldstate data\n");
     printf("no_accounts: %d\n", no_accounts);
@@ -319,12 +337,45 @@ void freeTraceData(bool copy_state_data) {
 // LCG parameters (commonly used for a 32-bit generator)
 
 // seed = (a * seed + c) % m;
+// chances out of 100
+
+#define CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS 50  // percent
+#define CHANCE_TO_CREATE_NEW_INTEGER 2            // one in 2
+#define CHANCE_TO_CREATE_NEW_ADDRESS 5            // percent
+#define A_LCG 1664525
+#define C_LCG 1013904223
+#define M_LCG 0xFFFFFFFF  // 2^32 - 1
+
+__device__ unsigned int mutate_byte_array(uint8_t* data, uint32_t element_length, uint32_t byte_length,
+                                          unsigned int seed, bool create_new) {
+    seed = (A_LCG * seed + C_LCG) % M_LCG;
+    uint8_t mutated_byte = seed % (byte_length + 1);
+    if (create_new) {
+        seed = (A_LCG * seed + C_LCG) % M_LCG;
+        uint32_t random_chance = seed % 100;
+        if (random_chance <= CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS) {
+            seed = (A_LCG * seed + C_LCG) % M_LCG;
+            // take from constants
+            uint32_t random_index = seed % g_fuzzing_constants->integer_constants_count;
+            for (int i = element_length - byte_length; i < element_length; i++) {
+                data[i] = g_fuzzing_constants->integer_constants[random_index * 32 + i];
+            }
+        } else {
+            for (int i = 0; i < element_length - mutated_byte; i++) {
+                data[i] = 0;
+            }
+        }
+    }
+    uint8_t* start_offset = data + element_length - mutated_byte;
+    for (int mutate_byte_index = 0; mutate_byte_index < mutated_byte; mutate_byte_index++) {
+        seed = (A_LCG * seed + C_LCG) % M_LCG;
+        uint8_t random_byte = seed & 0xFF;
+        start_offset[mutate_byte_index] = random_byte;
+    }
+    return seed;
+}
 
 __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* transaction_list_ptr) {
-    const unsigned int a = 1664525;
-    const unsigned int c = 1013904223;
-    const unsigned int m = 0xFFFFFFFF;            // 2^32 - 1
-    const unsigned int chance_to_create_new = 2;  //  chance to create new value
     unsigned int seed = INSTANCE_GLOBAL_IDX + transaction_list_ptr->start_seed;
 
     uint32_t marker_idx = INSTANCE_GLOBAL_IDX / CUEVM_MUTATE_GROUP_SIZE;
@@ -340,27 +391,28 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
         if (element_type != 0 && element_type != 1) {
             uint32_t byte_length = element_type / 8;
             // randomize the marker data
-            seed = (a * seed + c) % m;
-            bool create_new = (seed % chance_to_create_new) == 1;
-            seed = (a * seed + c) % m;
-            uint8_t mutated_byte = seed % (byte_length + 1);
-            if (create_new) {
-                // printf("thread %d create_new %d mutated_byte %d\n", INSTANCE_GLOBAL_IDX, create_new, mutated_byte);
-                // clear call data before mutated byte
-                for (int i = 0; i < element_length - mutated_byte; i++) {
-                    call_data[element_offset + i] = 0;
-                }
-            }
-            uint8_t* start_offset = call_data + element_offset + element_length - mutated_byte;
-            for (int mutate_byte_index = 0; mutate_byte_index < mutated_byte; mutate_byte_index++) {
-                seed = (a * seed + c) % m;
-                uint8_t random_byte = seed & 0xFF;  // Extract least significant byte
+            seed = (A_LCG * seed + C_LCG) % M_LCG;
+            bool create_new = (seed % CHANCE_TO_CREATE_NEW_INTEGER) == 0;
+            seed = mutate_byte_array(call_data + element_offset, element_length, byte_length, seed, create_new);
+        } else if (element_type == 1) {  // address
+            // randomize the marker data
+            seed = (A_LCG * seed + C_LCG) % M_LCG;
+            uint32_t random_chance = seed % 100;
 
-                // printf("instance %d mutated byte %d mutate_byte_index %d random_byte %x\n", INSTANCE_GLOBAL_IDX,
-                //        start_offset[mutate_byte_index], mutate_byte_index, random_byte);
-                start_offset[mutate_byte_index] = random_byte;
-                // printf("thread %d marker_type %d mutated_byte %d random_byte %d\n", INSTANCE_GLOBAL_IDX,
-                // element_type, mutated_byte, random_byte);
+            if (random_chance <= CHANCE_TO_CREATE_NEW_ADDRESS) {
+                // printf("thread %d create new address\n", INSTANCE_GLOBAL_IDX);
+                seed = mutate_byte_array(call_data + element_offset, 32, 20, seed, true);
+            } else {
+                seed = (A_LCG * seed + C_LCG) % M_LCG;
+                // select from the constants
+                uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
+                uint32_t random_index = seed % address_constants_count;
+                // printf("thread %d seed %d address_constants_count %d random_address_index %d\n", INSTANCE_GLOBAL_IDX,
+                //        seed, address_constants_count, random_index);
+                for (int i = 0; i < 20; i++) {
+                    call_data[element_offset + 12 + i] =
+                        g_fuzzing_constants->address_constants[random_index * 32 + 12 + i];
+                }
             }
         }
     }

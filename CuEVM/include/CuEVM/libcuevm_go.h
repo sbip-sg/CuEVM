@@ -129,7 +129,7 @@ SimplifiedGPUResultC* process_batch_transactions(
  * @return int Error code (0 for success, non-zero for error)
  */
 int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false,
-                           uint32_t skipTxSize = 1);
+                           uint32_t skipTxSize = 1, const char* fuzzing_constants = nullptr);
 
 /**
  * @brief Reset the state database to its initial state.
@@ -147,7 +147,24 @@ void reset_state_db();
  */
 GPUExecutionResultC* get_gpu_execution_results();
 
+/**
+ * @brief Setup fuzzing constants.
+ *
+ * Sets up fuzzing constants for the GPU.
+ *
+ * @param[in] fuzzing_constants JSON string containing the fuzzing constants
+ */
+void setup_fuzzing_constants(const char* fuzzing_constants);
+
+/**
+ * @brief Get the number of instances per device.
+ *
+ * Retrieves the number of instances per device.
+ *
+ * @return uint32_t Number of instances per device
+ */
 uint32_t get_num_instances_per_device();
+
 /**
  * @brief Get the results of the most recent GPU execution.
  *

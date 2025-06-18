@@ -12,6 +12,10 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     int32_t instance = blockIdx.x * blockDim.x + threadIdx.x;
     if (instance >= count) return;
 #ifdef BUILD_GO_LIBRARY
+    // if (instance == 1) {
+    //     printf("g_fuzzing_constants: %p\n", g_fuzzing_constants);
+    //     g_fuzzing_constants->print();
+    // }
     mutate_transaction_data(transaction_list_ptr);
 #endif
 
