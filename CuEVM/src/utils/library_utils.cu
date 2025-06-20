@@ -341,7 +341,7 @@ void freeTraceData(bool copy_state_data) {
 
 #define CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS 50  // percent
 #define CHANCE_TO_CREATE_NEW_INTEGER 2            // one in 2
-#define CHANCE_TO_CREATE_NEW_ADDRESS 5            // percent
+#define CHANCE_TO_CREATE_NEW_ADDRESS 0            // percent
 #define A_LCG 1664525
 #define C_LCG 1013904223
 #define M_LCG 0xFFFFFFFF  // 2^32 - 1
@@ -381,6 +381,7 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
     uint32_t marker_idx = INSTANCE_GLOBAL_IDX / CUEVM_MUTATE_GROUP_SIZE;
     uint32_t marker_size = transaction_list_ptr->marker_size[marker_idx];
     if (marker_size == 0) return;
+    // if (INSTANCE_GLOBAL_IDX % CUEVM_MUTATE_GROUP_SIZE != 0) return;  // skip the first sequence in each group
     uint32_t current_marker_offset = transaction_list_ptr->marker_offset[marker_idx];
     uint8_t* call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
     for (int j = 0; j < marker_size; j++) {

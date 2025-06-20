@@ -18,7 +18,9 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     // }
     mutate_transaction_data(transaction_list_ptr);
 #endif
-
+    // if (instance == 0) {
+    //     global_state_db_ptr->print();
+    // }
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef DEBUG
     if (instance == 1) transaction_list_ptr->print();
@@ -821,7 +823,8 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
 
 __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
-    // printf("finish_CALL thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
+    // printf("finish_CALL thread %d, error_code %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, error_code,
+    //        call_state_ptr);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
@@ -860,7 +863,9 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         call_state_ptr->parent->dynamic_ret_size = 0;
         call_state_ptr->fixed_ret_size = 0;
     }
-
+    // printf("finish_CALL thread %d, error_code %d, call_state_ptr->snapshot_state %p\n", INSTANCE_GLOBAL_IDX,
+    // error_code,
+    //        call_state_ptr->snapshot_state);
     if (error_code != ERROR_RETURN && call_state_ptr->snapshot_state != nullptr) {
         // printf("\n\nRevert to previous depth %d \n\n", call_state_ptr->depth - 1);
         call_state_ptr->revert();

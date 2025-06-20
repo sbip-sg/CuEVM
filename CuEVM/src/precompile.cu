@@ -151,8 +151,6 @@ __device__ int32_t operation_MODEXP(gas_t &gas_limit, gas_t &gas_used, CuEVM::ev
 
     bool exp_is_zero = true;
 
-    
-
     // Safe allocation: ensure at least 1 byte to avoid malloc(0)
     uint32_t safe_exp_len = (exp_len == 0) ? 1 : exp_len;
     if (safe_exp_len > data_len) {
@@ -416,9 +414,11 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
             uint8_t *output = new uint8_t[32];
 
             size_t res = ERROR_SUCCESS;
-            if (call_context->parent != nullptr) {
-                signer = call_context->parent->from;
-            }
+            signer = 0;
+            //
+            // if (call_context->parent != nullptr) {
+            //     signer = call_context->parent->from;
+            // }
 #else
         // TODO: is not 27 and 28, only?
         if (signature->v == 28 || signature->v == 27) {
@@ -429,10 +429,10 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
             if (res == ERROR_SUCCESS) {
                 uint256_to_bytes(output, &signer, 32);
 #ifdef DEBUG
-            if (threadIdx.x == 0) {
-                printf(" THREAD %d signer \n", threadIdx.x);
-                signer.print();
-            }
+                if (threadIdx.x == 0) {
+                    printf(" THREAD %d signer \n", threadIdx.x);
+                    signer.print();
+                }
 #endif
                 error_code = ERROR_RETURN;
                 call_context->set_parent_return_data(output, 32);

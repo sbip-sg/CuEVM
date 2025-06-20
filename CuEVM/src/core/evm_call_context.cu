@@ -48,7 +48,8 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
                                                     uint8_t* call_data, uint32_t call_data_size, uint8_t* byte_code,
                                                     uint32_t byte_code_size, int32_t bytecode_offset,
                                                     evm_call_context_t* parent, bool static_env, gas_t gas_refund) {
-    // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
+    // printf("evm_call_context_t initiate_values with depth thread %d, parent call state ptr %p this call state ptr
+    // %p\n",
     //        INSTANCE_GLOBAL_IDX, parent, this);
 
     this->parent = parent;
@@ -76,7 +77,9 @@ __device__ void evm_call_context_t::initiate_values(uint32_t depth, gas_t gas_li
     this->gas_refund = gas_refund;
     this->stack_ptr->init(CuEVM::memory_pool::global_memory_pool->stack_base);
     this->memory_ptr->init(0);  // no more prealloc after this point
-
+#ifdef BUILD_GO_LIBRARY
+    global_state_db_ptr->init_snapshot(this, depth, &storage_address);
+#endif
     // auto to_address_idx = (byte_code == nullptr ? -1 : global_state_db_ptr->get_address_index(bytecode_address));
     // this->bytecode_offset = -1;
     // if (to_address_idx >= 0){
@@ -154,8 +157,11 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
                                                     uint8_t* byte_code, uint32_t byte_code_size,
                                                     int32_t bytecode_offset, uint32_t return_data_offset,
                                                     uint32_t return_data_size, bool static_env, gas_t gas_refund) {
-    // printf("evm_call_context_t initiate_values thread %d, parent call state ptr %p this call state ptr %p\n",
-    //        INSTANCE_GLOBAL_IDX, parent, this);
+    // printf(
+    //     "evm_call_context_t initiate_values with parent state thread %d, parent call state ptr %p this call state ptr
+    //     "
+    //     "%p\n",
+    //     INSTANCE_GLOBAL_IDX, parent, this);
     if (parent == nullptr) {
         printf("parent is nullptr\n");
         return;
