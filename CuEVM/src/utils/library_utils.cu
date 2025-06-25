@@ -26,6 +26,7 @@ __device__ uint32_t* g_new_bug_count = nullptr;
 __device__ uint32_t* g_new_bug_idx = nullptr;
 
 __device__ fuzzing_constants* g_fuzzing_constants = nullptr;
+__device__ uint32_t* g_static_marker_data = nullptr;
 
 __host__ __device__ void fuzzing_constants::print() {
     printf("address_constants_count: %d\n", address_constants_count);
@@ -341,7 +342,8 @@ void freeTraceData(bool copy_state_data) {
 
 #define CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS 50  // percent
 #define CHANCE_TO_CREATE_NEW_INTEGER 2            // one in 2
-#define CHANCE_TO_CREATE_NEW_ADDRESS 0            // percent
+#define CHANCE_TO_CREATE_NEW_ADDRESS 0            // 1 percent
+#define CHANCE_TO_SKIP_MUTATE 50                  // percent we skip a marker
 #define A_LCG 1664525
 #define C_LCG 1013904223
 #define M_LCG 0xFFFFFFFF  // 2^32 - 1
@@ -379,16 +381,35 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
     unsigned int seed = INSTANCE_GLOBAL_IDX + transaction_list_ptr->start_seed;
 
     uint32_t marker_idx = INSTANCE_GLOBAL_IDX / CUEVM_MUTATE_GROUP_SIZE;
-    uint32_t marker_size = transaction_list_ptr->marker_size[marker_idx];
+    // printf("thread %d marker_idx %d , marker offset %d\n", INSTANCE_GLOBAL_IDX, marker_idx,
+    //        transaction_list_ptr->marker_offset[marker_idx]);
+    int32_t marker_offset = transaction_list_ptr->marker_offset[marker_idx];
+    uint32_t* marker_data;
+
+    if (marker_offset < 0) {
+        marker_data = g_static_marker_data + (-marker_offset - 1);
+    } else {
+        marker_data = transaction_list_ptr->marker_data + marker_offset;
+    }
+    // The first element is the marker size, then marker_data points to the next element
+    uint32_t marker_size = *marker_data++;
+
     if (marker_size == 0) return;
     // if (INSTANCE_GLOBAL_IDX % CUEVM_MUTATE_GROUP_SIZE != 0) return;  // skip the first sequence in each group
-    uint32_t current_marker_offset = transaction_list_ptr->marker_offset[marker_idx];
+
     uint8_t* call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
     for (int j = 0; j < marker_size; j++) {
-        uint32_t element_offset = transaction_list_ptr->marker_data[current_marker_offset + j * 3];
-        uint32_t element_type = transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1];
-        uint32_t element_length = transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2];
+        uint32_t element_offset = *marker_data++;
+        uint32_t element_type = *marker_data++;
+        uint32_t element_length = *marker_data++;
 
+        seed = (A_LCG * seed + C_LCG) % M_LCG;
+        uint32_t random_chance = seed % 100;
+        if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
+            continue;
+        }
+        // printf("thread %d marker_idx %d marker_offset %d element_offset %d element_type %d element_length %d\n",
+        //        INSTANCE_GLOBAL_IDX, marker_idx, marker_offset, element_offset, element_type, element_length);
         if (element_type != 0 && element_type != 1) {
             uint32_t byte_length = element_type / 8;
             // randomize the marker data

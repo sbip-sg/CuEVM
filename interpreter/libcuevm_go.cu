@@ -44,7 +44,7 @@ uint32_t get_num_instances_per_device() { return g_num_instances_per_device; }
 // Process state data on GPU - initialize StateDB and print data
 
 int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state, uint32_t skipTxSize,
-                           const char* fuzzing_constants) {
+                           const char* fuzzing_constants, uint32_t* markerData, uint32_t markerDataLen) {
     // Reset counter when new state is processed and reset_state is true
     if (reset_state) {
         reset_state_db();
@@ -58,6 +58,12 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         g_num_gpus = 0;
         return -1;
     }
+    // debug printing marker data
+    printf("CuEVM Debug: markerDataLen: %d\n", markerDataLen);
+    for (int i = 0; i < markerDataLen; i++) {
+        printf("CuEVM Debug: markerData[%d]: %d\n", i, markerData[i]);
+    }
+
     printf("Found %d GPUs.\n", g_num_gpus);
     printf("Resetting GPU devices\n");
     for (int i = 0; i < g_num_gpus; i++) {
@@ -75,7 +81,7 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         CUDA_CHECK(cudaMemset(d_coverage_bitmap, 0, BITMAP_SIZE_IN_INTS * sizeof(uint32_t)));
         CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::g_coverage_bitmap, &d_coverage_bitmap, sizeof(uint32_t*)));
 
-        setup_fuzzing_constants(fuzzing_constants);
+        setup_fuzzing_constants(fuzzing_constants, markerData, markerDataLen);
     }
     // Include <cassert> header at the top of the file for this to work.
     // Standard assert takes only one argument (the condition).
@@ -144,7 +150,7 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
     return 0;
 }
 
-void setup_fuzzing_constants(const char* fuzzing_constants) {
+void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData, uint32_t markerDataLen) {
     printf("Setting up fuzzing constants\n");
     if (fuzzing_constants == nullptr) {
         printf("No fuzzing constants provided\n");
@@ -215,6 +221,13 @@ void setup_fuzzing_constants(const char* fuzzing_constants) {
     CUDA_CHECK(cudaMemcpy(d_fuzzing_constants, host_fuzzing_constants, sizeof(CuEVM::fuzzing_constants),
                           cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::g_fuzzing_constants, &d_fuzzing_constants, sizeof(CuEVM::fuzzing_constants*)));
+
+    // copy marker data to device
+    uint32_t* d_marker_data;
+    CUDA_CHECK(cudaMalloc(&d_marker_data, markerDataLen * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMemcpy(d_marker_data, markerData, markerDataLen * sizeof(uint32_t), cudaMemcpyHostToDevice));
+
+    CUDA_CHECK(cudaMemcpyToSymbol(CuEVM::g_static_marker_data, &d_marker_data, sizeof(uint32_t*)));
 
     cJSON_Delete(constantsJson);
     delete[] host_address_constants;
@@ -446,8 +459,8 @@ void print_evm_instances_results(bool copy_state_data) {
 std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
     const unsigned char* values, const unsigned char* callData, int callDataLen, const uint32_t* dataOffsets,
-    int dataOffsetsLen, const uint32_t* dataSizes, int txCount, const uint32_t* markerOffsets,
-    const uint32_t* markerCounts, const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0) {
+    int dataOffsetsLen, const uint32_t* dataSizes, int txCount, const int32_t* markerOffsets,
+    const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0) {
     printf("create transaction list with start seed %u\n", start_seed);
     // Create TransactionList on host
     CuEVM::transaction::TransactionList* host_transaction_list = new CuEVM::transaction::TransactionList();
@@ -541,9 +554,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 
         // initialize marker data
         CUDA_CHECK(
-            cudaMalloc(&temp_transaction_list->marker_size, transaction_per_gpu / g_skipTxSize * sizeof(uint32_t)));
-        CUDA_CHECK(
-            cudaMalloc(&temp_transaction_list->marker_offset, transaction_per_gpu / g_skipTxSize * sizeof(uint32_t)));
+            cudaMalloc(&temp_transaction_list->marker_offset, transaction_per_gpu / g_skipTxSize * sizeof(int32_t)));
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->marker_data, markerDataLen * sizeof(uint32_t)));
 #endif
 
@@ -580,9 +591,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
 
         // Copy marker data from host to GPU
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset, markerOffsets,
-                              transaction_per_gpu / g_skipTxSize * sizeof(uint32_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_size, markerCounts,
-                              transaction_per_gpu / g_skipTxSize * sizeof(uint32_t), cudaMemcpyHostToDevice));
+                              transaction_per_gpu / g_skipTxSize * sizeof(int32_t), cudaMemcpyHostToDevice));
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_data, markerData, markerDataLen * sizeof(uint32_t),
                               cudaMemcpyHostToDevice));
 
@@ -630,9 +639,9 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
                                                  uint32_t callDataLen, const uint32_t* dataOffsets,
                                                  const uint32_t* dataSizes,
                                                  // June: added marker data
-                                                 const uint32_t* markerOffsets, const uint32_t* markerCounts,
-                                                 const uint32_t* markerData, uint32_t markerDataLen,
-                                                 uint32_t txBatchCount, uint32_t sequenceLength, uint32_t start_seed) {
+                                                 const int32_t* markerOffsets, const uint32_t* markerData,
+                                                 uint32_t markerDataLen, uint32_t txBatchCount, uint32_t sequenceLength,
+                                                 uint32_t start_seed) {
     printf("CuEVM Go interface: Processing batch of %d transactions, num tx per gpu %d, sequence length: %d\n",
            txBatchCount, g_num_instances_per_device, sequenceLength);
     std::vector<cudaStream_t> streams;  // TODO move streams to global
@@ -663,20 +672,16 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
         final_result->num_results = sequenceLength;
         for (int sequenceIdx = 0; sequenceIdx < sequenceLength; sequenceIdx++) {
             uint32_t current_idx = sequenceIdx * txBatchCount;
-            uint32_t current_marker_offset_idx = current_idx / g_skipTxSize;
+
             if (current_idx != 0) {
                 current_calldata_offset += dataOffsets[current_idx - 1] + dataSizes[current_idx - 1];
-                current_marker_offset +=
-                    markerOffsets[current_marker_offset_idx - 1] + markerCounts[current_marker_offset_idx - 1] * 3;
             }
             callDataLen = dataOffsets[current_idx + txBatchCount - 1] + dataSizes[current_idx + txBatchCount - 1];
             // June debug, check this
-            markerDataLen = markerOffsets[current_marker_offset_idx + txBatchCount / g_skipTxSize - 1] +
-                            markerCounts[current_marker_offset_idx + txBatchCount / g_skipTxSize - 1] * 3;
+
             printf("current_idx: %u, current_calldata_offset: %u, callDataLen: %u\n", current_idx,
                    current_calldata_offset, callDataLen);
 
-            printf("current_marker_offset: %u, markerDataLen: %u\n", current_marker_offset, markerDataLen);
             // Create and transfer transaction list to GPU
 
             const unsigned char* newFromAddr = fromAddr + 32 * current_idx;
@@ -684,9 +689,8 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
             auto d_transaction_list_ptrs = create_transaction_list(
                 blockNumber + current_idx, timeStamp + current_idx, newFromAddr, toAddr, newValues,
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
-                dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,
-                markerCounts + current_idx / g_skipTxSize, markerData + current_marker_offset, markerDataLen,
-                start_seed + sequenceIdx);
+                dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize, markerData,
+                markerDataLen, start_seed + sequenceIdx);
 
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call

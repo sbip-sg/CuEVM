@@ -49,6 +49,7 @@ struct fuzzing_constants {
 };
 // for fuzzing utilities
 extern __device__ fuzzing_constants* g_fuzzing_constants;
+extern __device__ uint32_t* g_static_marker_data;
 // Max new branches to record per execution
 // #endif
 /**

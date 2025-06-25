@@ -111,11 +111,13 @@ typedef struct {
  * @return SimplifiedGPUResultC* Pointer to the execution results structure
  */
 #ifdef BUILD_GO_LIBRARY
-SimplifiedGPUResultC* process_batch_transactions(
-    const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
-    const unsigned char* values, const unsigned char* callData, uint32_t callDataLen, const uint32_t* dataOffsets,
-    const uint32_t* dataSizes, const uint32_t* markerOffsets, const uint32_t* markerCounts, const uint32_t* markerData,
-    uint32_t markerDataLen, uint32_t txBatchCount, uint32_t sequenceLength, uint32_t start_seed);
+SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp,
+                                                 const unsigned char* fromAddr, const unsigned char* toAddr,
+                                                 const unsigned char* values, const unsigned char* callData,
+                                                 uint32_t callDataLen, const uint32_t* dataOffsets,
+                                                 const uint32_t* dataSizes, const int32_t* markerOffsets,
+                                                 const uint32_t* markerData, uint32_t markerDataLen,
+                                                 uint32_t txBatchCount, uint32_t sequenceLength, uint32_t start_seed);
 #endif
 
 /**
@@ -129,7 +131,8 @@ SimplifiedGPUResultC* process_batch_transactions(
  * @return int Error code (0 for success, non-zero for error)
  */
 int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false,
-                           uint32_t skipTxSize = 1, const char* fuzzing_constants = nullptr);
+                           uint32_t skipTxSize = 1, const char* fuzzing_constants = nullptr,
+                           uint32_t* markerData = nullptr, uint32_t markerDataLen = 0);
 
 /**
  * @brief Reset the state database to its initial state.
@@ -154,7 +157,7 @@ GPUExecutionResultC* get_gpu_execution_results();
  *
  * @param[in] fuzzing_constants JSON string containing the fuzzing constants
  */
-void setup_fuzzing_constants(const char* fuzzing_constants);
+void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData, uint32_t markerDataLen);
 
 /**
  * @brief Get the number of instances per device.

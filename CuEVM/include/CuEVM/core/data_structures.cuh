@@ -172,9 +172,9 @@ class TransactionList {
 #ifdef BUILD_GO_LIBRARY
     gas_t *block_number;
     gas_t *time_stamp;
-    uint32_t *marker_offset;  // offset of the mutation marker
-    uint32_t *marker_size;    // size of the mutation marker
-    uint32_t *marker_data;    // raw data of the mutation marker
+    int32_t *marker_offset;  // offset of the mutation marker
+
+    uint32_t *marker_data;  // raw data of the mutation marker
 #endif
     __host__ __device__ void print();
 };
