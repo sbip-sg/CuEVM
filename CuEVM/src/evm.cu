@@ -25,7 +25,9 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
 #ifdef DEBUG
     if (instance == 1) transaction_list_ptr->print();
 #endif
-    // if (instance == 1) transaction_list_ptr->print();
+
+    // if (instance == 0) transaction_list_ptr->print();
+
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
     evm.run(cached_call_state, copy_state_data);
 
@@ -67,7 +69,8 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
     CuEVM::evm_memory_t *memory_ptr = memory_pool::get_memory(0);
 
 #ifdef BUILD_GO_LIBRARY
-    evm_word_t *sender = &transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX];
+    // evm_word_t *sender = &transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX];
+    evm_word_t *sender = &g_fuzzing_constants->sender_list[transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX]];
 #else
     evm_word_t *sender = &transaction_list_ptr->sender;
 #endif
@@ -87,26 +90,43 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
             // todo: return error code
             return;
         }
-
+#ifdef BUILD_GO_LIBRARY
+        call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit, stack_ptr, memory_ptr, *sender,
+                                        transaction_list_ptr->to, transaction_list_ptr->to,
+                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CREATE, call_data,
+                                        call_data_size, call_data, call_data_size, bytecode_offset);
+#else
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                         *sender, transaction_list_ptr->to, transaction_list_ptr->to,
                                         transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CREATE, call_data,
                                         call_data_size, call_data, call_data_size, bytecode_offset);
+#endif
     } else {
         byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
         bytecode_offset = find_global_bytecode_offset(&transaction_list_ptr->to);
 
+#ifdef BUILD_GO_LIBRARY
+        call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit, stack_ptr, memory_ptr, *sender,
+                                        transaction_list_ptr->to, transaction_list_ptr->to,
+                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CALL, call_data,
+                                        call_data_size, byte_code, byte_code_size, bytecode_offset);
+#else
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                         *sender, transaction_list_ptr->to, transaction_list_ptr->to,
                                         transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CALL, call_data,
                                         call_data_size, byte_code, byte_code_size, bytecode_offset);
+#endif
     }
     // charge gas and validate balance
     CuEVM::gas_t gas_intrinsic;
     CuEVM::gas_cost::transaction_intrinsic_gas(transaction_list_ptr, gas_intrinsic);
     call_state_ptr->gas_used = gas_intrinsic;
     // deduct upfront cost
+#ifdef BUILD_GO_LIBRARY
+    evm_word_t upfront_cost = transaction_list_ptr->gas_limit;
+#else
     evm_word_t upfront_cost = transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX];
+#endif
 
     uint256_mul(&upfront_cost, &upfront_cost, &transaction_list_ptr->gas_price);
     global_state_db_ptr->deduct_balance_sender(sender, &upfront_cost);
@@ -126,9 +146,17 @@ __device__ evm_t::~evm_t() {
 
 __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state) {
 #ifdef DEBUG
-    printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
-    call_state_ptr->from.print();
-    call_state_ptr->to.print();
+    if (INSTANCE_GLOBAL_IDX == 0) {
+        printf("Start call sender receipient %d code size %d\n", THREADIDX, call_state_ptr->byte_code_size);
+        call_state_ptr->from.print();
+        call_state_ptr->to.print();
+        printf("byte code size %d\n", call_state_ptr->byte_code_size);
+        printf("byte code %p\n", call_state_ptr->byte_code);
+        for (int i = 0; i < call_state_ptr->byte_code_size; i++) {
+            printf("%x ", call_state_ptr->byte_code[i]);
+        }
+        printf("\n");
+    }
 #endif
 
     const evm_word_t *sender = &call_state_ptr->from;

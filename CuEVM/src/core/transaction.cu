@@ -12,10 +12,10 @@ namespace transaction {
 __host__ __device__ void TransactionList::print() {
     printf("TransactionList:\n");
     printf("nonce: %lu\n", nonce);
-    #ifndef BUILD_GO_LIBRARY
+#ifndef BUILD_GO_LIBRARY
     printf("sender: ");
     sender.print();
-    #endif
+#endif
     printf("to: ");
     to.print();
     printf("max_fee_per_gas: ");
@@ -26,16 +26,20 @@ __host__ __device__ void TransactionList::print() {
     gas_price.print();
     printf("type: %d\n", type);
     printf("size: %d\n", size);
+#ifdef BUILD_GO_LIBRARY
+    printf("gas_limit: %lu\n", gas_limit);
+#endif
     for (uint32_t i = 0; i < size; i++) {
         printf("value[%d]: ", i);
         value[i].print();
-        #ifdef BUILD_GO_LIBRARY
-        printf("sender[%d]: ", i);
-        sender[i].print();
+#ifdef BUILD_GO_LIBRARY
+        printf("sender[%d]: %d\n", i, sender[i]);
         printf("block_number[%d]: %lu\n", i, block_number[i]);
         printf("time_stamp[%d]: %lu\n", i, time_stamp[i]);
-        #endif
+#endif
+#ifndef BUILD_GO_LIBRARY
         printf("gas_limit[%d]: %lu\n", i, gas_limit[i]);
+#endif
         printf("call_data_offset[%d]: %d\n", i, call_data_offset[i]);
         printf("call_data_size[%d]: %d\n", i, call_data_size[i]);
         printf("call_data[%d]: ", i);

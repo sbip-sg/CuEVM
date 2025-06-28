@@ -165,6 +165,7 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
 
     cJSON* address_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "address");
     cJSON* integer_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "integer");
+    cJSON* sender_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "sender");
 
     if (!cJSON_IsArray(address_constants) || !cJSON_IsArray(integer_constants)) {
         printf("Error: address or integer is not an array\n");
@@ -173,15 +174,20 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     }
     int address_count = cJSON_GetArraySize(address_constants);
     int integer_count = cJSON_GetArraySize(integer_constants);
+    int sender_count = cJSON_GetArraySize(sender_constants);
     printf("Address count: %d\n", address_count);
     printf("Integer count: %d\n", integer_count);
+    printf("Sender count: %d\n", sender_count);
 
     // Allocate host arrays
     uint8_t* host_address_constants = new uint8_t[address_count * 32];
     uint8_t* host_integer_constants = new uint8_t[integer_count * 32];
+    evm_word_t* host_address_list = new evm_word_t[address_count];
+    evm_word_t* host_sender_list = new evm_word_t[sender_count];
     CuEVM::fuzzing_constants* host_fuzzing_constants = new CuEVM::fuzzing_constants();
     host_fuzzing_constants->address_constants_count = address_count;
     host_fuzzing_constants->integer_constants_count = integer_count;
+    host_fuzzing_constants->sender_counts = sender_count;
     evm_word_t temp_word;
     // Parse address constants
     for (int i = 0; i < address_count; ++i) {
@@ -190,6 +196,15 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
             printf("  Address constant[%d]: %s\n", i, item->valuestring);
             temp_word.from_hex(item->valuestring);
             uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
+            host_address_list[i] = temp_word;
+        }
+    }
+    for (int i = 0; i < sender_count; ++i) {
+        cJSON* item = cJSON_GetArrayItem(sender_constants, i);
+        if (cJSON_IsString(item) && item->valuestring) {
+            printf("  Sender constant[%d]: %s\n", i, item->valuestring);
+            temp_word.from_hex(item->valuestring);
+            host_sender_list[i] = temp_word;
         }
     }
 
@@ -204,8 +219,12 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     }
     uint8_t* d_address_constants;
     uint8_t* d_integer_constants;
+    evm_word_t* d_sender_list;
+    evm_word_t* d_address_list;
     CUDA_CHECK(cudaMalloc(&d_address_constants, address_count * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&d_integer_constants, integer_count * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&d_address_list, address_count * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&d_sender_list, sender_count * sizeof(evm_word_t)));
     printf("Copying address constants to device address array size: %d %d\n", address_count * sizeof(evm_word_t),
            address_count * 32 * sizeof(uint8_t));
     printf("Copying integer constants to device integer array size: %d %d\n", integer_count * sizeof(evm_word_t),
@@ -214,8 +233,14 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
                           cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_integer_constants, host_integer_constants, integer_count * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
+    CUDA_CHECK(
+        cudaMemcpy(d_address_list, host_address_list, address_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_sender_list, host_sender_list, sender_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
     host_fuzzing_constants->address_constants = d_address_constants;
     host_fuzzing_constants->integer_constants = d_integer_constants;
+    host_fuzzing_constants->address_list = d_address_list;
+    host_fuzzing_constants->sender_list = d_sender_list;
+
     CuEVM::fuzzing_constants* d_fuzzing_constants;
     CUDA_CHECK(cudaMalloc(&d_fuzzing_constants, sizeof(CuEVM::fuzzing_constants)));
     CUDA_CHECK(cudaMemcpy(d_fuzzing_constants, host_fuzzing_constants, sizeof(CuEVM::fuzzing_constants),
@@ -232,6 +257,8 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     cJSON_Delete(constantsJson);
     delete[] host_address_constants;
     delete[] host_integer_constants;
+    delete[] host_address_list;
+    delete[] host_sender_list;
 }
 
 void reset_state_db() {
@@ -463,92 +490,65 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0) {
     printf("create transaction list with start seed %u\n", start_seed);
     // Create TransactionList on host
-    CuEVM::transaction::TransactionList* host_transaction_list = new CuEVM::transaction::TransactionList();
-    host_transaction_list->size = txCount;
 
     // Allocate memory for transaction data on host
-    host_transaction_list->value = new evm_word_t[txCount];
-    host_transaction_list->call_data_offset = new uint32_t[txCount];
-    host_transaction_list->call_data_size = new uint32_t[txCount];
+    // evm_word_t* converted_values = new evm_word_t[txCount];
 
 #ifdef BUILD_GO_LIBRARY
-    // Allocate memory for sender array when using GO library
-    host_transaction_list->sender = new evm_word_t[txCount];
-    host_transaction_list->block_number = new uint64_t[txCount];
-    host_transaction_list->time_stamp = new uint64_t[txCount];
-    host_transaction_list->start_seed = start_seed;
-#endif
+    // do we need to memcpy ?
+    // memcpy(host_transaction_list->block_number, blockNumber, txCount * sizeof(uint64_t));
+    // memcpy(host_transaction_list->time_stamp, timeStamp, txCount * sizeof(uint64_t));
 
-    // Use fixed gas limit for all transactions
-    host_transaction_list->gas_limit = new uint64_t[txCount];
-    for (int i = 0; i < txCount; i++) {
-        host_transaction_list->gas_limit[i] = 1000000;  // Fixed gas limit
-    }
-
-    // Copy data offsets and sizes
-    memcpy(host_transaction_list->call_data_offset, dataOffsets, txCount * sizeof(uint32_t));
-    memcpy(host_transaction_list->call_data_size, dataSizes, txCount * sizeof(uint32_t));
-#ifdef BUILD_GO_LIBRARY
-    memcpy(host_transaction_list->block_number, blockNumber, txCount * sizeof(uint64_t));
-    memcpy(host_transaction_list->time_stamp, timeStamp, txCount * sizeof(uint64_t));
 #endif
     // TODO optimize this pattern (set pointers directly)
 
 #ifndef BUILD_GO_LIBRARY
     // Handle single sender (common for all transactions)
-    uint256_from_bytes(&host_transaction_list->sender, fromAddr, 32);
+    // uint256_from_bytes(&host_transaction_list->sender, fromAddr, 32);
 #endif
 
     // Handle recipient (common for all transactions)
-    uint256_from_bytes(&host_transaction_list->to, toAddr, 32);
+    // uint256_from_bytes(&host_transaction_list->to, toAddr, 32);
 
     // Set fixed gas price and nonce
-    host_transaction_list->gas_price = 1;  // 1 wei fixed gas price
-    host_transaction_list->nonce = 0;      // Fixed nonce
+    // host_transaction_list->gas_price = 1;  // 1 wei fixed gas price
+    // host_transaction_list->nonce = 0;      // Fixed nonce
 
     // Handle values for each transaction
-    for (int i = 0; i < txCount; i++) {
-#ifdef BUILD_GO_LIBRARY
-        uint256_from_bytes(&host_transaction_list->sender[i], &fromAddr[i * 32], 32);
-#endif
-        uint256_from_bytes(&host_transaction_list->value[i], &values[i * 32], 32);
-    }
 
-    // Handle call data (if any)
-    uint8_t* host_call_data = nullptr;
-    if (callDataLen > 0) {
-        host_call_data = new uint8_t[callDataLen];
-        memcpy(host_call_data, callData, callDataLen);
-        host_transaction_list->call_data = host_call_data;
-    } else {
-        host_transaction_list->call_data = nullptr;
-    }
+    // for (int i = 0; i < txCount; i++) {
+    //     uint256_from_bytes(&converted_values[i], &values[i * 32], 32);
+    // }
 
-    // Set transaction type (default to 0)
-    host_transaction_list->type = 0;
     std::vector<CuEVM::transaction::TransactionList*> d_transaction_list_ptrs;
     uint32_t transaction_per_gpu = txCount / g_num_gpus;
     for (int i = 0; i < g_num_gpus; i++) {
         printf("\n CuEVM: allocation %d txs on GPU %d \n", transaction_per_gpu, i);
         CUDA_CHECK(cudaSetDevice(i));
-#ifdef BUILD_GO_LIBRARY
-        host_transaction_list->start_seed = start_seed + i;
-        printf("host_transaction_list->start_seed: %u\n", host_transaction_list->start_seed);
-#endif
+
         // Now we need to allocate GPU memory and transfer data
         CuEVM::transaction::TransactionList* d_transaction_list_ptr;
         CuEVM::transaction::TransactionList* temp_transaction_list = new CuEVM::transaction::TransactionList();
-        memcpy(temp_transaction_list, host_transaction_list, sizeof(CuEVM::transaction::TransactionList));
-
+        // memcpy(temp_transaction_list, host_transaction_list, sizeof(CuEVM::transaction::TransactionList));
+#ifdef BUILD_GO_LIBRARY
+        temp_transaction_list->start_seed = start_seed + i;
+        temp_transaction_list->nonce = 0;
+        temp_transaction_list->gas_price = 1;
+        temp_transaction_list->gas_limit = 1000000;
+        temp_transaction_list->type = 0;
+        temp_transaction_list->size = transaction_per_gpu;
+        uint256_from_bytes(&temp_transaction_list->to, toAddr, 32);
+        printf("host_transaction_list->start_seed: %u\n", temp_transaction_list->start_seed);
+#endif
         // Allocate GPU memory for transaction data
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->value, transaction_per_gpu * sizeof(evm_word_t)));
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->gas_limit, transaction_per_gpu * sizeof(uint64_t)));
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_offset, transaction_per_gpu * sizeof(uint32_t)));
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data_size, transaction_per_gpu * sizeof(uint32_t)));
 
 #ifdef BUILD_GO_LIBRARY
         // Allocate GPU memory for sender array
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->sender, transaction_per_gpu * sizeof(evm_word_t)));
+        CUDA_CHECK(cudaMalloc(&temp_transaction_list->sender, transaction_per_gpu * sizeof(uint8_t)));
+
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->block_number, transaction_per_gpu * sizeof(uint64_t)));
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
 
@@ -561,32 +561,30 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         // Allocate GPU memory for call data if needed
         if (callDataLen > 0) {
             CUDA_CHECK(cudaMalloc(&temp_transaction_list->call_data, callDataLen * sizeof(uint8_t)));
-            CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data, host_call_data, callDataLen * sizeof(uint8_t),
+            CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data, callData, callDataLen * sizeof(uint8_t),
                                   cudaMemcpyHostToDevice));
         }
 
         // Copy data from host to GPU
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->value, host_transaction_list->value + i * transaction_per_gpu,
-                              transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->gas_limit,
-                              host_transaction_list->gas_limit + i * transaction_per_gpu,
-                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_offset,
-                              host_transaction_list->call_data_offset + i * transaction_per_gpu,
+        // CUDA_CHECK(cudaMemcpy(temp_transaction_list->value, converted_values + i * transaction_per_gpu,
+        //                       transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+
+        // CuEVM debug June 27, disable value for now
+        // memset zero for blocknumber
+        CUDA_CHECK(cudaMemset(temp_transaction_list->value, 0, transaction_per_gpu * sizeof(evm_word_t)));
+
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_offset, dataOffsets + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_size,
-                              host_transaction_list->call_data_size + i * transaction_per_gpu,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->call_data_size, dataSizes + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
 #ifdef BUILD_GO_LIBRARY
         // Copy sender array from host to GPU
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->sender, host_transaction_list->sender + i * transaction_per_gpu,
-                              transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->block_number,
-                              host_transaction_list->block_number + i * transaction_per_gpu,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->sender, fromAddr + i * transaction_per_gpu,
+                              transaction_per_gpu * sizeof(uint8_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->block_number, blockNumber + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->time_stamp,
-                              host_transaction_list->time_stamp + i * transaction_per_gpu,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->time_stamp, timeStamp + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
 
         // Copy marker data from host to GPU
@@ -616,19 +614,8 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         d_transaction_list_ptrs.push_back(d_transaction_list_ptr);
     }
     // Free host memory
-    delete[] host_transaction_list->gas_limit;
-    delete[] host_transaction_list->value;
-    delete[] host_transaction_list->call_data_offset;
-    delete[] host_transaction_list->call_data_size;
-#ifdef BUILD_GO_LIBRARY
-    delete[] host_transaction_list->sender;
-    delete[] host_transaction_list->block_number;
-    delete[] host_transaction_list->time_stamp;
-#endif
-    if (host_transaction_list->call_data != nullptr) {
-        delete[] host_transaction_list->call_data;
-    }
-    delete host_transaction_list;
+
+    // delete[] converted_values;
     return d_transaction_list_ptrs;
 }
 
@@ -665,6 +652,18 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
         //     printf("markerOffsets[%d]: %u, markerCounts[%d]: %u\n", i, markerOffsets[i], i, markerCounts[i]);
         // }
 
+        // print the call data for debugging
+        // printf("calldata : \n");
+        // for (int i = 0; i < callDataLen; i++) {
+        //     printf("%x", callData[i]);
+        // }
+        // printf("\n");
+        // printf("dataOffsets and size : \n");
+        // for (int i = 0; i < txBatchCount * sequenceLength; i++) {
+        //     printf("index :%u, offset :%u, size :%u\n", i, dataOffsets[i], dataSizes[i]);
+        // }
+        // printf("\n");
+
         uint32_t current_calldata_offset = 0;
         uint32_t current_marker_offset = 0;
         SimplifiedGPUResultC* final_result = new SimplifiedGPUResultC();
@@ -684,14 +683,19 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
 
             // Create and transfer transaction list to GPU
 
-            const unsigned char* newFromAddr = fromAddr + 32 * current_idx;
+            // from addr is uint8 array
+            const uint8_t* newFromAddr = fromAddr + current_idx;
+
             const unsigned char* newValues = values + 32 * current_idx;
             auto d_transaction_list_ptrs = create_transaction_list(
                 blockNumber + current_idx, timeStamp + current_idx, newFromAddr, toAddr, newValues,
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
                 dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize, markerData,
                 markerDataLen, start_seed + sequenceIdx);
-
+            // auto d_transaction_list_ptrs = create_transaction_list(
+            //     newFromAddr, toAddr, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
+            //     txBatchCount, dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,
+            //     markerData, markerDataLen, start_seed + sequenceIdx);
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call
 

@@ -4,6 +4,9 @@
 #include <CuEVM/operations/environmental.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_utils.cuh>
+#ifdef BUILD_GO_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 namespace CuEVM::operations {
 __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
                         CuEVM::evm_memory_t &memory) {
@@ -108,7 +111,7 @@ __device__ int32_t ORIGIN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
 #ifdef BUILD_GO_LIBRARY
-        evm_word_t origin = transaction_list->sender[INSTANCE_GLOBAL_IDX];
+        evm_word_t origin = g_fuzzing_constants->address_list[transaction_list->sender[INSTANCE_GLOBAL_IDX]];
 #else
         evm_word_t origin = transaction_list->sender;
 #endif

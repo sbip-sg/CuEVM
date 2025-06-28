@@ -150,7 +150,7 @@ class TransactionList {
     evm_word_t nonce;
     // allow different sender in fuzzing mode
 #ifdef BUILD_GO_LIBRARY
-    evm_word_t *sender;
+    uint8_t *sender;  // index to the constant address array
     uint32_t start_seed;
 #else
     evm_word_t sender;
@@ -162,7 +162,11 @@ class TransactionList {
     uint16_t type;
     // different for each transaction (eth-tests)
     evm_word_t *value;
+#ifdef BUILD_GO_LIBRARY
+    gas_t gas_limit = 1000000;  // shared gaslimit
+#else
     gas_t *gas_limit;
+#endif
     uint8_t *call_data;
     uint32_t *call_data_offset;
     uint32_t *call_data_size;

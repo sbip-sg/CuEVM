@@ -40,11 +40,19 @@ extern __device__ uint32_t* g_new_bug_idx;
 extern __device__ uint32_t* g_new_bug_pc;
 extern __device__ uint32_t* g_new_bug_count;
 
+#define ELEMENT_ADDRESS_TYPE 1
+#define ELEMENT_VALUE_TYPE 2
+
 struct fuzzing_constants {
     uint8_t* address_constants;
     uint32_t address_constants_count;  // number of address constants
+    evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
     uint8_t* integer_constants;
     uint32_t integer_constants_count;  // number of uint256 constants
+    uint32_t block_number_delay_max = 60480;
+    uint32_t block_timestamp_delay_max = 604800;
+    evm_word_t* sender_list;  // sender list for fuzzing
+    uint32_t sender_counts = 3;
     __host__ __device__ void print();
 };
 // for fuzzing utilities

@@ -97,11 +97,8 @@ typedef struct {
  *
  * Executes multiple Ethereum transactions in parallel on the GPU.
  *
- * @param[in] blockNumber Array of block numbers
- * @param[in] timeStamp Array of timestamps
  * @param[in] fromAddr Array of sender addresses in byte format
  * @param[in] toAddr Array of recipient addresses in byte format
- * @param[in] values Array of transaction values
  * @param[in] callData Combined call data for all transactions
  * @param[in] callDataLen Length of the combined call data
  * @param[in] dataOffsets Array of offsets into the call data for each transaction

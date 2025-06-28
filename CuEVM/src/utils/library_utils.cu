@@ -292,9 +292,11 @@ void freeTransactionList(TransactionList* d_transaction_list_ptr) {
     if (temp_list.value != nullptr) {
         CUDA_CHECK(cudaFree(temp_list.value));
     }
+#ifndef BUILD_GO_LIBRARY
     if (temp_list.gas_limit != nullptr) {
         CUDA_CHECK(cudaFree(temp_list.gas_limit));
     }
+#endif
     if (temp_list.call_data != nullptr) {
         CUDA_CHECK(cudaFree(temp_list.call_data));
     }
@@ -340,10 +342,13 @@ void freeTraceData(bool copy_state_data) {
 // seed = (a * seed + c) % m;
 // chances out of 100
 
-#define CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS 50  // percent
+#define CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS 10  // percent
 #define CHANCE_TO_CREATE_NEW_INTEGER 2            // one in 2
 #define CHANCE_TO_CREATE_NEW_ADDRESS 0            // 1 percent
 #define CHANCE_TO_SKIP_MUTATE 50                  // percent we skip a marker
+#define VALUE_MUTATE_INT32 7                      // 2**(7*4*8) = 2**224
+#define VALUE_CHANCE_TO_STOP_INT_32 30            // 30 percent.
+
 #define A_LCG 1664525
 #define C_LCG 1013904223
 #define M_LCG 0xFFFFFFFF  // 2^32 - 1
@@ -377,6 +382,59 @@ __device__ unsigned int mutate_byte_array(uint8_t* data, uint32_t element_length
     return seed;
 }
 
+__device__ unsigned int mutate_block_values_senders(unsigned int seed, uint64_t* block_numbers,
+                                                    uint64_t* block_timestamps, uint8_t* senders) {
+    // block number first
+    seed = (A_LCG * seed + C_LCG) % M_LCG;
+    uint32_t random_chance = seed % 100;
+    if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
+        return seed;
+    }
+    seed = (A_LCG * seed + C_LCG) % M_LCG;
+    uint32_t block_number = seed % g_fuzzing_constants->block_number_delay_max;
+
+    seed = (A_LCG * seed + C_LCG) % M_LCG;
+    uint32_t block_timestamp = seed % g_fuzzing_constants->block_timestamp_delay_max;
+
+    if (block_timestamp == 0)
+        block_number = 0;
+    else
+        block_number = block_number % block_timestamp;
+    block_numbers[INSTANCE_GLOBAL_IDX] = block_number;
+    block_timestamps[INSTANCE_GLOBAL_IDX] = block_timestamp;
+    // mutate sender
+    // need to skip again ?
+    // seed = (A_LCG * seed + C_LCG) % M_LCG;
+    // random_chance = seed % 100;
+    // if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
+    //     return seed;
+    // }
+    seed = (A_LCG * seed + C_LCG) % M_LCG;
+    senders[INSTANCE_GLOBAL_IDX] = seed % g_fuzzing_constants->sender_counts;
+    // printf("thread %d block_number %u block_timestamp %u sender %u seed %u\n", INSTANCE_GLOBAL_IDX, block_number,
+    //        block_timestamp, senders[INSTANCE_GLOBAL_IDX], seed);
+    return seed;
+    // blockNumberDelay %= blockTimestampDelay
+}
+__device__ unsigned int mutate_value(unsigned int seed, evm_word_t* value) {
+    seed = (A_LCG * seed + C_LCG) % M_LCG;
+    uint32_t random_chance = seed % 100;
+    if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
+        return seed;
+    }
+    for (int i = 0; i < VALUE_MUTATE_INT32; i++) {
+        seed = (A_LCG * seed + C_LCG) % M_LCG;
+        value->words[i] = seed;
+        // printf("thread %d value %s seed %u\n", INSTANCE_GLOBAL_IDX, value->to_hex(), seed);
+        seed = (A_LCG * seed + C_LCG) % M_LCG;
+        random_chance = seed % 100;
+        if (random_chance <= VALUE_CHANCE_TO_STOP_INT_32) {
+            // printf("thread %d stopping at seed %u\n", INSTANCE_GLOBAL_IDX, seed);
+            return seed;
+        }
+    }
+    return seed;
+}
 __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* transaction_list_ptr) {
     unsigned int seed = INSTANCE_GLOBAL_IDX + transaction_list_ptr->start_seed;
 
@@ -394,29 +452,42 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
     // The first element is the marker size, then marker_data points to the next element
     uint32_t marker_size = *marker_data++;
 
+    // mutate block values
+    seed = mutate_block_values_senders(seed, transaction_list_ptr->block_number, transaction_list_ptr->time_stamp,
+                                       transaction_list_ptr->sender);
+
     if (marker_size == 0) return;
     // if (INSTANCE_GLOBAL_IDX % CUEVM_MUTATE_GROUP_SIZE != 0) return;  // skip the first sequence in each group
 
     uint8_t* call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
+
     for (int j = 0; j < marker_size; j++) {
         uint32_t element_offset = *marker_data++;
         uint32_t element_type = *marker_data++;
         uint32_t element_length = *marker_data++;
+
+        if (element_type == ELEMENT_VALUE_TYPE) {  // always mutate value
+            // printf("thread %d value mutation\n", INSTANCE_GLOBAL_IDX);
+            seed = mutate_value(seed, &transaction_list_ptr->value[INSTANCE_GLOBAL_IDX]);
+
+            continue;
+        }
 
         seed = (A_LCG * seed + C_LCG) % M_LCG;
         uint32_t random_chance = seed % 100;
         if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
             continue;
         }
-        // printf("thread %d marker_idx %d marker_offset %d element_offset %d element_type %d element_length %d\n",
+        // printf("thread %d marker_idx %d marker_offset %d element_offset %d element_type %d element_length
+        // %d\n",
         //        INSTANCE_GLOBAL_IDX, marker_idx, marker_offset, element_offset, element_type, element_length);
-        if (element_type != 0 && element_type != 1) {
+        if (element_type > 2) {
             uint32_t byte_length = element_type / 8;
             // randomize the marker data
             seed = (A_LCG * seed + C_LCG) % M_LCG;
             bool create_new = (seed % CHANCE_TO_CREATE_NEW_INTEGER) == 0;
             seed = mutate_byte_array(call_data + element_offset, element_length, byte_length, seed, create_new);
-        } else if (element_type == 1) {  // address
+        } else if (element_type == ELEMENT_ADDRESS_TYPE) {  // address
             // randomize the marker data
             seed = (A_LCG * seed + C_LCG) % M_LCG;
             uint32_t random_chance = seed % 100;
@@ -429,7 +500,8 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
                 // select from the constants
                 uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
                 uint32_t random_index = seed % address_constants_count;
-                // printf("thread %d seed %d address_constants_count %d random_address_index %d\n", INSTANCE_GLOBAL_IDX,
+                // printf("thread %d seed %d address_constants_count %d random_address_index %d\n",
+                // INSTANCE_GLOBAL_IDX,
                 //        seed, address_constants_count, random_index);
                 for (int i = 0; i < 20; i++) {
                     call_data[element_offset + 12 + i] =
@@ -438,76 +510,6 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
             }
         }
     }
-
-    /*
-        uint32_t instance = INSTANCE_GLOBAL_IDX;
-        if (instance == 0) {
-            printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8,
-       transaction_list_ptr->marker_size[instance/8]);
-
-            uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
-            for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
-                printf("marker data %d: offset %d type %d length %d \n", j ,
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
-            }
-        }
-        __syncthreads();
-        if (instance == 1) {
-            printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8,
-       transaction_list_ptr->marker_size[instance/8]);
-
-            uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
-            for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
-                printf("marker data %d: offset %d type %d length %d \n", j,
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
-            }
-        }
-        __syncthreads();
-        if (instance == 10) {
-            printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8,
-       transaction_list_ptr->marker_size[instance/8]);
-
-            uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
-            for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
-                printf("marker data %d: offset %d type %d length %d \n", j,
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
-            }
-        }
-
-        __syncthreads();
-        if (instance == 16) {
-            printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8,
-       transaction_list_ptr->marker_size[instance/8]);
-
-            uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
-            for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
-                printf("marker data %d: offset %d type %d length %d \n", j,
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
-            }
-        }
-
-           __syncthreads();
-        if (instance == 31) {
-            printf("marker data instance %d marker_idx %d marker_size %d \n", instance, instance/8,
-       transaction_list_ptr->marker_size[instance/8]);
-
-            uint32_t current_marker_offset = transaction_list_ptr->marker_offset[instance/8];
-            for (int j = 0; j < transaction_list_ptr->marker_size[instance/8]; j++) {
-                printf("marker data %d: offset %d type %d length %d \n", j,
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 1],
-                       transaction_list_ptr->marker_data[current_marker_offset + j * 3 + 2]);
-            }
-        }
-    */
 }
 #endif
 
@@ -525,9 +527,10 @@ __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
     data->no_storage_elements = 0;
 
     // uint32_t new_offset =
-    // (contract_index[address_index] * account_prealloc_keys_size + storage_size) * num_states + INSTANCE_GLOBAL_IDX;
-    // uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-    // // printf("get_value_status address_index %d, instance_idx %d instance %d\n", address_index, instance_idx,
+    // (contract_index[address_index] * account_prealloc_keys_size + storage_size) * num_states +
+    // INSTANCE_GLOBAL_IDX; uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
+    // // printf("get_value_status address_index %d, instance_idx %d instance %d\n", address_index,
+    // instance_idx,
     // //        INSTANCE_GLOBAL_IDX);
     // uint32_t contract_idx = contract_index[address_index];
     // uint32_t storage_size = account_storage_size[instance_idx];
