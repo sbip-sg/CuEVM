@@ -89,7 +89,7 @@ struct serialized_worldstate_data {
 
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
-#define MAX_CALLS_TRACING 32
+#define MAX_CALLS_TRACING 128
 #ifdef BUILD_GO_LIBRARY
 #define MAX_BRANCHES_TRACING 2048  // only track this number of branches in one trace
 #else
