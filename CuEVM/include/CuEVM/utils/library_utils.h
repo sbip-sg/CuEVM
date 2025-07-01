@@ -90,9 +90,14 @@ struct serialized_worldstate_data {
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
 #define MAX_CALLS_TRACING 32
-#define MAX_BRANCHES_TRACING 64  // only track the latest 64 branches
+#ifdef BUILD_GO_LIBRARY
+#define MAX_BRANCHES_TRACING 2048  // only track this number of branches in one trace
+#else
+#define MAX_BRANCHES_TRACING 64  // only trace and return this number of branches in python lib mode, deprecated soon
+#endif
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
+#define MAX_FUZZING_LOOP_LIMIT 200
 // In fuzzing mode, Reentrancy is permitted and may be detected but will raise error flag after this amount
 #define MAX_RECURSION 8
 /**
@@ -134,12 +139,15 @@ struct call_trace {
  * Records source and destination program counters, missed branches, and distance metrics.
  */
 struct branch_trace {
+#ifndef BUILD_GO_LIBRARY
     uint32_t pc_src;
     uint32_t pc_dst;
     uint32_t pc_missed;
     evm_word_t distance;  // distance between pc_src and pc_dst
-
+#else
+    // Jul 1 save memory for go library
     // todo: use evm_word_t for distance
+#endif
 };
 
 // struct return_data {
@@ -157,7 +165,9 @@ struct simplified_trace_data {
     simple_event_trace events[MAX_TRACE_EVENTS];
     // evm_word_t addresses[MAX_ADDRESSES_TRACING];
     call_trace calls[MAX_CALLS_TRACING];
+#ifndef BUILD_GO_LIBRARY                          // July disable branch recording, done on CPU
     branch_trace branches[MAX_BRANCHES_TRACING];  // pc_src jump to pc_dest
+#endif
     uint32_t no_addresses = 0;
     // uint32_t current_address_idx = 0;
     uint32_t no_events = 0;
@@ -214,7 +224,7 @@ struct simplified_trace_data {
      * @param[in] pc_dst The destination program counter.
      * @param[in] pc_missed The missed program counter.
      */
-    __device__ void record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
+    __device__ bool record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
 
     /**
      * @brief Record the distance metric for a branch operation.

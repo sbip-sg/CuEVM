@@ -138,18 +138,24 @@ __device__ void simplified_trace_data::start_operation(const uint32_t pc, const 
     }
 }
 
-__device__ void simplified_trace_data::record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed) {
-    if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
+__device__ bool simplified_trace_data::record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed) {
+    if (no_branches >= MAX_BRANCHES_TRACING) {
+        no_branches = 0;
+        return true;
+    }
+    // printf("record branch pc_src %u pc_dst %u distance %s\n", pc_src, pc_dst,
+    // branches[no_branches].distance.to_hex());
+#ifdef BUILD_GO_LIBRARY
+    // go library: branch info is recorded on CPU side
+    update_coverage_bitmap(pc_src, pc_dst);
+#else
     branches[no_branches].pc_src = pc_src;
     branches[no_branches].pc_dst = pc_dst;
     branches[no_branches].pc_missed = pc_missed;
     branches[no_branches].distance = last_distance;
-    // printf("record branch pc_src %u pc_dst %u distance %s\n", pc_src, pc_dst,
-    // branches[no_branches].distance.to_hex());
-#ifdef BUILD_GO_LIBRARY
-    update_coverage_bitmap(pc_src, pc_dst);
 #endif
     no_branches++;
+    return false;
 }
 
 __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::evm_stack_t& stack_ptr) {
@@ -217,10 +223,10 @@ __device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t
 
     if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
     // add extra markers for entering call
-    branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
-    branches[no_branches].pc_dst = 0;
-    branches[no_branches].pc_missed = 0;
-    branches[no_branches].distance = 0;
+    // branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
+    // branches[no_branches].pc_dst = 0;
+    // branches[no_branches].pc_missed = 0;
+    // branches[no_branches].distance = 0;
     no_branches++;
 #endif
     return ERROR_SUCCESS;
@@ -244,10 +250,10 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
 #ifdef BUILD_GO_LIBRARY
     if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
     // add extra markers for exiting call
-    branches[no_branches].pc_src = END_CALL_BRANCH_MARKER;
-    branches[no_branches].pc_dst = 0;
-    branches[no_branches].pc_missed = 0;
-    branches[no_branches].distance = 0;
+    // branches[no_branches].pc_src = END_CALL_BRANCH_MARKER;
+    // branches[no_branches].pc_dst = 0;
+    // branches[no_branches].pc_missed = 0;
+    // branches[no_branches].distance = 0;
     no_branches++;
 #endif
 
@@ -271,10 +277,12 @@ __host__ __device__ void simplified_trace_data::print() {
                calls[i].sender.to_hex(), calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].error_code);
     }
     printf("branches\n");
+#ifndef BUILD_GO_LIBRARY
     for (uint32_t i = 0; i < no_branches; i++) {
         printf("pc_src %u pc_dst %u distance %s\n", branches[i].pc_src, branches[i].pc_dst,
                branches[i].distance.to_hex());
     }
+#endif
 }
 __device__ serialized_worldstate_data* global_serialized_worldstate;
 __device__ simplified_trace_data* global_simplified_trace;
@@ -436,11 +444,11 @@ __device__ unsigned int mutate_value(unsigned int seed, evm_word_t* value) {
     return seed;
 }
 __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* transaction_list_ptr) {
-    unsigned int seed = INSTANCE_GLOBAL_IDX + transaction_list_ptr->start_seed;
+    uint32_t seed = INSTANCE_GLOBAL_IDX + transaction_list_ptr->start_seed;
 
     uint32_t marker_idx = INSTANCE_GLOBAL_IDX / CUEVM_MUTATE_GROUP_SIZE;
-    // printf("thread %d marker_idx %d , marker offset %d\n", INSTANCE_GLOBAL_IDX, marker_idx,
-    //        transaction_list_ptr->marker_offset[marker_idx]);
+    // printf("thread %d marker_idx %d , marker offset %d seed %u\n", INSTANCE_GLOBAL_IDX, marker_idx,
+    //        transaction_list_ptr->marker_offset[marker_idx], seed);
     int32_t marker_offset = transaction_list_ptr->marker_offset[marker_idx];
     uint32_t* marker_data;
 

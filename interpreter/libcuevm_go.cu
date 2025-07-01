@@ -355,131 +355,134 @@ void reset_state_db() {
 }
 
 void print_evm_instances_results(bool copy_state_data) {
-    // Copy trace data from device memory
-    CuEVM::simplified_trace_data* trace_data =
-        new CuEVM::simplified_trace_data[g_num_instances_per_device * g_num_gpus];
-
-    for (int i = 0; i < g_num_gpus; i++) {
-        CuEVM::simplified_trace_data* d_trace_data;
-
-        // Retrieve the device pointers stored in the global symbols
-        CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
-
-        // Copy the data arrays from device to host memory
-        CUDA_CHECK(cudaMemcpy(&trace_data[i * g_num_instances_per_device], d_trace_data,
-                              sizeof(CuEVM::simplified_trace_data) * g_num_instances_per_device,
-                              cudaMemcpyDeviceToHost));
-    }
-    // Copy world state data if requested
-    CuEVM::serialized_worldstate_data* world_data = nullptr;
-    if (copy_state_data) {
-        CuEVM::serialized_worldstate_data* d_world_data;
-        world_data = new CuEVM::serialized_worldstate_data[g_num_instances_per_device * g_num_gpus];
+    // deprecated golibrary code
+    /*
+        // Copy trace data from device memory
+        CuEVM::simplified_trace_data* trace_data =
+            new CuEVM::simplified_trace_data[g_num_instances_per_device * g_num_gpus];
 
         for (int i = 0; i < g_num_gpus; i++) {
-            CUDA_CHECK(cudaMemcpyFromSymbol(&d_world_data, global_serialized_worldstate, sizeof(d_world_data)));
-            CUDA_CHECK(cudaMemcpy(&world_data[i * g_num_instances_per_device], d_world_data,
-                                  sizeof(CuEVM::serialized_worldstate_data) * g_num_instances_per_device,
+            CuEVM::simplified_trace_data* d_trace_data;
+
+            // Retrieve the device pointers stored in the global symbols
+            CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
+
+            // Copy the data arrays from device to host memory
+            CUDA_CHECK(cudaMemcpy(&trace_data[i * g_num_instances_per_device], d_trace_data,
+                                  sizeof(CuEVM::simplified_trace_data) * g_num_instances_per_device,
                                   cudaMemcpyDeviceToHost));
         }
-    }
-    printf("===== Printing results for %u EVM instances =====\n", g_num_instances_per_device * g_num_gpus);
+        // Copy world state data if requested
+        CuEVM::serialized_worldstate_data* world_data = nullptr;
+        if (copy_state_data) {
+            CuEVM::serialized_worldstate_data* d_world_data;
+            world_data = new CuEVM::serialized_worldstate_data[g_num_instances_per_device * g_num_gpus];
 
-    // Print information for each instance
-    for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
-        printf("\n----- Instance %u -----\n", idx);
+            for (int i = 0; i < g_num_gpus; i++) {
+                CUDA_CHECK(cudaMemcpyFromSymbol(&d_world_data, global_serialized_worldstate, sizeof(d_world_data)));
+                CUDA_CHECK(cudaMemcpy(&world_data[i * g_num_instances_per_device], d_world_data,
+                                      sizeof(CuEVM::serialized_worldstate_data) * g_num_instances_per_device,
+                                      cudaMemcpyDeviceToHost));
+            }
+        }
+        printf("===== Printing results for %u EVM instances =====\n", g_num_instances_per_device * g_num_gpus);
 
-        // Print trace data
-        printf("Trace Data:\n");
-        printf("  Events: %u\n", trace_data[idx].no_events);
-        printf("  Calls: %u\n", trace_data[idx].no_calls);
-        printf("  Branches: %u\n", trace_data[idx].no_branches);
+        // Print information for each instance
+        for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
+            printf("\n----- Instance %u -----\n", idx);
 
-        // Print ALL events
-        if (trace_data[idx].no_events > 0) {
-            printf("  All Events:\n");
-            for (uint32_t e = 0; e < trace_data[idx].no_events; e++) {
-                printf("    Event[%u]: PC=%u, OP=%u, Operand1=", e, trace_data[idx].events[e].pc,
-                       trace_data[idx].events[e].op);
-                trace_data[idx].events[e].operand_1.print();
-                printf(", Operand2=");
-                trace_data[idx].events[e].operand_2.print();
-                printf(", Result=");
-                trace_data[idx].events[e].res.print();
-                printf("\n");
+            // Print trace data
+            printf("Trace Data:\n");
+            printf("  Events: %u\n", trace_data[idx].no_events);
+            printf("  Calls: %u\n", trace_data[idx].no_calls);
+            printf("  Branches: %u\n", trace_data[idx].no_branches);
+
+            // Print ALL events
+            if (trace_data[idx].no_events > 0) {
+                printf("  All Events:\n");
+                for (uint32_t e = 0; e < trace_data[idx].no_events; e++) {
+                    printf("    Event[%u]: PC=%u, OP=%u, Operand1=", e, trace_data[idx].events[e].pc,
+                           trace_data[idx].events[e].op);
+                    trace_data[idx].events[e].operand_1.print();
+                    printf(", Operand2=");
+                    trace_data[idx].events[e].operand_2.print();
+                    printf(", Result=");
+                    trace_data[idx].events[e].res.print();
+                    printf("\n");
+                }
+            }
+
+            // Print ALL calls
+            if (trace_data[idx].no_calls > 0) {
+                printf("  All Calls:\n");
+                for (uint32_t c = 0; c < trace_data[idx].no_calls; c++) {
+                    printf("    Call[%u]: PC=%u, OP=%u, Sender=", c, trace_data[idx].calls[c].pc,
+                           trace_data[idx].calls[c].op);
+                    trace_data[idx].calls[c].sender.print();
+                    printf(", Receiver=");
+                    trace_data[idx].calls[c].receiver.print();
+                    printf(", Value=");
+                    trace_data[idx].calls[c].value.print();
+                    printf(", Error_code=%u\n", trace_data[idx].calls[c].error_code);
+                }
+            }
+
+            // Print ALL branches
+            if (trace_data[idx].no_branches > 0) {
+                printf("  All Branches:\n");
+                for (uint32_t b = 0; b < trace_data[idx].no_branches; b++) {
+                    printf("    Branch[%u]: PC_src=%u, PC_dst=%u, PC_missed=%u, Distance=", b,
+                           trace_data[idx].branches[b].pc_src, trace_data[idx].branches[b].pc_dst,
+                           trace_data[idx].branches[b].pc_missed);
+                    trace_data[idx].branches[b].distance.print();
+                    printf("\n");
+                }
+            }
+
+            // Print ALL world state data if available
+            if (copy_state_data && world_data != nullptr) {
+                printf("\n  World State:\n");
+                printf("    Accounts: %u\n", world_data[idx].no_accounts);
+                printf("    Storage Elements: %u\n", world_data[idx].no_storage_elements);
+
+                // Print ALL account info
+                if (world_data[idx].no_accounts > 0) {
+                    printf("    All Accounts:\n");
+                    for (uint32_t a = 0; a < world_data[idx].no_accounts; a++) {
+                        char addr_buf[70];
+                        world_data[idx].addresses[a].to_hex(addr_buf);
+                        char balance_buf[70];
+                        world_data[idx].balance[a].to_hex(balance_buf);
+
+                        printf("      Account[%u]: Address=%s, Balance=%s, Nonce=%u\n", a, addr_buf, balance_buf,
+                               world_data[idx].nonce[a]);
+                    }
+                }
+
+                // Print ALL storage elements
+                if (world_data[idx].no_storage_elements > 0) {
+                    printf("    All Storage Elements:\n");
+                    for (uint32_t s = 0; s < world_data[idx].no_storage_elements; s++) {
+                        char key_buf[70];
+                        world_data[idx].storage_keys[s].to_hex(key_buf);
+                        char value_buf[70];
+                        world_data[idx].storage_values[s].to_hex(value_buf);
+
+                        printf("      Storage[%u]: Account_Index=%u, Key=%s, Value=%s\n", s,
+                               world_data[idx].storage_indexes[s], key_buf, value_buf);
+                    }
+                }
             }
         }
 
-        // Print ALL calls
-        if (trace_data[idx].no_calls > 0) {
-            printf("  All Calls:\n");
-            for (uint32_t c = 0; c < trace_data[idx].no_calls; c++) {
-                printf("    Call[%u]: PC=%u, OP=%u, Sender=", c, trace_data[idx].calls[c].pc,
-                       trace_data[idx].calls[c].op);
-                trace_data[idx].calls[c].sender.print();
-                printf(", Receiver=");
-                trace_data[idx].calls[c].receiver.print();
-                printf(", Value=");
-                trace_data[idx].calls[c].value.print();
-                printf(", Error_code=%u\n", trace_data[idx].calls[c].error_code);
-            }
-        }
+        printf("\n===== End of results =====\n");
 
-        // Print ALL branches
-        if (trace_data[idx].no_branches > 0) {
-            printf("  All Branches:\n");
-            for (uint32_t b = 0; b < trace_data[idx].no_branches; b++) {
-                printf("    Branch[%u]: PC_src=%u, PC_dst=%u, PC_missed=%u, Distance=", b,
-                       trace_data[idx].branches[b].pc_src, trace_data[idx].branches[b].pc_dst,
-                       trace_data[idx].branches[b].pc_missed);
-                trace_data[idx].branches[b].distance.print();
-                printf("\n");
-            }
-        }
-
-        // Print ALL world state data if available
+        // Clean up memory
+        delete[] trace_data;
         if (copy_state_data && world_data != nullptr) {
-            printf("\n  World State:\n");
-            printf("    Accounts: %u\n", world_data[idx].no_accounts);
-            printf("    Storage Elements: %u\n", world_data[idx].no_storage_elements);
-
-            // Print ALL account info
-            if (world_data[idx].no_accounts > 0) {
-                printf("    All Accounts:\n");
-                for (uint32_t a = 0; a < world_data[idx].no_accounts; a++) {
-                    char addr_buf[70];
-                    world_data[idx].addresses[a].to_hex(addr_buf);
-                    char balance_buf[70];
-                    world_data[idx].balance[a].to_hex(balance_buf);
-
-                    printf("      Account[%u]: Address=%s, Balance=%s, Nonce=%u\n", a, addr_buf, balance_buf,
-                           world_data[idx].nonce[a]);
-                }
-            }
-
-            // Print ALL storage elements
-            if (world_data[idx].no_storage_elements > 0) {
-                printf("    All Storage Elements:\n");
-                for (uint32_t s = 0; s < world_data[idx].no_storage_elements; s++) {
-                    char key_buf[70];
-                    world_data[idx].storage_keys[s].to_hex(key_buf);
-                    char value_buf[70];
-                    world_data[idx].storage_values[s].to_hex(value_buf);
-
-                    printf("      Storage[%u]: Account_Index=%u, Key=%s, Value=%s\n", s,
-                           world_data[idx].storage_indexes[s], key_buf, value_buf);
-                }
-            }
+            delete[] world_data;
         }
-    }
-
-    printf("\n===== End of results =====\n");
-
-    // Clean up memory
-    delete[] trace_data;
-    if (copy_state_data && world_data != nullptr) {
-        delete[] world_data;
-    }
+        */
 }
 // Creates transaction list on both host and device
 
@@ -669,7 +672,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
         SimplifiedGPUResultC* final_result = new SimplifiedGPUResultC();
         final_result->results = new SimplifiedGPUResultSingleBatchC[sequenceLength];
         final_result->num_results = sequenceLength;
-        for (int sequenceIdx = 0; sequenceIdx < sequenceLength; sequenceIdx++) {
+        for (uint32_t sequenceIdx = 0; sequenceIdx < sequenceLength; sequenceIdx++) {
             uint32_t current_idx = sequenceIdx * txBatchCount;
 
             if (current_idx != 0) {
@@ -691,7 +694,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
                 blockNumber + current_idx, timeStamp + current_idx, newFromAddr, toAddr, newValues,
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
                 dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize, markerData,
-                markerDataLen, start_seed + sequenceIdx);
+                markerDataLen, start_seed + sequenceIdx * txBatchCount);
             // auto d_transaction_list_ptrs = create_transaction_list(
             //     newFromAddr, toAddr, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
             //     txBatchCount, dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,
@@ -970,6 +973,8 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
 // For debugging, tracking unique marker patterns
 std::unordered_map<std::string, std::vector<uint32_t>> unique_marker_patterns;
 
+// deprecated golibrary code due to performance concern
+/*
 GPUExecutionResultC* get_gpu_execution_results() {
     // Allocate and initialize result structure
     GPUExecutionResultC* result = (GPUExecutionResultC*)calloc(1, sizeof(GPUExecutionResultC));
@@ -1216,6 +1221,7 @@ GPUExecutionResultC* get_gpu_execution_results() {
 
     return result;
 }
+*/
 
 void free_simplified_gpu_result(SimplifiedGPUResultC* result) {
     // TODO: Implement this
