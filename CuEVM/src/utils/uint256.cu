@@ -943,11 +943,11 @@ __host__ __device__ uint256 *uint256_from_bytes(uint256 *dst, const uint8_t *src
 __host__ __device__ uint256 *uint256_extract_byte(uint256 *dst, const uint256 *src, uint32_t byte_index) {
     uint32_t word_index = byte_index / sizeof(uint32_t);
     uint32_t byte_position = byte_index % sizeof(uint32_t);
-    printf("word_index: %d, byte_position: %d\n", word_index, byte_position);
-    printf("src->words[word_index]: %u\n", src->words[word_index]);
+    // printf("word_index: %d, byte_position: %d\n", word_index, byte_position);
+    // printf("src->words[word_index]: %u\n", src->words[word_index]);
     uint32_t mask = 0xff << (8 * byte_position);
     uint32_t extracted_byte = (src->words[word_index] & mask) >> (8 * byte_position);
-    printf("extracted_byte: %u\n", extracted_byte);
+    // printf("extracted_byte: %u\n", extracted_byte);
     uint256_from_word(dst, extracted_byte);
     return dst;
 }
