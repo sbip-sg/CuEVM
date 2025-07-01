@@ -139,8 +139,10 @@ __device__ void simplified_trace_data::start_operation(const uint32_t pc, const 
 }
 
 __device__ bool simplified_trace_data::record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed) {
+    // printf("thread %d branch count %d\n", INSTANCE_GLOBAL_IDX, no_branches);
     if (no_branches >= MAX_BRANCHES_TRACING) {
         no_branches = MAX_BRANCHES_TRACING;
+        // printf("no_branches >= MAX_BRANCHES_TRACING, %d\n", INSTANCE_GLOBAL_IDX);
         return true;
     }
     // printf("record branch pc_src %u pc_dst %u distance %s\n", pc_src, pc_dst,
@@ -191,6 +193,16 @@ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t
 }
 __device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
     assert(call_context_ptr != nullptr);
+#ifdef BUILD_GO_LIBRARY
+    // printf("thread %d start call branch count %d\n", INSTANCE_GLOBAL_IDX, no_branches);
+    // if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
+    // add extra markers for entering call
+    // branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
+    // branches[no_branches].pc_dst = 0;
+    // branches[no_branches].pc_missed = 0;
+    // branches[no_branches].distance = 0;
+    no_branches += 20;  // call saturates the branch limit faster than normal jumps
+#endif
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
@@ -219,19 +231,19 @@ __device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t
             return ERROR_REENTRANCY;
         }
     }
-#ifdef BUILD_GO_LIBRARY
 
-    // if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
-    // add extra markers for entering call
-    // branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
-    // branches[no_branches].pc_dst = 0;
-    // branches[no_branches].pc_missed = 0;
-    // branches[no_branches].distance = 0;
-    no_branches += 4;  // call saturates the branch limit faster than normal jumps
-#endif
     return ERROR_SUCCESS;
 }
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc) {
+#ifdef BUILD_GO_LIBRARY
+    // if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
+    // add extra markers for exiting call
+    // branches[no_branches].pc_src = END_CALL_BRANCH_MARKER;
+    // branches[no_branches].pc_dst = 0;
+    // branches[no_branches].pc_missed = 0;
+    // branches[no_branches].distance = 0;
+    no_branches += 2;
+#endif
     if (no_calls > MAX_CALLS_TRACING) return;
     int i;
     for (i = no_calls - 1; i >= 0; i--) {
@@ -247,15 +259,6 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
             break;
         }
     }
-#ifdef BUILD_GO_LIBRARY
-    // if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
-    // add extra markers for exiting call
-    // branches[no_branches].pc_src = END_CALL_BRANCH_MARKER;
-    // branches[no_branches].pc_dst = 0;
-    // branches[no_branches].pc_missed = 0;
-    // branches[no_branches].distance = 0;
-    no_branches += 4;
-#endif
 
 #ifdef BUILD_GO_LIBRARY
     if (error_code == ERROR_INVALID_OPCODE) {

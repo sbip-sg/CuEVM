@@ -49,7 +49,7 @@ __device__ SnapshotState *SnapshotState::revert() {
     if (touched_account_counts > 0) {
         for (uint32_t i = 0; i < touched_account_counts; i++) {
             int32_t address_index = preallocated_touched_accounts[i];
-            if (address_index >= 0) {
+            if (address_index >= 0 && address_index < global_state_db_ptr->num_accounts) {
                 // printf("set cold revert thread %d, address_index %d\n", INSTANCE_GLOBAL_IDX, address_index);
                 uint32_t instance_idx = address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
                 global_state_db_ptr->account_is_warm[instance_idx] = false;
@@ -77,7 +77,8 @@ __device__ SnapshotState *SnapshotState::revert() {
 #ifdef DEBUG_PERF
             printf("revert account address_index %d\n", current_account->address_index);
 #endif
-            if (current_account->address_index >= 0) {
+            if (current_account->address_index >= 0 &&
+                current_account->address_index < global_state_db_ptr->num_accounts) {
                 uint32_t instance_idx =
                     current_account->address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
                 global_state_db_ptr->account_balances[instance_idx] = current_account->balance;
