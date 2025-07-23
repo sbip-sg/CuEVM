@@ -3,6 +3,9 @@
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/state/state_db.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 /**
  * 50s: Storage Operations:
  * - SLOAD
@@ -24,7 +27,12 @@ namespace CuEVM::operations {
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, CuEVM::StateDb *state_db,
-                         evm_call_context_t *call_context);
+                         evm_call_context_t *call_context
+#ifdef BUILD_LIBRARY
+                         ,
+                         simplified_trace_data *simplified_trace_data_ptr
+#endif
+);
 
 /**
  * The SSTORE operation implementation.
@@ -43,6 +51,11 @@ __device__ int32_t SLOAD(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_sta
  * @return 0 if the operation was successful, an error code otherwise.
  */
 __device__ int32_t SSTORE(const gas_t &gas_limit, gas_t &gas_used, gas_t &gas_refund, CuEVM::evm_stack_t &stack,
-                          CuEVM::StateDb *state_db, evm_call_context_t *call_context);
+                          CuEVM::StateDb *state_db, evm_call_context_t *call_context
+#ifdef BUILD_LIBRARY
+                          ,
+                          simplified_trace_data *simplified_trace_data_ptr
+#endif
+);
 
 }  // namespace CuEVM::operations

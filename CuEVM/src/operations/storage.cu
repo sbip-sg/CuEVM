@@ -3,7 +3,12 @@
 
 namespace CuEVM::operations {
 __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                         CuEVM::StateDb *state_db, evm_call_context_t *call_context) {
+                         CuEVM::StateDb *state_db, evm_call_context_t *call_context
+#ifdef BUILD_LIBRARY
+                         ,
+                         simplified_trace_data *simplified_trace_data_ptr
+#endif
+) {
     evm_word_t *key;
     if (stack.size() < 1) {
         return ERROR_STACK_UNDERFLOW;
@@ -33,7 +38,11 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     if (error_code == ERROR_SUCCESS) {
         evm_word_t *value =
             state_db->get_storage_with_known_index(&call_context->storage_address, key, address_index, found_value);
-        // printf("finish get storage thread %d, value %p\n", INSTANCE_GLOBAL_IDX, value);
+// printf("finish get storage thread %d, value %p\n", INSTANCE_GLOBAL_IDX, value);
+#ifdef BUILD_LIBRARY
+        if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
+            simplified_trace_data_ptr->update_storage_coverage(call_context->pc, key->words[0], address_index, false);
+#endif
         if (value == nullptr)
             error_code |= stack.push_uint32(0);
         else
@@ -43,7 +52,12 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 }
 
 __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::gas_t &gas_refund,
-                          CuEVM::evm_stack_t &stack, CuEVM::StateDb *state_db, evm_call_context_t *call_context) {
+                          CuEVM::evm_stack_t &stack, CuEVM::StateDb *state_db, evm_call_context_t *call_context
+#ifdef BUILD_LIBRARY
+                          ,
+                          simplified_trace_data *simplified_trace_data_ptr
+#endif
+) {
     // only if is not a static call
     int32_t error_code = (call_context->static_env ? ERROR_STATIC_CALL_CONTEXT_SSTORE : ERROR_SUCCESS);
 
@@ -79,6 +93,10 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (error_code == ERROR_SUCCESS) {
         state_db->write_storage_with_known_index(&call_context->storage_address, key, value, address_index,
                                                  found_value);
+#ifdef BUILD_LIBRARY
+        if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
+            simplified_trace_data_ptr->update_storage_coverage(call_context->pc, key->words[0], address_index, true);
+#endif
     }
 
     return error_code;

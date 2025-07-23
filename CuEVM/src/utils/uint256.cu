@@ -257,6 +257,26 @@ __host__ __device__ uint256 *uint256_add(uint256 *dst, const uint256 *a, const u
     return dst;
 }
 
+__host__ __device__ bool uint256_add_overflow(uint256 *dst, const uint256 *a, const uint256 *b) {
+    uint32_t carry = 0;
+    for (int i = 0; i < UINT256_WORDS; i++) {
+        uint32_t sum = a->words[i] + b->words[i] + carry;
+        carry = (sum < a->words[i] || (carry && sum == a->words[i])) ? 1 : 0;
+        dst->words[i] = sum;
+    }
+    return (carry != 0);
+}
+
+__host__ __device__ bool uint256_sub_overflow(uint256 *dst, const uint256 *a, const uint256 *b) {
+    uint32_t borrow = 0;
+    for (int i = 0; i < UINT256_WORDS; i++) {
+        uint64_t diff = (uint64_t)a->words[i] - (uint64_t)b->words[i] - borrow;
+        borrow = (diff >> 32) & 1;
+        dst->words[i] = (uint32_t)diff;
+    }
+    return borrow != 0;
+}
+
 // Improved implementation: modular addition without using uint512 arithmetic
 // This version assumes that a and b have been reduced (i.e. < N)
 // and uses the fact that (a + b) < 2N.

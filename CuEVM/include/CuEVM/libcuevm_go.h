@@ -44,6 +44,21 @@ typedef struct {
     uint32_t length; /**< Length of the return data */
 } ReturnDataEntry;
 
+typedef struct {
+    BranchInfoEntry* new_branch_info;
+    uint32_t num_new_branch;
+    BugInfoEntry* new_bug_info;
+    uint32_t num_new_bug;
+    StorageInfoEntry* new_storage_info;
+    uint32_t num_new_storage;
+} SimplifiedGPUResultSingleBatchC;
+
+typedef struct {
+    SimplifiedGPUResultSingleBatchC* results;
+    uint32_t num_results;
+} SimplifiedGPUResultC;
+
+// deprecated structures
 /**
  * @brief C-compatible structure for representing code coverage data.
  *
@@ -72,25 +87,6 @@ typedef struct {
     uint8_t* error_codes;         /**< Array of error codes for each instance */
     uint8_t allocations_valid;    /**< Track if allocations are valid (1) or freed (0) */
 } GPUExecutionResultC;
-
-typedef struct {
-    uint32_t* new_coverage_idx;         /**< Array of new coverage indices */
-    uint32_t num_new_coverage;          /**< Number of new coverage entries for each batch, size is tx_sequence size*/
-    uint32_t* new_bug_idx;              /**< Array of new bug indices */
-    uint32_t* new_bug_pc;               /**< Array of new bug PCs */
-    uint32_t num_new_bugs;              /**< Number of new bug entries for each batch, size is tx_sequence size*/
-    uint8_t* branch_call_data;          /**< Array of branch call data */
-    uint32_t* branch_call_data_sizes;   /**< Size of the branch call data */
-    uint32_t* branch_call_data_offsets; /**< Offset of the branch call data */
-    uint8_t* bug_call_data;             /**< Array of bug call data */
-    uint32_t* bug_call_data_sizes;      /**< Size of the bug call data */
-    uint32_t* bug_call_data_offsets;    /**< Offset of the bug call data */
-} SimplifiedGPUResultSingleBatchC;
-
-typedef struct {
-    SimplifiedGPUResultSingleBatchC* results;
-    uint32_t num_results;
-} SimplifiedGPUResultC;
 
 /**
  * @brief Process a batch of transactions on the GPU.

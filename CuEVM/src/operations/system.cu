@@ -226,10 +226,10 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
             CuEVM::global_state_db_ptr->update_nonce(&current_context->to,
                                                      CuEVM::global_state_db_ptr->get_nonce(&current_context->to) + 1);
         }
-        if (THREADIDX == 1) {
-            printf("CREATE contract address\n");
-            contract_address.print();
-        }
+        // if (THREADIDX == 1) {
+        //     printf("CREATE contract address\n");
+        //     contract_address.print();
+        // }
         CuEVM::global_state_db_ptr->update_nonce(&contract_address, 1);
     }
 

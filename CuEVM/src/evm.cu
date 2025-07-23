@@ -315,16 +315,31 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     error_code = CuEVM::operations::STOP(call_state_ptr);
                     break;
                 case OP_ADD:
-                    error_code = CuEVM::operations::ADD(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        cached_call_state.stack_ptr);
+                    error_code = CuEVM::operations::ADD(
+                        cached_call_state.gas_limit, cached_call_state.gas_used, cached_call_state.stack_ptr
+#ifdef BUILD_LIBRARY
+                        ,
+                        cached_call_state.pc, &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                    );
                     break;
                 case OP_MUL:
-                    error_code = CuEVM::operations::MUL(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        cached_call_state.stack_ptr);
+                    error_code = CuEVM::operations::MUL(
+                        cached_call_state.gas_limit, cached_call_state.gas_used, cached_call_state.stack_ptr
+#ifdef BUILD_LIBRARY
+                        ,
+                        cached_call_state.pc, &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                    );
                     break;
                 case OP_SUB:
-                    error_code = CuEVM::operations::SUB(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        cached_call_state.stack_ptr);
+                    error_code = CuEVM::operations::SUB(
+                        cached_call_state.gas_limit, cached_call_state.gas_used, cached_call_state.stack_ptr
+#ifdef BUILD_LIBRARY
+                        ,
+                        cached_call_state.pc, &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                    );
                     break;
                 case OP_DIV:
                     error_code = CuEVM::operations::DIV(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -359,35 +374,35 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                                                                cached_call_state.stack_ptr);
                     break;
                 case OP_LT:
-#ifdef BUILD_PYTHON_LIBRARY
+#ifdef BUILD_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::LT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_GT:
-#ifdef BUILD_PYTHON_LIBRARY
+#ifdef BUILD_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::GT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                        cached_call_state.stack_ptr);
                     break;
                 case OP_SLT:
-#ifdef BUILD_PYTHON_LIBRARY
+#ifdef BUILD_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SLT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_SGT:
-#ifdef BUILD_PYTHON_LIBRARY
+#ifdef BUILD_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::SGT(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                         cached_call_state.stack_ptr);
                     break;
                 case OP_EQ:
-#ifdef BUILD_PYTHON_LIBRARY
+#ifdef BUILD_LIBRARY
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].record_distance(opcode, *cached_call_state.stack_ptr);
 #endif
                     error_code = CuEVM::operations::EQ(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -563,12 +578,22 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                 case OP_SLOAD:
                     error_code =
                         CuEVM::operations::SLOAD(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                 *cached_call_state.stack_ptr, global_state_db_ptr, call_state_ptr);
+                                                 *cached_call_state.stack_ptr, global_state_db_ptr, call_state_ptr
+#ifdef BUILD_LIBRARY
+                                                 ,
+                                                 &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                        );
                     break;
                 case OP_SSTORE:
                     error_code = CuEVM::operations::SSTORE(cached_call_state.gas_limit, cached_call_state.gas_used,
                                                            call_state_ptr->gas_refund, *cached_call_state.stack_ptr,
-                                                           global_state_db_ptr, call_state_ptr);
+                                                           global_state_db_ptr, call_state_ptr
+#ifdef BUILD_LIBRARY
+                                                           ,
+                                                           &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                    );
                     break;
                 case OP_JUMP:
                     error_code =
@@ -674,9 +699,10 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                                                              *cached_call_state.stack_ptr, call_state_ptr, opcode);
                     } else {
                         error_code = CuEVM::operations::INVALID();
-#ifdef BUILD_GO_LIBRARY
-                        global_simplified_trace[INSTANCE_GLOBAL_IDX].record_operation(cached_call_state.pc, opcode);
-#endif
+                        // #ifdef BUILD_GO_LIBRARY
+                        //                         global_simplified_trace[INSTANCE_GLOBAL_IDX].record_operation(cached_call_state.pc,
+                        //                         opcode);
+                        // #endif
                     }
                     break;
             }
@@ -705,8 +731,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                 cached_call_state = cached_evm_call_context(call_state_ptr);
                 error_code = start_CALL(cached_call_state);
 #ifdef BUILD_LIBRARY
-                error_code =
-                    global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(call_state_ptr->parent->pc, call_state_ptr);
+                if (opcode == OP_CREATE || opcode == OP_CREATE2) {
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].start_create();
+                } else {
+                    error_code = global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(call_state_ptr->parent->pc,
+                                                                                         call_state_ptr);
+                }
 #endif
             } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                 // Logic: when op_create or create2 does not succeed,
@@ -833,7 +863,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
     }
 #endif
 
-#ifdef BUILD_LIBRARY
+#ifdef BUILD_PYTHON_LIBRARY
     // serialize data
     if (copy_state_data) {
         serialize_state_data(&global_serialized_worldstate[INSTANCE_GLOBAL_IDX]);
@@ -841,7 +871,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
 #endif
 
 #ifdef BUILD_GO_LIBRARY
-    finalize_coverage_bitmap();
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finalize_coverage_bitmap();
 #endif
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
     // printf("updated final world state\n");
@@ -965,8 +995,7 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     // bn_t sender_address;
     // call_state_ptr->message_ptr->get_sender(sender_address);
 
-    // TODO: fix this
-    printf("finish_CREATE thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
+    // printf("finish_CREATE thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
 
     CuEVM::gas_cost::code_cost(cached_call_state.gas_used, call_state_ptr->dynamic_ret_size);
     int32_t error_code = ERROR_SUCCESS;
