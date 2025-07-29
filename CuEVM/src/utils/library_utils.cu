@@ -152,8 +152,13 @@ __device__ void simplified_trace_data::update_bugs(uint32_t pc, uint8_t bug_type
 __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint32_t pc_src, uint32_t pc_dst,
                                                                             uint32_t pc_missed, uint8_t distance_bits) {
     // AFL simple hash: Extremely fast (shift + XOR), citable from AFL (widely used in fuzzing papers)
-    uint32_t afl_hash_covered = (pc_src >> 1) ^ pc_dst;
-    uint32_t afl_hash_missed = (pc_src >> 1) ^ pc_missed;
+    // printf(
+    //     "thread %d update_coverage_bitmap_with_distance pc_src %u pc_dst %u pc_missed %u distance_bits %u "
+    //     "current_account_id %x\n",
+    //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, distance_bits, current_account_id);
+    uint32_t afl_hash_covered = (pc_src << 1) ^ pc_dst ^ current_account_id;
+    uint32_t afl_hash_missed = (pc_src << 1) ^ pc_missed ^ current_account_id;
+
     uint32_t bitmap_idx_covered = afl_hash_covered % BITMAP_SIZE;
     uint32_t bitmap_idx_missed = afl_hash_missed % BITMAP_SIZE;
 
@@ -186,13 +191,22 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
         last_distance_bits = distance_bits;
     }
 }
+__device__ __forceinline__ uint32_t fnv1a(uint32_t value) {
+    uint32_t hash = 2166136261U;                 // FNV offset basis
+    hash = (hash ^ (value & 0xFF)) * 16777619U;  // FNV prime
+    hash = (hash ^ ((value >> 8) & 0xFF)) * 16777619U;
+    hash = (hash ^ ((value >> 16) & 0xFF)) * 16777619U;
+    hash = (hash ^ (value >> 24)) * 16777619U;
+    return hash;
+}
+__device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint16_t storage_slot, uint8_t is_write) {
+    // printf("thread %d update_storage_coverage pc %u storage_slot %u is_write %u current_account_id %u\n",
+    //        INSTANCE_GLOBAL_IDX, pc, storage_slot, is_write, current_account_id);
+    uint32_t storage_hash_id =
+        is_write ? pc ^ (storage_slot + BITMAP_SIZE / 2) ^ current_account_id : pc ^ storage_slot ^ current_account_id;
 
-__device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint16_t storage_slot, uint8_t account_idx,
-                                                               bool is_write) {
-    // Construct 32-bit storage_id: [8-bit account_idx][8-bit operation][16-bit storage_slot]
-    uint32_t storage_id = is_write ? pc ^ (storage_slot + BITMAP_SIZE / 2) : pc ^ storage_slot;
-
-    uint32_t bitmap_idx = storage_id % BITMAP_SIZE;
+    // uint32_t bitmap_idx = fnv1a(storage_id) % BITMAP_SIZE;
+    uint32_t bitmap_idx = storage_hash_id % BITMAP_SIZE;
     unsigned int prev_dist = atomicMax(&g_events_bitmap[bitmap_idx], 1);
 
     // printf(
@@ -207,14 +221,21 @@ __device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint
         int idx = atomicAdd(&g_gpu_feedback_count->new_storage_count, 1);
         if (idx < CuEVM::MAX_NEW_STORAGE) {
             g_new_storage_info[idx].storage_thread_idx = INSTANCE_GLOBAL_IDX;
-            g_new_storage_info[idx].storage_id = account_idx << 24 | is_write << 16 | storage_slot;
+            // Construct 32-bit storage_id:
+            // [31:30] 2 bits: is_write (last 2 bits)
+            // [29:16] 14 bits: account_idx (last 14 bits)
+            // [15:0]  16 bits: storage_slot
+            g_new_storage_info[idx].storage_id = ((uint32_t)(is_write & 0x3) << 30) |
+                                                 ((uint32_t)(current_account_id & 0x3FFF) << 16) |
+                                                 ((uint32_t)storage_slot & 0xFFFF);
         }
     }
 }
 __device__ void simplified_trace_data::add_bugs_for_later(uint32_t pc, uint8_t bug_type) {
-    uint32_t bug_id = pc << 16 | bug_type;
-    // printf("thread %d add_bugs_for_later pc %u bug_type %u bug_id 0x%08x\n", INSTANCE_GLOBAL_IDX, pc, bug_type,
-    // bug_id);
+    uint32_t bug_id = pc << 16 | bug_type << 8 | (current_account_id & 0xFF);
+    // printf("thread %d add_bugs_for_later pc %u bug_type %u bug_id 0x%08x to_addr 0x%08x\n", INSTANCE_GLOBAL_IDX, pc,
+    //        bug_type, bug_id, current_account_id);
+
     bugs[no_bugs] = bug_id;
     if (no_bugs >= MAX_BUGS_TRACING) {
         // printf("thread %d no_bugs >= MAX_BUGS_TRACING, %d\n", INSTANCE_GLOBAL_IDX, no_bugs);
@@ -228,11 +249,7 @@ __device__ void simplified_trace_data::update_bugs(uint32_t bug_id) {
     // uint32_t bug_id = (pc << 16) | bug_type;  // Unique ID
     // printf("thread %d update_bugs pc %u bug_type %u bug_id 0x%08x\n", INSTANCE_GLOBAL_IDX, pc, bug_type, bug_id);
     // FNV-1a:
-    uint32_t hash = 2166136261U;                  // FNV offset basis
-    hash = (hash ^ (bug_id & 0xFF)) * 16777619U;  // FNV prime
-    hash = (hash ^ ((bug_id >> 8) & 0xFF)) * 16777619U;
-    hash = (hash ^ ((bug_id >> 16) & 0xFF)) * 16777619U;
-    hash = (hash ^ (bug_id >> 24)) * 16777619U;
+    uint32_t hash = fnv1a(bug_id);
 
     bool inserted = false;
     for (uint32_t probe = 0; probe < MAX_NEW_BUGS; ++probe) {
@@ -287,6 +304,24 @@ __device__ void simplified_trace_data::finalize_coverage_bitmap() {
             if (idx < CuEVM::MAX_NEW_BRANCHES) {
                 g_new_branch_info[idx].branch_thread_idx = INSTANCE_GLOBAL_IDX;
                 g_new_branch_info[idx].branch_id = last_missed_branch_id;
+            }
+        }
+    }
+
+    if (no_bugs > 0) {
+        // printf("thread %d finalize_coverage_bitmap no_bugs %d\n", INSTANCE_GLOBAL_IDX, no_bugs);
+        // for (uint32_t i = 0; i < no_bugs; i++) {
+        //     printf("bug %x state_written %d\n", bugs[i], state_written);
+        // }
+        if (state_written) {
+            // printf("thread %d finalize_coverage_bitmap state_written %d\n", INSTANCE_GLOBAL_IDX, state_written);
+            for (uint32_t i = 0; i < no_bugs; i++) {
+                // printf("thread %d add bug %x state_written %d\n", INSTANCE_GLOBAL_IDX, bugs[i], state_written);
+                uint8_t bug_type = static_cast<uint8_t>((bugs[i] >> 8) & 0xFF);
+
+                if (bug_type == BUG_INTEGER_OVERFLOW || bug_type == BUG_INTEGER_UNDERFLOW) {
+                    if (state_written) update_bugs(bugs[i]);
+                }
             }
         }
     }
@@ -403,25 +438,25 @@ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t
 */
 __device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
     assert(call_context_ptr != nullptr);
+    // printf("thread %d start_call pc %u current_account_id %x\n", INSTANCE_GLOBAL_IDX, pc, current_account_id);
 #ifdef BUILD_GO_LIBRARY
-    // printf("thread %d start call branch count %d\n", INSTANCE_GLOBAL_IDX, no_branches);
-    // if (no_branches >= MAX_BRANCHES_TRACING) no_branches = 0;
-    // add extra markers for entering call
-    // branches[no_branches].pc_src = START_CALL_BRANCH_MARKER;
-    // branches[no_branches].pc_dst = 0;
-    // branches[no_branches].pc_missed = 0;
-    // branches[no_branches].distance = 0;
+
     no_branches += 20;  // call saturates the branch limit faster than normal jumps
+    // state_written = true;
 #endif
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
     // printf("start call simplified trace data pc %d no calls %d\n", pc, no_calls);
-    calls[no_calls].sender = call_context_ptr->from;
-    calls[no_calls].receiver = call_context_ptr->to;
+    calls[no_calls].sender_id = call_context_ptr->from.words[0] & 0xffff;
+    current_account_id = call_context_ptr->to.words[0] & 0xffff;
+    calls[no_calls].receiver_id = current_account_id;
     calls[no_calls].pc = pc;
     calls[no_calls].op = call_context_ptr->call_type;
     calls[no_calls].value = call_context_ptr->value;
+    if (calls[no_calls].value.words[0] != 0) {
+        state_written = true;  // transfer = true
+    }
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
     calls[no_calls].last_pc = 0;
     no_calls++;
@@ -430,7 +465,7 @@ __device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t
         uint8_t loop_found = 0;
         // loop back 10 calls and check if we found loops
         for (int i = no_calls - 2; i >= no_calls - MAX_RECURSION; i--) {
-            if (calls[i].receiver == calls[no_calls - 1].receiver) {
+            if (calls[i].receiver_id == calls[no_calls - 1].receiver_id) {
                 loop_found++;
             }
         }
@@ -447,8 +482,11 @@ __device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t
 __device__ void simplified_trace_data::start_create() {
     // printf("thread %d finish_create no_branches %d\n", INSTANCE_GLOBAL_IDX, no_branches);
     no_branches += MAX_BRANCHES_TRACING / 2;
+    state_written = true;
 }
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc) {
+    // printf("thread %d finish_call error_code %u last_pc %u depth %u\n", INSTANCE_GLOBAL_IDX, error_code, last_pc,
+    //        depth);
 #ifdef BUILD_GO_LIBRARY
     no_branches += 2;
 #endif
@@ -467,35 +505,37 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
             break;
         }
     }
+    if (i > 0) {
+        current_account_id = calls[i - 1].receiver_id;
+    }
 
 #ifdef BUILD_GO_LIBRARY
 
     if (error_code == ERROR_INVALID_OPCODE) {
         // update_coverage_bitmap(last_pc, 0, true);
         // printf("thread %d add invalid bug %u\n", INSTANCE_GLOBAL_IDX, last_pc << 16 | BUG_INVALID_OPCODE);
-        update_bugs(last_pc << 16 | BUG_INVALID_OPCODE);
-    } else if (error_code == ERROR_RETURN || error_code == ERROR_SUCCESS) {
-        // check existing bugs and add bugs to the bug table
-        for (uint32_t i = 0; i < no_bugs; i++) {
-            // printf("thread %d add bug %x\n", INSTANCE_GLOBAL_IDX, bugs[i]);
-            update_bugs(bugs[i]);
-        }
-        no_bugs = 0;
+        update_bugs(last_pc << 16 | BUG_INVALID_OPCODE << 8 | (calls[0].receiver_id & 0xFF));
     }
+
 #endif
 }
 __host__ __device__ void simplified_trace_data::print() {
-    printf("no_events %u\n", no_events);
+    // printf("no_events %u\n", no_events);
     printf("no_calls %u\n", no_calls);
-    printf("events\n");
+    printf("no_bugs %u\n", no_bugs);
+    printf("bugs\n");
+    for (uint32_t i = 0; i < no_bugs; i++) {
+        printf("bug %u\n", bugs[i]);
+    }
+    // printf("events\n");
     // for (uint32_t i = 0; i < no_events; i++) {
     //     printf("pc %u op %u operand_1 %s operand_2 %s res %s\n", events[i].pc, events[i].op,
     //            events[i].operand_1.to_hex(), events[i].operand_2.to_hex(), events[i].res.to_hex());
     // }
     printf("calls\n");
     for (uint32_t i = 0; i < no_calls; i++) {
-        printf("pc %u op %u sender %s receiver %s value %s error_code %u\n", calls[i].pc, calls[i].op,
-               calls[i].sender.to_hex(), calls[i].receiver.to_hex(), calls[i].value.to_hex(), calls[i].error_code);
+        printf("pc %u op %u sender_id %u receiver_id %u value %s error_code %u\n", calls[i].pc, calls[i].op,
+               calls[i].sender_id, calls[i].receiver_id, calls[i].value.to_hex(), calls[i].error_code);
     }
     printf("branches\n");
 #ifndef BUILD_GO_LIBRARY
@@ -575,8 +615,9 @@ void freeTraceData(bool copy_state_data) {
 #define CHANCE_TO_CREATE_NEW_INTEGER 2            // one in 2
 #define CHANCE_TO_CREATE_NEW_ADDRESS 0            // 1 percent
 #define CHANCE_TO_SKIP_MUTATE 50                  // percent we skip a marker
+#define CHANCE_TO_SMALL_DELTA 5                   // percent we do small delta mutation
 #define VALUE_MUTATE_INT32 7                      // 2**(7*4*8) = 2**224
-#define VALUE_CHANCE_TO_STOP_INT_32 30            // 30 percent.
+// #define VALUE_CHANCE_TO_STOP_INT_32 30            // 30 percent.
 
 #define A_LCG 1664525
 #define C_LCG 1013904223
@@ -657,10 +698,10 @@ __device__ unsigned int mutate_value(unsigned int seed, evm_word_t* value) {
         // printf("thread %d value %s seed %u\n", INSTANCE_GLOBAL_IDX, value->to_hex(), seed);
         seed = (A_LCG * seed + C_LCG) % M_LCG;
         random_chance = seed % 100;
-        if (random_chance <= VALUE_CHANCE_TO_STOP_INT_32) {
-            // printf("thread %d stopping at seed %u\n", INSTANCE_GLOBAL_IDX, seed);
-            return seed;
-        }
+        // if (random_chance <= VALUE_CHANCE_TO_STOP_INT_32) {
+        //     // printf("thread %d stopping at seed %u\n", INSTANCE_GLOBAL_IDX, seed);
+        //     return seed;
+        // }
     }
     return seed;
 }
@@ -712,6 +753,15 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
         seed = (A_LCG * seed + C_LCG) % M_LCG;
         uint32_t random_chance = seed % 100;
         if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
+            if (element_type > 7) {
+                // mutate the marker data
+                seed = (A_LCG * seed + C_LCG) % M_LCG;
+                random_chance = seed % 100;
+                if (random_chance <= CHANCE_TO_SMALL_DELTA) {
+                    // do small delta mutation
+                    seed = mutate_byte_array(call_data + element_offset, element_length, 1, seed, false);
+                }
+            }
             continue;
         }
         // printf("thread %d marker_idx %d marker_offset %d element_offset %d element_type %d element_length

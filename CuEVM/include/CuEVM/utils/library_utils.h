@@ -135,7 +135,7 @@ struct serialized_worldstate_data {
 #define MAX_ADDRESSES_TRACING 16
 #define MAX_CALLS_TRACING 32
 #define MAX_BRANCHES_TRACING 128  // only track this number of branches in one trace
-#define MAX_BUGS_TRACING 16       // only track this number of bugs in one call
+#define MAX_BUGS_TRACING 32       // only track this number of bugs in one tx
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
 #define MAX_FUZZING_LOOP_LIMIT 200
@@ -166,8 +166,10 @@ struct call_trace {
     uint32_t pc;
     uint8_t op;
     // uint8_t address_idx;
-    evm_word_t sender;
-    evm_word_t receiver;
+    // evm_word_t sender;
+    // evm_word_t receiver;
+    uint16_t sender_id;    // unique identifer, last 8bit of address
+    uint16_t receiver_id;  // unique identifer, last 8bit of address
     evm_word_t value;
     uint8_t error_code = RESERVED_ERROR_CODE;  // 0 or 1
     uint32_t last_pc;                          // the last pc of the call before returning
@@ -208,15 +210,17 @@ struct simplified_trace_data {
 
     call_trace calls[MAX_CALLS_TRACING];
 
-    uint32_t no_addresses = 0;
+    // uint32_t no_addresses = 0;
     // uint32_t current_address_idx = 0;
-    uint32_t no_events = 0;
+    // uint32_t no_events = 0;
     uint32_t no_calls = 0;
     uint32_t no_branches = 0;
     evm_word_t last_distance;         // use to track branch distance by comparison opcodes
     uint32_t last_covered_branch_id;  // use to track last branch id that has improved distance
     uint32_t last_missed_branch_id;   // use to track last branch id that has improved distance
     uint8_t last_distance_bits;       // use to track last distance bits
+    uint8_t state_written = false;
+    uint16_t current_account_id = 0;
     uint32_t no_bugs = 0;
     uint32_t bugs[MAX_BUGS_TRACING];
 
@@ -242,7 +246,7 @@ struct simplified_trace_data {
      * @param[in] account_idx The account index.
      * @param[in] is_write The write flag.
      */
-    __device__ void update_storage_coverage(uint32_t pc, uint16_t storage_slot, uint8_t account_idx, bool is_write);
+    __device__ void update_storage_coverage(uint32_t pc, uint16_t storage_slot, uint8_t is_write);
 
     /**
      * @brief Update the bug table with the bug type.

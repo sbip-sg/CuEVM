@@ -1584,18 +1584,20 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
                 state_db->contract_index[idx] = state_db->num_contracts;
                 state_db->num_contracts++;
             }
+            if (storage_size > account_prealloc_keys_size) {
+                // todo: handle storage size > account_prealloc_keys_size
+                // clone num_states times of storage page
+                printf("PreState storage size: %d greater than supported, set to maximum %d\n", storage_size,
+                       account_prealloc_keys_size);
+                storage_size = account_prealloc_keys_size;
+            }
             state_db->account_storage_size[idx * num_states] = storage_size;
             // for (uint32_t i = 0; i < num_states; i++) {
             //     state_db->account_storage_size[idx * num_states + i] = storage_size;
             // }
             state_db->num_storage_elements += state_db->account_storage_size[idx * num_states];
             // allocate new page per account
-            if (storage_size > account_prealloc_keys_size) {
-                // todo: handle storage size > account_prealloc_keys_size
-                // clone num_states times of storage page
-                printf("PreState storage size: %d greater than supported\n", storage_size);
-                break;
-            }
+
         } else
             state_db->account_storage_size[idx * num_states] = 0;
         // memset(&state_db->account_storage_size[idx * num_states], 0, num_states * sizeof(uint32_t));

@@ -716,11 +716,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         tracer_ptr->finish_operation(cached_call_state.gas_used, call_state_ptr->gas_refund);
 
 #endif
-#ifdef BUILD_PYTHON_LIBRARY
-        if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
-            global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_operation(*cached_call_state.stack_ptr, error_code);
-        }
-#endif
+        // #ifdef BUILD_PYTHON_LIBRARY
+        //         if ((opcode <= OP_EXP || opcode >= OP_REVERT || opcode == OP_SSTORE) && opcode != 0) {
+        //             global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_operation(*cached_call_state.stack_ptr,
+        //             error_code);
+        //         }
+        // #endif
 
         // all calls  + create
         if (opcode >= OP_CREATE && opcode <= OP_STATICCALL && opcode != OP_RETURN) {
