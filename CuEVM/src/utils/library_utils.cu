@@ -607,102 +607,245 @@ void freeTraceData(bool copy_state_data) {
 
 #ifdef BUILD_GO_LIBRARY
 // LCG parameters (commonly used for a 32-bit generator)
+#define LCG_A 1664525
+#define LCG_C 1013904223
+#define LCG_M 0xFFFFFFFF  // 2^32 - 1
 
-// seed = (a * seed + c) % m;
-// chances out of 100
+// AFL-style mutation configuration
+#define CHANCE_TO_CREATE_NEW_ADDRESS 1  // 1 percent
+#define CHANCE_TO_SKIP_MUTATE 50        // percent we skip a marker
+#define CHANCE_HAVOC_MUTATION 6         // percent chance for havoc (stacked mutations)
+#define MAX_HAVOC_STACK 3               // maximum number of stacked mutations in havoc
+#define VALUE_MUTATE_INT32 7            // 2**(7*4*8) = 2**224
 
-#define CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS 10  // percent
-#define CHANCE_TO_CREATE_NEW_INTEGER 2            // one in 2
-#define CHANCE_TO_CREATE_NEW_ADDRESS 0            // 1 percent
-#define CHANCE_TO_SKIP_MUTATE 50                  // percent we skip a marker
-#define CHANCE_TO_SMALL_DELTA 5                   // percent we do small delta mutation
-#define VALUE_MUTATE_INT32 7                      // 2**(7*4*8) = 2**224
-// #define VALUE_CHANCE_TO_STOP_INT_32 30            // 30 percent.
+// Mutation context to reduce parameter passing
+struct MutationContext {
+    uint8_t* data;
+    uint32_t length;
+    uint32_t seed;
+};
 
-#define A_LCG 1664525
-#define C_LCG 1013904223
-#define M_LCG 0xFFFFFFFF  // 2^32 - 1
-
-__device__ unsigned int mutate_byte_array(uint8_t* data, uint32_t element_length, uint32_t byte_length,
-                                          unsigned int seed, bool create_new) {
-    seed = (A_LCG * seed + C_LCG) % M_LCG;
-    uint8_t mutated_byte = seed % (byte_length + 1);
-    if (create_new) {
-        seed = (A_LCG * seed + C_LCG) % M_LCG;
-        uint32_t random_chance = seed % 100;
-        if (random_chance <= CHANCE_TO_TAKE_INTEGER_FROM_CONSTANTS) {
-            seed = (A_LCG * seed + C_LCG) % M_LCG;
-            // take from constants
-            uint32_t random_index = seed % g_fuzzing_constants->integer_constants_count;
-            for (int i = element_length - byte_length; i < element_length; i++) {
-                data[i] = g_fuzzing_constants->integer_constants[random_index * 32 + i];
-            }
-        } else {
-            for (int i = 0; i < element_length - mutated_byte; i++) {
-                data[i] = 0;
-            }
-        }
-    }
-    uint8_t* start_offset = data + element_length - mutated_byte;
-    for (int mutate_byte_index = 0; mutate_byte_index < mutated_byte; mutate_byte_index++) {
-        seed = (A_LCG * seed + C_LCG) % M_LCG;
-        uint8_t random_byte = seed & 0xFF;
-        start_offset[mutate_byte_index] = random_byte;
-    }
+// Helper: Generate next random number
+__device__ __forceinline__ uint32_t next_rand(uint32_t& seed) {
+    seed = (LCG_A * seed + LCG_C) & LCG_M;
     return seed;
 }
 
-__device__ unsigned int mutate_block_values_senders(unsigned int seed, uint64_t* block_numbers,
-                                                    uint64_t* block_timestamps, uint8_t* senders) {
+// Helper: Get random in range [0, max)
+__device__ __forceinline__ uint32_t rand_range(uint32_t& seed, uint32_t max) {
+    return max == 0 ? 0 : next_rand(seed) % max;
+}
+
+// AFL mutation types
+enum MutationType {
+    MUTATE_BIT_FLIP = 0,
+    MUTATE_BYTE_FLIP,
+    MUTATE_ARITHMETIC,
+    MUTATE_KNOWN_INTEGER,
+    MUTATE_RANDOM_BYTES,
+    MUTATE_HAVOC,
+    MUTATE_TYPE_COUNT
+};
+
+__device__ void mutate_bit_flip(MutationContext& ctx) {
+    if (ctx.length == 0) return;
+
+    uint32_t flip_size = 1 << rand_range(ctx.seed, 3);  // 1, 2, or 4 bits
+    uint32_t max_bit_pos = ctx.length * 8 - flip_size + 1;
+    uint32_t bit_pos = rand_range(ctx.seed, max_bit_pos);
+
+    uint32_t byte_idx = bit_pos / 8;
+    uint32_t bit_idx = bit_pos % 8;
+
+    uint32_t mask = ((1 << flip_size) - 1) << bit_idx;
+    if (bit_idx + flip_size <= 8) {
+        ctx.data[byte_idx] ^= mask;
+    } else {
+        // Handle cross-byte boundary
+        ctx.data[byte_idx] ^= mask & 0xFF;
+        if (byte_idx + 1 < ctx.length) {
+            ctx.data[byte_idx + 1] ^= (mask >> 8) & 0xFF;
+        }
+    }
+}
+
+__device__ void mutate_byte_flip(MutationContext& ctx) {
+    if (ctx.length == 0) return;
+
+    uint32_t flip_size = 1 << rand_range(ctx.seed, 3);  // 1, 2, or 4 bytes
+    if (flip_size > ctx.length) flip_size = ctx.length;
+
+    uint32_t start_idx = rand_range(ctx.seed, ctx.length - flip_size + 1);
+
+    for (uint32_t i = 0; i < flip_size; i++) {
+        ctx.data[start_idx + i] ^= 0xFF;
+    }
+}
+
+__device__ void mutate_arithmetic(MutationContext& ctx) {
+    if (ctx.length == 0) return;
+
+    uint32_t delta = 1 + rand_range(ctx.seed, 35);  // Small arithmetic delta (1-35)
+    bool is_add = rand_range(ctx.seed, 2) == 0;
+
+    if (ctx.length >= 8) {
+        // 64-bit arithmetic with big-endian
+        // for efficiency, we dont do arithmetic on higher bytes
+        uint32_t start_idx = ctx.length - 8;
+        uint64_t value = ((uint64_t)ctx.data[start_idx] << 56) | ((uint64_t)ctx.data[start_idx + 1] << 48) |
+                         ((uint64_t)ctx.data[start_idx + 2] << 40) | ((uint64_t)ctx.data[start_idx + 3] << 32) |
+                         ((uint64_t)ctx.data[start_idx + 4] << 24) | ((uint64_t)ctx.data[start_idx + 5] << 16) |
+                         ((uint64_t)ctx.data[start_idx + 6] << 8) | ((uint64_t)ctx.data[start_idx + 7]);
+        value = is_add ? (value + delta) : (value - delta);
+        ctx.data[start_idx] = (value >> 56) & 0xFF;
+        ctx.data[start_idx + 1] = (value >> 48) & 0xFF;
+        ctx.data[start_idx + 2] = (value >> 40) & 0xFF;
+        ctx.data[start_idx + 3] = (value >> 32) & 0xFF;
+        ctx.data[start_idx + 4] = (value >> 24) & 0xFF;
+        ctx.data[start_idx + 5] = (value >> 16) & 0xFF;
+        ctx.data[start_idx + 6] = (value >> 8) & 0xFF;
+        ctx.data[start_idx + 7] = value & 0xFF;
+    } else if (ctx.length >= 4) {
+        // 32-bit arithmetic with big-endian
+        uint32_t start_idx = ctx.length - 4;
+        uint32_t value = (ctx.data[start_idx] << 24) | (ctx.data[start_idx + 1] << 16) |
+                         (ctx.data[start_idx + 2] << 8) | ctx.data[start_idx + 3];
+        value = is_add ? (value + delta) : (value - delta);
+        ctx.data[start_idx] = (value >> 24) & 0xFF;
+        ctx.data[start_idx + 1] = (value >> 16) & 0xFF;
+        ctx.data[start_idx + 2] = (value >> 8) & 0xFF;
+        ctx.data[start_idx + 3] = value & 0xFF;
+    } else {
+        // 8-bit arithmetic
+        uint32_t byte_idx = ctx.length - 1;
+        ctx.data[byte_idx] = is_add ? ((ctx.data[byte_idx] + delta) & 0xFF) : ((ctx.data[byte_idx] - delta) & 0xFF);
+    }
+}
+
+__device__ void mutate_known_integer(MutationContext& ctx) {
+    if (ctx.length == 0 || g_fuzzing_constants->integer_constants_count == 0) return;
+
+    uint32_t random_index = rand_range(ctx.seed, g_fuzzing_constants->integer_constants_count);
+    uint32_t copy_length = ctx.length > 32 ? 32 : ctx.length;
+
+    for (uint32_t i = 0; i < copy_length; i++) {
+        ctx.data[i] = g_fuzzing_constants->integer_constants[random_index * 32 + i];
+    }
+}
+
+__device__ void mutate_random_bytes(MutationContext& ctx) {
+    if (ctx.length == 0) return;
+
+    uint32_t start_pos = rand_range(ctx.seed, ctx.length);
+    uint32_t mutated_bytes = 1 + rand_range(ctx.seed, ctx.length - start_pos);
+
+    for (uint32_t i = 0; i < mutated_bytes; i++) {
+        ctx.data[start_pos + i] = next_rand(ctx.seed) & 0xFF;
+    }
+}
+
+__device__ void mutate_havoc(MutationContext& ctx) {
+    uint32_t stack_count = 1 + rand_range(ctx.seed, MAX_HAVOC_STACK);
+
+    for (uint32_t i = 0; i < stack_count; i++) {
+        uint32_t mutation_type = rand_range(ctx.seed, MUTATE_TYPE_COUNT - 1);  // Exclude MUTATE_HAVOC
+
+        switch (mutation_type) {
+            case MUTATE_BIT_FLIP:
+                mutate_bit_flip(ctx);
+                break;
+            case MUTATE_BYTE_FLIP:
+                mutate_byte_flip(ctx);
+                break;
+            case MUTATE_ARITHMETIC:
+                mutate_arithmetic(ctx);
+                break;
+            case MUTATE_KNOWN_INTEGER:
+                mutate_known_integer(ctx);
+                break;
+            case MUTATE_RANDOM_BYTES:
+                mutate_random_bytes(ctx);
+                break;
+        }
+    }
+}
+
+__device__ uint32_t afl_mutate_byte_array(uint8_t* data, uint32_t data_length, uint32_t element_bits, uint32_t seed) {
+    if (data == nullptr || data_length == 0) return seed;
+
+    uint32_t element_bytes = element_bits / 8;
+    if (element_bytes > data_length) element_bytes = data_length;
+
+    MutationContext ctx = {.data = data + data_length - element_bytes, .length = element_bytes, .seed = seed};
+
+    // Check for havoc mutation first
+    if (rand_range(ctx.seed, 100) < CHANCE_HAVOC_MUTATION) {
+        mutate_havoc(ctx);
+        return ctx.seed;
+    }
+
+    // Choose regular mutation type
+    uint32_t mutation_type = rand_range(ctx.seed, MUTATE_TYPE_COUNT - 1);  // Exclude MUTATE_HAVOC
+
+    switch (mutation_type) {
+        case MUTATE_BIT_FLIP:
+            mutate_bit_flip(ctx);
+            break;
+        case MUTATE_BYTE_FLIP:
+            mutate_byte_flip(ctx);
+            break;
+        case MUTATE_ARITHMETIC:
+            mutate_arithmetic(ctx);
+            break;
+        case MUTATE_KNOWN_INTEGER:
+            mutate_known_integer(ctx);
+            break;
+        case MUTATE_RANDOM_BYTES:
+        default:
+            // clear the data
+            for (uint32_t i = 0; i < data_length; i++) {
+                data[i] = 0;
+            }
+            // mutate the data
+            mutate_random_bytes(ctx);
+            break;
+    }
+
+    return ctx.seed;
+}
+
+__device__ uint32_t mutate_block_values_senders(uint32_t seed, uint64_t* block_numbers, uint64_t* block_timestamps,
+                                                uint8_t* senders) {
     // block number first
-    seed = (A_LCG * seed + C_LCG) % M_LCG;
-    uint32_t random_chance = seed % 100;
-    if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
+    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
         return seed;
     }
-    seed = (A_LCG * seed + C_LCG) % M_LCG;
-    uint32_t block_number = seed % g_fuzzing_constants->block_number_delay_max;
 
-    seed = (A_LCG * seed + C_LCG) % M_LCG;
-    uint32_t block_timestamp = seed % g_fuzzing_constants->block_timestamp_delay_max;
+    uint32_t block_number = rand_range(seed, g_fuzzing_constants->block_number_delay_max);
+    uint32_t block_timestamp = rand_range(seed, g_fuzzing_constants->block_timestamp_delay_max);
 
     if (block_timestamp == 0)
         block_number = 0;
     else
         block_number = block_number % block_timestamp;
+
     block_numbers[INSTANCE_GLOBAL_IDX] = block_number;
     block_timestamps[INSTANCE_GLOBAL_IDX] = block_timestamp;
-    // mutate sender
-    // need to skip again ?
-    // seed = (A_LCG * seed + C_LCG) % M_LCG;
-    // random_chance = seed % 100;
-    // if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
-    //     return seed;
-    // }
-    seed = (A_LCG * seed + C_LCG) % M_LCG;
-    senders[INSTANCE_GLOBAL_IDX] = seed % g_fuzzing_constants->sender_counts;
-    // printf("thread %d block_number %u block_timestamp %u sender %u seed %u\n", INSTANCE_GLOBAL_IDX, block_number,
-    //        block_timestamp, senders[INSTANCE_GLOBAL_IDX], seed);
+
+    senders[INSTANCE_GLOBAL_IDX] = rand_range(seed, g_fuzzing_constants->sender_counts);
+
     return seed;
-    // blockNumberDelay %= blockTimestampDelay
 }
-__device__ unsigned int mutate_value(unsigned int seed, evm_word_t* value) {
-    seed = (A_LCG * seed + C_LCG) % M_LCG;
-    uint32_t random_chance = seed % 100;
-    if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
+
+__device__ uint32_t mutate_value(uint32_t seed, evm_word_t* value) {
+    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
         return seed;
     }
+
     for (int i = 0; i < VALUE_MUTATE_INT32; i++) {
-        seed = (A_LCG * seed + C_LCG) % M_LCG;
-        value->words[i] = seed;
-        // printf("thread %d value %s seed %u\n", INSTANCE_GLOBAL_IDX, value->to_hex(), seed);
-        seed = (A_LCG * seed + C_LCG) % M_LCG;
-        random_chance = seed % 100;
-        // if (random_chance <= VALUE_CHANCE_TO_STOP_INT_32) {
-        //     // printf("thread %d stopping at seed %u\n", INSTANCE_GLOBAL_IDX, seed);
-        //     return seed;
-        // }
+        value->words[i] = next_rand(seed);
     }
+
     return seed;
 }
 __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* transaction_list_ptr) {
@@ -745,50 +888,28 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
 
         if (element_type == ELEMENT_BOOL_TYPE) {  // always mutate bool
             // printf("thread %d bool mutation\n", INSTANCE_GLOBAL_IDX);
-            seed = (A_LCG * seed + C_LCG) % M_LCG;
-            call_data[element_offset + 31] = seed % 2;  // set last byte to 0 or 1
+            call_data[element_offset + 31] = next_rand(seed) % 2;  // set last byte to 0 or 1
             continue;
         }
 
-        seed = (A_LCG * seed + C_LCG) % M_LCG;
-        uint32_t random_chance = seed % 100;
-        if (random_chance <= CHANCE_TO_SKIP_MUTATE) {
-            if (element_type > 7) {
-                // mutate the marker data
-                seed = (A_LCG * seed + C_LCG) % M_LCG;
-                random_chance = seed % 100;
-                if (random_chance <= CHANCE_TO_SMALL_DELTA) {
-                    // do small delta mutation
-                    seed = mutate_byte_array(call_data + element_offset, element_length, 1, seed, false);
-                }
-            }
+        if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
             continue;
         }
-        // printf("thread %d marker_idx %d marker_offset %d element_offset %d element_type %d element_length
-        // %d\n",
-        //        INSTANCE_GLOBAL_IDX, marker_idx, marker_offset, element_offset, element_type, element_length);
+
         if (element_type > 7) {
-            uint32_t byte_length = element_type / 8;
-            // randomize the marker data
-            seed = (A_LCG * seed + C_LCG) % M_LCG;
-            bool create_new = (seed % CHANCE_TO_CREATE_NEW_INTEGER) == 0;
-            seed = mutate_byte_array(call_data + element_offset, element_length, byte_length, seed, create_new);
-        } else if (element_type == ELEMENT_ADDRESS_TYPE) {  // address
-            // randomize the marker data
-            seed = (A_LCG * seed + C_LCG) % M_LCG;
-            uint32_t random_chance = seed % 100;
+            seed = afl_mutate_byte_array(call_data + element_offset, element_length, element_type, seed);
 
-            if (random_chance <= CHANCE_TO_CREATE_NEW_ADDRESS) {
+        } else if (element_type == ELEMENT_ADDRESS_TYPE) {  // address
+            if (rand_range(seed, 100) < CHANCE_TO_CREATE_NEW_ADDRESS) {
                 // printf("thread %d create new address\n", INSTANCE_GLOBAL_IDX);
-                seed = mutate_byte_array(call_data + element_offset, 32, 20, seed, true);
+                MutationContext ctx = {.data = call_data + element_offset + 12, .length = 20, .seed = seed};
+                mutate_random_bytes(ctx);
+                seed = ctx.seed;
             } else {
-                seed = (A_LCG * seed + C_LCG) % M_LCG;
                 // select from the constants
                 uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
-                uint32_t random_index = seed % address_constants_count;
-                // printf("thread %d seed %d address_constants_count %d random_address_index %d\n",
-                // INSTANCE_GLOBAL_IDX,
-                //        seed, address_constants_count, random_index);
+                uint32_t random_index = rand_range(seed, address_constants_count);
+
                 for (int i = 0; i < 20; i++) {
                     call_data[element_offset + 12 + i] =
                         g_fuzzing_constants->address_constants[random_index * 32 + 12 + i];
