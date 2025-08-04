@@ -33,15 +33,17 @@ __device__ int32_t COINBASE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_use
 
 __device__ int32_t TIMESTAMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack
 #ifdef BUILD_GO_LIBRARY
-                             , const transaction::TransactionList *transaction_list_ptr // supplement the block info by adding delay per transaction
+                             ,
+                             const transaction::TransactionList
+                                 *transaction_list_ptr  // supplement the block info by adding delay per transaction
 #endif
 ) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
 #ifdef BUILD_GO_LIBRARY
-        error_code |= stack.push_uint64(global_block_info->time_stamp + transaction_list_ptr->time_stamp[INSTANCE_GLOBAL_IDX]);
-        // printf("TIMESTAMP: Thread %d, %lu\n", INSTANCE_GLOBAL_IDX, global_block_info->time_stamp + transaction_list_ptr->time_stamp[INSTANCE_GLOBAL_IDX]);
+        error_code |= stack.push_uint64(transaction_list_ptr->time_stamp[INSTANCE_GLOBAL_IDX]);
+
 #else
         error_code |= stack.push_uint64(global_block_info->time_stamp);
 #endif
@@ -51,15 +53,17 @@ __device__ int32_t TIMESTAMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_us
 
 __device__ int32_t NUMBER(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack
 #ifdef BUILD_GO_LIBRARY
-                             , const transaction::TransactionList *transaction_list_ptr // supplement the block info by adding delay per transaction
+                          ,
+                          const transaction::TransactionList
+                              *transaction_list_ptr  // supplement the block info by adding delay per transaction
 #endif
 ) {
     gas_used += GAS_BASE;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
 #ifdef BUILD_GO_LIBRARY
-        error_code |= stack.push_uint64(global_block_info->number + transaction_list_ptr->block_number[INSTANCE_GLOBAL_IDX]);
-        // printf("NUMBER: Thread %d, %lu\n", INSTANCE_GLOBAL_IDX, global_block_info->number + transaction_list_ptr->block_number[INSTANCE_GLOBAL_IDX]);
+        error_code |= stack.push_uint64(transaction_list_ptr->block_number[INSTANCE_GLOBAL_IDX]);
+
 #else
         error_code |= stack.push_uint64(global_block_info->number);
 #endif

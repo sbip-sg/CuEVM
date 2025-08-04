@@ -16,6 +16,8 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     //     printf("g_fuzzing_constants: %p\n", g_fuzzing_constants);
     //     g_fuzzing_constants->print();
     // }
+    // if (instance == 0) transaction_list_ptr->print();
+
     mutate_transaction_data(transaction_list_ptr);
 #endif
     // if (instance == 0) {
@@ -159,6 +161,16 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     }
 #endif
 
+    // if (INSTANCE_GLOBAL_IDX == 1) {
+    //     printf("Start %d call sender %x receipient %x  code size %d value %d\n", THREADIDX,
+    //            call_state_ptr->from.words[0], call_state_ptr->to.words[0], call_state_ptr->byte_code_size,
+    //            call_state_ptr->value.words[0]);
+    //     for (int i = 0; i < call_state_ptr->call_data_size; i++) {
+    //         printf("%x ", call_state_ptr->call_data[i]);
+    //     }
+    //     printf("\n");
+    // }
+
     const evm_word_t *sender = &call_state_ptr->from;
     const evm_word_t *recipient = &call_state_ptr->to;
 
@@ -239,10 +251,10 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
 #endif
 
     int32_t error_code = start_CALL(cached_call_state);
-    // printf("error_code start_call: %d\n", error_code);
+    // printf("Thread %d error_code start_call: %d\n", INSTANCE_GLOBAL_IDX, error_code);
     if (error_code != ERROR_SUCCESS) {
 #ifdef BUILD_LIBRARY
-        global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(0, 0);
+        global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(0, 0, 0);
 #endif
         return;  // finish call
     }
@@ -286,6 +298,14 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         //     // }
         // }
 #endif
+        // if (INSTANCE_GLOBAL_IDX == 1) {
+        //     printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+        //            cached_call_state.gas_limit, cached_call_state.gas_used);
+        //     // printf("\n\n");
+        //     // cached_call_state.stack_ptr->print();
+        // }
 
 #ifdef BUILD_PYTHON_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -689,7 +709,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     // TODO: fix this
                     error_code =
                         CuEVM::operations::SELFDESTRUCT(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr, call_state_ptr);
+                                                        *cached_call_state.stack_ptr, call_state_ptr
+#ifdef BUILD_GO_LIBRARY
+                                                        ,
+                                                        &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                        );
                     break;
 
                 default:
@@ -882,8 +907,10 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
 
 __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
-    // printf("finish_CALL thread %d, error_code %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, error_code,
-    //        call_state_ptr);
+    // if (INSTANCE_GLOBAL_IDX == 8) {
+    //     printf("finish_CALL thread %d, error_code %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, error_code,
+    //            call_state_ptr);
+    // }
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
@@ -913,7 +940,8 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         }
     }
 #ifdef BUILD_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, call_state_ptr->pc);
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, call_state_ptr->pc,
+                                                             call_state_ptr->from.words[0]);
 #endif
 
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;

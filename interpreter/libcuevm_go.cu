@@ -20,6 +20,10 @@ static std::vector<StorageInfoEntry*> d_storage_infos;  // vector size = num gpu
 static std::vector<uint32_t*>
     d_new_coverage_bitmaps;  // vector size = num gpus for tracking each thread if coverage hit
 static std::vector<GPUFeedbackCount*> d_gpu_feedback_counts;  // vector size = num gpus
+
+static std::vector<uint64_t*> device_block_numbers;  // vector size = num gpus for persistent block numbers
+static std::vector<uint64_t*> device_time_stamps;    // vector size = num gpus for persistent time stamps
+
 static int call_counter = 0;
 // Global variable to hold persistent jump table
 // CuEVM::ContractPCsMap contract_pcs_map;
@@ -139,6 +143,14 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         d_bug_infos.push_back(d_new_bug_info);
         // d_new_coverage_bitmaps.push_back(d_new_coverage_bitmap);
         d_gpu_feedback_counts.push_back(d_gpu_feedback_count);
+
+        // block number and timestamp
+        uint64_t* d_block_number;
+        CUDA_CHECK(cudaMalloc(&d_block_number, num_instances * sizeof(uint64_t)));
+        device_block_numbers.push_back(d_block_number);
+        uint64_t* d_time_stamp;
+        CUDA_CHECK(cudaMalloc(&d_time_stamp, num_instances * sizeof(uint64_t)));
+        device_time_stamps.push_back(d_time_stamp);
     }
     // Include <cassert> header at the top of the file for this to work.
     // Standard assert takes only one argument (the condition).
@@ -547,7 +559,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
     const unsigned char* values, const unsigned char* callData, int callDataLen, const uint32_t* dataOffsets,
     int dataOffsetsLen, const uint32_t* dataSizes, int txCount, const int32_t* markerOffsets,
-    const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0) {
+    const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0, uint32_t sequence_idx = 0) {
     printf("create transaction list with start seed %u\n", start_seed);
     // Create TransactionList on host
 
@@ -609,8 +621,12 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         // Allocate GPU memory for sender array
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->sender, transaction_per_gpu * sizeof(uint8_t)));
 
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->block_number, transaction_per_gpu * sizeof(uint64_t)));
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
+        // CUDA_CHECK(cudaMalloc(&temp_transaction_list->block_number, transaction_per_gpu * sizeof(uint64_t)));
+        // CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
+        // use persistent block number and timestamp
+
+        temp_transaction_list->block_number = device_block_numbers[i];
+        temp_transaction_list->time_stamp = device_time_stamps[i];
 
         // initialize marker data
         CUDA_CHECK(
@@ -642,11 +658,14 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         // Copy sender array from host to GPU
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->sender, fromAddr + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint8_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->block_number, blockNumber + i * transaction_per_gpu,
-                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->time_stamp, timeStamp + i * transaction_per_gpu,
-                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
 
+        // Block number and timestamp persistent after the first tx
+        if (sequence_idx == 0) {
+            CUDA_CHECK(cudaMemcpy(temp_transaction_list->block_number, blockNumber + i * transaction_per_gpu,
+                                  transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(temp_transaction_list->time_stamp, timeStamp + i * transaction_per_gpu,
+                                  transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
+        }
         // Copy marker data from host to GPU
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset, markerOffsets,
                               transaction_per_gpu / g_skipTxSize * sizeof(int32_t), cudaMemcpyHostToDevice));
@@ -752,7 +771,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
                 blockNumber + current_idx, timeStamp + current_idx, newFromAddr, toAddr, newValues,
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
                 dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize, markerData,
-                markerDataLen, start_seed + sequenceIdx * txBatchCount);
+                markerDataLen, start_seed + sequenceIdx * txBatchCount, sequenceIdx);
             // auto d_transaction_list_ptrs = create_transaction_list(
             //     newFromAddr, toAddr, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
             //     txBatchCount, dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,

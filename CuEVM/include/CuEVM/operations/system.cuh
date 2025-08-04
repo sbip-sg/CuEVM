@@ -5,6 +5,9 @@
 #include <CuEVM/core/evm_call_context.cuh>
 #include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/state/state_db.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 
 /**
  * The system operations class.
@@ -173,7 +176,12 @@ __device__ int32_t INVALID();
  * @return The error code. 0 if the operation is successful.
  */
 __device__ int32_t SELFDESTRUCT(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                CuEVM::evm_call_context_t *call_state_ptr);
+                                CuEVM::evm_call_context_t *call_state_ptr
+#ifdef BUILD_LIBRARY
+                                ,
+                                CuEVM::simplified_trace_data *trace_data
+#endif
+);
 }  // namespace CuEVM::operations
 
 #endif

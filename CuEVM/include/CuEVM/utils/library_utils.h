@@ -9,7 +9,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <unordered_set>
 
-#define CUEVM_MUTATE_GROUP_SIZE 32  // same as fuzzer SkipSequenceSize
+#define CUEVM_MUTATE_GROUP_SIZE 2  // same as fuzzer SkipSequenceSize
 /**
  * @file library_utils.h
  * @brief Utility functions and data structures for library integration.
@@ -81,11 +81,17 @@ extern __device__ GPUFeedbackCount* g_gpu_feedback_count;  // counter for intere
 #define ELEMENT_BOOL_TYPE 3
 
 // bug types
-#define BUG_INTEGER_OVERFLOW 0x01
-#define BUG_INTEGER_UNDERFLOW 0x02
-#define BUG_SELF_DESTRUCT 0x03
-#define BUG_LEAKING_ETHER 0x04
+#define BUG_INTEGER_BUG 0x01
+#define BUG_SELF_DESTRUCT 0x02
+#define BUG_LEAKING_ETHER 0x03
+#define BUG_ARBITRARY_CALL 0x04
+#define BUG_REENTRANCY 0x05
 #define BUG_INVALID_OPCODE 0xFF
+
+// special attacker address for oracles (last 32 bit)
+#define REENTRANCY_ATTACKER_ADDRESS 0xCAFECAFE
+#define TRANSPARENT_ATTACKER_ADDRESS 0xC0DE0001
+#define RANDOM_ATTACKER_ADDRESS 0xC0DE0002  // never appears in address dict
 
 struct fuzzing_constants {
     uint8_t* address_constants;
@@ -93,9 +99,9 @@ struct fuzzing_constants {
     evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
     uint8_t* integer_constants;
     uint32_t integer_constants_count;  // number of uint256 constants
-    uint32_t block_number_delay_max = 60480;
-    uint32_t block_timestamp_delay_max = 604800;
-    evm_word_t* sender_list;  // sender list for fuzzing
+    uint32_t block_number_delay_max = 60480 * 2;
+    uint32_t block_timestamp_delay_max = 604800 * 4;  // 1 month
+    evm_word_t* sender_list;                          // sender list for fuzzing
     uint32_t sender_counts = 3;
     __host__ __device__ void print();
 };
@@ -168,8 +174,8 @@ struct call_trace {
     // uint8_t address_idx;
     // evm_word_t sender;
     // evm_word_t receiver;
-    uint16_t sender_id;    // unique identifer, last 8bit of address
-    uint16_t receiver_id;  // unique identifer, last 8bit of address
+    uint32_t sender_id;    // unique identifer, last 8bit of address
+    uint32_t receiver_id;  // unique identifer, last 8bit of address
     evm_word_t value;
     uint8_t error_code = RESERVED_ERROR_CODE;  // 0 or 1
     uint32_t last_pc;                          // the last pc of the call before returning
@@ -210,9 +216,6 @@ struct simplified_trace_data {
 
     call_trace calls[MAX_CALLS_TRACING];
 
-    // uint32_t no_addresses = 0;
-    // uint32_t current_address_idx = 0;
-    // uint32_t no_events = 0;
     uint32_t no_calls = 0;
     uint32_t no_branches = 0;
     evm_word_t last_distance;         // use to track branch distance by comparison opcodes
@@ -220,8 +223,9 @@ struct simplified_trace_data {
     uint32_t last_missed_branch_id;   // use to track last branch id that has improved distance
     uint8_t last_distance_bits;       // use to track last distance bits
     uint8_t state_written = false;
-    uint16_t current_account_id = 0;
+    uint32_t current_account_id = 0;
     uint32_t no_bugs = 0;
+    uint8_t reentrancy_count = 0;
     uint32_t bugs[MAX_BUGS_TRACING];
 
     /**
@@ -263,6 +267,32 @@ struct simplified_trace_data {
     __device__ void add_bugs_for_later(uint32_t pc, uint8_t bug_type);
 
     /**
+     * @brief Add selfdestruct oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void selfdestruct_oracle(uint32_t pc);
+
+    /**
+     * @brief Add reentrancy oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void reentrancy_oracle(uint32_t pc);
+
+    /**
+     * @brief Add invalid opcode oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void invalid_opcode_oracle(uint32_t pc);
+
+    /**
+     * @brief Add leaking ether oracle.
+     * @param[in] pc The program counter.
+     * @param[in] value The value.
+     * @param[in] sender_id The sender id.
+     */
+    __device__ void leaking_ether_oracle(uint32_t pc, uint32_t sender_id);
+
+    /**
      * @brief Begin recording an operation in the trace.
      * @param[in] pc The program counter.
      * @param[in] op The operation code.
@@ -299,7 +329,7 @@ struct simplified_trace_data {
      * @param[in] success The success flag.
      * @param[in] last_pc The last program counter.
      */
-    __device__ void finish_call(uint8_t success, uint32_t last_pc);
+    __device__ void finish_call(uint8_t success, uint32_t last_pc, uint32_t _current_account_id);
 
     /**
      * @brief Record a branch operation.

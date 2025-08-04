@@ -15,6 +15,7 @@ __host__ __device__ void TransactionList::print() {
 #ifndef BUILD_GO_LIBRARY
     printf("sender: ");
     sender.print();
+    return;
 #endif
     printf("to: ");
     to.print();

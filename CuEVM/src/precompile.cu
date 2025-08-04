@@ -572,6 +572,13 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
     return error_code;
 }
 
+// todo when optimizing, reentrancy attacker becomes a precompile
+__device__ int32_t operation_ReentrancyAttacker(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
+                                                CuEVM::evm_call_context_t *call_context) {
+    // todo when optimizing, reentrancy attacker becomes a precompile
+    return ERROR_SUCCESS;
+}
+
 }  // namespace precompile_operations
 
 }  // namespace CuEVM
