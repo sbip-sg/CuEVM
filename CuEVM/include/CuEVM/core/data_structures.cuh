@@ -20,11 +20,11 @@ constexpr uint32_t memory_pool_return_data_preallocate = 128;    // number of re
 constexpr uint32_t memory_pool_snapshot_preallocate_slots = 32;  // number of snapshot slots for each instance
 
 constexpr uint32_t value_page_size = 16;             // number of storage slots per page when expanding storage
-constexpr uint32_t snapshot_account_pool_size = 32;  // number of snapshot accounts for each instance
+constexpr uint32_t snapshot_account_pool_size = 64;  // number of snapshot accounts for each instance
 constexpr uint32_t snapshot_page_size = 8;
 // each snapshot state keeps track of the touched accounts warming up in the context
 constexpr uint32_t preallocated_touched_accounts_size = 4;
-constexpr uint32_t preallocated_touched_storage_keys_size = account_prealloc_keys_size / 2;
+constexpr uint32_t preallocated_touched_storage_keys_size = 16;
 
 constexpr CONSTANT uint32_t serialized_worldstate_addresses_size = 32;
 constexpr CONSTANT uint32_t serialized_worldstate_storage_slots = 512;

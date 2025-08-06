@@ -5,6 +5,9 @@
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 namespace CuEVM::memory {
 
 // experimental, not used
@@ -13,9 +16,10 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
     uint32_t lane_id = threadIdx.x % 32;
     unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
-    
-    // printf("warp_cooperative_set thread %d, num_active_threads %u, length %u ptr1 %p ptr2 %p\n", INSTANCE_GLOBAL_IDX, num_active_threads, length, ptr1, ptr2);
-    
+
+    // printf("warp_cooperative_set thread %d, num_active_threads %u, length %u ptr1 %p ptr2 %p\n", INSTANCE_GLOBAL_IDX,
+    // num_active_threads, length, ptr1, ptr2);
+
     // TODO : interleaving inactive threads
     // Iterate over each thread in the warp
 #pragma unroll
@@ -109,6 +113,13 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
 #ifdef DEBUG_PERF
             printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
                    INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
+#endif
+#ifdef BUILD_LIBRARY
+            if (new_size > MAX_NEW_MEMORY) {
+                // printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
+                //        INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
+                return ERROR_OUT_OF_GAS;
+            }
 #endif
             // allocate new page
             uint8_t *new_data = new uint8_t[new_size + preallocated_base_offset - memory_prealloc_size];
@@ -358,7 +369,7 @@ __device__ int32_t evm_memory_t::set_buffer_data(uint8_t *data_, uint32_t data_o
 
     // Grow the memory as needed.
     error_code |= grow(index + length);
-    // if (error_code != ERROR_SUCCESS) return error_code;
+    if (error_code != ERROR_SUCCESS) return error_code;
 
     uint32_t total_offset = preallocated_base_offset + index;
 

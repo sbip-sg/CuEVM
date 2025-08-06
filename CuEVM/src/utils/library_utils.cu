@@ -153,21 +153,11 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
                                                                             uint32_t pc_missed, uint8_t distance_bits) {
     // AFL simple hash: Extremely fast (shift + XOR), citable from AFL (widely used in fuzzing papers)
 
-    // printf(
-    //     "thread %d update_coverage_bitmap_with_distance pc_src %u pc_dst %u pc_missed %u distance_bits %u "
-    //     "current_account_id %x\n",
-    //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, distance_bits, current_account_id);
-
     uint32_t afl_hash_covered = (pc_src << 1) ^ pc_dst ^ current_account_id;
     uint32_t afl_hash_missed = (pc_src << 1) ^ pc_missed ^ current_account_id;
 
     uint32_t bitmap_idx_covered = afl_hash_covered % BITMAP_SIZE;
     uint32_t bitmap_idx_missed = afl_hash_missed % BITMAP_SIZE;
-
-    // printf(
-    //     "thread %d update_coverage_bitmap_with_distance pc_src %u pc_dst %u pc_missed %u distance_bits %u, "
-    //     "bitmap_idx_covered %u, bitmap_idx_missed %u\n",
-    //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, distance_bits, bitmap_idx_covered, bitmap_idx_missed);
 
     unsigned int prev_dist = atomicAdd(&g_events_bitmap[bitmap_idx_covered], 1);
     // printf("thread %d atomic add prev_dist %x\n", INSTANCE_GLOBAL_IDX, prev_dist);
@@ -437,9 +427,10 @@ __device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t
     no_events++;
 }
 */
-__device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
+__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
     assert(call_context_ptr != nullptr);
-    // printf("thread %d start_call pc %u current_account_id %x\n", INSTANCE_GLOBAL_IDX, pc, current_account_id);
+    // if (current_account_id != 0)
+    //     printf("thread %d start_call pc %u current_account_id %x\n", INSTANCE_GLOBAL_IDX, pc, current_account_id);
 #ifdef BUILD_GO_LIBRARY
 
     no_branches += 20;  // call saturates the branch limit faster than normal jumps
@@ -480,7 +471,7 @@ __device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t
     //     }
     // }
 
-    return ERROR_SUCCESS;
+    // return ERROR_SUCCESS;
 }
 __device__ void simplified_trace_data::start_create() {
     // printf("thread %d finish_create no_branches %d\n", INSTANCE_GLOBAL_IDX, no_branches);
@@ -509,14 +500,17 @@ __device__ void simplified_trace_data::invalid_opcode_oracle(uint32_t pc) {
 }
 
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc, uint32_t _current_account_id) {
-    // printf("thread %d finish_call error_code %u last_pc %u, no_calls %u\n", INSTANCE_GLOBAL_IDX, error_code,
-    // last_pc,
+    // printf("thread %d finish_call error_code %u last_pc %u, no_calls %u\n", INSTANCE_GLOBAL_IDX, error_code, last_pc,
     //        no_calls);
 #ifdef BUILD_GO_LIBRARY
     // print all calls
 
 #endif
-    if (no_calls > MAX_CALLS_TRACING) return;
+    if (no_calls > MAX_CALLS_TRACING) {
+        printf("THREAD %d no_calls > MAX_CALLS_TRACING, no_calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
+
+        return;
+    }
     int i;
     for (i = no_calls - 1; i >= 0; i--) {
         // Check if this call is marked as unfinished (using the sentinel value)
@@ -531,6 +525,7 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
             break;
         }
     }
+    if (i < 0) i = 0;
 
 #ifdef BUILD_GO_LIBRARY
     if (error_code == ERROR_INVALID_OPCODE) {
@@ -643,8 +638,9 @@ void freeTraceData(bool copy_state_data) {
 #define GLIBC_LCG_C 12345
 
 // AFL-style mutation configuration
-#define CHANCE_TO_CREATE_NEW_ADDRESS 1  // 1 percent
+#define CHANCE_TO_CREATE_NEW_ADDRESS 0  // 1 percent
 #define CHANCE_TO_SKIP_MUTATE 50        // percent we skip a marker
+#define CHANCE_TO_SKIP_MUTATE_BLOCK 25  // percent we skip block mutation
 #define CHANCE_HAVOC_MUTATION 6         // percent chance for havoc (stacked mutations)
 #define MAX_HAVOC_STACK 3               // maximum number of stacked mutations in havoc
 #define VALUE_MUTATE_INT32 7            // 2**(7*4*8) = 2**224
@@ -861,7 +857,7 @@ __device__ uint32_t mutate_block_values_senders(uint32_t seed, uint64_t* block_n
     // printf("Thread %d seed %d block_numbers orig %lu block_timestamps orig %lu\n", INSTANCE_GLOBAL_IDX, seed,
     //        block_numbers[INSTANCE_GLOBAL_IDX], block_timestamps[INSTANCE_GLOBAL_IDX]);
     // block number first
-    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
+    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE_BLOCK) {
         // printf("Thread %d skip block mutation %d\n", INSTANCE_GLOBAL_IDX);
         block_numbers[INSTANCE_GLOBAL_IDX] += 1;
         block_timestamps[INSTANCE_GLOBAL_IDX] += 1;

@@ -102,6 +102,13 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
             new_context_ptr->bytecode_offset = find_global_bytecode_offset(contract_address_ptr);
         }
 #ifdef BUILD_LIBRARY
+        // if (blockIdx.x > 32) {
+        //     if (new_context_ptr->from.words[0] == REENTRANCY_ATTACKER_ADDRESS ||
+        //         new_context_ptr->from.words[0] == TRANSPARENT_ATTACKER_ADDRESS) {
+        //         new_context_ptr->byte_code_size = 0;
+        //         return ERR_FUZZING_STOP;
+        //     }
+        // }
         if (new_context_ptr->from.words[0] == REENTRANCY_ATTACKER_ADDRESS) {
             // printf("Thread %d bypass args logic for reentrancy attacker\n", INSTANCE_GLOBAL_IDX);
             // bypass args logic for reentrancy attacker
@@ -506,6 +513,10 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (error_code == ERROR_SUCCESS) {
         // printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
         // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
+        // if (length_ui32 > 2048) {
+        //     printf("THREAD %d RETURN : set return data %u %u\n", INSTANCE_GLOBAL_IDX, memory_offset_ui32,
+        //     length_ui32);
+        // }
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
         error_code = ERROR_RETURN;
     }
@@ -541,7 +552,10 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         // memory.increase_memory_cost(memory_expansion_cost);
-        // printf("REVERT : set return data %u %u\n", memory_offset_ui32, length_ui32);
+        // if (length_ui32 > 2048) {
+        //     printf("THREAD %d REVERT : set return data %u %u\n", INSTANCE_GLOBAL_IDX, memory_offset_ui32,
+        //     length_ui32);
+        // }
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
         // error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
         error_code = ERROR_REVERT;

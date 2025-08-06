@@ -967,15 +967,18 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
         CUDA_CHECK(cudaMemcpyFromSymbol(&host_counter_ptr, g_gpu_feedback_count, sizeof(GPUFeedbackCount*)));
 
         CUDA_CHECK(cudaMemcpy(&host_counter, host_counter_ptr, sizeof(GPUFeedbackCount), cudaMemcpyDeviceToHost));
-        total_num_new_branch += host_counter.new_branch_count;
-        total_num_new_bug += host_counter.new_bug_count;
-        total_num_new_storage += host_counter.new_storage_count;
-        branch_counts[i] = host_counter.new_branch_count;
-        bug_counts[i] = host_counter.new_bug_count;
-        storage_counts[i] = host_counter.new_storage_count;
+        // using min in corner case where atomic add over the max value
+
+        branch_counts[i] = std::min(host_counter.new_branch_count, MAX_NEW_BRANCHES);
+        bug_counts[i] = std::min(host_counter.new_bug_count, MAX_NEW_BUGS);
+        storage_counts[i] = std::min(host_counter.new_storage_count, MAX_NEW_STORAGE);
+        total_num_new_branch += branch_counts[i];
+        total_num_new_bug += bug_counts[i];
+        total_num_new_storage += storage_counts[i];
     }
 
-    printf("Total new coverage branches: %u, total new bugs: %u\n", total_num_new_branch, total_num_new_bug);
+    printf("Total new coverage branches: %u, total new bugs: %u, total new storage: %u\n", total_num_new_branch,
+           total_num_new_bug, total_num_new_storage);
 
     // Allocate memory for result arrays once we know the total sizes
     result->num_new_branch = total_num_new_branch;
@@ -1061,6 +1064,7 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
         if (storage_counts[i] > 0) {
             StorageInfoEntry* d_new_storage_info = nullptr;
             CUDA_CHECK(cudaMemcpyFromSymbol(&d_new_storage_info, g_new_storage_info, sizeof(StorageInfoEntry*)));
+
             CUDA_CHECK(cudaMemcpy(&result->new_storage_info[storage_offset], d_new_storage_info,
                                   storage_counts[i] * sizeof(StorageInfoEntry), cudaMemcpyDeviceToHost));
 

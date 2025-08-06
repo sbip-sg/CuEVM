@@ -572,12 +572,18 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
     return error_code;
 }
 
+#ifdef BUILD_LIBRARY
 // todo when optimizing, reentrancy attacker becomes a precompile
-__device__ int32_t operation_ReentrancyAttacker(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
-                                                CuEVM::evm_call_context_t *call_context) {
+__device__ int32_t operation_TransparentAttacker(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
+                                                 CuEVM::evm_call_context_t *call_context) {
     // todo when optimizing, reentrancy attacker becomes a precompile
-    return ERROR_SUCCESS;
+    // printf("Thread %d: TransparentAttacker\n", INSTANCE_GLOBAL_IDX);
+    uint8_t output[32] = {0};
+    output[31] = 1;
+    call_context->set_parent_return_data(output, 32);
+    return ERROR_RETURN;
 }
+#endif
 
 }  // namespace precompile_operations
 

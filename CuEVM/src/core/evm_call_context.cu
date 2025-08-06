@@ -3,6 +3,9 @@
 #include <CuEVM/core/memory_pool.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/opcodes.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 namespace CuEVM {
 __device__ cached_evm_call_context::cached_evm_call_context(evm_call_context_t* state) {  // copy from state to cache
 
@@ -101,6 +104,9 @@ __device__ void evm_call_context_t::clear() {
     this->byte_code_size = 0;
     this->static_env = false;
     this->gas_refund = 0;
+    // printf("Thread %d Call context pointer clear, snapshot %p", INSTANCE_GLOBAL_IDX, this->snapshot_state);
+    // Aug patch corner case: check correctness
+    this->snapshot_state = nullptr;
     // this->jump_destinations = nullptr;
     if (memory_ptr->preallocated_base_offset < memory_prealloc_size) {
         // printf("clear memory ptr %p\n", memory_ptr);
@@ -308,6 +314,12 @@ __device__ void evm_call_context_t::set_parent_return_data(uint32_t offset, uint
     parent->dynamic_ret_size = size;
     dynamic_ret_size = size;
     if (size == 0) return;
+#ifdef BUILD_LIBRARY
+    // bounded return data size
+    if (size > MAX_RETURN_DATA_SIZE) {
+        return;
+    }
+#endif
     // TODO: reimplement
 
     if (size <= memory_pool_return_data_preallocate) {
@@ -320,6 +332,10 @@ __device__ void evm_call_context_t::set_parent_return_data(uint32_t offset, uint
 
     } else {
         uint8_t* new_return_data = new uint8_t[size];
+        if (new_return_data == nullptr) {
+            // printf("THREAD %d new_return_data Memory allocation error\n", INSTANCE_GLOBAL_IDX);
+            return;
+        }
         memory_ptr->copy(offset, size, new_return_data);
         if (parent->return_data != nullptr) {
             delete[] parent->return_data;

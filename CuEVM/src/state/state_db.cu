@@ -531,8 +531,15 @@ __device__ void StateDb::increase_balance(const evm_word_t *address, const evm_w
         account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
     }
     if (snapshot_state != nullptr) {
+        // #ifdef BUILD_LIBRARY
+        //         // in fuzzing mode, we don't need to set snapshot of the balance as address is random
+        //         return;
+        // #endif
         // set snapshot of the balance
         SnapshotAccount *snapshot_account = new SnapshotAccount();
+        if (snapshot_account == nullptr) {
+            return;
+        }
         snapshot_account->address_index = address_index;
         snapshot_account->balance = *current_balance;
         snapshot_account->next_account = snapshot_state->accounts;
@@ -770,6 +777,7 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
         printf("init_snapshot address not found in state db\n");
         address->print();
 #endif
+        // printf("THREAD %d init_snapshot address not found in state db\n", INSTANCE_GLOBAL_IDX);
         SnapshotState *tmp = CuEVM::memory_pool::get_snapshot_state();
         tmp->address = *address;
         tmp->storage_size = 0;
@@ -783,9 +791,14 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
     //
 
     SnapshotState *tmp = CuEVM::memory_pool::get_snapshot_state();
-    // printf("tmp %p\n", tmp);
+    // printf("THREAD %d init_snapshot tmp %p\n", INSTANCE_GLOBAL_IDX, tmp);
     //
     call_context->snapshot_state = tmp;
+#ifdef BUILD_LIBRARY
+    if (tmp == nullptr) {
+        return;
+    }
+#endif
     tmp->address = *address;
     tmp->storage_size = 0;
     tmp->touched_account_counts = 0;
@@ -1635,7 +1648,7 @@ __host__ StateDb *StateDb::GPUFromCPU(StateDb *&state_db) {
     return state_db_gpu;
 }
 
-__host__ __device__ void StateDb::print() {
+__host__ __device__ void StateDb::print(uint account_id) {
     printf("num_accounts: %d\n", num_accounts);
     printf("num_storage_elements: %d\n", num_storage_elements);
     for (uint32_t i = 0; i < num_accounts; i++) {
@@ -1655,13 +1668,16 @@ __host__ __device__ void StateDb::print() {
                 prealloc_values_pool[(account_prealloc_keys_size * contract_idx + j) * num_states].print();
             }
             if (num_states > 1) {
-                printf("\n state 2 \n");
+                account_storage_size_i = account_storage_size[i * num_states + account_id];
+                printf("\n state %d \n", account_id);
                 printf("keys size %d\n", account_storage_size_i);
                 for (uint32_t j = 0; j < account_storage_size_i; j++) {
                     printf("\n key: \n");
-                    prealloc_keys_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + 1].print();
+                    prealloc_keys_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + account_id]
+                        .print();
                     printf("value: \n");
-                    prealloc_values_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + 1].print();
+                    prealloc_values_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + account_id]
+                        .print();
                 }
             }
         }

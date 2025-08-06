@@ -203,6 +203,13 @@ __device__ CuEVM::SnapshotState* get_snapshot_state() {
     } else {
 #ifdef DEBUG_PERF
         printf("snapshot account pool is full for instance %u, create a new one\n", INSTANCE_GLOBAL_IDX);
+
+#endif
+#ifdef BUILD_LIBRARY
+        // printf("Thread %d hit snapshot size limit \n", INSTANCE_GLOBAL_IDX);
+        return &CuEVM::memory_pool::global_memory_pool
+                    ->snapshot_states_pool[INSTANCE_GLOBAL_IDX +
+                                           global_state_db_ptr->num_states * (snapshot_account_pool_size - 1)];
 #endif
         SnapshotState* tmp = new CuEVM::SnapshotState();
 

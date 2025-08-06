@@ -9,7 +9,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <unordered_set>
 
-#define CUEVM_MUTATE_GROUP_SIZE 2  // same as fuzzer SkipSequenceSize
+#define CUEVM_MUTATE_GROUP_SIZE 32  // same as fuzzer SkipSequenceSize
 /**
  * @file library_utils.h
  * @brief Utility functions and data structures for library integration.
@@ -52,8 +52,10 @@ using CuEVM::transaction::TransactionList;
 // constexpr CONSTANT uint32_t BITMAP_SIZE_IN_INTS = BITMAP_SIZE_IN_BITS / 32;  // 8192 unsigned ints
 constexpr CONSTANT uint32_t BITMAP_SIZE = 65536;     // AFL size 64KB
 constexpr CONSTANT uint32_t MAX_NEW_BRANCHES = 512;  // per kenel launch
-constexpr CONSTANT uint32_t MAX_NEW_STORAGE = 128;   // per kenel launch
+constexpr CONSTANT uint32_t MAX_NEW_STORAGE = 64;    // per kenel launch
 constexpr CONSTANT uint32_t MAX_NEW_BUGS = 128;
+constexpr CONSTANT uint32_t MAX_NEW_MEMORY = 32768;       // per instance
+constexpr CONSTANT uint32_t MAX_RETURN_DATA_SIZE = 4096;  // per call
 
 // persistent state across kernel launches
 extern __device__ uint32_t* g_events_bitmap;
@@ -320,7 +322,7 @@ struct simplified_trace_data {
      * @param[in] call_context_ptr The call context pointer.
      * @return The error code.
      */
-    __device__ int start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
+    __device__ void start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
 
     __device__ void start_create();
 

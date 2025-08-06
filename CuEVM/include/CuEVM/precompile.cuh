@@ -141,5 +141,10 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, gas_t &gas_li
 __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, gas_t &gas_limit, gas_t &gas_used,
                                        CuEVM::evm_call_context_t *call_context);
 
+#ifdef BUILD_LIBRARY
+__device__ int32_t operation_TransparentAttacker(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
+                                                 CuEVM::evm_call_context_t *call_context);
+#endif
+
 }  // namespace precompile_operations
 }  // namespace CuEVM

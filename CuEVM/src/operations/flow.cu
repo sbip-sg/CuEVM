@@ -64,7 +64,7 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
         if ((error_code == ERROR_SUCCESS) && (uint256_cmp_word(condition, 0) != 0)) {
 #ifdef BUILD_LIBRARY
             error_code =
-                simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1) ? ERROR_OUT_OF_GAS : error_code;
+                simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1) ? ERROR_FUZZING_STOP : error_code;
 #endif
 
             int32_t bytecode_offset = call_context->bytecode_offset;
@@ -86,9 +86,9 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 #ifdef BUILD_LIBRARY
         else {
             error_code =
-                simplified_trace_data_ptr->record_branch(pc, pc + 1, destination_u32) ? ERROR_OUT_OF_GAS : error_code;
+                simplified_trace_data_ptr->record_branch(pc, pc + 1, destination_u32) ? ERROR_FUZZING_STOP : error_code;
         }
-        if (gas_used > MAX_GAS_FUZZING) error_code = ERROR_OUT_OF_GAS;
+        if (gas_used > MAX_GAS_FUZZING) error_code = ERROR_FUZZING_STOP;
 #endif
     }
     return error_code;
