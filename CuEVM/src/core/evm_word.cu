@@ -101,11 +101,6 @@ __host__ __device__ bool evm_word_t::is_precompile() const {
             return false;
         }
     }
-#ifdef BUILD_LIBRARY
-    if (words[0] == 0xC0DE0001) {
-        return true;
-    }
-#endif
     return words[0] <= CuEVM::no_precompile_contracts && words[0] > 0x00;
 }
 

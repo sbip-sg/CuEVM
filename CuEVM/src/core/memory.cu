@@ -85,12 +85,17 @@ __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
 __device__ void evm_memory_t::print() const {
     printf("Memory data: \n");
     printf("Size: %d\n", size);
+    printf("preallocated_base_offset %u memory_prealloc_size %u\n", preallocated_base_offset);
+    printf(
+        "Preallocated base %p\n",
+        &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + preallocated_base_offset]);
     printf("Memory cost: %lu\n", memory_cost);
     printf("\n");
     for (uint32_t i = 0; i < size; i++) {
         // if (i == 228) printf("---debug---\n");
         if (preallocated_base_offset + i < memory_prealloc_size) {
-            printf("%02x", memory_pool::preallocated_memory_base[preallocated_base_offset + i]);
+            printf("%02x", memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+                                                                 preallocated_base_offset + i]);
         } else {
             printf("%02x", dynamic_data[preallocated_base_offset + i - memory_prealloc_size]);
         }
@@ -256,8 +261,7 @@ __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint
     uint32_t to_copy = (src != nullptr) ? ((src_available < bytes) ? src_available : bytes) : 0;
     unsigned active_mask = __activemask();
     uint32_t num_active_threads = __popc(active_mask);
-    // printf("copy_with_padding thread %d num_active_threads %d to_copy %d bytes %d\n", THREADIDX, num_active_threads,
-    // to_copy, bytes);
+
     if (src != nullptr && to_copy > 0) {
         // memcpy(dest, src, to_copy);
         if (num_active_threads == 32)

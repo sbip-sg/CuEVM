@@ -92,19 +92,22 @@ extern __device__ GPUFeedbackCount* g_gpu_feedback_count;  // counter for intere
 
 // special attacker address for oracles (last 32 bit)
 #define REENTRANCY_ATTACKER_ADDRESS 0xCAFECAFE
-#define TRANSPARENT_ATTACKER_ADDRESS 0xC0DE0001
-#define RANDOM_ATTACKER_ADDRESS 0xC0DE0002  // never appears in address dict
+#define RANDOM_ATTACKER_ADDRESS 0xC0DE0001
+// #define RANDOM_ATTACKER_ADDRESS 0xC0DE0002  // never appears in address dict
 
+#define RETURN_BUFFER_SIZE 128  // return buffer of reentrancy attacker.
 struct fuzzing_constants {
     uint8_t* address_constants;
     uint32_t address_constants_count;  // number of address constants
-    evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
+    // evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
     uint8_t* integer_constants;
     uint32_t integer_constants_count;  // number of uint256 constants
     uint32_t block_number_delay_max = 60480 * 2;
     uint32_t block_timestamp_delay_max = 604800 * 4;  // 1 month
     evm_word_t* sender_list;                          // sender list for fuzzing
     uint32_t sender_counts = 3;
+    uint8_t* return_buffer;       // for return data RETURN_BUFFER_SIZE
+    uint32_t special_sender_idx;  // index of the special sender in the sender list
     __host__ __device__ void print();
 };
 // for fuzzing utilities
@@ -173,12 +176,10 @@ struct simple_event_trace {
 struct call_trace {
     uint32_t pc;
     uint8_t op;
-    // uint8_t address_idx;
-    // evm_word_t sender;
-    // evm_word_t receiver;
     uint32_t sender_id;    // unique identifer, last 8bit of address
     uint32_t receiver_id;  // unique identifer, last 8bit of address
     evm_word_t value;
+    uint32_t call_data_size;
     uint8_t error_code = RESERVED_ERROR_CODE;  // 0 or 1
     uint32_t last_pc;                          // the last pc of the call before returning
     // todo add more depth + result etc
@@ -289,10 +290,14 @@ struct simplified_trace_data {
     /**
      * @brief Add leaking ether oracle.
      * @param[in] pc The program counter.
-     * @param[in] value The value.
-     * @param[in] sender_id The sender id.
      */
-    __device__ void leaking_ether_oracle(uint32_t pc, uint32_t sender_id);
+    __device__ void leaking_ether_oracle(uint32_t pc);
+
+    /**
+     * @brief Add arbitrary call oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void arbitrary_call_oracle(uint32_t pc);
 
     /**
      * @brief Begin recording an operation in the trace.
@@ -361,7 +366,7 @@ struct simplified_trace_data {
     /**
      * @brief Finalize the coverage bitmap.
      */
-    __device__ void finalize_coverage_bitmap();
+    __device__ void finalize_coverage_bitmap(int32_t error_code);
 };
 
 /**

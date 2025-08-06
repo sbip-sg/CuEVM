@@ -1,6 +1,9 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/precompile.cuh>
 #include <CuEVM/utils/error_codes.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 namespace CuEVM {
 
 /**
@@ -578,9 +581,9 @@ __device__ int32_t operation_TransparentAttacker(CuEVM::gas_t &gas_limit, CuEVM:
                                                  CuEVM::evm_call_context_t *call_context) {
     // todo when optimizing, reentrancy attacker becomes a precompile
     // printf("Thread %d: TransparentAttacker\n", INSTANCE_GLOBAL_IDX);
-    uint8_t output[32] = {0};
-    output[31] = 1;
-    call_context->set_parent_return_data(output, 32);
+    uint8_t *output = g_fuzzing_constants->return_buffer;
+    // printf("Thread %d TransparentAttacker return buffer: %p\n", INSTANCE_GLOBAL_IDX, output);
+    call_context->set_parent_return_data(output, RETURN_BUFFER_SIZE);
     return ERROR_RETURN;
 }
 #endif

@@ -1,6 +1,6 @@
 #include <CuEVM/evm.cuh>
 #include <cassert>
-#define DEBUG_THREAD 1
+#define DEBUG_THREAD 24
 namespace CuEVM {
 
 // define the kernel function
@@ -314,9 +314,9 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         //            cached_call_state.gas_limit, cached_call_state.gas_used);
 
         //     printf("\n\n");
-        //     // cached_call_state.stack_ptr->print();
-        //     // printf("\n\n");
-        //     // call_state_ptr->memory_ptr->print();
+        //     cached_call_state.stack_ptr->print();
+        //     printf("\n\n call_state_ptr->memory_ptr %p \n", call_state_ptr->memory_ptr);
+        //     call_state_ptr->memory_ptr->print();
         // }
 
 #ifdef BUILD_PYTHON_LIBRARY
@@ -913,7 +913,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
 #endif
 
 #ifdef BUILD_GO_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].finalize_coverage_bitmap();
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finalize_coverage_bitmap(error_code);
 #endif
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
     // printf("updated final world state\n");

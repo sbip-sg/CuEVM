@@ -235,8 +235,9 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     cJSON* address_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "address");
     cJSON* integer_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "integer");
     cJSON* sender_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "sender");
+    cJSON* special_senders = cJSON_GetObjectItemCaseSensitive(constantsJson, "specialSenderIdx");
 
-    if (!cJSON_IsArray(address_constants) || !cJSON_IsArray(integer_constants)) {
+    if (!cJSON_IsArray(address_constants) || !cJSON_IsArray(integer_constants) || !cJSON_IsArray(special_senders)) {
         printf("Error: address or integer is not an array\n");
         cJSON_Delete(constantsJson);
         return;
@@ -244,36 +245,51 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     int address_count = cJSON_GetArraySize(address_constants);
     int integer_count = cJSON_GetArraySize(integer_constants);
     int sender_count = cJSON_GetArraySize(sender_constants);
+    int special_sender_idx_count = cJSON_GetArraySize(special_senders);
+    int special_sender_idx = 0;
     printf("Address count: %d\n", address_count);
     printf("Integer count: %d\n", integer_count);
     printf("Sender count: %d\n", sender_count);
+    printf("Special sender count: %d\n", special_sender_idx_count);
+    if (special_sender_idx_count != 0) {
+        printf("Special sender idx: %s\n", cJSON_GetArrayItem(special_senders, 0)->valuestring);
+        special_sender_idx = atoi(cJSON_GetArrayItem(special_senders, 0)->valuestring);
+    }
 
+    // last position in the address contants is for special sender
+    address_count += 1;
     // Allocate host arrays
     uint8_t* host_address_constants = new uint8_t[address_count * 32];
     uint8_t* host_integer_constants = new uint8_t[integer_count * 32];
-    evm_word_t* host_address_list = new evm_word_t[address_count];
+    // evm_word_t* host_address_list = new evm_word_t[address_count];
     evm_word_t* host_sender_list = new evm_word_t[sender_count];
     CuEVM::fuzzing_constants* host_fuzzing_constants = new CuEVM::fuzzing_constants();
-    host_fuzzing_constants->address_constants_count = address_count;
+    host_fuzzing_constants->address_constants_count = address_count - 1;  // normal address count
     host_fuzzing_constants->integer_constants_count = integer_count;
     host_fuzzing_constants->sender_counts = sender_count;
+    host_fuzzing_constants->special_sender_idx = special_sender_idx;
     evm_word_t temp_word;
-    // Parse address constants
-    for (int i = 0; i < address_count; ++i) {
-        cJSON* item = cJSON_GetArrayItem(address_constants, i);
-        if (cJSON_IsString(item) && item->valuestring) {
-            printf("  Address constant[%d]: %s\n", i, item->valuestring);
-            temp_word.from_hex(item->valuestring);
-            uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
-            host_address_list[i] = temp_word;
-        }
-    }
+
     for (int i = 0; i < sender_count; ++i) {
         cJSON* item = cJSON_GetArrayItem(sender_constants, i);
         if (cJSON_IsString(item) && item->valuestring) {
-            printf("  Sender constant[%d]: %s\n", i, item->valuestring);
             temp_word.from_hex(item->valuestring);
             host_sender_list[i] = temp_word;
+        }
+    }
+
+    // Parse address constants
+    for (int i = 0; i < address_count; ++i) {
+        if (i == address_count - 1) {
+            temp_word = host_sender_list[special_sender_idx];
+            uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
+            continue;
+        }
+        cJSON* item = cJSON_GetArrayItem(address_constants, i);
+        if (cJSON_IsString(item) && item->valuestring) {
+            temp_word.from_hex(item->valuestring);
+            uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
+            // host_address_list[i] = temp_word;
         }
     }
 
@@ -281,18 +297,52 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     for (int i = 0; i < integer_count; ++i) {
         cJSON* item = cJSON_GetArrayItem(integer_constants, i);
         if (cJSON_IsString(item) && item->valuestring) {
-            printf("  Integer constant[%d]: %s\n", i, item->valuestring);
             temp_word.from_hex(item->valuestring);
             uint256_to_bytes(host_integer_constants + i * 32, &temp_word, 32);
         }
     }
+    // print all in hex
+    printf("Sender constants size: %d\n", host_fuzzing_constants->sender_counts);
+    for (int i = 0; i < sender_count; ++i) {
+        // Assuming evm_word_t has a to_hex() or similar, otherwise print bytes
+        char hexstr[65] = {0};
+        host_sender_list[i].to_hex(hexstr);  // You may need to implement this if not present
+        printf("  [%d]: %s\n", i, hexstr);
+    }
+
+    // Print all address constants in hex
+    printf("Address constants size: %d\n", host_fuzzing_constants->address_constants_count);
+    for (int i = 0; i < address_count; ++i) {
+        printf("  [%d]: 0x", i);
+        for (int j = 0; j < 32; ++j) {
+            printf("%02x", host_address_constants[i * 32 + j]);
+        }
+        printf("\n");
+    }
+
+    // Print all integer constants in hex
+    printf("Integer constants size: %d\n", host_fuzzing_constants->integer_constants_count);
+    for (int i = 0; i < integer_count; ++i) {
+        printf("  [%d]: 0x", i);
+        for (int j = 0; j < 32; ++j) {
+            printf("%02x", host_integer_constants[i * 32 + j]);
+        }
+        printf("\n");
+    }
+
+    uint8_t* host_return_data = new uint8_t[RETURN_BUFFER_SIZE];
+    memset(host_return_data, 0, RETURN_BUFFER_SIZE);
+    host_return_data[31] = 0x01;
+
     uint8_t* d_address_constants;
     uint8_t* d_integer_constants;
+    uint8_t* d_return_data_buffer;
     evm_word_t* d_sender_list;
-    evm_word_t* d_address_list;
+    // evm_word_t* d_address_list;
     CUDA_CHECK(cudaMalloc(&d_address_constants, address_count * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&d_integer_constants, integer_count * sizeof(evm_word_t)));
-    CUDA_CHECK(cudaMalloc(&d_address_list, address_count * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&d_return_data_buffer, RETURN_BUFFER_SIZE * sizeof(uint8_t)));
+    // CUDA_CHECK(cudaMalloc(&d_address_list, address_count * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&d_sender_list, sender_count * sizeof(evm_word_t)));
     printf("Copying address constants to device address array size: %d %d\n", address_count * sizeof(evm_word_t),
            address_count * 32 * sizeof(uint8_t));
@@ -302,14 +352,16 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
                           cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_integer_constants, host_integer_constants, integer_count * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
-    CUDA_CHECK(
-        cudaMemcpy(d_address_list, host_address_list, address_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    // CUDA_CHECK(
+    //     cudaMemcpy(d_address_list, host_address_list, address_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_sender_list, host_sender_list, sender_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_return_data_buffer, host_return_data, RETURN_BUFFER_SIZE * sizeof(uint8_t),
+                          cudaMemcpyHostToDevice));
     host_fuzzing_constants->address_constants = d_address_constants;
     host_fuzzing_constants->integer_constants = d_integer_constants;
-    host_fuzzing_constants->address_list = d_address_list;
+    // host_fuzzing_constants->address_list = d_address_list;
     host_fuzzing_constants->sender_list = d_sender_list;
-
+    host_fuzzing_constants->return_buffer = d_return_data_buffer;
     CuEVM::fuzzing_constants* d_fuzzing_constants;
     CUDA_CHECK(cudaMalloc(&d_fuzzing_constants, sizeof(CuEVM::fuzzing_constants)));
     CUDA_CHECK(cudaMemcpy(d_fuzzing_constants, host_fuzzing_constants, sizeof(CuEVM::fuzzing_constants),
@@ -326,8 +378,9 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     cJSON_Delete(constantsJson);
     delete[] host_address_constants;
     delete[] host_integer_constants;
-    delete[] host_address_list;
+    // delete[] host_address_list;
     delete[] host_sender_list;
+    delete[] host_return_data;
 }
 
 void reset_state_db() {
