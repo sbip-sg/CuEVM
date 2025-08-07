@@ -645,10 +645,10 @@ void freeTraceData(bool copy_state_data) {
 // AFL-style mutation configuration
 #define CHANCE_TO_CREATE_NEW_ADDRESS 0  // 1 percent
 #define CHANCE_TO_SKIP_MUTATE 50        // percent we skip a marker
-#define CHANCE_TO_SKIP_MUTATE_BLOCK 25  // percent we skip block mutation
-#define CHANCE_HAVOC_MUTATION 6         // percent chance for havoc (stacked mutations)
-#define MAX_HAVOC_STACK 3               // maximum number of stacked mutations in havoc
-#define VALUE_MUTATE_INT32 7            // 2**(7*4*8) = 2**224
+// #define CHANCE_TO_SKIP_MUTATE_BLOCK 25  // percent we skip block mutation
+#define CHANCE_HAVOC_MUTATION 6  // percent chance for havoc (stacked mutations)
+#define MAX_HAVOC_STACK 3        // maximum number of stacked mutations in havoc
+#define VALUE_MUTATE_INT32 7     // 2**(7*4*8) = 2**224
 
 // Mutation context to reduce parameter passing
 struct MutationContext {
@@ -862,7 +862,7 @@ __device__ uint32_t mutate_block_values_senders(uint32_t seed, uint64_t* block_n
     // printf("Thread %d seed %d block_numbers orig %lu block_timestamps orig %lu\n", INSTANCE_GLOBAL_IDX, seed,
     //        block_numbers[INSTANCE_GLOBAL_IDX], block_timestamps[INSTANCE_GLOBAL_IDX]);
     // block number first
-    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE_BLOCK) {
+    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
         // printf("Thread %d skip block mutation %d\n", INSTANCE_GLOBAL_IDX);
         block_numbers[INSTANCE_GLOBAL_IDX] += 1;
         block_timestamps[INSTANCE_GLOBAL_IDX] += 1;
@@ -953,24 +953,23 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
             seed = afl_mutate_byte_array(call_data + element_offset, element_length, element_type, seed);
 
         } else if (element_type == ELEMENT_ADDRESS_TYPE) {  // address
-            if (rand_range(seed, 100) < CHANCE_TO_CREATE_NEW_ADDRESS) {
-                // printf("thread %d create new address\n", INSTANCE_GLOBAL_IDX);
-                MutationContext ctx = {.data = call_data + element_offset + 12, .length = 20, .seed = seed};
-                mutate_random_bytes(ctx);
-                seed = ctx.seed;
-            } else {
-                // select from the constants
-                uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
-                if (transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX] == g_fuzzing_constants->special_sender_idx) {
-                    address_constants_count += 1;  // for special sender, use the last address constant
-                }
-                uint32_t random_index = rand_range(seed, address_constants_count);
-
-                for (int i = 0; i < 20; i++) {
-                    call_data[element_offset + 12 + i] =
-                        g_fuzzing_constants->address_constants[random_index * 32 + 12 + i];
-                }
+            // if (rand_range(seed, 100) < CHANCE_TO_CREATE_NEW_ADDRESS) {
+            //     // printf("thread %d create new address\n", INSTANCE_GLOBAL_IDX);
+            //     MutationContext ctx = {.data = call_data + element_offset + 12, .length = 20, .seed = seed};
+            //     mutate_random_bytes(ctx);
+            //     seed = ctx.seed;
+            // } else {
+            // select from the constants
+            uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
+            if (transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX] == g_fuzzing_constants->special_sender_idx) {
+                address_constants_count += 1;  // for special sender, use the last address constant
             }
+            uint32_t random_index = rand_range(seed, address_constants_count);
+
+            for (int i = 0; i < 20; i++) {
+                call_data[element_offset + 12 + i] = g_fuzzing_constants->address_constants[random_index * 32 + 12 + i];
+            }
+            // }
         }
     }
 }

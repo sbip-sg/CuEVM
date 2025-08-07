@@ -110,6 +110,13 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
         //     }
         // }
         if (new_context_ptr->from.words[0] == REENTRANCY_ATTACKER_ADDRESS) {
+            // if (blockIdx.x > gridDim.x / 10) {
+            // only 1/10 of the blocks will consider reentrancy attacker
+            // printf("Thread %d skip reentrancy attacker blockIdx.x %d gridDim.x %d\n", INSTANCE_GLOBAL_IDX,
+            //        blockIdx.x, gridDim.x);
+            // new_context_ptr->byte_code_size = 0;
+            // return ERROR_SUCCESS;
+            // }
             // printf("Thread %d bypass args logic for reentrancy attacker\n", INSTANCE_GLOBAL_IDX);
             // bypass args logic for reentrancy attacker
             CuEVM::evm_call_context_t *parent_context = new_context_ptr->parent;
