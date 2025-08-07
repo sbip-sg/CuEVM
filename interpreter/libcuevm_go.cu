@@ -235,9 +235,8 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     cJSON* address_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "address");
     cJSON* integer_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "integer");
     cJSON* sender_constants = cJSON_GetObjectItemCaseSensitive(constantsJson, "sender");
-    cJSON* special_senders = cJSON_GetObjectItemCaseSensitive(constantsJson, "specialSenderIdx");
 
-    if (!cJSON_IsArray(address_constants) || !cJSON_IsArray(integer_constants) || !cJSON_IsArray(special_senders)) {
+    if (!cJSON_IsArray(address_constants) || !cJSON_IsArray(integer_constants)) {
         printf("Error: address or integer is not an array\n");
         cJSON_Delete(constantsJson);
         return;
@@ -245,29 +244,23 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     int address_count = cJSON_GetArraySize(address_constants);
     int integer_count = cJSON_GetArraySize(integer_constants);
     int sender_count = cJSON_GetArraySize(sender_constants);
-    int special_sender_idx_count = cJSON_GetArraySize(special_senders);
-    int special_sender_idx = 0;
+
     printf("Address count: %d\n", address_count);
     printf("Integer count: %d\n", integer_count);
     printf("Sender count: %d\n", sender_count);
-    printf("Special sender count: %d\n", special_sender_idx_count);
-    if (special_sender_idx_count != 0) {
-        printf("Special sender idx: %s\n", cJSON_GetArrayItem(special_senders, 0)->valuestring);
-        special_sender_idx = atoi(cJSON_GetArrayItem(special_senders, 0)->valuestring);
-    }
 
     // last position in the address contants is for special sender
-    address_count += 1;
+    address_count += 2;
     // Allocate host arrays
     uint8_t* host_address_constants = new uint8_t[address_count * 32];
     uint8_t* host_integer_constants = new uint8_t[integer_count * 32];
     // evm_word_t* host_address_list = new evm_word_t[address_count];
     evm_word_t* host_sender_list = new evm_word_t[sender_count];
     CuEVM::fuzzing_constants* host_fuzzing_constants = new CuEVM::fuzzing_constants();
-    host_fuzzing_constants->address_constants_count = address_count - 1;  // normal address count
+    host_fuzzing_constants->address_constants_count =
+        address_count - 2;  // normal address count, last 2 are special attackers
     host_fuzzing_constants->integer_constants_count = integer_count;
     host_fuzzing_constants->sender_counts = sender_count;
-    host_fuzzing_constants->special_sender_idx = special_sender_idx;
     evm_word_t temp_word;
 
     for (int i = 0; i < sender_count; ++i) {
@@ -280,11 +273,6 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
 
     // Parse address constants
     for (int i = 0; i < address_count; ++i) {
-        if (i == address_count - 1) {
-            temp_word = host_sender_list[special_sender_idx];
-            uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
-            continue;
-        }
         cJSON* item = cJSON_GetArrayItem(address_constants, i);
         if (cJSON_IsString(item) && item->valuestring) {
             temp_word.from_hex(item->valuestring);
@@ -292,6 +280,11 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
             // host_address_list[i] = temp_word;
         }
     }
+    // add special sender addresses to address constants
+    temp_word = host_sender_list[sender_count - 1];
+    uint256_to_bytes(host_address_constants + (address_count - 1) * 32, &temp_word, 32);
+    temp_word = host_sender_list[sender_count - 2];
+    uint256_to_bytes(host_address_constants + (address_count - 2) * 32, &temp_word, 32);
 
     // Parse integer constants
     for (int i = 0; i < integer_count; ++i) {

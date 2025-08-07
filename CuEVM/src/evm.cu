@@ -957,8 +957,12 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         }
     }
 #ifdef BUILD_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, call_state_ptr->pc,
-                                                             call_state_ptr->from.words[0]);
+    uint32_t pc = call_state_ptr->pc;
+    // random attacker does not have pc
+    if (pc == 0 && call_state_ptr->parent != nullptr) {
+        pc = call_state_ptr->parent->pc;
+    }
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, pc, call_state_ptr->from.words[0]);
 #endif
 
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;

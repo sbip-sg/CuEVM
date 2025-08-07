@@ -73,81 +73,6 @@ __host__ void serialized_worldstate_data::print() {
     }
 }
 
-/*
-Deprecated: use update_coverage_bitmap_with_distance and update_bugs instead
-__device__ void simplified_trace_data::update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug) {
-    // printf("thread %d update_coverage_bitmap pc_src %u pc_dst %u\n", threadIdx.x, pc_src, pc_dst);
-    uint32_t branch_id = (static_cast<uint32_t>(pc_src) << 16) | pc_dst;
-    // printf("thread %d branch_id %x\n", threadIdx.x, branch_id);
-    uint32_t h1 = 2166136261U;
-    h1 = (h1 ^ (branch_id & 0xFF)) * 16777619U;
-    h1 = (h1 ^ ((branch_id >> 8) & 0xFF)) * 16777619U;
-    h1 = (h1 ^ ((branch_id >> 16) & 0xFF)) * 16777619U;
-    h1 = (h1 ^ (branch_id >> 24)) * 16777619U;
-
-    uint32_t h2 = (branch_id * 2654435761U) & 0xFFFFFFFF;
-    bool is_new = false;
-
-    // Double hashing for k=2
-    // TODO: double check
-    for (int i = 0; i < 2; ++i) {
-        uint32_t hash_i = (h1 + i * h2) & 0x3FFFF;  // 2^18 - 1
-        uint32_t index = hash_i >> 5;               // Divide by 32
-        uint32_t bit_pos = hash_i & 31;             // Modulo 32
-        unsigned int mask = 1U << bit_pos;
-
-        // Set bit and check if it was newly set
-        unsigned int old = atomicOr(&g_coverage_bitmap[index], mask);
-        if (!(old & mask)) {
-            is_new = true;
-        }
-    }
-    // Record new branch
-    if (is_new) {
-        int bitmap_idx = INSTANCE_GLOBAL_IDX / 32;
-        int bit_pos = INSTANCE_GLOBAL_IDX % 32;
-        atomicOr(&g_new_coverage_bitmap[bitmap_idx], 1 << bit_pos);
-        // printf("thread %d bitmap_idx %d bit_pos %d  new branch or bug \n", INSTANCE_GLOBAL_IDX, bitmap_idx, bit_pos);
-        if (is_bug) {
-            // printf("thread %d is bug, add to bug list \n", threadIdx.x);
-            int idx = atomicAdd(g_new_bug_count, 1);
-            if (idx < CuEVM::MAX_NEW_BUGS) {
-                g_new_bug_idx[idx] = INSTANCE_GLOBAL_IDX;
-                g_new_bug_pc[idx] = pc_src;
-            }
-        }
-    }
-}
-*/
-/* // template code, to remove
-__device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint32_t pc_src, uint32_t pc_dst,
-                                                                            uint8_t distance_bits) {
-    uint32_t bitmap_idx = ((pc_src >> 1) ^ pc_dst) % BITMAP_SIZE;
-    printf("thread %d update_coverage_bitmap_with_distance pc_src %u pc_dst %u distance_bits %u, bitmap_idx %u\n",
-           INSTANCE_GLOBAL_IDX, pc_src, pc_dst, distance_bits, bitmap_idx);
-    unsigned int old_dist = g_coverage_bitmap[bitmap_idx];
-    unsigned int prev_dist = atomicMin(&g_coverage_bitmap[bitmap_idx], distance_bits);
-    if (distance_bits < old_dist) {
-    }
-}
-
-__device__ void simplified_trace_data::update_bugs(uint32_t pc, uint8_t bug_type) {
-    // use global array to record bugs. Search through exsiting bug list and add new bug if not found
-    uint32_t bug_id = pc << 16 | bug_type;
-    for (int i = 0; i < g_total_bug_count; i++) {
-        if (g_bug_list[i] == bug_id) {
-            return;
-        }
-    }
-    // add new bug, atomic add to g_total_bug_count, persist across kernels
-    int idx = atomicInc(g_total_bug_count, CuEVM::MAX_NEW_BUGS);
-    if (idx < CuEVM::MAX_NEW_BUGS) {
-        g_total_bug_list[idx] = bug_id;
-        g_total_bug_idx[idx] = INSTANCE_GLOBAL_IDX;  // for reconstructing on CPU side
-    }
-}
-*/
-
 // Simplified coverage: Pure AFL simple hash (shift + XOR) for max performance, single atomicMin
 __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint32_t pc_src, uint32_t pc_dst,
                                                                             uint32_t pc_missed, uint8_t distance_bits) {
@@ -338,22 +263,6 @@ __device__ void simplified_trace_data::finalize_coverage_bitmap(int32_t error_co
     // printf("g_new_coverage_count %d\n", g_new_coverage_count[0]);
 }
 
-/*
-__device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
-                                                       const CuEVM::evm_stack_t& stack_ptr) {
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    events[no_events].pc = pc;
-    events[no_events].op = op;
-    if (op != OP_INVALID && op != OP_SELFDESTRUCT) {
-        // printf("add new operation, src data %d \n", THREADIDX);
-        // printf("stack size %d\n", stack_ptr.size());
-
-        events[no_events].operand_1 = *stack_ptr.get_address_at_index(1);
-        events[no_events].operand_2 = *stack_ptr.get_address_at_index(2);
-    }
-}
-*/
-
 __device__ bool simplified_trace_data::increase_branch_count() {
     if (no_branches >= MAX_BRANCHES_TRACING) {
         no_branches = MAX_BRANCHES_TRACING;
@@ -408,22 +317,6 @@ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::
     last_distance = distance;
 }
 
-/*
-__device__ void simplified_trace_data::record_operation(const uint32_t pc, const uint8_t op) {
-    // for simple trace, no need stack content
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    events[no_events].pc = pc;
-    events[no_events].op = op;
-    no_events++;
-}
-
-__device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t& stack_ptr, uint32_t error_code) {
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    if (events[no_events].op < OP_REVERT && events[no_events].op != OP_SSTORE)
-        events[no_events].res = *stack_ptr.get_address_at_index(1);
-    no_events++;
-}
-*/
 __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
     assert(call_context_ptr != nullptr);
     // if (current_account_id != 0)
@@ -452,22 +345,6 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
     calls[no_calls].last_pc = 0;
     no_calls++;
-    // if (no_calls > MAX_RECURSION) {
-    //     // printf("\nThread %d: No calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
-    //     uint8_t loop_found = 0;
-    //     // loop back 10 calls and check if we found loops
-    //     for (int i = no_calls - 2; i >= no_calls - MAX_RECURSION; i--) {
-    //         if (calls[i].receiver_id == calls[no_calls - 1].receiver_id) {
-    //             loop_found++;
-    //         }
-    //     }
-    //     // printf("Thread %d: Loop found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
-
-    //     if (loop_found >= MAX_RECURSION / 2) {
-    //         // printf("\nThread %d: Reentrancy detected, loop_found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
-    //         return ERROR_REENTRANCY;
-    //     }
-    // }
 
     // return ERROR_SUCCESS;
 }
@@ -536,10 +413,11 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
 
     if (no_calls > 1 && calls[i].receiver_id == RANDOM_ATTACKER_ADDRESS) {
         // current value is greater than the first call value
-        if (uint256_cmp(&calls[i].value, &calls[0].value) > 0) {
+        if (!uint256_is_zero(&calls[i].value)) {
             leaking_ether_oracle(last_pc);
         }
-        if (calls[i].call_data_size > 0) {
+        // at least 4 bytes sig, 32 byte data
+        if (calls[i].call_data_size > 32) {
             arbitrary_call_oracle(last_pc);
         }
     }
@@ -922,17 +800,21 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
     seed = mutate_block_values_senders(seed, transaction_list_ptr->block_number, transaction_list_ptr->time_stamp,
                                        transaction_list_ptr->sender);
 
+    // printf("Thread %d sender %d, marker_size %d, seed %d\n", INSTANCE_GLOBAL_IDX,
+    //        transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX], marker_size, seed);
+
     if (marker_size == 0) return;
-    // if (INSTANCE_GLOBAL_IDX % CUEVM_MUTATE_GROUP_SIZE != 0) return;  // skip the first sequence in each group
 
     uint8_t* call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
+    uint32_t distance_from_count =
+        g_fuzzing_constants->sender_counts - transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX];
 
     for (int j = 0; j < marker_size; j++) {
         uint32_t element_offset = *marker_data++;
         uint32_t element_type = *marker_data++;
         uint32_t element_length = *marker_data++;
 
-        if (element_type == ELEMENT_VALUE_TYPE) {  // always mutate value
+        if (element_type == ELEMENT_VALUE_TYPE && distance_from_count != 1) {  // random attacker does not mutate value
             // printf("thread %d value mutation\n", INSTANCE_GLOBAL_IDX);
             seed = mutate_value(seed, &transaction_list_ptr->value[INSTANCE_GLOBAL_IDX]);
 
@@ -961,11 +843,12 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
             // } else {
             // select from the constants
             uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
-            if (transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX] == g_fuzzing_constants->special_sender_idx) {
-                address_constants_count += 1;  // for special sender, use the last address constant
-            }
-            uint32_t random_index = rand_range(seed, address_constants_count);
+            if (distance_from_count <= 2) address_constants_count += 3 - distance_from_count;
+            // distance_from_count == 1 // last address -> random attacker => use all address constants (+2)
+            // distance_from_count == 2 // last 2 address -> reentrancy attacker => use all address constants except
+            // random attacker (+1)
 
+            uint32_t random_index = rand_range(seed, address_constants_count);
             for (int i = 0; i < 20; i++) {
                 call_data[element_offset + 12 + i] = g_fuzzing_constants->address_constants[random_index * 32 + 12 + i];
             }

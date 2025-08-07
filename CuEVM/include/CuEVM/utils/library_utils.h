@@ -106,8 +106,7 @@ struct fuzzing_constants {
     uint32_t block_timestamp_delay_max = 604800 * 4;  // 1 month
     evm_word_t* sender_list;                          // sender list for fuzzing
     uint32_t sender_counts = 3;
-    uint8_t* return_buffer;       // for return data RETURN_BUFFER_SIZE
-    uint32_t special_sender_idx;  // index of the special sender in the sender list
+    uint8_t* return_buffer;  // for return data RETURN_BUFFER_SIZE
     __host__ __device__ void print();
 };
 // for fuzzing utilities
@@ -150,8 +149,7 @@ struct serialized_worldstate_data {
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
 #define MAX_FUZZING_LOOP_LIMIT 200
-// In fuzzing mode, Reentrancy is permitted and may be detected but will raise error flag after this amount
-#define MAX_RECURSION 8
+
 /**
  * @brief Structure for tracing simple EVM events.
  *
