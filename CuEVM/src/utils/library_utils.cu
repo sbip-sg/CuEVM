@@ -337,9 +337,13 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     //        calls[no_calls].receiver_id);
     calls[no_calls].pc = pc;
     calls[no_calls].op = call_context_ptr->call_type;
-    calls[no_calls].value = call_context_ptr->value;
+    calls[no_calls].value_not_zero = !uint256_is_zero(&call_context_ptr->value);
     calls[no_calls].call_data_size = call_context_ptr->call_data_size;
-    if (calls[no_calls].value.words[0] != 0) {
+    if (calls[no_calls].call_data_size > 0) {
+        calls[no_calls].first_byte_call_data = call_context_ptr->call_data[0];
+    }
+
+    if (calls[no_calls].value_not_zero) {
         state_written = true;  // transfer = true
     }
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
@@ -371,9 +375,26 @@ __device__ void simplified_trace_data::leaking_ether_oracle(uint32_t pc) {
     add_bugs_for_later(pc, BUG_LEAKING_ETHER);
 }
 
-__device__ void simplified_trace_data::arbitrary_call_oracle(uint32_t pc) {
-    // printf("thread %d arbitrary_call_oracle pc %u\n", INSTANCE_GLOBAL_IDX, pc);
-    // update_bugs(pc << 16 | BUG_ARBITRARY_CALL << 8 | (current_account_id & 0xFF));
+__device__ void simplified_trace_data::arbitrary_call_oracle(uint32_t pc, uint8_t first_byte_call_data) {
+    // Pack into single 32-bit value to avoid pc/data visibility races: value = (pc << 16) | first_byte_call_data
+    // Assumes pc fits in 16 bits.
+    uint32_t packed = (pc << 16) | (uint32_t)first_byte_call_data;
+
+    for (int i = 0; i < MAX_ARBITRARY_CALL_CHECK; i++) {
+        uint32_t stored = g_fuzzing_constants->arbitrary_call_check[i];
+
+        if (stored == packed) return;  // exact match already present
+
+        if (stored == 0) {
+            uint32_t prev = atomicCAS(&g_fuzzing_constants->arbitrary_call_check[i], 0, packed);
+            if (prev == 0 || prev == packed) return;  // claimed or identical inserted concurrently
+        } else {
+            // Same pc but different first byte? Compare high 16 bits.
+            if ((stored >> 16) == pc && (stored & 0xFFFFu) != (uint32_t)first_byte_call_data) break;
+        }
+    }
+
+    // Conflict or table full
     add_bugs_for_later(pc, BUG_ARBITRARY_CALL);
 }
 
@@ -413,12 +434,12 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
 
     if (no_calls > 1 && calls[i].receiver_id == RANDOM_ATTACKER_ADDRESS) {
         // current value is greater than the first call value
-        if (!uint256_is_zero(&calls[i].value)) {
+        if (calls[i].value_not_zero) {
             leaking_ether_oracle(last_pc);
         }
-        // at least 4 bytes sig, 32 byte data
-        if (calls[i].call_data_size > 32) {
-            arbitrary_call_oracle(last_pc);
+
+        if (calls[i].call_data_size > 1) {
+            arbitrary_call_oracle(last_pc, calls[i].first_byte_call_data);
         }
     }
 
@@ -441,8 +462,9 @@ __host__ __device__ void simplified_trace_data::print() {
     // }
     printf("calls\n");
     for (uint32_t i = 0; i < no_calls; i++) {
-        printf("pc %u op %u sender_id %u receiver_id %u value %s error_code %u\n", calls[i].pc, calls[i].op,
-               calls[i].sender_id, calls[i].receiver_id, calls[i].value.to_hex(), calls[i].error_code);
+        printf("pc %u op %u sender_id %u receiver_id %u value_not_zero %u first_byte_call_data %x error_code %u\n",
+               calls[i].pc, calls[i].op, calls[i].sender_id, calls[i].receiver_id, calls[i].value_not_zero,
+               calls[i].first_byte_call_data, calls[i].error_code);
     }
     printf("branches\n");
 #ifndef BUILD_GO_LIBRARY

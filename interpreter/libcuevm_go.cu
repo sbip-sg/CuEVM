@@ -261,6 +261,9 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
         address_count - 2;  // normal address count, last 2 are special attackers
     host_fuzzing_constants->integer_constants_count = integer_count;
     host_fuzzing_constants->sender_counts = sender_count;
+    for (int i = 0; i < MAX_ARBITRARY_CALL_CHECK; ++i) {
+        host_fuzzing_constants->arbitrary_call_check[i] = 0;
+    }
     evm_word_t temp_word;
 
     for (int i = 0; i < sender_count; ++i) {

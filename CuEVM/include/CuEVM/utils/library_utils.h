@@ -57,6 +57,7 @@ constexpr CONSTANT uint32_t MAX_NEW_BUGS = 128;
 constexpr CONSTANT uint32_t MAX_NEW_MEMORY = 32768;       // per instance
 constexpr CONSTANT uint32_t MAX_RETURN_DATA_SIZE = 4096;  // per call
 
+constexpr CONSTANT uint32_t MAX_ARBITRARY_CALL_CHECK = 4;  // store 3 different calls
 // persistent state across kernel launches
 extern __device__ uint32_t* g_events_bitmap;
 extern __device__ uint32_t* g_total_bug_table;
@@ -106,7 +107,8 @@ struct fuzzing_constants {
     uint32_t block_timestamp_delay_max = 604800 * 4;  // 1 month
     evm_word_t* sender_list;                          // sender list for fuzzing
     uint32_t sender_counts = 3;
-    uint8_t* return_buffer;  // for return data RETURN_BUFFER_SIZE
+    uint8_t* return_buffer;                                   // for return data RETURN_BUFFER_SIZE
+    uint32_t arbitrary_call_check[MAX_ARBITRARY_CALL_CHECK];  // storing PC, first byte of call data pair
     __host__ __device__ void print();
 };
 // for fuzzing utilities
@@ -173,13 +175,15 @@ struct simple_event_trace {
  */
 struct call_trace {
     uint32_t pc;
-    uint8_t op;
+    uint32_t call_data_size;
     uint32_t sender_id;    // unique identifer, last 8bit of address
     uint32_t receiver_id;  // unique identifer, last 8bit of address
-    evm_word_t value;
-    uint32_t call_data_size;
+    uint32_t last_pc;
+    bool value_not_zero;
+    uint8_t op;
+    uint8_t first_byte_call_data;
     uint8_t error_code = RESERVED_ERROR_CODE;  // 0 or 1
-    uint32_t last_pc;                          // the last pc of the call before returning
+                                               // the last pc of the call before returning
     // todo add more depth + result etc
 };
 
@@ -295,7 +299,7 @@ struct simplified_trace_data {
      * @brief Add arbitrary call oracle.
      * @param[in] pc The program counter.
      */
-    __device__ void arbitrary_call_oracle(uint32_t pc);
+    __device__ void arbitrary_call_oracle(uint32_t pc, uint8_t first_byte_call_data);
 
     /**
      * @brief Begin recording an operation in the trace.

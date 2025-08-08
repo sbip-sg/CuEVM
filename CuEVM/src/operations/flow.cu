@@ -36,8 +36,8 @@ __device__ int32_t JUMP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, u
             }
         }
 #ifdef BUILD_LIBRARY
-        error_code = simplified_trace_data_ptr->increase_branch_count() ? ERROR_OUT_OF_GAS : error_code;
-        if (gas_used > MAX_GAS_FUZZING) error_code = ERROR_OUT_OF_GAS;
+        // error_code = simplified_trace_data_ptr->increase_branch_count() ? ERROR_OUT_OF_GAS : error_code;
+        // if (gas_used > MAX_GAS_FUZZING) error_code = ERROR_OUT_OF_GAS;
 #endif
         pc = destination_u32 - 1;
     }
