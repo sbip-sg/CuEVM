@@ -657,6 +657,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         temp_transaction_list->gas_price = 1;
         temp_transaction_list->gas_limit = 1000000;
         temp_transaction_list->type = 0;
+        // temp_transaction_list->sequence_id = min(sequence_idx + 1, 15);  // 15 4-bit is the max sequence id
         temp_transaction_list->size = transaction_per_gpu;
         uint256_from_bytes(&temp_transaction_list->to, toAddr, 32);
         printf("host_transaction_list->start_seed: %u\n", temp_transaction_list->start_seed);

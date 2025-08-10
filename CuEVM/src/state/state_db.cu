@@ -46,6 +46,7 @@ __device__ SnapshotState *SnapshotState::revert() {
            storage_size, touched_account_counts);
     printf("revert touched account to cold num touched %d\n", touched_account_counts);
 #endif
+#ifndef BUILD_GO_LIBRARY  // fuzzing mode we dont track cold/warm diff in gas
     if (touched_account_counts > 0) {
         for (uint32_t i = 0; i < touched_account_counts; i++) {
             int32_t address_index = preallocated_touched_accounts[i];
@@ -68,6 +69,7 @@ __device__ SnapshotState *SnapshotState::revert() {
             }
         }
     }
+#endif
     if (diff_account_counts > 0) {
 #ifdef DEBUG_PERF
         printf("revert account diff_account_counts %d\n", diff_account_counts);
@@ -1045,8 +1047,6 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
     found_value = get_value_status(address_index, key);
 
     if (found_value == nullptr) {
-        // todo: // implement value not found in both pools
-        // printf("is_warm_key_with_offset value not found in both pools\n");
         if (snapshot_state != nullptr) {
             // printf("set snapshot_state %p to restore null_ptr\n", snapshot_state);
             snapshot_state->set_blank_key(key);

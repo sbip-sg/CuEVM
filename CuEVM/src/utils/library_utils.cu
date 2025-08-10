@@ -323,7 +323,7 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     //     printf("thread %d start_call pc %u current_account_id %x\n", INSTANCE_GLOBAL_IDX, pc, current_account_id);
 #ifdef BUILD_GO_LIBRARY
 
-    no_branches += 20;  // call saturates the branch limit faster than normal jumps
+    no_branches += 10;  // call saturates the branch limit faster than normal jumps
                         // state_written = true;
 #endif
     if (no_calls >= MAX_CALLS_TRACING) return;
@@ -337,13 +337,17 @@ __device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_
     //        calls[no_calls].receiver_id);
     calls[no_calls].pc = pc;
     calls[no_calls].op = call_context_ptr->call_type;
-    calls[no_calls].value_not_zero = !uint256_is_zero(&call_context_ptr->value);
+    if (call_context_ptr->parent != nullptr) {
+        calls[no_calls].value_leaking = uint256_cmp(&call_context_ptr->value, &call_context_ptr->parent->value) > 0;
+    } else {
+        calls[no_calls].value_leaking = false;
+    }
     calls[no_calls].call_data_size = call_context_ptr->call_data_size;
     if (calls[no_calls].call_data_size > 0) {
         calls[no_calls].first_byte_call_data = call_context_ptr->call_data[0];
     }
 
-    if (calls[no_calls].value_not_zero) {
+    if (call_context_ptr->value.words[0] != 0) {
         state_written = true;  // transfer = true
     }
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
@@ -379,7 +383,7 @@ __device__ void simplified_trace_data::arbitrary_call_oracle(uint32_t pc, uint8_
     // Pack into single 32-bit value to avoid pc/data visibility races: value = (pc << 16) | first_byte_call_data
     // Assumes pc fits in 16 bits.
     uint32_t packed = (pc << 16) | (uint32_t)first_byte_call_data;
-
+    bool bug = false;
     for (int i = 0; i < MAX_ARBITRARY_CALL_CHECK; i++) {
         uint32_t stored = g_fuzzing_constants->arbitrary_call_check[i];
 
@@ -390,12 +394,15 @@ __device__ void simplified_trace_data::arbitrary_call_oracle(uint32_t pc, uint8_
             if (prev == 0 || prev == packed) return;  // claimed or identical inserted concurrently
         } else {
             // Same pc but different first byte? Compare high 16 bits.
-            if ((stored >> 16) == pc && (stored & 0xFFFFu) != (uint32_t)first_byte_call_data) break;
+            if ((stored >> 16) == pc && (stored & 0xFFFFu) != (uint32_t)first_byte_call_data) {
+                bug = true;
+                break;
+            }
         }
     }
 
-    // Conflict or table full
-    add_bugs_for_later(pc, BUG_ARBITRARY_CALL);
+    // same PC but different first byte
+    if (bug) add_bugs_for_later(pc, BUG_ARBITRARY_CALL);
 }
 
 __device__ void simplified_trace_data::invalid_opcode_oracle(uint32_t pc) {
@@ -407,7 +414,7 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
     //        no_calls);
 
     if (no_calls > MAX_CALLS_TRACING) {
-        printf("THREAD %d no_calls > MAX_CALLS_TRACING, no_calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
+        // printf("THREAD %d no_calls > MAX_CALLS_TRACING, no_calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
 
         return;
     }
@@ -434,11 +441,14 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
 
     if (no_calls > 1 && calls[i].receiver_id == RANDOM_ATTACKER_ADDRESS) {
         // current value is greater than the first call value
-        if (calls[i].value_not_zero) {
+        if (calls[i].value_leaking) {
             leaking_ether_oracle(last_pc);
         }
 
         if (calls[i].call_data_size > 1) {
+            // printf("arbitrary_call_oracle thread %d last_pc %u first_byte_call_data %x\n", INSTANCE_GLOBAL_IDX,
+            // last_pc,
+            //        calls[i].first_byte_call_data);
             arbitrary_call_oracle(last_pc, calls[i].first_byte_call_data);
         }
     }
@@ -462,8 +472,8 @@ __host__ __device__ void simplified_trace_data::print() {
     // }
     printf("calls\n");
     for (uint32_t i = 0; i < no_calls; i++) {
-        printf("pc %u op %u sender_id %u receiver_id %u value_not_zero %u first_byte_call_data %x error_code %u\n",
-               calls[i].pc, calls[i].op, calls[i].sender_id, calls[i].receiver_id, calls[i].value_not_zero,
+        printf("pc %u op %u sender_id %u receiver_id %u value_leaking %u first_byte_call_data %x error_code %u\n",
+               calls[i].pc, calls[i].op, calls[i].sender_id, calls[i].receiver_id, calls[i].value_leaking,
                calls[i].first_byte_call_data, calls[i].error_code);
     }
     printf("branches\n");

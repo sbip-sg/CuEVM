@@ -478,7 +478,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     break;
                 case OP_SHA3:
                     error_code = CuEVM::operations::SHA3(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                         *cached_call_state.stack_ptr, *call_state_ptr->memory_ptr);
+                                                         *cached_call_state.stack_ptr, *call_state_ptr->memory_ptr
+#ifdef BUILD_LIBRARY
+                                                         ,
+                                                         &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                    );
                     break;
                 case OP_ADDRESS:
                     error_code = CuEVM::operations::ADDRESS(cached_call_state.gas_limit, cached_call_state.gas_used,

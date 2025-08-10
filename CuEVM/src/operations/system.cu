@@ -102,13 +102,6 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
             new_context_ptr->bytecode_offset = find_global_bytecode_offset(contract_address_ptr);
         }
 #ifdef BUILD_LIBRARY
-        // if (blockIdx.x > 32) {
-        //     if (new_context_ptr->from.words[0] == REENTRANCY_ATTACKER_ADDRESS ||
-        //         new_context_ptr->from.words[0] == TRANSPARENT_ATTACKER_ADDRESS) {
-        //         new_context_ptr->byte_code_size = 0;
-        //         return ERR_FUZZING_STOP;
-        //     }
-        // }
         if (new_context_ptr->from.words[0] == REENTRANCY_ATTACKER_ADDRESS) {
             // printf("Thread %d bypass args logic for reentrancy attacker\n", INSTANCE_GLOBAL_IDX);
             // bypass args logic for reentrancy attacker

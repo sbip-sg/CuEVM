@@ -47,7 +47,12 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 
     if (error_code == ERROR_SUCCESS) {
         evm_word_t *value =
-            state_db->get_storage_with_known_index(&call_context->storage_address, key, address_index, found_value);
+            state_db->get_storage_with_known_index(&call_context->storage_address, key, address_index, found_value
+#ifdef BUILD_GO_LIBRARY
+                                                   ,
+                                                   false
+#endif
+            );
 // printf("finish get storage thread %d, value %p\n", INSTANCE_GLOBAL_IDX, value);
 #ifdef BUILD_LIBRARY
         if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
@@ -116,6 +121,7 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
         state_db->write_storage_with_known_index(&call_context->storage_address, key, value, address_index,
                                                  found_value);
 #ifdef BUILD_LIBRARY
+        simplified_trace_data_ptr->no_branches += 2;
         simplified_trace_data_ptr->state_written = 1;
         if (simplified_trace_data_ptr->reentrancy_count >= 2) {
             simplified_trace_data_ptr->reentrancy_oracle(call_context->pc);

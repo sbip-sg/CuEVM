@@ -9,7 +9,12 @@
 #endif
 namespace CuEVM::operations {
 __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                        CuEVM::evm_memory_t &memory) {
+                        CuEVM::evm_memory_t &memory
+#ifdef BUILD_LIBRARY
+                        ,
+                        void *simplified_trace_data_ptr
+#endif
+) {
     gas_used += GAS_KECCAK256;
     // int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     // if (error_code == ERROR_SUCCESS) {
@@ -67,6 +72,9 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
         //     printf("\n");
         // }
         error_code |= stack.pushx(CuEVM::hash_size, hash_data, CuEVM::hash_size);
+#ifdef BUILD_LIBRARY
+        // ((simplified_trace_data *)simplified_trace_data_ptr)->no_branches += 2;
+#endif
     }
     // }
     return error_code;
