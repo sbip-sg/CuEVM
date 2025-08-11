@@ -533,10 +533,6 @@ __device__ void StateDb::increase_balance(const evm_word_t *address, const evm_w
         account_is_warm[address_index * num_states + INSTANCE_GLOBAL_IDX] = is_warm;
     }
     if (snapshot_state != nullptr) {
-        // #ifdef BUILD_LIBRARY
-        //         // in fuzzing mode, we don't need to set snapshot of the balance as address is random
-        //         return;
-        // #endif
         // set snapshot of the balance
         SnapshotAccount *snapshot_account = new SnapshotAccount();
         if (snapshot_account == nullptr) {
@@ -1046,6 +1042,9 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
 
     found_value = get_value_status(address_index, key);
 
+#ifdef BUILD_LIBRARY
+    if (write_snapshot == false) return true;  // fuzzing mode does not implement 2929 for performance
+#endif
     if (found_value == nullptr) {
         if (snapshot_state != nullptr) {
             // printf("set snapshot_state %p to restore null_ptr\n", snapshot_state);
@@ -1469,7 +1468,8 @@ __host__ void StateDb::GPUfromJsonMultiGPU(std::vector<StateDb *> &state_db, con
                               num_states * num_accounts * sizeof(bool), cudaMemcpyHostToDevice));
 
 #endif
-        // CUDA_CHECK(cudaMemcpy(tmp_state_db->snapshot_total_storage_size, state_db_cpu->snapshot_total_storage_size,
+        // CUDA_CHECK(cudaMemcpy(tmp_state_db->snapshot_total_storage_size,
+        // state_db_cpu->snapshot_total_storage_size,
         //                       num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
         // printf("state db cpu\n");
