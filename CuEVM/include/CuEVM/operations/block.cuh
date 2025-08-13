@@ -31,7 +31,13 @@ namespace CuEVM::operations {
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack);
+__device__ int32_t BLOCKHASH(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack
+#ifdef BUILD_GO_LIBRARY
+                             ,
+                             const transaction::TransactionList
+                                 *transaction_list_ptr  // supplement the block info by adding delay per transaction
+#endif
+);
 
 /**
  * The COINBASE operation implementation.
@@ -53,7 +59,9 @@ __device__ int32_t COINBASE(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_
  */
 __device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack
 #ifdef BUILD_GO_LIBRARY
-                             ,const transaction::TransactionList *transaction_list_ptr // supplement the block info by adding delay per transaction
+                             ,
+                             const transaction::TransactionList
+                                 *transaction_list_ptr  // supplement the block info by adding delay per transaction
 #endif
 );
 
@@ -67,7 +75,9 @@ __device__ int32_t TIMESTAMP(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm
  */
 __device__ int32_t NUMBER(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack
 #ifdef BUILD_GO_LIBRARY
-                             ,const transaction::TransactionList *transaction_list_ptr // supplement the block info by adding delay per transaction
+                          ,
+                          const transaction::TransactionList
+                              *transaction_list_ptr  // supplement the block info by adding delay per transaction
 #endif
 );
 

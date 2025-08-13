@@ -552,7 +552,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     break;
                 case OP_BLOCKHASH:
                     error_code = CuEVM::operations::BLOCKHASH(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                              *cached_call_state.stack_ptr);
+                                                              *cached_call_state.stack_ptr
+#ifdef BUILD_GO_LIBRARY
+                                                              ,
+                                                              transaction_list_ptr
+#endif
+                    );
                     break;
                 case OP_COINBASE:
                     error_code = CuEVM::operations::COINBASE(cached_call_state.gas_limit, cached_call_state.gas_used,

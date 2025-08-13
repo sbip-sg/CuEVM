@@ -92,7 +92,7 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
         //     "thread %d update_coverage_bitmap_with_distance covered branch pc_src %u pc_dst %u pc_missed %u, "
         //     "prev_dist %u\n",
         //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, prev_dist);
-        last_covered_branch_id = afl_hash_covered + 1;  // +1 to avoid 0
+        last_covered_branch_id = bitmap_idx_covered + 1;  // +1 to avoid 0
     }
     uint32_t dist_compare = (255 - distance_bits) << 24;  // first 8 bits are distance bit of the branch
     // update missed branch
