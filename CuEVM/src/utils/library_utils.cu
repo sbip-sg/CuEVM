@@ -555,6 +555,7 @@ void freeTraceData(bool copy_state_data) {
 // AFL-style mutation configuration
 #define CHANCE_TO_CREATE_NEW_ADDRESS 0  // 1 percent
 #define CHANCE_TO_SKIP_MUTATE 50        // percent we skip a marker
+#define CHANCE_TO_SKIP_MUTATE_VALUE 25  // percent we skip a marker
 // #define CHANCE_TO_SKIP_MUTATE_BLOCK 25  // percent we skip block mutation
 #define CHANCE_HAVOC_MUTATION 6  // percent chance for havoc (stacked mutations)
 #define MAX_HAVOC_STACK 3        // maximum number of stacked mutations in havoc
@@ -800,7 +801,7 @@ __device__ uint32_t mutate_block_values_senders(uint32_t seed, uint64_t* block_n
 }
 
 __device__ uint32_t mutate_value(uint32_t seed, evm_word_t* value) {
-    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
+    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE_VALUE) {
         return seed;
     }
     // always mutate at least one value
