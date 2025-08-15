@@ -413,15 +413,11 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
 #ifdef BUILD_GO_LIBRARY
         // bypass fuzzing mode
         // TODO: make it configurable
-        if (signature->v % 2 == 0) {
+        if (signature->v == 28 || signature->v == 27) {
             uint8_t *output = new uint8_t[32];
 
             size_t res = ERROR_SUCCESS;
             signer = 0;
-            //
-            // if (call_context->parent != nullptr) {
-            //     signer = call_context->parent->from;
-            // }
 #else
         // TODO: is not 27 and 28, only?
         if (signature->v == 28 || signature->v == 27) {
