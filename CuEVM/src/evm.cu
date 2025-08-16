@@ -193,6 +193,9 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     if (recipient->words[0] == 0xC0DE0001)
         return CuEVM::precompile_operations::operation_TransparentAttacker(cached_call_state.gas_limit,
                                                                            cached_call_state.gas_used, call_state_ptr);
+    if (call_state_ptr->byte_code_size == 4 && recipient->words[1] != 0)  // the fuzzable return address
+        return CuEVM::precompile_operations::operation_TransparentAttackerEnhanced(
+            cached_call_state.gas_limit, cached_call_state.gas_used, call_state_ptr, transaction_list_ptr);
 #endif
 
     if (call_state_ptr->byte_code_size == 0) {

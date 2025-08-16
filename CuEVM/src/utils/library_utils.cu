@@ -306,7 +306,7 @@ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::
     evm_word_t* op1 = stack_ptr.get_address_at_index(1);
     evm_word_t* op2 = stack_ptr.get_address_at_index(2);
     uint32_t stack_size = stack_ptr.size();
-
+    if (stack_size < 2) return;
     if (uint256_cmp(op1, op2) >= 1)
         uint256_sub(&distance, op1, op2);
     else
