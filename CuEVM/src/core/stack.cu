@@ -162,7 +162,8 @@ __device__ int32_t evm_stack_t::dupx(uint32_t x) {
         stack_offset++;
         return ERROR_SUCCESS;
     } else {
-        printf(" dupx overflow or underflow stack offset %d\n", stack_offset);
+        // TODO: check this
+        // printf("THREAD %d dupx overflow or underflow stack offset %d\n", INSTANCE_GLOBAL_IDX, stack_offset);
         return ERROR_STACK_OVERFLOW;  // represent underflow also
     };
 }
@@ -170,6 +171,7 @@ __device__ int32_t evm_stack_t::dupx(uint32_t x) {
 __device__ int32_t evm_stack_t::swapx(uint32_t x) {
     x++;
     if (x > stack_offset) {
+        // printf("THREAD %d swap overflow or underflow stack offset %d\n", INSTANCE_GLOBAL_IDX, stack_offset);
         return ERROR_STACK_UNDERFLOW;
     }
     evm_word_t tmp;
@@ -181,8 +183,8 @@ __device__ int32_t evm_stack_t::swapx(uint32_t x) {
 }
 
 __device__ void evm_stack_t::print() const {
-    printf("Stack size: %d, data:\n", size());
-    for (uint32_t idx = 1; idx <= size(); idx++) {
+    printf("Stack size: %d, top 5 data:\n", size());
+    for (uint32_t idx = 1; idx <= min(size(), 5); idx++) {
         evm_word_t *elem = get_address_at_index(idx);
         printf("idx %d, elem %p\n", idx, elem);
         elem->print();

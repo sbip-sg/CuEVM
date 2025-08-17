@@ -15,7 +15,17 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     }
     key = stack.get_address_at_index(1);
     stack.reduce_size(1);
-
+#ifdef BUILD_LIBRARY
+    // bypass logic for reentrancy attacker to track directly in the trace_data_ptr
+    if (simplified_trace_data_ptr->current_account_id == REENTRANCY_ATTACKER_ADDRESS) {
+        gas_used += GAS_COLD_SLOAD;
+        int error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+        if (error_code == ERROR_SUCCESS) error_code |= stack.push_uint32(simplified_trace_data_ptr->reentrancy_count);
+        // printf("Thread %d read reentrancy_count %d\n", INSTANCE_GLOBAL_IDX,
+        //        simplified_trace_data_ptr->reentrancy_count);
+        return error_code;
+    }
+#endif
     // get the key warm
     int32_t address_index;
     ValueStatus *found_value;
@@ -37,7 +47,12 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 
     if (error_code == ERROR_SUCCESS) {
         evm_word_t *value =
-            state_db->get_storage_with_known_index(&call_context->storage_address, key, address_index, found_value);
+            state_db->get_storage_with_known_index(&call_context->storage_address, key, address_index, found_value
+#ifdef BUILD_GO_LIBRARY
+                                                   ,
+                                                   false
+#endif
+            );
 // printf("finish get storage thread %d, value %p\n", INSTANCE_GLOBAL_IDX, value);
 #ifdef BUILD_LIBRARY
         if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
@@ -75,6 +90,18 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     evm_word_t *value = stack.get_address_at_index(2);
     stack.reduce_size(2);
 
+#ifdef BUILD_LIBRARY
+    // bypass logic for reentrancy attacker to track directly in the trace_data_ptr
+    if (simplified_trace_data_ptr->current_account_id == REENTRANCY_ATTACKER_ADDRESS) {
+        gas_used += GAS_COLD_SLOAD;
+        int error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
+        if (error_code == ERROR_SUCCESS) simplified_trace_data_ptr->reentrancy_count++;
+        // printf("Thread %d update reentrancy_count %d\n", INSTANCE_GLOBAL_IDX,
+        //        simplified_trace_data_ptr->reentrancy_count);
+        return error_code;
+    }
+#endif
+
     int32_t address_index;
     ValueStatus *found_value;
     error_code |= CuEVM::gas_cost::sstore_cost(gas_used, gas_refund, state_db, &call_context->storage_address, key,
@@ -94,7 +121,11 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
         state_db->write_storage_with_known_index(&call_context->storage_address, key, value, address_index,
                                                  found_value);
 #ifdef BUILD_LIBRARY
+        simplified_trace_data_ptr->no_branches += 2;
         simplified_trace_data_ptr->state_written = 1;
+        if (simplified_trace_data_ptr->reentrancy_count >= 2) {
+            simplified_trace_data_ptr->reentrancy_oracle(call_context->pc);
+        }
         if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
             simplified_trace_data_ptr->update_storage_coverage(call_context->pc, key->words[0], 1);
 

@@ -20,6 +20,10 @@ static std::vector<StorageInfoEntry*> d_storage_infos;  // vector size = num gpu
 static std::vector<uint32_t*>
     d_new_coverage_bitmaps;  // vector size = num gpus for tracking each thread if coverage hit
 static std::vector<GPUFeedbackCount*> d_gpu_feedback_counts;  // vector size = num gpus
+
+static std::vector<uint64_t*> device_block_numbers;  // vector size = num gpus for persistent block numbers
+static std::vector<uint64_t*> device_time_stamps;    // vector size = num gpus for persistent time stamps
+
 static int call_counter = 0;
 // Global variable to hold persistent jump table
 // CuEVM::ContractPCsMap contract_pcs_map;
@@ -139,6 +143,14 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
         d_bug_infos.push_back(d_new_bug_info);
         // d_new_coverage_bitmaps.push_back(d_new_coverage_bitmap);
         d_gpu_feedback_counts.push_back(d_gpu_feedback_count);
+
+        // block number and timestamp
+        uint64_t* d_block_number;
+        CUDA_CHECK(cudaMalloc(&d_block_number, num_instances * sizeof(uint64_t)));
+        device_block_numbers.push_back(d_block_number);
+        uint64_t* d_time_stamp;
+        CUDA_CHECK(cudaMalloc(&d_time_stamp, num_instances * sizeof(uint64_t)));
+        device_time_stamps.push_back(d_time_stamp);
     }
     // Include <cassert> header at the top of the file for this to work.
     // Standard assert takes only one argument (the condition).
@@ -232,55 +244,101 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     int address_count = cJSON_GetArraySize(address_constants);
     int integer_count = cJSON_GetArraySize(integer_constants);
     int sender_count = cJSON_GetArraySize(sender_constants);
+
     printf("Address count: %d\n", address_count);
     printf("Integer count: %d\n", integer_count);
     printf("Sender count: %d\n", sender_count);
 
+    // last position in the address contants is for special sender
+    address_count += 2;
     // Allocate host arrays
     uint8_t* host_address_constants = new uint8_t[address_count * 32];
     uint8_t* host_integer_constants = new uint8_t[integer_count * 32];
-    evm_word_t* host_address_list = new evm_word_t[address_count];
+    // evm_word_t* host_address_list = new evm_word_t[address_count];
     evm_word_t* host_sender_list = new evm_word_t[sender_count];
     CuEVM::fuzzing_constants* host_fuzzing_constants = new CuEVM::fuzzing_constants();
-    host_fuzzing_constants->address_constants_count = address_count;
+    host_fuzzing_constants->address_constants_count =
+        address_count - 2;  // normal address count, last 2 are special attackers
     host_fuzzing_constants->integer_constants_count = integer_count;
     host_fuzzing_constants->sender_counts = sender_count;
-    evm_word_t temp_word;
-    // Parse address constants
-    for (int i = 0; i < address_count; ++i) {
-        cJSON* item = cJSON_GetArrayItem(address_constants, i);
-        if (cJSON_IsString(item) && item->valuestring) {
-            printf("  Address constant[%d]: %s\n", i, item->valuestring);
-            temp_word.from_hex(item->valuestring);
-            uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
-            host_address_list[i] = temp_word;
-        }
+    for (int i = 0; i < MAX_ARBITRARY_CALL_CHECK; ++i) {
+        host_fuzzing_constants->arbitrary_call_check[i] = 0;
     }
+    evm_word_t temp_word;
+
     for (int i = 0; i < sender_count; ++i) {
         cJSON* item = cJSON_GetArrayItem(sender_constants, i);
         if (cJSON_IsString(item) && item->valuestring) {
-            printf("  Sender constant[%d]: %s\n", i, item->valuestring);
             temp_word.from_hex(item->valuestring);
             host_sender_list[i] = temp_word;
         }
     }
 
+    // Parse address constants
+    for (int i = 0; i < address_count; ++i) {
+        cJSON* item = cJSON_GetArrayItem(address_constants, i);
+        if (cJSON_IsString(item) && item->valuestring) {
+            temp_word.from_hex(item->valuestring);
+            uint256_to_bytes(host_address_constants + i * 32, &temp_word, 32);
+            // host_address_list[i] = temp_word;
+        }
+    }
+    // add special sender addresses to address constants
+    temp_word = host_sender_list[sender_count - 1];
+    uint256_to_bytes(host_address_constants + (address_count - 1) * 32, &temp_word, 32);
+    temp_word = host_sender_list[sender_count - 2];
+    uint256_to_bytes(host_address_constants + (address_count - 2) * 32, &temp_word, 32);
+
     // Parse integer constants
     for (int i = 0; i < integer_count; ++i) {
         cJSON* item = cJSON_GetArrayItem(integer_constants, i);
         if (cJSON_IsString(item) && item->valuestring) {
-            printf("  Integer constant[%d]: %s\n", i, item->valuestring);
             temp_word.from_hex(item->valuestring);
             uint256_to_bytes(host_integer_constants + i * 32, &temp_word, 32);
         }
     }
+    // print all in hex
+    printf("Sender constants size: %d\n", host_fuzzing_constants->sender_counts);
+    for (int i = 0; i < sender_count; ++i) {
+        // Assuming evm_word_t has a to_hex() or similar, otherwise print bytes
+        char hexstr[65] = {0};
+        host_sender_list[i].to_hex(hexstr);  // You may need to implement this if not present
+        printf("  [%d]: %s\n", i, hexstr);
+    }
+
+    // Print all address constants in hex
+    printf("Address constants size: %d\n", host_fuzzing_constants->address_constants_count);
+    for (int i = 0; i < address_count; ++i) {
+        printf("  [%d]: 0x", i);
+        for (int j = 0; j < 32; ++j) {
+            printf("%02x", host_address_constants[i * 32 + j]);
+        }
+        printf("\n");
+    }
+
+    // Print all integer constants in hex
+    printf("Integer constants size: %d\n", host_fuzzing_constants->integer_constants_count);
+    for (int i = 0; i < integer_count; ++i) {
+        printf("  [%d]: 0x", i);
+        for (int j = 0; j < 32; ++j) {
+            printf("%02x", host_integer_constants[i * 32 + j]);
+        }
+        printf("\n");
+    }
+
+    uint8_t* host_return_data = new uint8_t[RETURN_BUFFER_SIZE];
+    memset(host_return_data, 0, RETURN_BUFFER_SIZE);
+    host_return_data[31] = 0x01;
+
     uint8_t* d_address_constants;
     uint8_t* d_integer_constants;
+    uint8_t* d_return_data_buffer;
     evm_word_t* d_sender_list;
-    evm_word_t* d_address_list;
+    // evm_word_t* d_address_list;
     CUDA_CHECK(cudaMalloc(&d_address_constants, address_count * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&d_integer_constants, integer_count * sizeof(evm_word_t)));
-    CUDA_CHECK(cudaMalloc(&d_address_list, address_count * sizeof(evm_word_t)));
+    CUDA_CHECK(cudaMalloc(&d_return_data_buffer, RETURN_BUFFER_SIZE * sizeof(uint8_t)));
+    // CUDA_CHECK(cudaMalloc(&d_address_list, address_count * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&d_sender_list, sender_count * sizeof(evm_word_t)));
     printf("Copying address constants to device address array size: %d %d\n", address_count * sizeof(evm_word_t),
            address_count * 32 * sizeof(uint8_t));
@@ -290,14 +348,16 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
                           cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_integer_constants, host_integer_constants, integer_count * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
-    CUDA_CHECK(
-        cudaMemcpy(d_address_list, host_address_list, address_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    // CUDA_CHECK(
+    //     cudaMemcpy(d_address_list, host_address_list, address_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_sender_list, host_sender_list, sender_count * sizeof(evm_word_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_return_data_buffer, host_return_data, RETURN_BUFFER_SIZE * sizeof(uint8_t),
+                          cudaMemcpyHostToDevice));
     host_fuzzing_constants->address_constants = d_address_constants;
     host_fuzzing_constants->integer_constants = d_integer_constants;
-    host_fuzzing_constants->address_list = d_address_list;
+    // host_fuzzing_constants->address_list = d_address_list;
     host_fuzzing_constants->sender_list = d_sender_list;
-
+    host_fuzzing_constants->return_buffer = d_return_data_buffer;
     CuEVM::fuzzing_constants* d_fuzzing_constants;
     CUDA_CHECK(cudaMalloc(&d_fuzzing_constants, sizeof(CuEVM::fuzzing_constants)));
     CUDA_CHECK(cudaMemcpy(d_fuzzing_constants, host_fuzzing_constants, sizeof(CuEVM::fuzzing_constants),
@@ -314,8 +374,9 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     cJSON_Delete(constantsJson);
     delete[] host_address_constants;
     delete[] host_integer_constants;
-    delete[] host_address_list;
+    // delete[] host_address_list;
     delete[] host_sender_list;
+    delete[] host_return_data;
 }
 
 void reset_state_db() {
@@ -547,7 +608,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
     const unsigned char* values, const unsigned char* callData, int callDataLen, const uint32_t* dataOffsets,
     int dataOffsetsLen, const uint32_t* dataSizes, int txCount, const int32_t* markerOffsets,
-    const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0) {
+    const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0, uint32_t sequence_idx = 0) {
     printf("create transaction list with start seed %u\n", start_seed);
     // Create TransactionList on host
 
@@ -596,6 +657,7 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         temp_transaction_list->gas_price = 1;
         temp_transaction_list->gas_limit = 1000000;
         temp_transaction_list->type = 0;
+        // temp_transaction_list->sequence_id = min(sequence_idx + 1, 15);  // 15 4-bit is the max sequence id
         temp_transaction_list->size = transaction_per_gpu;
         uint256_from_bytes(&temp_transaction_list->to, toAddr, 32);
         printf("host_transaction_list->start_seed: %u\n", temp_transaction_list->start_seed);
@@ -609,8 +671,12 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         // Allocate GPU memory for sender array
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->sender, transaction_per_gpu * sizeof(uint8_t)));
 
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->block_number, transaction_per_gpu * sizeof(uint64_t)));
-        CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
+        // CUDA_CHECK(cudaMalloc(&temp_transaction_list->block_number, transaction_per_gpu * sizeof(uint64_t)));
+        // CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
+        // use persistent block number and timestamp
+
+        temp_transaction_list->block_number = device_block_numbers[i];
+        temp_transaction_list->time_stamp = device_time_stamps[i];
 
         // initialize marker data
         CUDA_CHECK(
@@ -642,11 +708,14 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         // Copy sender array from host to GPU
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->sender, fromAddr + i * transaction_per_gpu,
                               transaction_per_gpu * sizeof(uint8_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->block_number, blockNumber + i * transaction_per_gpu,
-                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->time_stamp, timeStamp + i * transaction_per_gpu,
-                              transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
 
+        // Block number and timestamp persistent after the first tx
+        if (sequence_idx == 0) {
+            CUDA_CHECK(cudaMemcpy(temp_transaction_list->block_number, blockNumber + i * transaction_per_gpu,
+                                  transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(temp_transaction_list->time_stamp, timeStamp + i * transaction_per_gpu,
+                                  transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
+        }
         // Copy marker data from host to GPU
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset, markerOffsets,
                               transaction_per_gpu / g_skipTxSize * sizeof(int32_t), cudaMemcpyHostToDevice));
@@ -752,7 +821,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
                 blockNumber + current_idx, timeStamp + current_idx, newFromAddr, toAddr, newValues,
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
                 dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize, markerData,
-                markerDataLen, start_seed + sequenceIdx * txBatchCount);
+                markerDataLen, start_seed + sequenceIdx * txBatchCount, sequenceIdx);
             // auto d_transaction_list_ptrs = create_transaction_list(
             //     newFromAddr, toAddr, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
             //     txBatchCount, dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,
@@ -948,15 +1017,18 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
         CUDA_CHECK(cudaMemcpyFromSymbol(&host_counter_ptr, g_gpu_feedback_count, sizeof(GPUFeedbackCount*)));
 
         CUDA_CHECK(cudaMemcpy(&host_counter, host_counter_ptr, sizeof(GPUFeedbackCount), cudaMemcpyDeviceToHost));
-        total_num_new_branch += host_counter.new_branch_count;
-        total_num_new_bug += host_counter.new_bug_count;
-        total_num_new_storage += host_counter.new_storage_count;
-        branch_counts[i] = host_counter.new_branch_count;
-        bug_counts[i] = host_counter.new_bug_count;
-        storage_counts[i] = host_counter.new_storage_count;
+        // using min in corner case where atomic add over the max value
+
+        branch_counts[i] = std::min(host_counter.new_branch_count, MAX_NEW_BRANCHES);
+        bug_counts[i] = std::min(host_counter.new_bug_count, MAX_NEW_BUGS);
+        storage_counts[i] = std::min(host_counter.new_storage_count, MAX_NEW_STORAGE);
+        total_num_new_branch += branch_counts[i];
+        total_num_new_bug += bug_counts[i];
+        total_num_new_storage += storage_counts[i];
     }
 
-    printf("Total new coverage branches: %u, total new bugs: %u\n", total_num_new_branch, total_num_new_bug);
+    printf("Total new coverage branches: %u, total new bugs: %u, total new storage: %u\n", total_num_new_branch,
+           total_num_new_bug, total_num_new_storage);
 
     // Allocate memory for result arrays once we know the total sizes
     result->num_new_branch = total_num_new_branch;
@@ -1042,6 +1114,7 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
         if (storage_counts[i] > 0) {
             StorageInfoEntry* d_new_storage_info = nullptr;
             CUDA_CHECK(cudaMemcpyFromSymbol(&d_new_storage_info, g_new_storage_info, sizeof(StorageInfoEntry*)));
+
             CUDA_CHECK(cudaMemcpy(&result->new_storage_info[storage_offset], d_new_storage_info,
                                   storage_counts[i] * sizeof(StorageInfoEntry), cudaMemcpyDeviceToHost));
 

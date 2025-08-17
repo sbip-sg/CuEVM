@@ -432,7 +432,7 @@ class StateDb {
     /**
      * @brief Print the state database contents.
      */
-    __host__ __device__ void print();
+    __host__ __device__ void print(uint account_id);
 
     /**
      * @brief Create a GPU state database from JSON.

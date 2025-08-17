@@ -1,6 +1,6 @@
 #include <CuEVM/evm.cuh>
 #include <cassert>
-
+#define DEBUG_THREAD 24
 namespace CuEVM {
 
 // define the kernel function
@@ -16,17 +16,17 @@ __global__ void kernel_evm_multiple_instances(CuEVM::transaction::TransactionLis
     //     printf("g_fuzzing_constants: %p\n", g_fuzzing_constants);
     //     g_fuzzing_constants->print();
     // }
+    // if (instance == 0) transaction_list_ptr->print();
+
     mutate_transaction_data(transaction_list_ptr);
 #endif
-    // if (instance == 0) {
-    //     global_state_db_ptr->print();
-    // }
+    // if (instance == 0) global_state_db_ptr->print(DEBUG_THREAD);
+    // if (instance == 0) transaction_list_ptr->print();
+
     CuEVM::evm_t evm = CuEVM::evm_t(transaction_list_ptr);
 #ifdef DEBUG
     if (instance == 1) transaction_list_ptr->print();
 #endif
-
-    // if (instance == 0) transaction_list_ptr->print();
 
     cached_evm_call_context cached_call_state(evm.call_state_ptr);
     evm.run(cached_call_state, copy_state_data);
@@ -159,6 +159,20 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     }
 #endif
 
+    // printf("Start %d call sender %x receipient %x  code size %d value %d\n", THREADIDX,
+    // call_state_ptr->from.words[0],
+    //        call_state_ptr->to.words[0], call_state_ptr->byte_code_size, call_state_ptr->value.words[0]);
+    // if (INSTANCE_GLOBAL_IDX == DEBUG_THREAD) {
+    //     printf("Start %d call sender %x receipient %x  code size %d value %d\n", THREADIDX,
+    //            call_state_ptr->from.words[0], call_state_ptr->to.words[0], call_state_ptr->byte_code_size,
+    //            call_state_ptr->value.words[0]);
+    //     call_state_ptr->value.print();
+    //     for (int i = 0; i < call_state_ptr->call_data_size; i++) {
+    //         printf("%x", call_state_ptr->call_data[i]);
+    //     }
+    //     printf("\n");
+    // }
+
     const evm_word_t *sender = &call_state_ptr->from;
     const evm_word_t *recipient = &call_state_ptr->to;
 
@@ -174,7 +188,15 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     // Go-ethereum: check depth > 1024 before increase -> depth > 1025 after increase
     // test: stSelfBalance/diffPlaces.json
     error_code |= call_state_ptr->depth > CuEVM::max_depth + 1 ? ERROR_MESSAGE_CALL_DEPTH_EXCEEDED : ERROR_SUCCESS;
-    // Dont use account ptr here, byte_code already set
+// Dont use account ptr here, byte_code already set
+#ifdef BUILD_LIBRARY
+    if (recipient->words[0] == 0xC0DE0001)
+        return CuEVM::precompile_operations::operation_TransparentAttacker(cached_call_state.gas_limit,
+                                                                           cached_call_state.gas_used, call_state_ptr);
+    if (call_state_ptr->byte_code_size == 4 && recipient->words[1] != 0)  // the fuzzable return address
+        return CuEVM::precompile_operations::operation_TransparentAttackerEnhanced(
+            cached_call_state.gas_limit, cached_call_state.gas_used, call_state_ptr, transaction_list_ptr);
+#endif
 
     if (call_state_ptr->byte_code_size == 0) {
         if (call_state_ptr->to.is_precompile()) {
@@ -216,6 +238,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
                                                                           cached_call_state.gas_used, call_state_ptr);
                 case 0x0a:
                     return ERROR_RETURN;
+
                 default:
                     return ERROR_RETURN;
                     break;
@@ -239,10 +262,10 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
 #endif
 
     int32_t error_code = start_CALL(cached_call_state);
-    // printf("error_code start_call: %d\n", error_code);
+    // printf("Thread %d error_code start_call: %d\n", INSTANCE_GLOBAL_IDX, error_code);
     if (error_code != ERROR_SUCCESS) {
 #ifdef BUILD_LIBRARY
-        global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(0, 0);
+        global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(0, 0, 0);
 #endif
         return;  // finish call
     }
@@ -286,6 +309,18 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         //     // }
         // }
 #endif
+
+        // if (INSTANCE_GLOBAL_IDX == DEBUG_THREAD) {
+        //     printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
+        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+        //            cached_call_state.gas_limit, cached_call_state.gas_used);
+
+        //     printf("\n\n");
+        //     cached_call_state.stack_ptr->print();
+        //     printf("\n\n call_state_ptr->memory_ptr %p \n", call_state_ptr->memory_ptr);
+        //     call_state_ptr->memory_ptr->print();
+        // }
 
 #ifdef BUILD_PYTHON_LIBRARY
         // comparison, arithmetic, revert/invalid
@@ -446,7 +481,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     break;
                 case OP_SHA3:
                     error_code = CuEVM::operations::SHA3(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                         *cached_call_state.stack_ptr, *call_state_ptr->memory_ptr);
+                                                         *cached_call_state.stack_ptr, *call_state_ptr->memory_ptr
+#ifdef BUILD_LIBRARY
+                                                         ,
+                                                         &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                    );
                     break;
                 case OP_ADDRESS:
                     error_code = CuEVM::operations::ADDRESS(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -515,7 +555,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     break;
                 case OP_BLOCKHASH:
                     error_code = CuEVM::operations::BLOCKHASH(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                              *cached_call_state.stack_ptr);
+                                                              *cached_call_state.stack_ptr
+#ifdef BUILD_GO_LIBRARY
+                                                              ,
+                                                              transaction_list_ptr
+#endif
+                    );
                     break;
                 case OP_COINBASE:
                     error_code = CuEVM::operations::COINBASE(cached_call_state.gas_limit, cached_call_state.gas_used,
@@ -689,7 +734,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     // TODO: fix this
                     error_code =
                         CuEVM::operations::SELFDESTRUCT(cached_call_state.gas_limit, cached_call_state.gas_used,
-                                                        *cached_call_state.stack_ptr, call_state_ptr);
+                                                        *cached_call_state.stack_ptr, call_state_ptr
+#ifdef BUILD_GO_LIBRARY
+                                                        ,
+                                                        &global_simplified_trace[INSTANCE_GLOBAL_IDX]
+#endif
+                        );
                     break;
 
                 default:
@@ -722,7 +772,12 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         //             error_code);
         //         }
         // #endif
-
+#ifdef BUILD_GO_LIBRARY
+        if (error_code == ERROR_FUZZING_STOP) {
+            // printf("CuEVM Debug: THREAD %d: ERR_FUZZING_STOP\n", INSTANCE_GLOBAL_IDX);
+            finish_TRANSACTION(error_code, false);
+        }
+#endif
         // all calls  + create
         if (opcode >= OP_CREATE && opcode <= OP_STATICCALL && opcode != OP_RETURN) {
             if (error_code == ERROR_SUCCESS) {
@@ -735,8 +790,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                 if (opcode == OP_CREATE || opcode == OP_CREATE2) {
                     global_simplified_trace[INSTANCE_GLOBAL_IDX].start_create();
                 } else {
-                    error_code = global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(call_state_ptr->parent->pc,
-                                                                                         call_state_ptr);
+                    global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(call_state_ptr->parent->pc, call_state_ptr);
                 }
 #endif
             } else if (opcode == OP_CREATE || opcode == OP_CREATE2) {
@@ -872,7 +926,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
 #endif
 
 #ifdef BUILD_GO_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].finalize_coverage_bitmap();
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finalize_coverage_bitmap(error_code);
 #endif
     // this->state_db_ptr->serialize_data(serialized_worldstate_data_ptr);
     // printf("updated final world state\n");
@@ -882,8 +936,11 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
 
 __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     evm_word_t child_success = 0;
-    // printf("finish_CALL thread %d, error_code %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, error_code,
-    //        call_state_ptr);
+
+    // if (INSTANCE_GLOBAL_IDX == DEBUG_THREAD) {
+    //     printf("finish_CALL thread %d, error_code %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, error_code,
+    //            call_state_ptr);
+    // }
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT) || (error_code == ERROR_INSUFFICIENT_FUNDS) ||
         (error_code == ERROR_MESSAGE_CALL_CREATE_NONCE_EXCEEDED) || error_code == ERROR_MESSAGE_CALL_DEPTH_EXCEEDED) {
         // give back the gas left from the child computation
@@ -913,7 +970,12 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         }
     }
 #ifdef BUILD_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, call_state_ptr->pc);
+    uint32_t pc = call_state_ptr->pc;
+    // random attacker does not have pc
+    if (pc == 0 && call_state_ptr->parent != nullptr) {
+        pc = call_state_ptr->parent->pc;
+    }
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, pc, call_state_ptr->from.words[0]);
 #endif
 
     uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
@@ -926,7 +988,6 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     // error_code,
     //        call_state_ptr->snapshot_state);
     if (error_code != ERROR_RETURN && call_state_ptr->snapshot_state != nullptr) {
-        // printf("\n\nRevert to previous depth %d \n\n", call_state_ptr->depth - 1);
         call_state_ptr->revert();
     }
 
@@ -942,9 +1003,14 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
 
         SnapshotState *snapshot_state = call_state_ptr->snapshot_state;
         // printf("Finish call, set parent snapshot state, current state %p\n", snapshot_state);
+
         if (snapshot_state != nullptr) {
             while (snapshot_state->next_state != nullptr) {
                 // printf("current snapshot chain %p\n", snapshot_state);
+                if (snapshot_state->next_state == snapshot_state) {
+                    snapshot_state->next_state = nullptr;
+                    break;
+                }
                 snapshot_state = snapshot_state->next_state;
             }
             snapshot_state->next_state = parent_call_state_ptr->snapshot_state;
@@ -952,6 +1018,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
             // Revert chain : new_parent -> chain -> old_parent
         }
         SnapshotState *new_parent_snapshot_state = CuEVM::memory_pool::get_snapshot_state();
+
         new_parent_snapshot_state->address = parent_call_state_ptr->to;
         new_parent_snapshot_state->storage_size = 0;
         new_parent_snapshot_state->touched_account_counts = 0;
@@ -966,7 +1033,9 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
 
         // free memory
         if (call_state_ptr->depth > memory_pool_call_context_preallocate) {
+            // printf("Thread %d delete call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
             delete call_state_ptr;
+
         } else {
             call_state_ptr->clear();
         }
@@ -1002,9 +1071,16 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(cached_call_state.gas_limit, cached_call_state.gas_used);
     uint32_t code_size = call_state_ptr->dynamic_ret_size;
+#ifdef BUILD_LIBRARY
+    if (code_size > MAX_RETURN_DATA_SIZE) {
+        // bounded return data size
+        return ERROR_RETURN;
+    }
+#endif
     if (error_code == ERROR_SUCCESS && code_size > 0) {
 #ifdef EIP_3541
         uint8_t *code = new uint8_t[code_size];
+        // printf("THREAD %d: code_size %u\n", INSTANCE_GLOBAL_IDX, code_size, );
         call_state_ptr->parent->copy_return_data(code, 0, code_size);
 #endif
 

@@ -73,99 +73,16 @@ __host__ void serialized_worldstate_data::print() {
     }
 }
 
-/*
-Deprecated: use update_coverage_bitmap_with_distance and update_bugs instead
-__device__ void simplified_trace_data::update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug) {
-    // printf("thread %d update_coverage_bitmap pc_src %u pc_dst %u\n", threadIdx.x, pc_src, pc_dst);
-    uint32_t branch_id = (static_cast<uint32_t>(pc_src) << 16) | pc_dst;
-    // printf("thread %d branch_id %x\n", threadIdx.x, branch_id);
-    uint32_t h1 = 2166136261U;
-    h1 = (h1 ^ (branch_id & 0xFF)) * 16777619U;
-    h1 = (h1 ^ ((branch_id >> 8) & 0xFF)) * 16777619U;
-    h1 = (h1 ^ ((branch_id >> 16) & 0xFF)) * 16777619U;
-    h1 = (h1 ^ (branch_id >> 24)) * 16777619U;
-
-    uint32_t h2 = (branch_id * 2654435761U) & 0xFFFFFFFF;
-    bool is_new = false;
-
-    // Double hashing for k=2
-    // TODO: double check
-    for (int i = 0; i < 2; ++i) {
-        uint32_t hash_i = (h1 + i * h2) & 0x3FFFF;  // 2^18 - 1
-        uint32_t index = hash_i >> 5;               // Divide by 32
-        uint32_t bit_pos = hash_i & 31;             // Modulo 32
-        unsigned int mask = 1U << bit_pos;
-
-        // Set bit and check if it was newly set
-        unsigned int old = atomicOr(&g_coverage_bitmap[index], mask);
-        if (!(old & mask)) {
-            is_new = true;
-        }
-    }
-    // Record new branch
-    if (is_new) {
-        int bitmap_idx = INSTANCE_GLOBAL_IDX / 32;
-        int bit_pos = INSTANCE_GLOBAL_IDX % 32;
-        atomicOr(&g_new_coverage_bitmap[bitmap_idx], 1 << bit_pos);
-        // printf("thread %d bitmap_idx %d bit_pos %d  new branch or bug \n", INSTANCE_GLOBAL_IDX, bitmap_idx, bit_pos);
-        if (is_bug) {
-            // printf("thread %d is bug, add to bug list \n", threadIdx.x);
-            int idx = atomicAdd(g_new_bug_count, 1);
-            if (idx < CuEVM::MAX_NEW_BUGS) {
-                g_new_bug_idx[idx] = INSTANCE_GLOBAL_IDX;
-                g_new_bug_pc[idx] = pc_src;
-            }
-        }
-    }
-}
-*/
-/* // template code, to remove
-__device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint32_t pc_src, uint32_t pc_dst,
-                                                                            uint8_t distance_bits) {
-    uint32_t bitmap_idx = ((pc_src >> 1) ^ pc_dst) % BITMAP_SIZE;
-    printf("thread %d update_coverage_bitmap_with_distance pc_src %u pc_dst %u distance_bits %u, bitmap_idx %u\n",
-           INSTANCE_GLOBAL_IDX, pc_src, pc_dst, distance_bits, bitmap_idx);
-    unsigned int old_dist = g_coverage_bitmap[bitmap_idx];
-    unsigned int prev_dist = atomicMin(&g_coverage_bitmap[bitmap_idx], distance_bits);
-    if (distance_bits < old_dist) {
-    }
-}
-
-__device__ void simplified_trace_data::update_bugs(uint32_t pc, uint8_t bug_type) {
-    // use global array to record bugs. Search through exsiting bug list and add new bug if not found
-    uint32_t bug_id = pc << 16 | bug_type;
-    for (int i = 0; i < g_total_bug_count; i++) {
-        if (g_bug_list[i] == bug_id) {
-            return;
-        }
-    }
-    // add new bug, atomic add to g_total_bug_count, persist across kernels
-    int idx = atomicInc(g_total_bug_count, CuEVM::MAX_NEW_BUGS);
-    if (idx < CuEVM::MAX_NEW_BUGS) {
-        g_total_bug_list[idx] = bug_id;
-        g_total_bug_idx[idx] = INSTANCE_GLOBAL_IDX;  // for reconstructing on CPU side
-    }
-}
-*/
-
 // Simplified coverage: Pure AFL simple hash (shift + XOR) for max performance, single atomicMin
 __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint32_t pc_src, uint32_t pc_dst,
                                                                             uint32_t pc_missed, uint8_t distance_bits) {
     // AFL simple hash: Extremely fast (shift + XOR), citable from AFL (widely used in fuzzing papers)
-    // printf(
-    //     "thread %d update_coverage_bitmap_with_distance pc_src %u pc_dst %u pc_missed %u distance_bits %u "
-    //     "current_account_id %x\n",
-    //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, distance_bits, current_account_id);
+
     uint32_t afl_hash_covered = (pc_src << 1) ^ pc_dst ^ current_account_id;
     uint32_t afl_hash_missed = (pc_src << 1) ^ pc_missed ^ current_account_id;
 
     uint32_t bitmap_idx_covered = afl_hash_covered % BITMAP_SIZE;
     uint32_t bitmap_idx_missed = afl_hash_missed % BITMAP_SIZE;
-
-    // printf(
-    //     "thread %d update_coverage_bitmap_with_distance pc_src %u pc_dst %u pc_missed %u distance_bits %u, "
-    //     "bitmap_idx_covered %u, bitmap_idx_missed %u\n",
-    //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, distance_bits, bitmap_idx_covered, bitmap_idx_missed);
 
     unsigned int prev_dist = atomicAdd(&g_events_bitmap[bitmap_idx_covered], 1);
     // printf("thread %d atomic add prev_dist %x\n", INSTANCE_GLOBAL_IDX, prev_dist);
@@ -175,7 +92,7 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
         //     "thread %d update_coverage_bitmap_with_distance covered branch pc_src %u pc_dst %u pc_missed %u, "
         //     "prev_dist %u\n",
         //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, prev_dist);
-        last_covered_branch_id = afl_hash_covered + 1;  // +1 to avoid 0
+        last_covered_branch_id = bitmap_idx_covered + 1;  // +1 to avoid 0
     }
     uint32_t dist_compare = (255 - distance_bits) << 24;  // first 8 bits are distance bit of the branch
     // update missed branch
@@ -200,6 +117,7 @@ __device__ __forceinline__ uint32_t fnv1a(uint32_t value) {
     return hash;
 }
 __device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint16_t storage_slot, uint8_t is_write) {
+    if (current_account_id == REENTRANCY_ATTACKER_ADDRESS) return;
     // printf("thread %d update_storage_coverage pc %u storage_slot %u is_write %u current_account_id %u\n",
     //        INSTANCE_GLOBAL_IDX, pc, storage_slot, is_write, current_account_id);
     uint32_t storage_hash_id =
@@ -247,7 +165,7 @@ __device__ void simplified_trace_data::add_bugs_for_later(uint32_t pc, uint8_t b
 // Completed bugs: FNV-1a hash (citable, e.g., from Fowler–Noll–Vo papers) + quadratic probing (optimized, bounded)
 __device__ void simplified_trace_data::update_bugs(uint32_t bug_id) {
     // uint32_t bug_id = (pc << 16) | bug_type;  // Unique ID
-    // printf("thread %d update_bugs pc %u bug_type %u bug_id 0x%08x\n", INSTANCE_GLOBAL_IDX, pc, bug_type, bug_id);
+    // printf("thread %d update_bugs bug_id 0x%08x\n", INSTANCE_GLOBAL_IDX, bug_id);
     // FNV-1a:
     uint32_t hash = fnv1a(bug_id);
 
@@ -280,7 +198,7 @@ __device__ void simplified_trace_data::update_bugs(uint32_t bug_id) {
     }
 }
 
-__device__ void simplified_trace_data::finalize_coverage_bitmap() {
+__device__ void simplified_trace_data::finalize_coverage_bitmap(int32_t error_code) {
     // printf("thread %d finalize_coverage_bitmap last_covered_branch_id %u last_missed_branch_id %u\n",
     //        INSTANCE_GLOBAL_IDX, last_covered_branch_id, last_missed_branch_id);
     if (last_covered_branch_id != 0) {
@@ -308,20 +226,17 @@ __device__ void simplified_trace_data::finalize_coverage_bitmap() {
         }
     }
 
-    if (no_bugs > 0) {
-        // printf("thread %d finalize_coverage_bitmap no_bugs %d\n", INSTANCE_GLOBAL_IDX, no_bugs);
-        // for (uint32_t i = 0; i < no_bugs; i++) {
-        //     printf("bug %x state_written %d\n", bugs[i], state_written);
-        // }
-        if (state_written) {
-            // printf("thread %d finalize_coverage_bitmap state_written %d\n", INSTANCE_GLOBAL_IDX, state_written);
-            for (uint32_t i = 0; i < no_bugs; i++) {
-                // printf("thread %d add bug %x state_written %d\n", INSTANCE_GLOBAL_IDX, bugs[i], state_written);
-                uint8_t bug_type = static_cast<uint8_t>((bugs[i] >> 8) & 0xFF);
+    // add bugs that require sucess tx
+    if (no_bugs > 0 && (error_code == ERROR_SUCCESS || error_code == ERROR_RETURN)) {
+        // printf("thread %d finalize_coverage_bitmap state_written %d\n", INSTANCE_GLOBAL_IDX, state_written);
+        for (uint32_t i = 0; i < no_bugs; i++) {
+            // printf("thread %d add bug %x state_written %d\n", INSTANCE_GLOBAL_IDX, bugs[i], state_written);
+            uint8_t bug_type = static_cast<uint8_t>((bugs[i] >> 8) & 0xFF);
 
-                if (bug_type == BUG_INTEGER_OVERFLOW || bug_type == BUG_INTEGER_UNDERFLOW) {
-                    if (state_written) update_bugs(bugs[i]);
-                }
+            if (bug_type == BUG_INTEGER_BUG) {
+                if (state_written) update_bugs(bugs[i]);
+            } else {
+                update_bugs(bugs[i]);
             }
         }
     }
@@ -347,22 +262,6 @@ __device__ void simplified_trace_data::finalize_coverage_bitmap() {
 
     // printf("g_new_coverage_count %d\n", g_new_coverage_count[0]);
 }
-
-/*
-__device__ void simplified_trace_data::start_operation(const uint32_t pc, const uint8_t op,
-                                                       const CuEVM::evm_stack_t& stack_ptr) {
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    events[no_events].pc = pc;
-    events[no_events].op = op;
-    if (op != OP_INVALID && op != OP_SELFDESTRUCT) {
-        // printf("add new operation, src data %d \n", THREADIDX);
-        // printf("stack size %d\n", stack_ptr.size());
-
-        events[no_events].operand_1 = *stack_ptr.get_address_at_index(1);
-        events[no_events].operand_2 = *stack_ptr.get_address_at_index(2);
-    }
-}
-*/
 
 __device__ bool simplified_trace_data::increase_branch_count() {
     if (no_branches >= MAX_BRANCHES_TRACING) {
@@ -392,12 +291,10 @@ __device__ bool simplified_trace_data::record_branch(uint32_t pc_src, uint32_t p
     // pc_src,
     //        pc_dst, pc_missed, distance_bits);
     // go library: branch info is recorded on CPU side
-    update_coverage_bitmap_with_distance(pc_src, pc_dst, pc_missed, distance_bits);
-#else
-    branches[no_branches].pc_src = pc_src;
-    branches[no_branches].pc_dst = pc_dst;
-    branches[no_branches].pc_missed = pc_missed;
-    branches[no_branches].distance = last_distance;
+    // TODO Aug: remove this check after we bypass logic of two attackers
+    if (current_account_id != REENTRANCY_ATTACKER_ADDRESS && current_account_id != RANDOM_ATTACKER_ADDRESS &&
+        no_branches > 0)  // skip first branch
+        update_coverage_bitmap_with_distance(pc_src, pc_dst, pc_missed, distance_bits);
 #endif
 
     no_branches++;
@@ -409,7 +306,7 @@ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::
     evm_word_t* op1 = stack_ptr.get_address_at_index(1);
     evm_word_t* op2 = stack_ptr.get_address_at_index(2);
     uint32_t stack_size = stack_ptr.size();
-
+    if (stack_size < 2) return;
     if (uint256_cmp(op1, op2) >= 1)
         uint256_sub(&distance, op1, op2);
     else
@@ -420,77 +317,107 @@ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::
     last_distance = distance;
 }
 
-/*
-__device__ void simplified_trace_data::record_operation(const uint32_t pc, const uint8_t op) {
-    // for simple trace, no need stack content
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    events[no_events].pc = pc;
-    events[no_events].op = op;
-    no_events++;
-}
-
-__device__ void simplified_trace_data::finish_operation(const CuEVM::evm_stack_t& stack_ptr, uint32_t error_code) {
-    if (no_events >= MAX_TRACE_EVENTS) return;
-    if (events[no_events].op < OP_REVERT && events[no_events].op != OP_SSTORE)
-        events[no_events].res = *stack_ptr.get_address_at_index(1);
-    no_events++;
-}
-*/
-__device__ int simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
+__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
     assert(call_context_ptr != nullptr);
-    // printf("thread %d start_call pc %u current_account_id %x\n", INSTANCE_GLOBAL_IDX, pc, current_account_id);
+    // if (current_account_id != 0)
+    //     printf("thread %d start_call pc %u current_account_id %x\n", INSTANCE_GLOBAL_IDX, pc, current_account_id);
 #ifdef BUILD_GO_LIBRARY
 
-    no_branches += 20;  // call saturates the branch limit faster than normal jumps
-    // state_written = true;
+    no_branches += 10;  // call saturates the branch limit faster than normal jumps
+                        // state_written = true;
 #endif
     if (no_calls >= MAX_CALLS_TRACING) return;
     // add address and increment current_address_idx
     // addresses[current_address_idx] = cached_call_state->addresses[cached_call_state->current_address_idx];
     // printf("start call simplified trace data pc %d no calls %d\n", pc, no_calls);
-    calls[no_calls].sender_id = call_context_ptr->from.words[0] & 0xffff;
-    current_account_id = call_context_ptr->to.words[0] & 0xffff;
+    calls[no_calls].sender_id = call_context_ptr->from.words[0];  // & 0xffff;
+    current_account_id = call_context_ptr->to.words[0];           // & 0xffff;
     calls[no_calls].receiver_id = current_account_id;
+    // printf("thread %d start_call sender_id %x receiver_id %x\n", INSTANCE_GLOBAL_IDX, calls[no_calls].sender_id,
+    //        calls[no_calls].receiver_id);
     calls[no_calls].pc = pc;
     calls[no_calls].op = call_context_ptr->call_type;
-    calls[no_calls].value = call_context_ptr->value;
-    if (calls[no_calls].value.words[0] != 0) {
+    if (call_context_ptr->parent != nullptr) {
+        calls[no_calls].value_leaking = uint256_cmp(&call_context_ptr->value, &call_context_ptr->parent->value) > 0;
+    } else {
+        calls[no_calls].value_leaking = false;
+    }
+    calls[no_calls].call_data_size = call_context_ptr->call_data_size;
+    if (calls[no_calls].call_data_size > 0) {
+        calls[no_calls].first_byte_call_data = call_context_ptr->call_data[0];
+    }
+
+    if (call_context_ptr->value.words[0] != 0) {
         state_written = true;  // transfer = true
     }
     calls[no_calls].error_code = RESERVED_ERROR_CODE;
     calls[no_calls].last_pc = 0;
     no_calls++;
-    if (no_calls > MAX_RECURSION) {
-        // printf("\nThread %d: No calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
-        uint8_t loop_found = 0;
-        // loop back 10 calls and check if we found loops
-        for (int i = no_calls - 2; i >= no_calls - MAX_RECURSION; i--) {
-            if (calls[i].receiver_id == calls[no_calls - 1].receiver_id) {
-                loop_found++;
-            }
-        }
-        // printf("Thread %d: Loop found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
 
-        if (loop_found >= MAX_RECURSION / 2) {
-            // printf("\nThread %d: Reentrancy detected, loop_found %d\n", INSTANCE_GLOBAL_IDX, loop_found);
-            return ERROR_REENTRANCY;
-        }
-    }
-
-    return ERROR_SUCCESS;
+    // return ERROR_SUCCESS;
 }
 __device__ void simplified_trace_data::start_create() {
     // printf("thread %d finish_create no_branches %d\n", INSTANCE_GLOBAL_IDX, no_branches);
     no_branches += MAX_BRANCHES_TRACING / 2;
     state_written = true;
 }
-__device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc) {
-    // printf("thread %d finish_call error_code %u last_pc %u depth %u\n", INSTANCE_GLOBAL_IDX, error_code, last_pc,
-    //        depth);
-#ifdef BUILD_GO_LIBRARY
-    no_branches += 2;
-#endif
-    if (no_calls > MAX_CALLS_TRACING) return;
+__device__ void simplified_trace_data::selfdestruct_oracle(uint32_t pc) {
+    // printf("thread %d selfdestruct_oracle\n", INSTANCE_GLOBAL_IDX);
+    if (calls[0].sender_id == RANDOM_ATTACKER_ADDRESS)
+        update_bugs(pc << 16 | BUG_SELF_DESTRUCT << 8 | (current_account_id & 0xFF));
+}
+
+__device__ void simplified_trace_data::reentrancy_oracle(uint32_t pc) {
+    // printf("thread %d reentrancy_oracle pc %u\n", INSTANCE_GLOBAL_IDX, pc);
+    update_bugs(pc << 16 | BUG_REENTRANCY << 8 | (current_account_id & 0xFF));
+}
+__device__ void simplified_trace_data::leaking_ether_oracle(uint32_t pc) {
+    // printf("thread %d leaking_ether_oracle pc %u receiver_id %x\n", INSTANCE_GLOBAL_IDX, pc, receiver_id);
+
+    // printf("thread %d leaking_ether_oracle\n", INSTANCE_GLOBAL_IDX);
+    // update_bugs(pc << 16 | BUG_LEAKING_ETHER << 8 | (current_account_id & 0xFF));
+    add_bugs_for_later(pc, BUG_LEAKING_ETHER);
+}
+
+__device__ void simplified_trace_data::arbitrary_call_oracle(uint32_t pc, uint8_t first_byte_call_data) {
+    // Pack into single 32-bit value to avoid pc/data visibility races: value = (pc << 16) | first_byte_call_data
+    // Assumes pc fits in 16 bits.
+    uint32_t packed = (pc << 16) | (uint32_t)first_byte_call_data;
+    bool bug = false;
+    for (int i = 0; i < MAX_ARBITRARY_CALL_CHECK; i++) {
+        uint32_t stored = g_fuzzing_constants->arbitrary_call_check[i];
+
+        if (stored == packed) return;  // exact match already present
+
+        if (stored == 0) {
+            uint32_t prev = atomicCAS(&g_fuzzing_constants->arbitrary_call_check[i], 0, packed);
+            if (prev == 0 || prev == packed) return;  // claimed or identical inserted concurrently
+        } else {
+            // Same pc but different first byte? Compare high 16 bits.
+            if ((stored >> 16) == pc && (stored & 0xFFFFu) != (uint32_t)first_byte_call_data) {
+                bug = true;
+                break;
+            }
+        }
+    }
+
+    // same PC but different first byte
+    if (bug) add_bugs_for_later(pc, BUG_ARBITRARY_CALL);
+}
+
+__device__ void simplified_trace_data::invalid_opcode_oracle(uint32_t pc) {
+    update_bugs(pc << 16 | BUG_INVALID_OPCODE << 8 | (calls[0].receiver_id & 0xFF));
+}
+
+__device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc, uint32_t _current_account_id) {
+    // printf("thread %d finish_call error_code %u last_pc %u, no_calls %u\n", INSTANCE_GLOBAL_IDX, error_code, last_pc,
+    //        no_calls);
+
+    if (no_calls > MAX_CALLS_TRACING) {
+        // printf("THREAD %d no_calls > MAX_CALLS_TRACING, no_calls %d\n", INSTANCE_GLOBAL_IDX, no_calls);
+
+        return;
+    }
     int i;
     for (i = no_calls - 1; i >= 0; i--) {
         // Check if this call is marked as unfinished (using the sentinel value)
@@ -505,17 +432,28 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
             break;
         }
     }
-    if (i > 0) {
-        current_account_id = calls[i - 1].receiver_id;
-    }
+    if (i < 0) i = 0;
 
 #ifdef BUILD_GO_LIBRARY
-
     if (error_code == ERROR_INVALID_OPCODE) {
-        // update_coverage_bitmap(last_pc, 0, true);
-        // printf("thread %d add invalid bug %u\n", INSTANCE_GLOBAL_IDX, last_pc << 16 | BUG_INVALID_OPCODE);
-        update_bugs(last_pc << 16 | BUG_INVALID_OPCODE << 8 | (calls[0].receiver_id & 0xFF));
+        invalid_opcode_oracle(last_pc);
     }
+
+    if (no_calls > 1 && calls[i].receiver_id == RANDOM_ATTACKER_ADDRESS) {
+        // current value is greater than the first call value
+        if (calls[i].value_leaking) {
+            leaking_ether_oracle(last_pc);
+        }
+
+        if (calls[i].call_data_size > 1) {
+            // printf("arbitrary_call_oracle thread %d last_pc %u first_byte_call_data %x\n", INSTANCE_GLOBAL_IDX,
+            // last_pc,
+            //        calls[i].first_byte_call_data);
+            arbitrary_call_oracle(last_pc, calls[i].first_byte_call_data);
+        }
+    }
+
+    current_account_id = _current_account_id;
 
 #endif
 }
@@ -534,8 +472,9 @@ __host__ __device__ void simplified_trace_data::print() {
     // }
     printf("calls\n");
     for (uint32_t i = 0; i < no_calls; i++) {
-        printf("pc %u op %u sender_id %u receiver_id %u value %s error_code %u\n", calls[i].pc, calls[i].op,
-               calls[i].sender_id, calls[i].receiver_id, calls[i].value.to_hex(), calls[i].error_code);
+        printf("pc %u op %u sender_id %u receiver_id %u value_leaking %u first_byte_call_data %x error_code %u\n",
+               calls[i].pc, calls[i].op, calls[i].sender_id, calls[i].receiver_id, calls[i].value_leaking,
+               calls[i].first_byte_call_data, calls[i].error_code);
     }
     printf("branches\n");
 #ifndef BUILD_GO_LIBRARY
@@ -607,16 +546,20 @@ void freeTraceData(bool copy_state_data) {
 
 #ifdef BUILD_GO_LIBRARY
 // LCG parameters (commonly used for a 32-bit generator)
-#define LCG_A 1664525
-#define LCG_C 1013904223
-#define LCG_M 0xFFFFFFFF  // 2^32 - 1
+// #define LCG_A 1664525
+// #define LCG_C 1013904223
+// #define LCG_M 0xFFFFFFFF  // 2^32 - 1
+#define GLIBC_LCG_A 1103515245
+#define GLIBC_LCG_C 12345
 
 // AFL-style mutation configuration
-#define CHANCE_TO_CREATE_NEW_ADDRESS 1  // 1 percent
+#define CHANCE_TO_CREATE_NEW_ADDRESS 0  // 1 percent
 #define CHANCE_TO_SKIP_MUTATE 50        // percent we skip a marker
-#define CHANCE_HAVOC_MUTATION 6         // percent chance for havoc (stacked mutations)
-#define MAX_HAVOC_STACK 3               // maximum number of stacked mutations in havoc
-#define VALUE_MUTATE_INT32 7            // 2**(7*4*8) = 2**224
+#define CHANCE_TO_SKIP_MUTATE_VALUE 25  // percent we skip a marker
+// #define CHANCE_TO_SKIP_MUTATE_BLOCK 25  // percent we skip block mutation
+#define CHANCE_HAVOC_MUTATION 6  // percent chance for havoc (stacked mutations)
+#define MAX_HAVOC_STACK 3        // maximum number of stacked mutations in havoc
+#define VALUE_MUTATE_INT32 7     // 2**(7*4*8) = 2**224
 
 // Mutation context to reduce parameter passing
 struct MutationContext {
@@ -627,13 +570,24 @@ struct MutationContext {
 
 // Helper: Generate next random number
 __device__ __forceinline__ uint32_t next_rand(uint32_t& seed) {
-    seed = (LCG_A * seed + LCG_C) & LCG_M;
-    return seed;
+    // printf("Thread %d next_rand original seed %u\n", INSTANCE_GLOBAL_IDX, seed);
+    // seed = (LCG_A * seed + LCG_C) % LCG_M;
+    uint64_t temp = (uint64_t)GLIBC_LCG_A * seed + GLIBC_LCG_C;
+    seed = temp & 0x7FFFFFFF;  // Modulo 2^31
+    // printf("Thread %d next_rand seed %u\n", INSTANCE_GLOBAL_IDX, seed);
+    return seed;  // 31-bit output
 }
 
 // Helper: Get random in range [0, max)
 __device__ __forceinline__ uint32_t rand_range(uint32_t& seed, uint32_t max) {
+    // printf("Thread %d rand_range seed %u max %u\n", INSTANCE_GLOBAL_IDX, seed, max);
     return max == 0 ? 0 : next_rand(seed) % max;
+    // if (max == 0) return 0;
+    // uint32_t rand_val = next_rand(seed);
+    // printf("Thread %d rand_range seed %u max %u rand_val %u  rand_val %% max %u\n", INSTANCE_GLOBAL_IDX, seed,
+    // max,
+    //    rand_val, rand_val % max);
+    // return rand_val % max;
 }
 
 // AFL mutation types
@@ -816,33 +770,43 @@ __device__ uint32_t afl_mutate_byte_array(uint8_t* data, uint32_t data_length, u
 
 __device__ uint32_t mutate_block_values_senders(uint32_t seed, uint64_t* block_numbers, uint64_t* block_timestamps,
                                                 uint8_t* senders) {
+    // printf("Thread %d seed %d block_numbers orig %lu block_timestamps orig %lu\n", INSTANCE_GLOBAL_IDX, seed,
+    //        block_numbers[INSTANCE_GLOBAL_IDX], block_timestamps[INSTANCE_GLOBAL_IDX]);
     // block number first
     if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
+        // printf("Thread %d skip block mutation %d\n", INSTANCE_GLOBAL_IDX);
+        block_numbers[INSTANCE_GLOBAL_IDX] += 1;
+        block_timestamps[INSTANCE_GLOBAL_IDX] += 1;
         return seed;
     }
 
     uint32_t block_number = rand_range(seed, g_fuzzing_constants->block_number_delay_max);
     uint32_t block_timestamp = rand_range(seed, g_fuzzing_constants->block_timestamp_delay_max);
-
+    // printf("Thread %d mutated block_number %d block_timestamp %d seed %d\n", INSTANCE_GLOBAL_IDX, block_number,
+    //        block_timestamp, seed);
     if (block_timestamp == 0)
         block_number = 0;
     else
         block_number = block_number % block_timestamp;
-
-    block_numbers[INSTANCE_GLOBAL_IDX] = block_number;
-    block_timestamps[INSTANCE_GLOBAL_IDX] = block_timestamp;
-
+    // printf("Thread %d mutated block_number %d block_timestamp %d\n", INSTANCE_GLOBAL_IDX, block_number,
+    //        block_timestamp);
+    block_numbers[INSTANCE_GLOBAL_IDX] += block_number;
+    block_timestamps[INSTANCE_GLOBAL_IDX] += block_timestamp;
+    // printf("Thread %d mutated block_numbers %lu block_timestamps %lu\n", INSTANCE_GLOBAL_IDX,
+    //        block_numbers[INSTANCE_GLOBAL_IDX], block_timestamps[INSTANCE_GLOBAL_IDX]);
     senders[INSTANCE_GLOBAL_IDX] = rand_range(seed, g_fuzzing_constants->sender_counts);
-
+    // printf("Thread %d sender_counts %d sender %d seed %d\n", INSTANCE_GLOBAL_IDX, g_fuzzing_constants->sender_counts,
+    //        senders[INSTANCE_GLOBAL_IDX], seed);
     return seed;
 }
 
 __device__ uint32_t mutate_value(uint32_t seed, evm_word_t* value) {
-    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
+    if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE_VALUE) {
         return seed;
     }
-
-    for (int i = 0; i < VALUE_MUTATE_INT32; i++) {
+    // always mutate at least one value
+    uint32_t value_int_type = rand_range(seed, VALUE_MUTATE_INT32 - 1);
+    for (int i = 0; i < value_int_type + 1; i++) {
         value->words[i] = next_rand(seed);
     }
 
@@ -852,7 +816,7 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
     uint32_t seed = INSTANCE_GLOBAL_IDX + transaction_list_ptr->start_seed;
 
     uint32_t marker_idx = INSTANCE_GLOBAL_IDX / CUEVM_MUTATE_GROUP_SIZE;
-    // printf("thread %d marker_idx %d , marker offset %d seed %u\n", INSTANCE_GLOBAL_IDX, marker_idx,
+    // printf("thread %d marker_idx %d , marker offset %d seed %u \n", INSTANCE_GLOBAL_IDX, marker_idx,
     //        transaction_list_ptr->marker_offset[marker_idx], seed);
     int32_t marker_offset = transaction_list_ptr->marker_offset[marker_idx];
     uint32_t* marker_data;
@@ -869,17 +833,21 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
     seed = mutate_block_values_senders(seed, transaction_list_ptr->block_number, transaction_list_ptr->time_stamp,
                                        transaction_list_ptr->sender);
 
+    // printf("Thread %d sender %d, marker_size %d, seed %d\n", INSTANCE_GLOBAL_IDX,
+    //        transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX], marker_size, seed);
+
     if (marker_size == 0) return;
-    // if (INSTANCE_GLOBAL_IDX % CUEVM_MUTATE_GROUP_SIZE != 0) return;  // skip the first sequence in each group
 
     uint8_t* call_data = &transaction_list_ptr->call_data[transaction_list_ptr->call_data_offset[INSTANCE_GLOBAL_IDX]];
+    uint32_t distance_from_count =
+        g_fuzzing_constants->sender_counts - transaction_list_ptr->sender[INSTANCE_GLOBAL_IDX];
 
     for (int j = 0; j < marker_size; j++) {
         uint32_t element_offset = *marker_data++;
         uint32_t element_type = *marker_data++;
         uint32_t element_length = *marker_data++;
 
-        if (element_type == ELEMENT_VALUE_TYPE) {  // always mutate value
+        if (element_type == ELEMENT_VALUE_TYPE && distance_from_count != 1) {  // random attacker does not mutate value
             // printf("thread %d value mutation\n", INSTANCE_GLOBAL_IDX);
             seed = mutate_value(seed, &transaction_list_ptr->value[INSTANCE_GLOBAL_IDX]);
 
@@ -892,7 +860,7 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
             continue;
         }
 
-        if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE) {
+        if (rand_range(seed, 100) <= CHANCE_TO_SKIP_MUTATE && element_type != ELEMENT_ADDRESS_TYPE) {
             continue;
         }
 
@@ -900,21 +868,24 @@ __device__ void mutate_transaction_data(CuEVM::transaction::TransactionList* tra
             seed = afl_mutate_byte_array(call_data + element_offset, element_length, element_type, seed);
 
         } else if (element_type == ELEMENT_ADDRESS_TYPE) {  // address
-            if (rand_range(seed, 100) < CHANCE_TO_CREATE_NEW_ADDRESS) {
-                // printf("thread %d create new address\n", INSTANCE_GLOBAL_IDX);
-                MutationContext ctx = {.data = call_data + element_offset + 12, .length = 20, .seed = seed};
-                mutate_random_bytes(ctx);
-                seed = ctx.seed;
-            } else {
-                // select from the constants
-                uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
-                uint32_t random_index = rand_range(seed, address_constants_count);
+            // if (rand_range(seed, 100) < CHANCE_TO_CREATE_NEW_ADDRESS) {
+            //     // printf("thread %d create new address\n", INSTANCE_GLOBAL_IDX);
+            //     MutationContext ctx = {.data = call_data + element_offset + 12, .length = 20, .seed = seed};
+            //     mutate_random_bytes(ctx);
+            //     seed = ctx.seed;
+            // } else {
+            // select from the constants
+            uint32_t address_constants_count = g_fuzzing_constants->address_constants_count;
+            if (distance_from_count <= 2) address_constants_count += 3 - distance_from_count;
+            // distance_from_count == 1 // last address -> random attacker => use all address constants (+2)
+            // distance_from_count == 2 // last 2 address -> reentrancy attacker => use all address constants except
+            // random attacker (+1)
 
-                for (int i = 0; i < 20; i++) {
-                    call_data[element_offset + 12 + i] =
-                        g_fuzzing_constants->address_constants[random_index * 32 + 12 + i];
-                }
+            uint32_t random_index = rand_range(seed, address_constants_count);
+            for (int i = 0; i < 20; i++) {
+                call_data[element_offset + 12 + i] = g_fuzzing_constants->address_constants[random_index * 32 + 12 + i];
             }
+            // }
         }
     }
 }

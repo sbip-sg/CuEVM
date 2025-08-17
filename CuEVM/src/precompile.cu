@@ -1,6 +1,9 @@
 #include <CuEVM/gas_cost.cuh>
 #include <CuEVM/precompile.cuh>
 #include <CuEVM/utils/error_codes.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 namespace CuEVM {
 
 /**
@@ -410,15 +413,11 @@ __device__ int32_t operation_ecRecover(CuEVM::EccConstants *constants, CuEVM::ga
 #ifdef BUILD_GO_LIBRARY
         // bypass fuzzing mode
         // TODO: make it configurable
-        if (signature->v % 2 == 0) {
+        if (signature->v == 28 || signature->v == 27) {
             uint8_t *output = new uint8_t[32];
 
             size_t res = ERROR_SUCCESS;
             signer = 0;
-            //
-            // if (call_context->parent != nullptr) {
-            //     signer = call_context->parent->from;
-            // }
 #else
         // TODO: is not 27 and 28, only?
         if (signature->v == 28 || signature->v == 27) {
@@ -571,6 +570,88 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
     }
     return error_code;
 }
+
+#ifdef BUILD_LIBRARY
+__device__ int32_t operation_TransparentAttacker(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
+                                                 CuEVM::evm_call_context_t *call_context) {
+    // todo when optimizing, reentrancy attacker becomes a precompile
+    // printf("Thread %d: TransparentAttacker\n", INSTANCE_GLOBAL_IDX);
+    uint8_t *output = g_fuzzing_constants->return_buffer;
+    // printf("Thread %d TransparentAttacker return buffer: %p\n", INSTANCE_GLOBAL_IDX, output);
+    call_context->set_parent_return_data(output, RETURN_BUFFER_SIZE);
+    return ERROR_RETURN;
+}
+// todo when optimizing, reentrancy attacker becomes a precompile
+__device__ int32_t operation_TransparentAttackerEnhanced(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
+                                                         CuEVM::evm_call_context_t *call_context,
+                                                         const transaction::TransactionList *transaction_list_ptr) {
+    // todo when optimizing, attacker becomes a precompile
+    // printf("Thread %d: TransparentAttackerEnhanced\n", INSTANCE_GLOBAL_IDX);
+    // uint8_t *output = g_fuzzing_constants->return_buffer;
+    // // printf("Thread %d TransparentAttacker return buffer: %p\n", INSTANCE_GLOBAL_IDX, output);
+    // call_context->set_parent_return_data(output, RETURN_BUFFER_SIZE);
+
+    if (call_context->parent == nullptr) return ERROR_RETURN;
+    uint8_t *buf =
+        CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
+    memset(buf, 0, memory_pool_return_data_preallocate);  // Zero entire 128 bytes upfront for simplicity.
+    uint8_t mode = transaction_list_ptr->block_number[INSTANCE_GLOBAL_IDX] % 3;
+    uint8_t *start_ptr = nullptr;  // to copy 32 bytes to return data.
+    uint64_t word = 0;             // for randomly generated value
+    uint32_t seed = 0;
+    if (mode == 0) {
+        // start_ptr = g_fuzzing_constants->return_buffer;
+        buf[31] = 1;
+    } else if (mode == 1) {
+        // address: cast to uint160 for right-alignment
+
+        uint32_t indx = transaction_list_ptr->time_stamp[INSTANCE_GLOBAL_IDX] % 8;
+        // printf("Thread %d  address mode indx %d\n", INSTANCE_GLOBAL_IDX, indx);
+        uint8_t *src = (indx < g_fuzzing_constants->address_constants_count)
+                           ? g_fuzzing_constants->address_constants + indx * 32
+                           : g_fuzzing_constants->return_buffer;  // Fallback to return_buffer (assume zeros)
+        memcpy(buf, src, 32);
+    } else {
+        // number: direct uint256 value
+        seed = uint32_t(transaction_list_ptr->time_stamp[INSTANCE_GLOBAL_IDX]);
+        if (seed % 2 == 0) {
+            // Generate up to 2 uint32 words (high to low significance)
+            uint32_t word1 = 0, word2 = 0;
+            int count = 0;
+            uint32_t curr = seed * 1664525u + 1013904223u;
+            word1 = curr;
+            curr = curr * 1664525u + 1013904223u;
+            if (curr % 2 == 0) {
+                word2 = curr;
+            }
+            // Place big-endian bytes right-aligned
+            int byte_offset = 32 - count * 4;
+
+            buf[byte_offset++] = (word1 >> 24) & 0xFF;
+            buf[byte_offset++] = (word1 >> 16) & 0xFF;
+            buf[byte_offset++] = (word1 >> 8) & 0xFF;
+            buf[byte_offset++] = word1 & 0xFF;
+            buf[byte_offset++] = (word2 >> 24) & 0xFF;
+            buf[byte_offset++] = (word2 >> 16) & 0xFF;
+            buf[byte_offset++] = (word2 >> 8) & 0xFF;
+            buf[byte_offset++] = word2 & 0xFF;
+
+        } else {
+            seed = (seed * 1664525 + 1013904223) % 16;
+            uint8_t *src = (seed < g_fuzzing_constants->integer_constants_count)
+                               ? g_fuzzing_constants->integer_constants + seed * 32
+                               : g_fuzzing_constants->return_buffer;  // Fallback to return_buffer (assume zeros)
+            memcpy(buf, src, 32);
+        }
+    }
+
+    // printf("set_parent_return_data %u %u\n", data, size);
+    call_context->parent->dynamic_ret_size = memory_pool_return_data_preallocate;
+    call_context->dynamic_ret_size = memory_pool_return_data_preallocate;
+
+    return ERROR_RETURN;
+}
+#endif
 
 }  // namespace precompile_operations
 

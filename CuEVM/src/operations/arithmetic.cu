@@ -20,7 +20,7 @@ __device__ int32_t ADD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
 #ifdef BUILD_LIBRARY
         bool overflow = uint256_add_overflow(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
         if (overflow) {
-            simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_OVERFLOW);
+            simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_BUG);
         }
 #else
         uint256_add(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
@@ -53,7 +53,7 @@ __device__ int32_t MUL(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         // r < a or r < b
         if (uint256_cmp(stack->get_address_at_index(1), &r) == 1 ||
             uint256_cmp(stack->get_address_at_index(2), &r) == 1) {
-            if (!uint256_is_zero(&r)) simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_OVERFLOW);
+            if (!uint256_is_zero(&r)) simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_BUG);
         }
 #endif
         stack->reduce_size(2);
@@ -82,7 +82,7 @@ __device__ int32_t SUB(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         if (underflow) {
             // simple reducing FP:the common case to calculate uint256 0xff... mask
             if (!(uint256_is_zero(stack->get_address_at_index(1)) && stack->get_address_at_index(2)->words[0] == 1)) {
-                simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_UNDERFLOW);
+                simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_BUG);
             }
         }
 #else

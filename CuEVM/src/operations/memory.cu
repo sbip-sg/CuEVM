@@ -68,7 +68,6 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
         __shared__ uint8_t data[INSTANCES_PER_BLOCK][UINT256_BYTES];
         uint256_to_bytes(data[threadIdx.x], &value, UINT256_BYTES);
         error_code |= memory.set(data[threadIdx.x], UINT256_BYTES, memory_offset_u32, UINT256_BYTES);
-
     }
     return error_code;
 }

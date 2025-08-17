@@ -52,9 +52,12 @@ using CuEVM::transaction::TransactionList;
 // constexpr CONSTANT uint32_t BITMAP_SIZE_IN_INTS = BITMAP_SIZE_IN_BITS / 32;  // 8192 unsigned ints
 constexpr CONSTANT uint32_t BITMAP_SIZE = 65536;     // AFL size 64KB
 constexpr CONSTANT uint32_t MAX_NEW_BRANCHES = 512;  // per kenel launch
-constexpr CONSTANT uint32_t MAX_NEW_STORAGE = 128;   // per kenel launch
+constexpr CONSTANT uint32_t MAX_NEW_STORAGE = 64;    // per kenel launch
 constexpr CONSTANT uint32_t MAX_NEW_BUGS = 128;
+constexpr CONSTANT uint32_t MAX_NEW_MEMORY = 32768;       // per instance
+constexpr CONSTANT uint32_t MAX_RETURN_DATA_SIZE = 4096;  // per call
 
+constexpr CONSTANT uint32_t MAX_ARBITRARY_CALL_CHECK = 6;  // store 3 different calls
 // persistent state across kernel launches
 extern __device__ uint32_t* g_events_bitmap;
 extern __device__ uint32_t* g_total_bug_table;
@@ -81,22 +84,31 @@ extern __device__ GPUFeedbackCount* g_gpu_feedback_count;  // counter for intere
 #define ELEMENT_BOOL_TYPE 3
 
 // bug types
-#define BUG_INTEGER_OVERFLOW 0x01
-#define BUG_INTEGER_UNDERFLOW 0x02
-#define BUG_SELF_DESTRUCT 0x03
-#define BUG_LEAKING_ETHER 0x04
+#define BUG_INTEGER_BUG 0x01
+#define BUG_SELF_DESTRUCT 0x02
+#define BUG_LEAKING_ETHER 0x03
+#define BUG_ARBITRARY_CALL 0x04
+#define BUG_REENTRANCY 0x05
 #define BUG_INVALID_OPCODE 0xFF
 
+// special attacker address for oracles (last 32 bit)
+#define REENTRANCY_ATTACKER_ADDRESS 0xCAFECAFE
+#define RANDOM_ATTACKER_ADDRESS 0xC0DE0001
+// #define RANDOM_ATTACKER_ADDRESS 0xC0DE0002  // never appears in address dict
+
+#define RETURN_BUFFER_SIZE 128  // return buffer of reentrancy attacker.
 struct fuzzing_constants {
     uint8_t* address_constants;
     uint32_t address_constants_count;  // number of address constants
-    evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
+    // evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
     uint8_t* integer_constants;
     uint32_t integer_constants_count;  // number of uint256 constants
-    uint32_t block_number_delay_max = 60480;
-    uint32_t block_timestamp_delay_max = 604800;
-    evm_word_t* sender_list;  // sender list for fuzzing
+    uint32_t block_number_delay_max = 60480 * 2;
+    uint32_t block_timestamp_delay_max = 604800 * 4;  // 1 month
+    evm_word_t* sender_list;                          // sender list for fuzzing
     uint32_t sender_counts = 3;
+    uint8_t* return_buffer;                                   // for return data RETURN_BUFFER_SIZE
+    uint32_t arbitrary_call_check[MAX_ARBITRARY_CALL_CHECK];  // storing PC, first byte of call data pair
     __host__ __device__ void print();
 };
 // for fuzzing utilities
@@ -134,13 +146,12 @@ struct serialized_worldstate_data {
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
 #define MAX_CALLS_TRACING 32
-#define MAX_BRANCHES_TRACING 128  // only track this number of branches in one trace
+#define MAX_BRANCHES_TRACING 256  // only track this number of branches in one trace
 #define MAX_BUGS_TRACING 32       // only track this number of bugs in one tx
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
 #define MAX_FUZZING_LOOP_LIMIT 200
-// In fuzzing mode, Reentrancy is permitted and may be detected but will raise error flag after this amount
-#define MAX_RECURSION 8
+
 /**
  * @brief Structure for tracing simple EVM events.
  *
@@ -164,15 +175,15 @@ struct simple_event_trace {
  */
 struct call_trace {
     uint32_t pc;
+    uint32_t call_data_size;
+    uint32_t sender_id;    // unique identifer, last 8bit of address
+    uint32_t receiver_id;  // unique identifer, last 8bit of address
+    uint32_t last_pc;
+    bool value_leaking;
     uint8_t op;
-    // uint8_t address_idx;
-    // evm_word_t sender;
-    // evm_word_t receiver;
-    uint16_t sender_id;    // unique identifer, last 8bit of address
-    uint16_t receiver_id;  // unique identifer, last 8bit of address
-    evm_word_t value;
+    uint8_t first_byte_call_data;
     uint8_t error_code = RESERVED_ERROR_CODE;  // 0 or 1
-    uint32_t last_pc;                          // the last pc of the call before returning
+                                               // the last pc of the call before returning
     // todo add more depth + result etc
 };
 
@@ -210,9 +221,6 @@ struct simplified_trace_data {
 
     call_trace calls[MAX_CALLS_TRACING];
 
-    // uint32_t no_addresses = 0;
-    // uint32_t current_address_idx = 0;
-    // uint32_t no_events = 0;
     uint32_t no_calls = 0;
     uint32_t no_branches = 0;
     evm_word_t last_distance;         // use to track branch distance by comparison opcodes
@@ -220,8 +228,9 @@ struct simplified_trace_data {
     uint32_t last_missed_branch_id;   // use to track last branch id that has improved distance
     uint8_t last_distance_bits;       // use to track last distance bits
     uint8_t state_written = false;
-    uint16_t current_account_id = 0;
+    uint32_t current_account_id = 0;
     uint32_t no_bugs = 0;
+    uint8_t reentrancy_count = 0;
     uint32_t bugs[MAX_BUGS_TRACING];
 
     /**
@@ -263,6 +272,36 @@ struct simplified_trace_data {
     __device__ void add_bugs_for_later(uint32_t pc, uint8_t bug_type);
 
     /**
+     * @brief Add selfdestruct oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void selfdestruct_oracle(uint32_t pc);
+
+    /**
+     * @brief Add reentrancy oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void reentrancy_oracle(uint32_t pc);
+
+    /**
+     * @brief Add invalid opcode oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void invalid_opcode_oracle(uint32_t pc);
+
+    /**
+     * @brief Add leaking ether oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void leaking_ether_oracle(uint32_t pc);
+
+    /**
+     * @brief Add arbitrary call oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void arbitrary_call_oracle(uint32_t pc, uint8_t first_byte_call_data);
+
+    /**
      * @brief Begin recording an operation in the trace.
      * @param[in] pc The program counter.
      * @param[in] op The operation code.
@@ -290,7 +329,7 @@ struct simplified_trace_data {
      * @param[in] call_context_ptr The call context pointer.
      * @return The error code.
      */
-    __device__ int start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
+    __device__ void start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
 
     __device__ void start_create();
 
@@ -299,7 +338,7 @@ struct simplified_trace_data {
      * @param[in] success The success flag.
      * @param[in] last_pc The last program counter.
      */
-    __device__ void finish_call(uint8_t success, uint32_t last_pc);
+    __device__ void finish_call(uint8_t success, uint32_t last_pc, uint32_t _current_account_id);
 
     /**
      * @brief Record a branch operation.
@@ -329,7 +368,7 @@ struct simplified_trace_data {
     /**
      * @brief Finalize the coverage bitmap.
      */
-    __device__ void finalize_coverage_bitmap();
+    __device__ void finalize_coverage_bitmap(int32_t error_code);
 };
 
 /**
