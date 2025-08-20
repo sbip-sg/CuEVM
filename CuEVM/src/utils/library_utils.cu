@@ -93,6 +93,11 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
         //     "prev_dist %u\n",
         //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, prev_dist);
         last_covered_branch_id = bitmap_idx_covered + 1;  // +1 to avoid 0
+    } else {
+        // only track the last one
+        if (last_covered_branch_id != 0) {
+            last_covered_branch_id = bitmap_idx_covered + 1;  // +1 to avoid 0
+        }
     }
     uint32_t dist_compare = (255 - distance_bits) << 24;  // first 8 bits are distance bit of the branch
     // update missed branch
@@ -106,6 +111,12 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
         //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, distance_bits);
         last_missed_branch_id = bitmap_idx_missed + 1;  // +1 to avoid 0
         last_distance_bits = distance_bits;
+    } else {
+        // only track the last one
+        if (last_missed_branch_id != 0) {
+            last_missed_branch_id = bitmap_idx_missed + 1;  // +1 to avoid 0
+            last_distance_bits = distance_bits;
+        }
     }
 }
 __device__ __forceinline__ uint32_t fnv1a(uint32_t value) {
