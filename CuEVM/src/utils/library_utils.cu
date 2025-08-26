@@ -488,12 +488,6 @@ __host__ __device__ void simplified_trace_data::print() {
                calls[i].first_byte_call_data, calls[i].error_code);
     }
     printf("branches\n");
-#ifndef BUILD_GO_LIBRARY
-    for (uint32_t i = 0; i < no_branches; i++) {
-        printf("pc_src %u pc_dst %u distance %s\n", branches[i].pc_src, branches[i].pc_dst,
-               branches[i].distance.to_hex());
-    }
-#endif
 }
 __device__ serialized_worldstate_data* global_serialized_worldstate;
 __device__ simplified_trace_data* global_simplified_trace;
