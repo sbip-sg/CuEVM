@@ -9,7 +9,7 @@
 #include <CuEVM/utils/opcodes.cuh>
 #include <unordered_set>
 
-#define CUEVM_MUTATE_GROUP_SIZE 16  // same as fuzzer SkipSequenceSize
+#define CUEVM_MUTATE_GROUP_SIZE 32  // same as fuzzer SkipSequenceSize
 /**
  * @file library_utils.h
  * @brief Utility functions and data structures for library integration.
@@ -17,6 +17,28 @@
  * This file contains structures and utilities for data transfer between host and device,
  * execution tracing, and state serialization for the CuEVM library.
  */
+typedef struct {
+    uint32_t bug_thread_idx;  // Thread index
+    uint32_t bug_id;          // id of the bug (pc << 16 | bug_type) // to be decoded
+} BugInfoEntry;
+
+typedef struct {
+    uint32_t branch_thread_idx;  // Thread index
+    uint32_t branch_id;          // Branch ID (pc_src << 16 | pc_dst) // to be decoded
+} BranchInfoEntry;
+
+typedef struct {
+    uint32_t storage_thread_idx;  // Thread index
+    uint32_t
+        storage_id;  // Storage ID (account_idx (8bit) | storate_type (8bit) | storage_slot (16bit)) // to be decoded
+    // storage_type: 1 for write, 2 for read, 3 for balance
+} StorageInfoEntry;
+
+typedef struct {
+    uint32_t new_branch_count;
+    uint32_t new_bug_count;
+    uint32_t new_storage_count;
+} GPUFeedbackCount;
 
 // for convenient data transfer between host and device. set a fixed maximum size for the number of addresses to be
 // transferred
@@ -26,33 +48,67 @@ using CuEVM::transaction::TransactionList;
 
 // #ifdef BUILD_GO_LIBRARY
 // Constants
-constexpr CONSTANT uint32_t BITMAP_SIZE_IN_BITS = 262144;                    // 2^18 bits, ~32 KB
-constexpr CONSTANT uint32_t BITMAP_SIZE_IN_INTS = BITMAP_SIZE_IN_BITS / 32;  // 8192 unsigned ints
-constexpr CONSTANT uint32_t MAX_NEW_BRANCHES = 5000;
-constexpr CONSTANT uint32_t MAX_NEW_BUGS = 100;
-extern __device__ uint32_t* g_coverage_bitmap;
-extern __device__ uint32_t* g_new_coverage_bitmap;  // for each thread to set a flag if they encounter a new branch or a
-                                                    // bug (interesting)
-extern __device__ uint32_t* g_new_coverage_idx;
-extern __device__ uint32_t* g_new_coverage_count;
-// for bug detection tracking
-extern __device__ uint32_t* g_new_bug_idx;
-extern __device__ uint32_t* g_new_bug_pc;
-extern __device__ uint32_t* g_new_bug_count;
+// constexpr CONSTANT uint32_t BITMAP_SIZE_IN_BITS = 262144;                    // 2^18 bits, ~32 KB
+// constexpr CONSTANT uint32_t BITMAP_SIZE_IN_INTS = BITMAP_SIZE_IN_BITS / 32;  // 8192 unsigned ints
+constexpr CONSTANT uint32_t BITMAP_SIZE = 65536;     // AFL size 64KB
+constexpr CONSTANT uint32_t MAX_NEW_BRANCHES = 512;  // per kenel launch
+constexpr CONSTANT uint32_t MAX_NEW_STORAGE = 64;    // per kenel launch
+constexpr CONSTANT uint32_t MAX_NEW_BUGS = 128;
+constexpr CONSTANT uint32_t MAX_NEW_MEMORY = 32768;       // per instance
+constexpr CONSTANT uint32_t MAX_RETURN_DATA_SIZE = 4096;  // per call
+
+constexpr CONSTANT uint32_t MAX_ARBITRARY_CALL_CHECK = 6;  // store 3 different calls
+// persistent state across kernel launches
+extern __device__ uint32_t* g_events_bitmap;
+extern __device__ uint32_t* g_total_bug_table;
+extern __device__ uint32_t* g_total_bug_count;
+
+// event trackers, reset every kernel launch
+// extern __device__ uint32_t* g_new_coverage_bitmap;  // for each thread to set a flag if they encounter a new branch
+// or a
+extern __device__ BranchInfoEntry* g_new_branch_info;
+extern __device__ StorageInfoEntry* g_new_storage_info;
+extern __device__ BugInfoEntry* g_new_bug_info;
+extern __device__ GPUFeedbackCount* g_gpu_feedback_count;  // counter for interesting events, reset every kernel launch
+
+// // bug (interesting)
+// extern __device__ uint32_t* g_new_coverage_idx;
+// extern __device__ uint32_t* g_new_coverage_count;
+// // for bug detection tracking
+// extern __device__ uint32_t* g_new_bug_idx;
+// extern __device__ uint32_t* g_new_bug_pc;
+// extern __device__ uint32_t* g_new_bug_count;
 
 #define ELEMENT_ADDRESS_TYPE 1
 #define ELEMENT_VALUE_TYPE 2
+#define ELEMENT_BOOL_TYPE 3
 
+// bug types
+#define BUG_INTEGER_BUG 0x01
+#define BUG_SELF_DESTRUCT 0x02
+#define BUG_LEAKING_ETHER 0x03
+#define BUG_ARBITRARY_CALL 0x04
+#define BUG_REENTRANCY 0x05
+#define BUG_INVALID_OPCODE 0xFF
+
+// special attacker address for oracles (last 32 bit)
+#define REENTRANCY_ATTACKER_ADDRESS 0xCAFECAFE
+#define RANDOM_ATTACKER_ADDRESS 0xC0DE0001
+// #define RANDOM_ATTACKER_ADDRESS 0xC0DE0002  // never appears in address dict
+
+#define RETURN_BUFFER_SIZE 128  // return buffer of reentrancy attacker.
 struct fuzzing_constants {
     uint8_t* address_constants;
     uint32_t address_constants_count;  // number of address constants
-    evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
+    // evm_word_t* address_list;          // mirroring address constant but with evm_word_t type
     uint8_t* integer_constants;
     uint32_t integer_constants_count;  // number of uint256 constants
-    uint32_t block_number_delay_max = 60480;
-    uint32_t block_timestamp_delay_max = 604800;
-    evm_word_t* sender_list;  // sender list for fuzzing
+    uint32_t block_number_delay_max = 60480 * 2;
+    uint32_t block_timestamp_delay_max = 604800 * 4;  // 1 month
+    evm_word_t* sender_list;                          // sender list for fuzzing
     uint32_t sender_counts = 3;
+    uint8_t* return_buffer;                                   // for return data RETURN_BUFFER_SIZE
+    uint32_t arbitrary_call_check[MAX_ARBITRARY_CALL_CHECK];  // storing PC, first byte of call data pair
     __host__ __device__ void print();
 };
 // for fuzzing utilities
@@ -89,17 +145,13 @@ struct serialized_worldstate_data {
 
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
-#define MAX_CALLS_TRACING 64
-#ifdef BUILD_GO_LIBRARY
+#define MAX_CALLS_TRACING 32
 #define MAX_BRANCHES_TRACING 256  // only track this number of branches in one trace
-#else
-#define MAX_BRANCHES_TRACING 64  // only trace and return this number of branches in python lib mode, deprecated soon
-#endif
+#define MAX_BUGS_TRACING 32       // only track this number of bugs in one tx
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
 #define MAX_FUZZING_LOOP_LIMIT 200
-// In fuzzing mode, Reentrancy is permitted and may be detected but will raise error flag after this amount
-#define MAX_RECURSION 8
+
 /**
  * @brief Structure for tracing simple EVM events.
  *
@@ -123,13 +175,15 @@ struct simple_event_trace {
  */
 struct call_trace {
     uint32_t pc;
+    uint32_t call_data_size;
+    uint32_t sender_id;    // unique identifer, last 8bit of address
+    uint32_t receiver_id;  // unique identifer, last 8bit of address
+    uint32_t last_pc;
+    bool value_leaking;
     uint8_t op;
-    // uint8_t address_idx;
-    evm_word_t sender;
-    evm_word_t receiver;
-    evm_word_t value;
+    uint8_t first_byte_call_data;
     uint8_t error_code = RESERVED_ERROR_CODE;  // 0 or 1
-    uint32_t last_pc;                          // the last pc of the call before returning
+                                               // the last pc of the call before returning
     // todo add more depth + result etc
 };
 
@@ -162,24 +216,90 @@ struct branch_trace {
  * with methods to record various execution events.
  */
 struct simplified_trace_data {
-    simple_event_trace events[MAX_TRACE_EVENTS];
+    // simple_event_trace events[MAX_TRACE_EVENTS];
     // evm_word_t addresses[MAX_ADDRESSES_TRACING];
+
     call_trace calls[MAX_CALLS_TRACING];
-#ifndef BUILD_GO_LIBRARY                          // July disable branch recording, done on CPU
-    branch_trace branches[MAX_BRANCHES_TRACING];  // pc_src jump to pc_dest
-#endif
-    uint32_t no_addresses = 0;
-    // uint32_t current_address_idx = 0;
-    uint32_t no_events = 0;
+
     uint32_t no_calls = 0;
     uint32_t no_branches = 0;
-    evm_word_t last_distance;  // use to track branch distance by comparison opcodes
+    evm_word_t last_distance;         // use to track branch distance by comparison opcodes
+    uint32_t last_covered_branch_id;  // use to track last branch id that has improved distance
+    uint32_t last_missed_branch_id;   // use to track last branch id that has improved distance
+    uint8_t last_distance_bits;       // use to track last distance bits
+    uint8_t state_written = false;
+    uint32_t current_account_id = 0;
+    uint32_t no_bugs = 0;
+    uint8_t reentrancy_count = 0;
+    uint32_t bugs[MAX_BUGS_TRACING];
 
     /**
      * @brief Check if coverage exists.
      * @return True if coverage exists, false otherwise.
      */
-    __device__ void update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug = false);
+    // __device__ void update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug = false);
+
+    /**
+     * @brief Update the coverage bitmap with the distance between pc_src and pc_dst.
+     * @param[in] pc_src The source program counter.
+     * @param[in] pc_dst The destination program counter.
+     * @param[in] distance_bits The distance in number of bits before satisfying the jump.
+     */
+    __device__ void update_coverage_bitmap_with_distance(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed,
+                                                         uint8_t distance_bits);
+
+    /**
+     * @brief Update the storage coverage bitmap.
+     * @param[in] pc The program counter.
+     * @param[in] storage_slot The storage slot.
+     * @param[in] account_idx The account index.
+     * @param[in] is_write The write flag.
+     */
+    __device__ void update_storage_coverage(uint32_t pc, uint16_t storage_slot, uint8_t is_write);
+
+    /**
+     * @brief Update the bug table with the bug type.
+     * @param[in] pc The program counter.
+     * @param[in] bug_type The bug type
+     */
+    __device__ void update_bugs(uint32_t bug_id);
+
+    /**
+     * @brief Add bugs for later.
+     * @param[in] pc The program counter.
+     * @param[in] bug_type The bug type
+     */
+    __device__ void add_bugs_for_later(uint32_t pc, uint8_t bug_type);
+
+    /**
+     * @brief Add selfdestruct oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void selfdestruct_oracle(uint32_t pc);
+
+    /**
+     * @brief Add reentrancy oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void reentrancy_oracle(uint32_t pc);
+
+    /**
+     * @brief Add invalid opcode oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void invalid_opcode_oracle(uint32_t pc);
+
+    /**
+     * @brief Add leaking ether oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void leaking_ether_oracle(uint32_t pc);
+
+    /**
+     * @brief Add arbitrary call oracle.
+     * @param[in] pc The program counter.
+     */
+    __device__ void arbitrary_call_oracle(uint32_t pc, uint8_t first_byte_call_data);
 
     /**
      * @brief Begin recording an operation in the trace.
@@ -209,14 +329,16 @@ struct simplified_trace_data {
      * @param[in] call_context_ptr The call context pointer.
      * @return The error code.
      */
-    __device__ int start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
+    __device__ void start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
+
+    __device__ void start_create();
 
     /**
      * @brief Complete recording a call operation.
      * @param[in] success The success flag.
      * @param[in] last_pc The last program counter.
      */
-    __device__ void finish_call(uint8_t success, uint32_t last_pc);
+    __device__ void finish_call(uint8_t success, uint32_t last_pc, uint32_t _current_account_id);
 
     /**
      * @brief Record a branch operation.
@@ -225,6 +347,11 @@ struct simplified_trace_data {
      * @param[in] pc_missed The missed program counter.
      */
     __device__ bool record_branch(uint32_t pc_src, uint32_t pc_dst, uint32_t pc_missed);
+
+    /**
+     * @brief Increase the branch count.
+     */
+    __device__ bool increase_branch_count();
 
     /**
      * @brief Record the distance metric for a branch operation.
@@ -237,12 +364,12 @@ struct simplified_trace_data {
      * @brief Print the simplified trace data.
      */
     __device__ void print();
-};
 
-/**
- * @brief Finalize the coverage bitmap.
- */
-__device__ void finalize_coverage_bitmap();
+    /**
+     * @brief Finalize the coverage bitmap.
+     */
+    __device__ void finalize_coverage_bitmap(int32_t error_code);
+};
 
 /**
  * @brief Global serialized world state data.
@@ -253,7 +380,6 @@ extern __device__ serialized_worldstate_data* global_serialized_worldstate;
  * @brief Global simplified trace data.
  */
 extern __device__ simplified_trace_data* global_simplified_trace;
-
 /**
  * @brief Serialize state data from world state to the given data structure.
  * @param[out] data The data structure to serialize into.

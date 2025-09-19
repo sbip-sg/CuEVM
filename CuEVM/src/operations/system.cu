@@ -19,12 +19,6 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
                               ? ERROR_STATIC_CALL_CONTEXT_CALL_VALUE
                               : ERROR_SUCCESS);
 
-    // if (INSTANCE_GLOBAL_IDX == 1) {
-    //     printf("call \n");
-    //     new_context_ptr->to.print();
-    //     new_context_ptr->value.print();
-    // }
-
     // replace gas_used, throw away after the call
     // because we did not increase_memory_cost between expansions
     gas_t temp_memory_gas_used = 0;
@@ -107,7 +101,21 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
                 CuEVM::global_state_db_ptr->get_code(new_context_ptr->byte_code_size, contract_address_ptr);
             new_context_ptr->bytecode_offset = find_global_bytecode_offset(contract_address_ptr);
         }
-
+#ifdef BUILD_LIBRARY
+        if (new_context_ptr->from.words[0] == REENTRANCY_ATTACKER_ADDRESS) {
+            // printf("Thread %d bypass args logic for reentrancy attacker\n", INSTANCE_GLOBAL_IDX);
+            // bypass args logic for reentrancy attacker
+            CuEVM::evm_call_context_t *parent_context = new_context_ptr->parent;
+            while (parent_context->parent != nullptr) {
+                parent_context = parent_context->parent;
+            }
+            new_context_ptr->call_data = parent_context->call_data;
+            new_context_ptr->call_data_size = parent_context->call_data_size;
+            new_context_ptr->value = parent_context->value;
+            // calldata belong to the memory structure, safe to use without needing to free later.
+            return ERROR_SUCCESS;
+        }
+#endif
         uint8_t *call_data = nullptr;
         if (uint256_cmp_word(args_size, 0) > 0)
             error_code |= parent_memory_ptr->get(args_offset_ui32, args_size_ui32, call_data);
@@ -226,10 +234,10 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
             CuEVM::global_state_db_ptr->update_nonce(&current_context->to,
                                                      CuEVM::global_state_db_ptr->get_nonce(&current_context->to) + 1);
         }
-        if (THREADIDX == 1) {
-            printf("CREATE contract address\n");
-            contract_address.print();
-        }
+        // if (THREADIDX == 1) {
+        //     printf("CREATE contract address\n");
+        //     contract_address.print();
+        // }
         CuEVM::global_state_db_ptr->update_nonce(&contract_address, 1);
     }
 
@@ -498,6 +506,10 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (error_code == ERROR_SUCCESS) {
         // printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
         // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
+        // if (length_ui32 > 2048) {
+        //     printf("THREAD %d RETURN : set return data %u %u\n", INSTANCE_GLOBAL_IDX, memory_offset_ui32,
+        //     length_ui32);
+        // }
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
         error_code = ERROR_RETURN;
     }
@@ -533,7 +545,10 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         // memory.increase_memory_cost(memory_expansion_cost);
-        // printf("REVERT : set return data %u %u\n", memory_offset_ui32, length_ui32);
+        // if (length_ui32 > 2048) {
+        //     printf("THREAD %d REVERT : set return data %u %u\n", INSTANCE_GLOBAL_IDX, memory_offset_ui32,
+        //     length_ui32);
+        // }
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
         // error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
         error_code = ERROR_REVERT;
@@ -559,7 +574,12 @@ __device__ int32_t INVALID() { return ERROR_INVALID_OPCODE; }
  * @return 0 if the operation is successful, otherwise the error code.
  */
 __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                                CuEVM::evm_call_context_t *call_context) {
+                                CuEVM::evm_call_context_t *call_context
+#ifdef BUILD_GO_LIBRARY
+                                ,
+                                CuEVM::simplified_trace_data *trace_data
+#endif
+) {
     int32_t error_code = ERROR_SUCCESS;
     if (call_context->static_env) {
         error_code = ERROR_STATIC_CALL_CONTEXT_SELFDESTRUCT;
@@ -593,6 +613,9 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
             if (call_context->depth > 1) call_context->parent->dynamic_ret_size = 0;
             error_code |= ERROR_RETURN;
         }
+#ifdef BUILD_GO_LIBRARY
+        trace_data->selfdestruct_oracle(call_context->pc);
+#endif
     }
     return error_code;
 }

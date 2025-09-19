@@ -46,8 +46,12 @@ namespace CuEVM::operations {
  * @param[inout] memory The memory object.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t SHA3(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack,
-                        CuEVM::evm_memory_t &memory);
+__device__ int32_t SHA3(const gas_t &gas_limit, gas_t &gas_used, CuEVM::evm_stack_t &stack, CuEVM::evm_memory_t &memory
+#ifdef BUILD_LIBRARY
+                        ,
+                        void *simplified_trace_data_ptr
+#endif
+);
 
 /**
  * The ADDRESS operation implementation.

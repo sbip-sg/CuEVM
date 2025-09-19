@@ -5,6 +5,9 @@
 #include <CuEVM/core/evm_word.cuh>
 #include <CuEVM/utils/error_codes.cuh>
 #include <CuEVM/utils/evm_defines.cuh>
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 namespace CuEVM::memory {
 
 // experimental, not used
@@ -13,9 +16,10 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
     uint32_t lane_id = threadIdx.x % 32;
     unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
-    
-    // printf("warp_cooperative_set thread %d, num_active_threads %u, length %u ptr1 %p ptr2 %p\n", INSTANCE_GLOBAL_IDX, num_active_threads, length, ptr1, ptr2);
-    
+
+    // printf("warp_cooperative_set thread %d, num_active_threads %u, length %u ptr1 %p ptr2 %p\n", INSTANCE_GLOBAL_IDX,
+    // num_active_threads, length, ptr1, ptr2);
+
     // TODO : interleaving inactive threads
     // Iterate over each thread in the warp
 #pragma unroll
@@ -81,12 +85,17 @@ __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
 __device__ void evm_memory_t::print() const {
     printf("Memory data: \n");
     printf("Size: %d\n", size);
+    printf("preallocated_base_offset %u memory_prealloc_size %u\n", preallocated_base_offset);
+    printf(
+        "Preallocated base %p\n",
+        &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + preallocated_base_offset]);
     printf("Memory cost: %lu\n", memory_cost);
     printf("\n");
     for (uint32_t i = 0; i < size; i++) {
         // if (i == 228) printf("---debug---\n");
         if (preallocated_base_offset + i < memory_prealloc_size) {
-            printf("%02x", memory_pool::preallocated_memory_base[preallocated_base_offset + i]);
+            printf("%02x", memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
+                                                                 preallocated_base_offset + i]);
         } else {
             printf("%02x", dynamic_data[preallocated_base_offset + i - memory_prealloc_size]);
         }
@@ -109,6 +118,13 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
 #ifdef DEBUG_PERF
             printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
                    INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
+#endif
+#ifdef BUILD_LIBRARY
+            if (new_size > MAX_NEW_MEMORY) {
+                // printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
+                //        INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
+                return ERROR_OUT_OF_GAS;
+            }
 #endif
             // allocate new page
             uint8_t *new_data = new uint8_t[new_size + preallocated_base_offset - memory_prealloc_size];
@@ -245,8 +261,7 @@ __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint
     uint32_t to_copy = (src != nullptr) ? ((src_available < bytes) ? src_available : bytes) : 0;
     unsigned active_mask = __activemask();
     uint32_t num_active_threads = __popc(active_mask);
-    // printf("copy_with_padding thread %d num_active_threads %d to_copy %d bytes %d\n", THREADIDX, num_active_threads,
-    // to_copy, bytes);
+
     if (src != nullptr && to_copy > 0) {
         // memcpy(dest, src, to_copy);
         if (num_active_threads == 32)
@@ -358,7 +373,7 @@ __device__ int32_t evm_memory_t::set_buffer_data(uint8_t *data_, uint32_t data_o
 
     // Grow the memory as needed.
     error_code |= grow(index + length);
-    // if (error_code != ERROR_SUCCESS) return error_code;
+    if (error_code != ERROR_SUCCESS) return error_code;
 
     uint32_t total_offset = preallocated_base_offset + index;
 

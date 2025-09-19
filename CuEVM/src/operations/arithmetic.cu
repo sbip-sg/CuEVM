@@ -3,7 +3,12 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM::operations {
-__device__ int32_t ADD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t *stack) {
+__device__ int32_t ADD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t *stack
+#ifdef BUILD_LIBRARY
+                       ,
+                       uint32_t pc, simplified_trace_data *simplified_trace_data_ptr
+#endif
+) {
     gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -12,14 +17,26 @@ __device__ int32_t ADD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
             return ERROR_STACK_UNDERFLOW;
         }
         // r = a + b;
+#ifdef BUILD_LIBRARY
+        bool overflow = uint256_add_overflow(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
+        if (overflow) {
+            simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_BUG);
+        }
+#else
         uint256_add(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
+#endif
         stack->reduce_size(2);
         error_code |= stack->push(r);
     }
     return error_code;
 }
 
-__device__ int32_t MUL(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t *stack) {
+__device__ int32_t MUL(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t *stack
+#ifdef BUILD_LIBRARY
+                       ,
+                       uint32_t pc, simplified_trace_data *simplified_trace_data_ptr
+#endif
+) {
     gas_used += GAS_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -29,14 +46,28 @@ __device__ int32_t MUL(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
 
         // r = a * b;
+
         uint256_mul(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
+#ifdef BUILD_LIBRARY
+
+        // r < a or r < b
+        if (uint256_cmp(stack->get_address_at_index(1), &r) == 1 ||
+            uint256_cmp(stack->get_address_at_index(2), &r) == 1) {
+            if (!uint256_is_zero(&r)) simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_BUG);
+        }
+#endif
         stack->reduce_size(2);
         error_code |= stack->push(r);
     }
     return error_code;
 }
 
-__device__ int32_t SUB(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t *stack) {
+__device__ int32_t SUB(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuEVM::evm_stack_t *stack
+#ifdef BUILD_LIBRARY
+                       ,
+                       uint32_t pc, simplified_trace_data *simplified_trace_data_ptr
+#endif
+) {
     gas_used += GAS_VERY_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
@@ -46,9 +77,18 @@ __device__ int32_t SUB(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         // error_code |= stack->pop(a);
         // error_code |= stack->pop(b);
-
+#ifdef BUILD_LIBRARY
+        bool underflow = uint256_sub_overflow(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
+        if (underflow) {
+            // simple reducing FP:the common case to calculate uint256 0xff... mask
+            if (!(uint256_is_zero(stack->get_address_at_index(1)) && stack->get_address_at_index(2)->words[0] == 1)) {
+                simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_BUG);
+            }
+        }
+#else
         // r = a - b;
         uint256_sub(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
+#endif
         stack->reduce_size(2);
         error_code |= stack->push(r);
     }
