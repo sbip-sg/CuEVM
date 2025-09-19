@@ -44,6 +44,21 @@ typedef struct {
     uint32_t length; /**< Length of the return data */
 } ReturnDataEntry;
 
+typedef struct {
+    BranchInfoEntry* new_branch_info;
+    uint32_t num_new_branch;
+    BugInfoEntry* new_bug_info;
+    uint32_t num_new_bug;
+    StorageInfoEntry* new_storage_info;
+    uint32_t num_new_storage;
+} SimplifiedGPUResultSingleBatchC;
+
+typedef struct {
+    SimplifiedGPUResultSingleBatchC* results;
+    uint32_t num_results;
+} SimplifiedGPUResultC;
+
+// deprecated structures
 /**
  * @brief C-compatible structure for representing code coverage data.
  *
@@ -73,30 +88,13 @@ typedef struct {
     uint8_t allocations_valid;    /**< Track if allocations are valid (1) or freed (0) */
 } GPUExecutionResultC;
 
-typedef struct {
-    uint32_t* new_coverage_idx; /**< Array of new coverage indices */
-    uint32_t num_new_coverage;  /**< Number of new coverage entries for each batch, size is tx_sequence size*/
-    uint32_t* new_bug_idx;      /**< Array of new bug indices */
-    uint32_t* new_bug_pc;       /**< Array of new bug PCs */
-    uint32_t num_new_bugs;      /**< Number of new bug entries for each batch, size is tx_sequence size*/
-} SimplifiedGPUResultSingleBatchC;
-
-typedef struct {
-    SimplifiedGPUResultSingleBatchC* results;
-    uint32_t num_results;
-} SimplifiedGPUResultC;
-
-
 /**
  * @brief Process a batch of transactions on the GPU.
  *
  * Executes multiple Ethereum transactions in parallel on the GPU.
  *
- * @param[in] blockNumber Array of block numbers
- * @param[in] timeStamp Array of timestamps
  * @param[in] fromAddr Array of sender addresses in byte format
  * @param[in] toAddr Array of recipient addresses in byte format
- * @param[in] values Array of transaction values
  * @param[in] callData Combined call data for all transactions
  * @param[in] callDataLen Length of the combined call data
  * @param[in] dataOffsets Array of offsets into the call data for each transaction
@@ -105,11 +103,14 @@ typedef struct {
  * @param[in] sequenceLength Length of each sequence of transactions
  * @return SimplifiedGPUResultC* Pointer to the execution results structure
  */
- #ifdef BUILD_GO_LIBRARY
-SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp, const unsigned char* fromAddr, const unsigned char* toAddr,
+#ifdef BUILD_GO_LIBRARY
+SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, const uint64_t* timeStamp,
+                                                 const unsigned char* fromAddr, const unsigned char* toAddr,
                                                  const unsigned char* values, const unsigned char* callData,
-                                                 int callDataLen, const uint32_t* dataOffsets,
-                                                 const uint32_t* dataSizes, int txBatchCount, int sequenceLength);
+                                                 uint32_t callDataLen, const uint32_t* dataOffsets,
+                                                 const uint32_t* dataSizes, const int32_t* markerOffsets,
+                                                 const uint32_t* markerData, uint32_t markerDataLen,
+                                                 uint32_t txBatchCount, uint32_t sequenceLength, uint32_t start_seed);
 #endif
 
 /**
@@ -122,7 +123,9 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
  * @param[in] reset_state Flag to reset the state before processing (true to reset, false to keep existing state)
  * @return int Error code (0 for success, non-zero for error)
  */
-int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false);
+int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool reset_state = false,
+                           uint32_t skipTxSize = 1, const char* fuzzing_constants = nullptr,
+                           uint32_t* markerData = nullptr, uint32_t markerDataLen = 0);
 
 /**
  * @brief Reset the state database to its initial state.
@@ -141,13 +144,32 @@ void reset_state_db();
 GPUExecutionResultC* get_gpu_execution_results();
 
 /**
+ * @brief Setup fuzzing constants.
+ *
+ * Sets up fuzzing constants for the GPU.
+ *
+ * @param[in] fuzzing_constants JSON string containing the fuzzing constants
+ */
+void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData, uint32_t markerDataLen);
+
+/**
+ * @brief Get the number of instances per device.
+ *
+ * Retrieves the number of instances per device.
+ *
+ * @return uint32_t Number of instances per device
+ */
+uint32_t get_num_instances_per_device();
+
+/**
  * @brief Get the results of the most recent GPU execution.
  *
  * Retrieves execution results, including return data and code coverage information.
  *
  * @return SimplifiedGPUExecutionResultC* Pointer to the execution results structure
  */
-void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result);
+void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result, const uint8_t* callData,
+                                         const uint32_t* dataOffsets, const uint32_t* dataSizes);
 // // Function to free GPU execution results
 // void free_gpu_execution_results(GPUExecutionResultC* result);
 

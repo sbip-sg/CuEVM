@@ -63,6 +63,8 @@ __host__ __device__ uint256 *uint256_from_word(uint256 *dst, uint32_t a);
 __host__ __device__ uint256 *uint256_from_bytes(uint256 *dst, const uint8_t *src, size_t len);
 
 __host__ __device__ uint256 *uint256_add(uint256 *dst, const uint256 *a, const uint256 *b);
+__host__ __device__ bool uint256_add_overflow(uint256 *dst, const uint256 *a, const uint256 *b);
+__host__ __device__ bool uint256_sub_overflow(uint256 *dst, const uint256 *a, const uint256 *b);
 __host__ __device__ uint256 *uint256_addmod(uint256 *dst, const uint256 *a, const uint256 *b, const uint256 *N);
 __host__ __device__ uint256 *uint256_sub(uint256 *dst, const uint256 *a, const uint256 *b);
 __host__ __device__ uint256 *uint256_submod(uint256 *dst, const uint256 *a, const uint256 *b, const uint256 *N);

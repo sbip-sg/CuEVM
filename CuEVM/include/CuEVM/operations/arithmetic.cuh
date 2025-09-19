@@ -1,6 +1,8 @@
 #pragma once
 #include <CuEVM/core/data_structures.cuh>
-
+#ifdef BUILD_LIBRARY
+#include <CuEVM/utils/library_utils.h>
+#endif
 /**
  * The arithmetic operations.
  * Contains the arithmetic operations 0s: Arithmetic Operations:
@@ -40,7 +42,12 @@ namespace CuEVM::operations {
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t ADD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
+__device__ int32_t ADD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack
+#ifdef BUILD_LIBRARY
+                       ,
+                       uint32_t pc, simplified_trace_data *simplified_trace_data_ptr
+#endif
+);
 
 /**
  * The MUL operation implementation.
@@ -51,7 +58,12 @@ __device__ int32_t ADD(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *sta
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t MUL(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
+__device__ int32_t MUL(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack
+#ifdef BUILD_LIBRARY
+                       ,
+                       uint32_t pc, simplified_trace_data *simplified_trace_data_ptr
+#endif
+);
 
 /**
  * The SUB operation implementation.
@@ -62,7 +74,12 @@ __device__ int32_t MUL(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *sta
  * @param[inout] stack The stack.
  * @return The error code. 0 if no error.
  */
-__device__ int32_t SUB(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack);
+__device__ int32_t SUB(const gas_t &gas_limit, gas_t &gas_used, evm_stack_t *stack
+#ifdef BUILD_LIBRARY
+                       ,
+                       uint32_t pc, simplified_trace_data *simplified_trace_data_ptr
+#endif
+);
 
 /**
  * The DIV operation implementation.

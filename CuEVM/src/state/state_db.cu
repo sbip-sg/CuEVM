@@ -46,10 +46,11 @@ __device__ SnapshotState *SnapshotState::revert() {
            storage_size, touched_account_counts);
     printf("revert touched account to cold num touched %d\n", touched_account_counts);
 #endif
+#ifndef BUILD_GO_LIBRARY  // fuzzing mode we dont track cold/warm diff in gas
     if (touched_account_counts > 0) {
         for (uint32_t i = 0; i < touched_account_counts; i++) {
             int32_t address_index = preallocated_touched_accounts[i];
-            if (address_index >= 0) {
+            if (address_index >= 0 && address_index < global_state_db_ptr->num_accounts) {
                 // printf("set cold revert thread %d, address_index %d\n", INSTANCE_GLOBAL_IDX, address_index);
                 uint32_t instance_idx = address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
                 global_state_db_ptr->account_is_warm[instance_idx] = false;
@@ -68,6 +69,7 @@ __device__ SnapshotState *SnapshotState::revert() {
             }
         }
     }
+#endif
     if (diff_account_counts > 0) {
 #ifdef DEBUG_PERF
         printf("revert account diff_account_counts %d\n", diff_account_counts);
@@ -77,7 +79,8 @@ __device__ SnapshotState *SnapshotState::revert() {
 #ifdef DEBUG_PERF
             printf("revert account address_index %d\n", current_account->address_index);
 #endif
-            if (current_account->address_index >= 0) {
+            if (current_account->address_index >= 0 &&
+                current_account->address_index < global_state_db_ptr->num_accounts) {
                 uint32_t instance_idx =
                     current_account->address_index * global_state_db_ptr->num_states + INSTANCE_GLOBAL_IDX;
                 global_state_db_ptr->account_balances[instance_idx] = current_account->balance;
@@ -532,6 +535,9 @@ __device__ void StateDb::increase_balance(const evm_word_t *address, const evm_w
     if (snapshot_state != nullptr) {
         // set snapshot of the balance
         SnapshotAccount *snapshot_account = new SnapshotAccount();
+        if (snapshot_account == nullptr) {
+            return;
+        }
         snapshot_account->address_index = address_index;
         snapshot_account->balance = *current_balance;
         snapshot_account->next_account = snapshot_state->accounts;
@@ -769,6 +775,7 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
         printf("init_snapshot address not found in state db\n");
         address->print();
 #endif
+        // printf("THREAD %d init_snapshot address not found in state db\n", INSTANCE_GLOBAL_IDX);
         SnapshotState *tmp = CuEVM::memory_pool::get_snapshot_state();
         tmp->address = *address;
         tmp->storage_size = 0;
@@ -782,9 +789,14 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
     //
 
     SnapshotState *tmp = CuEVM::memory_pool::get_snapshot_state();
-    // printf("tmp %p\n", tmp);
+    // printf("THREAD %d init_snapshot tmp %p\n", INSTANCE_GLOBAL_IDX, tmp);
     //
     call_context->snapshot_state = tmp;
+#ifdef BUILD_LIBRARY
+    if (tmp == nullptr) {
+        return;
+    }
+#endif
     tmp->address = *address;
     tmp->storage_size = 0;
     tmp->touched_account_counts = 0;
@@ -1030,9 +1042,10 @@ __device__ bool StateDb::is_warm_key_with_offset(const evm_word_t *address, cons
 
     found_value = get_value_status(address_index, key);
 
+#ifdef BUILD_LIBRARY
+    if (write_snapshot == false) return true;  // fuzzing mode does not implement 2929 for performance
+#endif
     if (found_value == nullptr) {
-        // todo: // implement value not found in both pools
-        // printf("is_warm_key_with_offset value not found in both pools\n");
         if (snapshot_state != nullptr) {
             // printf("set snapshot_state %p to restore null_ptr\n", snapshot_state);
             snapshot_state->set_blank_key(key);
@@ -1455,7 +1468,8 @@ __host__ void StateDb::GPUfromJsonMultiGPU(std::vector<StateDb *> &state_db, con
                               num_states * num_accounts * sizeof(bool), cudaMemcpyHostToDevice));
 
 #endif
-        // CUDA_CHECK(cudaMemcpy(tmp_state_db->snapshot_total_storage_size, state_db_cpu->snapshot_total_storage_size,
+        // CUDA_CHECK(cudaMemcpy(tmp_state_db->snapshot_total_storage_size,
+        // state_db_cpu->snapshot_total_storage_size,
         //                       num_states * num_accounts * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
         // printf("state db cpu\n");
@@ -1583,18 +1597,20 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
                 state_db->contract_index[idx] = state_db->num_contracts;
                 state_db->num_contracts++;
             }
+            if (storage_size > account_prealloc_keys_size) {
+                // todo: handle storage size > account_prealloc_keys_size
+                // clone num_states times of storage page
+                printf("PreState storage size: %d greater than supported, set to maximum %d\n", storage_size,
+                       account_prealloc_keys_size);
+                storage_size = account_prealloc_keys_size;
+            }
             state_db->account_storage_size[idx * num_states] = storage_size;
             // for (uint32_t i = 0; i < num_states; i++) {
             //     state_db->account_storage_size[idx * num_states + i] = storage_size;
             // }
             state_db->num_storage_elements += state_db->account_storage_size[idx * num_states];
             // allocate new page per account
-            if (storage_size > account_prealloc_keys_size) {
-                // todo: handle storage size > account_prealloc_keys_size
-                // clone num_states times of storage page
-                printf("PreState storage size: %d greater than supported\n", storage_size);
-                break;
-            }
+
         } else
             state_db->account_storage_size[idx * num_states] = 0;
         // memset(&state_db->account_storage_size[idx * num_states], 0, num_states * sizeof(uint32_t));
@@ -1632,7 +1648,7 @@ __host__ StateDb *StateDb::GPUFromCPU(StateDb *&state_db) {
     return state_db_gpu;
 }
 
-__host__ __device__ void StateDb::print() {
+__host__ __device__ void StateDb::print(uint account_id) {
     printf("num_accounts: %d\n", num_accounts);
     printf("num_storage_elements: %d\n", num_storage_elements);
     for (uint32_t i = 0; i < num_accounts; i++) {
@@ -1652,13 +1668,16 @@ __host__ __device__ void StateDb::print() {
                 prealloc_values_pool[(account_prealloc_keys_size * contract_idx + j) * num_states].print();
             }
             if (num_states > 1) {
-                printf("\n state 2 \n");
+                account_storage_size_i = account_storage_size[i * num_states + account_id];
+                printf("\n state %d \n", account_id);
                 printf("keys size %d\n", account_storage_size_i);
                 for (uint32_t j = 0; j < account_storage_size_i; j++) {
                     printf("\n key: \n");
-                    prealloc_keys_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + 1].print();
+                    prealloc_keys_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + account_id]
+                        .print();
                     printf("value: \n");
-                    prealloc_values_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + 1].print();
+                    prealloc_values_pool[(account_prealloc_keys_size * contract_idx + j) * num_states + account_id]
+                        .print();
                 }
             }
         }
