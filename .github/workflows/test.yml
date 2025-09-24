@@ -45,6 +45,18 @@ jobs:
               cmake --build build -j \$(nproc)
             "
 
+      - name: Verify CuEVM GPU binary artifact
+        run: |
+          if [ ! -f build/cuevm_GPU ]; then
+            echo "cuevm_GPU binary was not produced"
+            exit 1
+          fi
+          if [ ! -x build/cuevm_GPU ]; then
+            echo "cuevm_GPU binary is not executable"
+            exit 1
+          fi
+          file build/cuevm_GPU
+
       - name: Notify Slack on failure
         if: failure()
         env:
