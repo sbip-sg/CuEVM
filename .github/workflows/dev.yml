@@ -11,7 +11,12 @@ on:
 
 jobs:
   build:
+    name: Build (${{ matrix.build_type }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [gpu, go-library]
 
     steps:
       - name: Checkout repository
@@ -23,16 +28,17 @@ jobs:
       - name: Cache Docker layers
         uses: ScribeMD/docker-cache@0.5.0
         with:
-          key: docker-${{ runner.os }}-${{ hashFiles('.github/workflows/test.yml') }}-nvidia-cuda-1232
+          key: docker-${{ runner.os }}-${{ hashFiles('.github/workflows/dev.yml') }}-nvidia-cuda-1232
 
       - name: Pull CUDA build image
         run: docker pull nvidia/cuda:12.3.2-devel-ubuntu22.04
 
-      - name: Build CuEVM binary inside CUDA container
+      - name: Build CuEVM inside CUDA container
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
+            -e BUILD_KIND=${{ matrix.build_type }} \
             nvidia/cuda:12.3.2-devel-ubuntu22.04 \
             /bin/bash -lc "set -euo pipefail
               apt-get update
@@ -41,21 +47,48 @@ jobs:
                 cmake \\
                 libcjson-dev \\
                 pkg-config
-              cmake -S . -B build -DTESTS=OFF -DGPU=ON -DCPU=OFF -DCUDA_COMPUTE_CAPABILITY=86 -DENABLE_EIP_3155_OPTIONAL=OFF -DENABLE_EIP_3155=ON
+              rm -rf build
+              case \"\${BUILD_KIND}\" in
+                gpu)
+                  cmake -S . -B build -DTESTS=OFF -DGPU=ON -DCPU=OFF -DCUDA_COMPUTE_CAPABILITY=86 -DENABLE_EIP_3155_OPTIONAL=OFF -DENABLE_EIP_3155=ON
+                  ;;
+                go-library)
+                  cmake -DBUILD_GO_LIBRARY=ON -DENABLE_EIP_3155=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY=86 -S . -B build
+                  ;;
+                *)
+                  echo \"Unknown build kind: \${BUILD_KIND}\"
+                  exit 1
+                  ;;
+              esac
               cmake --build build -j \$(nproc)
             "
 
-      - name: Verify CuEVM GPU binary artifact
+      - name: Verify build artifacts (${{ matrix.build_type }})
         run: |
-          if [ ! -f build/cuevm_GPU ]; then
-            echo "cuevm_GPU binary was not produced"
-            exit 1
-          fi
-          if [ ! -x build/cuevm_GPU ]; then
-            echo "cuevm_GPU binary is not executable"
-            exit 1
-          fi
-          file build/cuevm_GPU
+          case "${{ matrix.build_type }}" in
+            gpu)
+              if [ ! -f build/cuevm_GPU ]; then
+                echo "cuevm_GPU binary was not produced"
+                exit 1
+              fi
+              if [ ! -x build/cuevm_GPU ]; then
+                echo "cuevm_GPU binary is not executable"
+                exit 1
+              fi
+              file build/cuevm_GPU
+              ;;
+            go-library)
+              if [ ! -f build/libcuevm_go.so ]; then
+                echo "libcuevm_go.so library was not produced"
+                exit 1
+              fi
+              file build/libcuevm_go.so
+              ;;
+            *)
+              echo "Unknown build type: ${{ matrix.build_type }}"
+              exit 1
+              ;;
+          esac
 
       - name: Notify Slack on failure
         if: failure()
