@@ -17,17 +17,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure Git for private submodules
-        env:
-          SUBMODULE_PAT: ${{ secrets.SUBMODULE_PAT }}
-        run: |
-          if [ -z "${SUBMODULE_PAT}" ]; then
-            echo "SUBMODULE_PAT is not configured" >&2
-            exit 1
-          fi
-          git config --global url."https://${SUBMODULE_PAT}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
-          git config --global url."https://${SUBMODULE_PAT}:x-oauth-basic@github.com/".insteadOf "git@github.com:"
-
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
