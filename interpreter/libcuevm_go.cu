@@ -717,7 +717,8 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
                                   transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
         }
         // Copy marker data from host to GPU
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset, markerOffsets,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset,
+                              markerOffsets + i * transaction_per_gpu / g_skipTxSize,
                               transaction_per_gpu / g_skipTxSize * sizeof(int32_t), cudaMemcpyHostToDevice));
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_data, markerData, markerDataLen * sizeof(uint32_t),
                               cudaMemcpyHostToDevice));

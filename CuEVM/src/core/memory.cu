@@ -17,6 +17,16 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
     unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
 
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 800
+    memcpy(ptr1, ptr2, length);
+    return;
+#else
+    if (num_active_threads != 32) {
+        memcpy(ptr1, ptr2, length);
+        return;
+    }
+    // The code only works for cuda arch >= 800 and when num_active_threads == 32
+
     // printf("warp_cooperative_set thread %d, num_active_threads %u, length %u ptr1 %p ptr2 %p\n", INSTANCE_GLOBAL_IDX,
     // num_active_threads, length, ptr1, ptr2);
 
@@ -48,6 +58,7 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
             }
         }
     }
+#endif
 }
 
 __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
@@ -55,6 +66,14 @@ __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
     uint32_t lane_id = threadIdx.x % 32;
     unsigned active_mask = __activemask();              // Bitmask of active threads
     uint32_t num_active_threads = __popc(active_mask);  // Count active threads
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 800
+    memset(ptr1, 0, length);
+    return;
+#else
+    if (num_active_threads != 32) {
+        memset(ptr1, 0, length);
+        return;
+    }
 
     // TODO : interleaving inactive threads
     // Iterate over each thread in the warp
@@ -81,6 +100,7 @@ __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
             }
         }
     }
+#endif
 }
 __device__ void evm_memory_t::print() const {
     printf("Memory data: \n");
@@ -264,17 +284,13 @@ __device__ inline void copy_with_padding(uint8_t *dest, const uint8_t *src, uint
 
     if (src != nullptr && to_copy > 0) {
         // memcpy(dest, src, to_copy);
-        if (num_active_threads == 32)
-            CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
-        else
-            memcpy(dest, src, to_copy);
+        CuEVM::memory::warp_cooperative_set(dest, src, to_copy);
+
+        // memcpy(dest, src, to_copy);
     }
     if (to_copy < bytes) {
         // memset(dest + to_copy, 0, bytes - to_copy);
-        if (num_active_threads == 32)
-            CuEVM::memory::warp_cooperative_setzero(dest + to_copy, bytes - to_copy);
-        else
-            memset(dest + to_copy, 0, bytes - to_copy);
+        CuEVM::memory::warp_cooperative_setzero(dest + to_copy, bytes - to_copy);
     }
 }
 
