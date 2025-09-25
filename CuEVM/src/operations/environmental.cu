@@ -16,8 +16,7 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
 #endif
 ) {
     gas_used += GAS_KECCAK256;
-    // int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-    // if (error_code == ERROR_SUCCESS) {
+
     // Get the offset and length from the stack
     evm_word_t offset, length;
     int32_t error_code = stack.pop(offset);
@@ -51,32 +50,12 @@ __device__ int32_t SHA3(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, C
             remaining_input_length = max(0, remaining_input_length);
         uint8_t *memory_data = nullptr;
         memory.get(offset_u32, remaining_input_length, memory_data);
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("memory_data %p\n", memory_data);
-        //     memory.print();
-        //     printf("SHA3 thread %d, memory_data\n", INSTANCE_GLOBAL_IDX);
-        //     for (uint32_t i = 0; i < remaining_input_length; i++) {
-        //         printf("%x", memory_data[i]);
-        //     }
-        //     printf("\n");
-        // }
+
         CuCrypto::keccak::sha3(memory_data, remaining_input_length, hash_data, CuEVM::hash_size);
-        // evm_word_t hash_word;
-        // uint256_from_bytes(&hash_word, hash_data, CuEVM::hash_size);
-        // printf("hash_data: %x\n", hash_data);
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("SHA3 thread %d, hash_data\n", INSTANCE_GLOBAL_IDX);
-        //     for (uint32_t i = 0; i < CuEVM::hash_size; i++) {
-        //         printf("%x", hash_data[i]);
-        //     }
-        //     printf("\n");
-        // }
+
         error_code |= stack.pushx(CuEVM::hash_size, hash_data, CuEVM::hash_size);
-#ifdef BUILD_LIBRARY
-        // ((simplified_trace_data *)simplified_trace_data_ptr)->no_branches += 2;
-#endif
     }
-    // }
+
     return error_code;
 }
 
@@ -92,7 +71,6 @@ __device__ int32_t ADDRESS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
 
 __device__ int32_t BALANCE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
                            const CuEVM::evm_call_context_t *call_context) {
-    // cgbn_add_ui32(arith.env, gas_used, gas_used, GAS_ZERO);
     evm_word_t address;
     int32_t error_code = call_context->stack_ptr->pop(address);
     CuEVM::utils::evm_address_conversion(address);
@@ -383,8 +361,7 @@ __device__ int32_t RETURNDATACOPY(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &g
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     // TODO: Check EOF format
-    // printf("RETURNDATASIZE thread %d, call_context %p, length_ui32 %u, data_offset_ui32 %u, dynamic_ret_size %u\n",
-    //        INSTANCE_GLOBAL_IDX, call_context, length_ui32, data_offset_ui32, call_context->dynamic_ret_size);
+
     if (data_offset_ui32 > call_context->dynamic_ret_size ||
         (data_offset_ui32 + length_ui32) > call_context->dynamic_ret_size) {
         return ERROR_RETURN_DATA_OVERFLOW;
@@ -412,18 +389,18 @@ __device__ int32_t EXTCODEHASH(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_
     uint8_t *code = nullptr;
 
     if (global_state_db_ptr->is_empty_account(&address) || (global_state_db_ptr->is_deleted_account(&address)))
-    // &&uint256_cmp(&address, &transaction_list->sender) != 0)
+
     {
         error_code |= call_context->stack_ptr->push_uint32(0);
         return error_code;
     } else {
         code = global_state_db_ptr->get_code(code_size, &address);
     }
-    // CuEVM::byte_array_t hash(CuEVM::hash_size);
+
     uint8_t hash_data[CuEVM::hash_size];
     CuCrypto::keccak::sha3(code, code_size, hash_data, CuEVM::hash_size);
     // result is in address_shared[INSTANCE_IDX_PER_BLOCK]
-    // error_code |= stack.push(address);
+
     error_code |= call_context->stack_ptr->pushx(CuEVM::hash_size, hash_data, CuEVM::hash_size);
     return error_code;
 }
@@ -437,8 +414,6 @@ __device__ int32_t GAS(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
 
 __device__ int32_t SELFBALANCE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
                                const CuEVM::evm_call_context_t *call_context) {
-    // bn_t address;
-    // message.get_recipient(arith, address);
     gas_used += GAS_LOW;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {

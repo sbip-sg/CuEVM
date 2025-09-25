@@ -27,9 +27,6 @@ __device__ void warp_cooperative_set(uint8_t *ptr1, const uint8_t *ptr2, uint32_
     }
     // The code only works for cuda arch >= 800 and when num_active_threads == 32
 
-    // printf("warp_cooperative_set thread %d, num_active_threads %u, length %u ptr1 %p ptr2 %p\n", INSTANCE_GLOBAL_IDX,
-    // num_active_threads, length, ptr1, ptr2);
-
     // TODO : interleaving inactive threads
     // Iterate over each thread in the warp
 #pragma unroll
@@ -128,7 +125,6 @@ __device__ void evm_memory_t::increase_memory_cost(gas_t memory_expansion_cost) 
 }
 
 __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
-    // printf("grow new_size %u size %u\n", new_size, size);
     if (new_size > size) {
         new_size = (new_size + 31) / 32 * 32;
         if (new_size + preallocated_base_offset <= memory_prealloc_size) {
@@ -141,8 +137,6 @@ __device__ int32_t evm_memory_t::grow(uint32_t new_size) {
 #endif
 #ifdef BUILD_LIBRARY
             if (new_size > MAX_NEW_MEMORY) {
-                // printf("instance %u dynamic memory allocation new size %u currentsize %u base_offset %u\n",
-                //        INSTANCE_GLOBAL_IDX, new_size, size, preallocated_base_offset);
                 return ERROR_OUT_OF_GAS;
             }
 #endif
@@ -166,7 +160,7 @@ __device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&
         data_ = nullptr;
         return error_code;
     }
-    // printf("memory get index %u length %eu\n", index, length);
+
     // Ensure the memory is grown to cover up to index+length.
     error_code |= grow(index + length);
     if (error_code != ERROR_SUCCESS) {
@@ -210,8 +204,7 @@ __device__ int32_t evm_memory_t::get(uint32_t index, uint32_t length, uint8_t *&
             // The dynamic_data pointer holds bytes starting from offset memory_prealloc_size.
             // Compute the corresponding offset into dynamic_data.
             uint32_t dynamic_offset = (total_offset + prealloc_bytes) - memory_prealloc_size;
-            // printf("dynamic_bytes %u dynamic_offset %u dynamic_data %p\n", dynamic_bytes, dynamic_offset,
-            // dynamic_data);
+
             memcpy(data_ + prealloc_bytes, dynamic_data + dynamic_offset, dynamic_bytes);
         }
     }
@@ -238,11 +231,6 @@ __device__ int32_t evm_memory_t::copy(uint32_t index, uint32_t length, uint8_t *
     // If the entire requested block fits within the preallocated memory,
     // note the boundary check now uses <= to include the case where the block exactly fits.
     if (total_offset + length <= memory_prealloc_size) {
-        // data_ = &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
-        // total_offset];
-        // memcpy(data_, &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX +
-        // total_offset],
-        //        length);
         memory::warp_cooperative_set(
             data_, &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset],
             length);
@@ -351,8 +339,7 @@ __device__ int32_t evm_memory_t::set_zero(const uint32_t index, const uint32_t l
     uint32_t total_offset = preallocated_base_offset + index;
     if (total_offset + length <= memory_prealloc_size) {
         // Entire block is within the preallocated memory.
-        // memset(&memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset], 0,
-        //        length);
+
         CuEVM::memory::warp_cooperative_setzero(
             &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset], length);
     } else {
@@ -379,8 +366,6 @@ __device__ int32_t evm_memory_t::set_zero(const uint32_t index, const uint32_t l
 // When source data is not provided (or data_offset is invalid) the target is zero filled.
 __device__ int32_t evm_memory_t::set_buffer_data(uint8_t *data_, uint32_t data_offset, uint32_t data_size,
                                                  const uint32_t index, const uint32_t length) {
-    // printf("set_buffer_data thread %d data_offset %d data_size %d index %d length %d\n", THREADIDX, data_offset,
-    //        data_size, index, length);
     int32_t error_code = ERROR_SUCCESS;
     if (length == 0) return error_code;
 
@@ -397,23 +382,14 @@ __device__ int32_t evm_memory_t::set_buffer_data(uint8_t *data_, uint32_t data_o
     uint32_t available_prealloc = (total_offset < memory_prealloc_size) ? (memory_prealloc_size - total_offset) : 0;
     uint32_t prealloc_bytes = (length < available_prealloc) ? length : available_prealloc;
     uint32_t dynamic_bytes = length - prealloc_bytes;
-    // printf("set_buffer_data thread %d total_offset %d available_prealloc %d prealloc_bytes %d dynamic_bytes
-    // %d\n",
-    //        THREADIDX, total_offset, available_prealloc, prealloc_bytes, dynamic_bytes);
+
     // For the preallocated region, calculate the available bytes from the buffer.
     uint32_t available_source = (data_offset < data_size) ? (data_size - data_offset) : 0;
     uint8_t *prealloc_dest =
         &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + total_offset];
-    // printf("available_source %d\n", available_source);
+
     copy_with_padding(prealloc_dest, data_ + data_offset, available_source, prealloc_bytes);
-    // printf("after copy_with_padding\n");
-    // if (INSTANCE_GLOBAL_IDX == 0) {
-    //     printf("prealloc_dest\n");
-    //     for (uint32_t i = 0; i < prealloc_bytes; i++) {
-    //         printf("%x ", prealloc_dest[i]);
-    //     }
-    //     printf("\n");
-    // }
+
     // For the dynamic region, adjust the source pointer and available bytes.
     if (dynamic_bytes > 0) {
         uint32_t dynamic_offset = (total_offset + prealloc_bytes) - memory_prealloc_size;

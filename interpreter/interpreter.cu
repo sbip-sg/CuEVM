@@ -159,11 +159,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     for (int i = 0; i < num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
         cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
-        // printf("h_buffer: %p\n", h_buffer);
-        // uint32_t *buffer_as_uint = (uint32_t *)h_buffer;
-        // for (int i = 0; i < 20; i++) {
-        //     printf("buffer[%d]: %x\n", i, buffer_as_uint[i]);
-        // }
+
         // Parse and print the data (implemented later)
         CuEVM::utils::print_tracer_data(h_buffer);
         cudaFree(d_buffers[i]);

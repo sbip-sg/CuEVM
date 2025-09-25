@@ -26,19 +26,9 @@ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
         memory.increase_memory_cost(memory_expansion_cost);
 
         uint8_t *data = nullptr;
-        // if (INSTANCE_GLOBAL_IDX == 1) {
-        //     printf("MLOAD thread %d, memory_offset %u, UINT256_BYTES %u\n", INSTANCE_GLOBAL_IDX, memory_offset_u32,
-        //            UINT256_BYTES);
-        //     memory.print();
-        // }
+
         error_code |= memory.get(memory_offset_u32, UINT256_BYTES, data);
-        // if (INSTANCE_GLOBAL_IDX == 1) {
-        //     printf("MLOAD thread %d, data\n", INSTANCE_GLOBAL_IDX);
-        //     for (uint32_t i = 0; i < UINT256_BYTES; i++) {
-        //         printf("%x ", data[i]);
-        //     }
-        //     printf("\n");
-        // }
+
         error_code |= stack.pushx(32, data, UINT256_BYTES);
     }
     return error_code;

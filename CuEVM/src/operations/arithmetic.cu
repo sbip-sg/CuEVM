@@ -106,23 +106,16 @@ __device__ int32_t DIV(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         a = stack->get_address_at_index(1);
         b = stack->get_address_at_index(2);
-        // printf("div a \n");
-        // a.print();
-        // printf("div b \n");
-        // b.print();
+
         stack->reduce_size(2);
         if (b == 0) {
             stack->push_uint32(0);
             return ERROR_SUCCESS;
         }
         if (uint256_fast_div(&r, a, b)) {
-            // printf("fast div\n");
         } else {
-            // printf("slow div\n");
             uint256_div(&r, a, b);
         }
-        // printf("div r \n");
-        // r.print();
 
         error_code |= stack->push(r);
     }
@@ -201,10 +194,6 @@ __device__ int32_t ADDMOD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     gas_used += GAS_MID;
     int32_t error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        // evm_word_t a, b, N, r;
-        // error_code |= stack->pop(a);
-        // error_code |= stack->pop(b);
-        // error_code |= stack->pop(N);
         evm_word_t r;
 
         if (stack->size() < 3) {
@@ -249,12 +238,7 @@ __device__ int32_t EXP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         a = stack->get_address_at_index(1);
         exponent = stack->get_address_at_index(2);
-        // if (threadIdx.x == 1) {
-        //     printf("exp a \n");
-        //     a.print();
-        //     printf("exp exponent \n");
-        //     exponent.print();
-        // }
+
         stack->reduce_size(2);
         if (error_code == ERROR_SUCCESS) {
             uint32_t exponent_bit_length = uint256_bitlength(exponent);
@@ -272,10 +256,6 @@ __device__ int32_t EXP(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
                 }
             }
         }
-        // if (threadIdx.x == 1) {
-        //     printf("exp r \n");
-        //     r.print();
-        // }
     }
     return error_code;
 }
@@ -399,8 +379,7 @@ __device__ int32_t SHL(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         shift = stack->get_address_at_index(1);
         value = stack->get_address_at_index(2);
-        // error_code |= stack->pop(shift);
-        // error_code |= stack->pop(value);
+
         evm_word_t r;
 
         if (uint256_cmp_word(shift, CuEVM::word_bits - 1) == 1) {
@@ -426,8 +405,7 @@ __device__ int32_t SHR(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         shift = stack->get_address_at_index(1);
         value = stack->get_address_at_index(2);
-        // error_code |= stack->pop(shift);
-        // error_code |= stack->pop(value);
+
         evm_word_t r;
 
         if (uint256_cmp_word(shift, CuEVM::word_bits - 1) == 1) {
@@ -452,8 +430,7 @@ __device__ int32_t SAR(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         shift = stack->get_address_at_index(1);
         value = stack->get_address_at_index(2);
-        // error_code |= stack->pop(shift);
-        // error_code |= stack->pop(value);
+
         evm_word_t r;
         uint32_t shift_uint32 = uint256_get_uint32_t(shift);
         if (uint256_cmp_word(shift, UINT256_BITS - 1) == 1) {
@@ -477,9 +454,6 @@ __device__ int32_t LT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuE
         evm_word_t *a, *b;
         a = stack->get_address_at_index(1);
         b = stack->get_address_at_index(2);
-        // error_code |= stack->pop(a);
-        // error_code |= stack->pop(a);
-        // error_code |= stack->pop(b);
 
         stack->reduce_size(2);
         error_code |= stack->push_uint32(uint256_cmp(a, b) < 0);
@@ -497,8 +471,7 @@ __device__ int32_t GT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuE
         }
         a = stack->get_address_at_index(1);
         b = stack->get_address_at_index(2);
-        // error_code |= stack->pop(a);
-        // error_code |= stack->pop(b);
+
         stack->reduce_size(2);
         error_code |= stack->push_uint32(uint256_cmp(a, b) > 0);
     }
@@ -515,8 +488,7 @@ __device__ int32_t SLT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         a = stack->get_address_at_index(1);
         b = stack->get_address_at_index(2);
-        // error_code |= stack->pop(a);
-        // error_code |= stack->pop(b);
+
         stack->reduce_size(2);
         error_code |= stack->push_uint32(uint256_signed_cmp(a, b) < 0);
     }
@@ -533,8 +505,7 @@ __device__ int32_t SGT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         }
         a = stack->get_address_at_index(1);
         b = stack->get_address_at_index(2);
-        // error_code |= stack->pop(a);
-        // error_code |= stack->pop(b);
+
         stack->reduce_size(2);
         error_code |= stack->push_uint32(uint256_signed_cmp(a, b) > 0);
     }
@@ -551,8 +522,7 @@ __device__ int32_t EQ(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, CuE
         }
         a = stack->get_address_at_index(1);
         b = stack->get_address_at_index(2);
-        // error_code |= stack->pop(a);
-        // error_code |= stack->pop(b);
+
         stack->reduce_size(2);
         error_code |= stack->push_uint32(uint256_cmp(a, b) == 0);
     }
@@ -568,7 +538,7 @@ __device__ int32_t ISZERO(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
             return ERROR_STACK_UNDERFLOW;
         }
         a = stack->get_address_at_index(1);
-        // error_code |= stack->pop(a);
+
         stack->reduce_size(1);
         error_code |= stack->push_uint32(uint256_is_zero(a));
     }

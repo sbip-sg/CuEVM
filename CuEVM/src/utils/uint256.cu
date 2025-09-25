@@ -128,15 +128,6 @@ __host__ __device__ uint512 *uint512_set_bit(uint512 *num, int bit_index, uint8_
         num->words[word_index] &= ~(1U << bit_in_word);
     return num;
 }
-// __host__ __device__ uint256* uint256_clr_bit(uint256 *dst, unsigned bit_index) {
-//     dst->words[bit_index / 32] &= ~(1 << (bit_index % 32));
-//     return dst;
-// }
-
-// __host__ __device__ uint256* uint256_set_bit(uint256 *dst, unsigned bit_index) {
-//     dst->words[bit_index / 32] |= (1 << (bit_index % 32));
-//     return dst;
-// }
 
 // TODO: check if this is correct
 __host__ __device__ uint256 *uint256_mul(uint256 *dst, const uint256 *a, const uint256 *b) {
@@ -400,72 +391,6 @@ __host__ __device__ uint512 *uint512_sub(uint512 *dst, const uint512 *a, const u
     return dst;
 }
 
-// __host__ __device__ uint256* uint256_mul(uint256 *dst, const uint256 *a, const uint256 *b) {
-//     uint256 tmp;
-//     memset(dst->words, 0, sizeof(dst->words));
-//     for (int i = 0; i < UINT256_WORDS; i++) {
-//         if (a->words[i] == 0) continue;
-//         memset(tmp.words, 0, sizeof(tmp.words));
-//         uint32_t carry = 0;
-//         for (int j = 0; j < UINT256_WORDS - i; j++) {
-//             uint32_t product = a->words[i] * b->words[j] + carry;
-//             carry = product >> uint32_t_BITS;
-//             tmp.words[i + j] = product;
-//         }
-//         uint256_add(dst, dst, &tmp);
-//     }
-//     return dst;
-// }
-
-/*
-__host__ __device__ uint256* uint256_div_mod(uint256 *dst_quotient, uint256 *dst_remainder,
-                                             const uint256 *src_numerator, const uint256 *src_denominator) {
-    uint256 quotient;
-    memset(quotient.words, 0, sizeof(quotient.words));
-    uint256 remainder;
-    uint256 denominator;
-    uint256_cpy(&remainder, src_numerator);
-    uint256_cpy(&denominator, src_denominator);
-
-    // Check for division by zero
-    if (uint256_is_zero(&denominator)) {
-        memset(dst_quotient->words, 0, sizeof(dst_quotient->words));
-        memset(dst_remainder->words, 0, sizeof(dst_remainder->words));
-        return NULL;
-    }
-
-    // If numerator < denominator, quotient is 0, remainder is numerator
-    if (uint256_cmp(&remainder, &denominator) < 0) {
-        *dst_quotient = quotient;
-        *dst_remainder = remainder;
-        return dst_quotient;
-    }
-    printf("start division\n");
-    printf("remainder: ");
-    print_uint256(&remainder);
-    printf("quotient: ");
-    print_uint256(&quotient);
-    printf("\n-----------------------\n");
-    // Main division loop using repeated subtraction
-    while (uint256_cmp(&remainder, &denominator) >= 0) {
-        printf("remainder: ");
-        print_uint256(&remainder);
-        printf("denominator: ");
-        print_uint256(&denominator);
-        uint256_sub(&remainder, &remainder, &denominator);
-        uint256_add_word(&quotient, &quotient, 1);
-        printf("quotient: ");
-        print_uint256(&quotient);
-        printf("remainder: ");
-        print_uint256(&remainder);
-        printf("\n------------------\n");
-    }
-
-    *dst_quotient = quotient;
-    *dst_remainder = remainder;
-    return dst_quotient;
-}
-*/
 __host__ __device__ uint256 *uint512_div_mod(uint256 *dst_quotient, uint256 *dst_remainder, const uint512 *src_dividend,
                                              const uint256 *src_divisor) {
     // Check for division by zero
@@ -613,10 +538,7 @@ __host__ __device__ uint256 *uint512_mod(uint256 *dst_remainder, const uint512 *
 
         // Reduce the result modulo src_denominator.
         // In many cases the inner loop will run only once.
-        // printf("remainder: ");
-        // print_uint256(&remainder);
-        // printf("src_denominator: ");
-        // print_uint256(src_denominator);
+
         uint256 temp;
         if (uint256_cmp(&remainder, src_denominator) >= 0) {
             uint256_div(&temp, &remainder, src_denominator);
@@ -629,21 +551,6 @@ __host__ __device__ uint256 *uint512_mod(uint256 *dst_remainder, const uint512 *
     uint256_cpy(dst_remainder, &remainder);
     return dst_remainder;
 }
-// __host__ __device__ bigint *bigint_from_uint256(bigint *dst, const uint256 *src, const uint32_t word_size) {
-//     bigint_init(dst);
-//     bigint_reserve(dst, word_size);
-//     dst->size = word_size;
-//     memset(dst->words, 0, word_size * sizeof(uint32_t));
-//     memcpy(dst->words, src->words, UINT256_WORDS * sizeof(uint32_t));
-//     return dst;
-// }
-
-// __host__ __device__ uint256 *uint256_from_bigint(uint256 *dst, const bigint *src) {
-//     memset(dst->words, 0, sizeof(dst->words));
-//     memcpy(dst->words, src->words, UINT256_WORDS * sizeof(uint32_t));
-//     return dst;
-// }
-// check if can be imnplemented by shift, return true and result if can
 
 __host__ __device__ uint256 *uint256_div(uint256 *dst, const uint256 *numerator, const uint256 *denominator) {
     uint256 remainder;
@@ -986,13 +893,6 @@ __host__ __device__ uint256 *uint256_sub_word(uint256 *dst, const uint256 *src_a
     return uint256_sub(dst, src_a, &tmp);
 }
 
-// __host__ __device__ char* uint256_write_base(
-//     char *dst,
-//     int *n_dst,
-//     const uint256 *a,
-//     uint32_t base,
-//     int zero_terminate
-// );
 __host__ __device__ char *uint256_to_hex(char *dst, const uint256 *a) {
     int n = 0;
     static const char *table = "0123456789abcdef";

@@ -178,31 +178,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
         original_value = &found_value->original_value;
         current_value = &found_value->value;
     }
-    // if (THREADIDX == 0) {
-    //     printf("original value %p\n", original_value);
-    //     if (original_value != nullptr) {
-    //         original_value->print();
-    //     }
-    //     printf("current value %p\n", current_value);
-    //     if (current_value != nullptr) {
-    //         current_value->print();
-    //     }
 
-    //     new_value->print();
-    // }
-    // __syncthreads();
-    // if (THREADIDX == 1) {
-    //     printf("original value %p\n", original_value);
-    //     if (original_value != nullptr) {
-    //         original_value->print();
-    //     }
-    //     printf("current value %p\n", current_value);
-    //     if (current_value != nullptr) {
-    //         current_value->print();
-    //     }
-
-    //     new_value->print();
-    // }
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
