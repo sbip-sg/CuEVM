@@ -1,0 +1,110 @@
+name: CI Workflow
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  build:
+    name: Build (${{ matrix.build_type }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [gpu, go-library]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize submodules
+        run: git submodule update --init --recursive
+
+      - name: Cache Docker layers
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-${{ runner.os }}-${{ hashFiles('.github/workflows/dev.yml') }}-nvidia-cuda-1232
+
+      - name: Pull CUDA build image
+        run: docker pull nvidia/cuda:12.3.2-devel-ubuntu22.04
+
+      - name: Build CuEVM inside CUDA container
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            -e BUILD_KIND=${{ matrix.build_type }} \
+            nvidia/cuda:12.3.2-devel-ubuntu22.04 \
+            /bin/bash -lc "set -euo pipefail
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \\
+                build-essential \\
+                cmake \\
+                libcjson-dev \\
+                pkg-config
+              rm -rf build
+              case \"\${BUILD_KIND}\" in
+                gpu)
+                  cmake -S . -B build -DTESTS=OFF -DGPU=ON -DCPU=OFF -DCUDA_COMPUTE_CAPABILITY=86 -DENABLE_EIP_3155_OPTIONAL=OFF -DENABLE_EIP_3155=ON
+                  ;;
+                go-library)
+                  cmake -DBUILD_GO_LIBRARY=ON -DENABLE_EIP_3155=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY=86 -S . -B build
+                  ;;
+                *)
+                  echo \"Unknown build kind: \${BUILD_KIND}\"
+                  exit 1
+                  ;;
+              esac
+              cmake --build build -j \$(nproc)
+            "
+
+      - name: Verify build artifacts (${{ matrix.build_type }})
+        run: |
+          case "${{ matrix.build_type }}" in
+            gpu)
+              if [ ! -f build/cuevm_GPU ]; then
+                echo "cuevm_GPU binary was not produced"
+                exit 1
+              fi
+              if [ ! -x build/cuevm_GPU ]; then
+                echo "cuevm_GPU binary is not executable"
+                exit 1
+              fi
+              file build/cuevm_GPU
+              ;;
+            go-library)
+              if [ ! -f build/libcuevm_go.so ]; then
+                echo "libcuevm_go.so library was not produced"
+                exit 1
+              fi
+              file build/libcuevm_go.so
+              ;;
+            *)
+              echo "Unknown build type: ${{ matrix.build_type }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Notify Slack on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+            echo "SLACK_WEBHOOK_URL is not configured; skipping failure notification."
+            exit 0
+          fi
+          job_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          payload=$(printf '{"text":"*CuEVM build failed*\\n\\nWorkflow: %s\\nJob: %s\\nBranch/PR: %s\\nCommit: %s\\nRun ID: %s\\nURL: %s"}' \
+            "${GITHUB_WORKFLOW}" \
+            "${GITHUB_JOB}" \
+            "${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}" \
+            "${GITHUB_SHA}" \
+            "${GITHUB_RUN_ID}" \
+            "${job_url}")
+          curl -X POST -H 'Content-type: application/json' --data "${payload}" "${SLACK_WEBHOOK_URL}"

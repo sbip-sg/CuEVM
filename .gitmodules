@@ -1,6 +1,6 @@
 [submodule "CuEVM/libraries/CuBigInt"]
 	path = CuEVM/libraries/CuBigInt
-	url = git@github.com:minhhn2910/CuBigInt-Backup.git
+	url = https://github.com/minhhn2910/CuBigInt.git
 [submodule "CuEVM/libraries/CuCrypto"]
 	path = CuEVM/libraries/CuCrypto
 	url = https://github.com/sdcioc/CuCrypto.git
