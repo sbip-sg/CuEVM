@@ -1,6 +1,7 @@
 #include <CuEVM/evm.cuh>
 #include <cassert>
-#define DEBUG_THREAD 24
+// #define DEBUG
+#define DEBUG_THREAD 0
 namespace CuEVM {
 
 // define the kernel function
@@ -247,9 +248,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         return;  // finish call
     }
     uint8_t opcode;
-#ifdef BUILD_LIBRARY
-    uint32_t pc_src;
-#endif
+
     CuEVM::evm_call_context_t *child_call_state_ptr = nullptr;
     while (true) {
         opcode = ((cached_call_state.pc < cached_call_state.byte_code_size)
@@ -790,7 +789,6 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
     // sent the gas value to the block beneficiary
     gas_t gas_value;
     const evm_word_t *beneficiary = &(global_block_info->coin_base);
-    // block_info_ptr->get_coin_base(beneficiary);
     // printf("CuEVM Debug: thread %d finish_TRANSACTION error_code %d\n", INSTANCE_GLOBAL_IDX, error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         gas_t gas_left;
@@ -812,8 +810,8 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
         } else {
             gas_value = gas_left;
         }
-        gas_t send_back_gas;
-        send_back_gas = gas_value * gas_price;
+        // gas_t send_back_gas;
+        // send_back_gas = gas_value * gas_price;
         // add to sender balance g^{*}
         evm_word_t *sender_balance;
         // bn_t sender_address;
@@ -925,7 +923,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
     global_simplified_trace[INSTANCE_GLOBAL_IDX].finish_call(error_code, pc, call_state_ptr->from.words[0]);
 #endif
 
-    uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
+    // uint32_t ret_dynamic_size = call_state_ptr->dynamic_ret_size;
 
     if (call_state_ptr->depth > 1 && error_code != ERROR_RETURN && error_code != ERROR_REVERT) {
         call_state_ptr->parent->dynamic_ret_size = 0;
@@ -1101,7 +1099,7 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
 
     // evm_instance_t *evm_instances = new evm_instance_t[num_transactions];
 
-    CuEVM::StateDb *snapshot_state_db_ptr = nullptr;
+    // CuEVM::StateDb *snapshot_state_db_ptr = nullptr;
 
     // CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts
     // for multiGPU version
