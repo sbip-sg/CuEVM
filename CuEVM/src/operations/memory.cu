@@ -7,7 +7,7 @@ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
                          CuEVM::evm_memory_t &memory) {
     int32_t error_code = ERROR_SUCCESS;
 
-    evm_word_t memory_offset, length;
+    evm_word_t memory_offset;
     error_code |= stack.pop(memory_offset);
 
     uint32_t memory_offset_u32 = uint256_get_uint32_t(&memory_offset);
@@ -22,7 +22,6 @@ __device__ int32_t MLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
-        evm_word_t value_word;
         memory.increase_memory_cost(memory_expansion_cost);
 
         uint8_t *data = nullptr;

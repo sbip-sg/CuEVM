@@ -26,9 +26,6 @@ static std::vector<uint64_t*> device_time_stamps;    // vector size = num gpus f
 
 static int call_counter = 0;
 
-// Global variable to hold the last execution result
-static char* g_last_result = nullptr;
-
 static int g_num_gpus = 1;
 
 // Helper function to convert bytes to hex string
@@ -129,12 +126,11 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
 
         uint32_t num_integer_elements_bitmap = (num_instances + 31) / 32;
         printf("num_integer_elements_bitmap: %u\n", num_integer_elements_bitmap);
-        uint32_t* d_new_coverage_bitmap;
 
         d_branch_infos.push_back(d_new_branch_info);
         d_storage_infos.push_back(d_new_storage_info);
         d_bug_infos.push_back(d_new_bug_info);
-        // d_new_coverage_bitmaps.push_back(d_new_coverage_bitmap);
+
         d_gpu_feedback_counts.push_back(d_gpu_feedback_count);
 
         // block number and timestamp
@@ -330,9 +326,9 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     CUDA_CHECK(cudaMalloc(&d_return_data_buffer, RETURN_BUFFER_SIZE * sizeof(uint8_t)));
     // CUDA_CHECK(cudaMalloc(&d_address_list, address_count * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&d_sender_list, sender_count * sizeof(evm_word_t)));
-    printf("Copying address constants to device address array size: %d %d\n", address_count * sizeof(evm_word_t),
+    printf("Copying address constants to device address array size: %lu %lu\n", address_count * sizeof(evm_word_t),
            address_count * 32 * sizeof(uint8_t));
-    printf("Copying integer constants to device integer array size: %d %d\n", integer_count * sizeof(evm_word_t),
+    printf("Copying integer constants to device integer array size: %lu %lu\n", integer_count * sizeof(evm_word_t),
            integer_count * 32 * sizeof(uint8_t));
     CUDA_CHECK(cudaMemcpy(d_address_constants, host_address_constants, address_count * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
@@ -597,7 +593,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
         }
 
         uint32_t current_calldata_offset = 0;
-        uint32_t current_marker_offset = 0;
+
         SimplifiedGPUResultC* final_result = new SimplifiedGPUResultC();
         final_result->results = new SimplifiedGPUResultSingleBatchC[sequenceLength];
         final_result->num_results = sequenceLength;

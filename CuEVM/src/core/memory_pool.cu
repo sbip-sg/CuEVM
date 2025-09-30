@@ -97,12 +97,31 @@ __host__ void free_memory_pool(uint32_t num_devices) {
         // Free the memory_pool struct itself
         CUDA_CHECK(cudaFree(d_memory_pool));
 
-        // Free preallocated memory
-        CUDA_CHECK(cudaFree(preallocated_stack_base));
-        CUDA_CHECK(cudaFree(preallocated_return_data_base));
-        CUDA_CHECK(cudaFree(preallocated_snapshot_values));
-        CUDA_CHECK(cudaFree(preallocated_snapshot_restore_ptr));
-        CUDA_CHECK(cudaFree(preallocated_memory_base));
+        // Get pointers from device symbols before freeing
+        evm_word_t* h_preallocated_stack_base;
+        CUDA_CHECK(cudaMemcpyFromSymbol(&h_preallocated_stack_base, preallocated_stack_base, sizeof(evm_word_t*)));
+
+        uint8_t* h_preallocated_return_data_base;
+        CUDA_CHECK(
+            cudaMemcpyFromSymbol(&h_preallocated_return_data_base, preallocated_return_data_base, sizeof(uint8_t*)));
+
+        SnapshotValue* h_preallocated_snapshot_values;
+        CUDA_CHECK(cudaMemcpyFromSymbol(&h_preallocated_snapshot_values, preallocated_snapshot_values,
+                                        sizeof(SnapshotValue*)));
+
+        ValueStatus** h_preallocated_snapshot_restore_ptr;
+        CUDA_CHECK(cudaMemcpyFromSymbol(&h_preallocated_snapshot_restore_ptr, preallocated_snapshot_restore_ptr,
+                                        sizeof(ValueStatus**)));
+
+        uint8_t* h_preallocated_memory_base;
+        CUDA_CHECK(cudaMemcpyFromSymbol(&h_preallocated_memory_base, preallocated_memory_base, sizeof(uint8_t*)));
+
+        // Free preallocated memory using host copies of the pointers
+        CUDA_CHECK(cudaFree(h_preallocated_stack_base));
+        CUDA_CHECK(cudaFree(h_preallocated_return_data_base));
+        CUDA_CHECK(cudaFree(h_preallocated_snapshot_values));
+        CUDA_CHECK(cudaFree(h_preallocated_snapshot_restore_ptr));
+        CUDA_CHECK(cudaFree(h_preallocated_memory_base));
 
         // Free ECC constants
         CuEVM::EccConstants* d_ecc_constants;
@@ -114,7 +133,7 @@ __host__ void clear_memory_pool(uint32_t num_devices) {
     for (int i = 0; i < num_devices; i++) {
         CUDA_CHECK(cudaSetDevice(i));
         // Get the memory_pool pointer from device
-        memory_pool_t* d_memory_pool = global_memory_pool;
+        memory_pool_t* d_memory_pool;  //= global_memory_pool;
         CUDA_CHECK(cudaMemcpyFromSymbol(&d_memory_pool, global_memory_pool, sizeof(memory_pool_t*)));
         memory_pool_t* memory_pool = new memory_pool_t();
         CUDA_CHECK(cudaMemcpy(memory_pool, d_memory_pool, sizeof(memory_pool_t), cudaMemcpyDeviceToHost));

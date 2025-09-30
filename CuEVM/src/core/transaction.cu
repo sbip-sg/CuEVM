@@ -11,7 +11,7 @@ namespace transaction {
 
 __host__ __device__ void TransactionList::print() {
     printf("TransactionList:\n");
-    printf("nonce: %lu\n", nonce);
+    printf("nonce: %d\n", nonce.words[0]);
 #ifndef BUILD_GO_LIBRARY
     printf("sender: ");
     sender.print();

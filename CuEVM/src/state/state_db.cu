@@ -227,7 +227,7 @@ __device__ void SnapshotState::set_storage(ValueStatus *src_value) {
     }
 
     if (next_offset >= memory_pool_snapshot_preallocate_slots) {
-        uint32_t dynamic_offset = find_dynamic_offset(src_value);
+        int32_t dynamic_offset = find_dynamic_offset(src_value);
         if (dynamic_offset == -1) {
             dynamic_offset = (next_offset - memory_pool_snapshot_preallocate_slots) % snapshot_page_size;
 
@@ -712,7 +712,7 @@ __device__ void StateDb::write_storage_with_known_index(const evm_word_t *addres
 
 __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const uint16_t depth,
                                        const evm_word_t *address) {
-    uint32_t address_index = get_address_index(address);
+    int32_t address_index = get_address_index(address);
     if (address_index == -1) {
 #ifdef DEBUG_PERF
         printf("init_snapshot address not found in state db\n");
@@ -728,12 +728,9 @@ __device__ void StateDb::init_snapshot(evm_call_context_t *call_context, const u
         tmp->next_state = nullptr;
         return;
     }
-    uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-    //
 
     SnapshotState *tmp = CuEVM::memory_pool::get_snapshot_state();
-    // printf("THREAD %d init_snapshot tmp %p\n", INSTANCE_GLOBAL_IDX, tmp);
-    //
+
     call_context->snapshot_state = tmp;
 #ifdef BUILD_LIBRARY
     if (tmp == nullptr) {

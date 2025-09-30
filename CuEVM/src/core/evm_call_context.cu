@@ -327,5 +327,6 @@ __device__ int32_t evm_call_context_t::revert() {
         current_snapshot_state->clear();
         // current_snapshot_state = nullptr;
     }
+    return ERROR_SUCCESS;
 }
 }  // namespace CuEVM

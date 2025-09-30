@@ -120,8 +120,8 @@ __host__ __device__ void block_info_t::print() const {
     printf("BLOCK: \n");
     printf("COINBASE: ");
     coin_base.print();
-    printf("TIMESTAMP: %d\n", time_stamp);
-    printf("NUMBER: %d\n", number);
+    printf("TIMESTAMP: %ld\n", time_stamp);
+    printf("NUMBER: %ld\n", number);
     printf("DIFICULTY: ");
     difficulty.print();
     printf("GASLIMIT: ");

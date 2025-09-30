@@ -788,7 +788,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
 __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state_data) {
     // sent the gas value to the block beneficiary
     gas_t gas_value;
-    const evm_word_t *beneficiary = &(global_block_info->coin_base);
+    // const evm_word_t *beneficiary = &(global_block_info->coin_base);
     // printf("CuEVM Debug: thread %d finish_TRANSACTION error_code %d\n", INSTANCE_GLOBAL_IDX, error_code);
     if ((error_code == ERROR_RETURN) || (error_code == ERROR_REVERT)) {
         gas_t gas_left;
@@ -813,7 +813,7 @@ __device__ int32_t evm_t::finish_TRANSACTION(int32_t error_code, bool copy_state
         // gas_t send_back_gas;
         // send_back_gas = gas_value * gas_price;
         // add to sender balance g^{*}
-        evm_word_t *sender_balance;
+        // evm_word_t *sender_balance;
         // bn_t sender_address;
         // send back the gas left and gas refund to the sender
         // transaction_ptr->get_sender(sender_address);

@@ -363,7 +363,7 @@ struct simplified_trace_data {
     /**
      * @brief Print the simplified trace data.
      */
-    __device__ void print();
+    __host__ __device__ void print();
 
     /**
      * @brief Finalize the coverage bitmap.

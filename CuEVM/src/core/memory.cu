@@ -102,7 +102,7 @@ __device__ void warp_cooperative_setzero(uint8_t *ptr1, uint32_t length) {
 __device__ void evm_memory_t::print() const {
     printf("Memory data: \n");
     printf("Size: %d\n", size);
-    printf("preallocated_base_offset %u memory_prealloc_size %u\n", preallocated_base_offset);
+    printf("preallocated_base_offset %u memory_prealloc_size %u\n", preallocated_base_offset, memory_prealloc_size);
     printf(
         "Preallocated base %p\n",
         &memory_pool::preallocated_memory_base[memory_prealloc_size * INSTANCE_GLOBAL_IDX + preallocated_base_offset]);

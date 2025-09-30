@@ -57,7 +57,7 @@ __host__ __device__ uint256 *uint256_set_bit(uint256 *dst, unsigned bit_index, u
 __host__ __device__ uint256 *uint256_mul(uint256 *dst, const uint256 *a, const uint256 *b);
 __host__ __device__ uint256 *uint256_mulmod(uint256 *dst, const uint256 *a, const uint256 *b, const uint256 *N);
 __host__ __device__ uint256 *uint256_mulmod_largeN(uint256 *dst, const uint256 *a, const uint256 *b, const uint256 *N);
-__host__ __device__ uint256 *uint256_from_hex(uint256 *dst, const char *src);
+__host__ uint256 *uint256_from_hex(uint256 *dst, const char *src);
 __host__ __device__ uint256 *uint256_from_uint32(uint256 *dst, uint32_t src);
 __host__ __device__ uint256 *uint256_from_word(uint256 *dst, uint32_t a);
 __host__ __device__ uint256 *uint256_from_bytes(uint256 *dst, const uint8_t *src, size_t len);

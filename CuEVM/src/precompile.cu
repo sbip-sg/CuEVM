@@ -575,9 +575,9 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
 __device__ int32_t operation_TransparentAttacker(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
                                                  CuEVM::evm_call_context_t *call_context) {
     // todo when optimizing, reentrancy attacker becomes a precompile
-    // printf("Thread %d: TransparentAttacker\n", INSTANCE_GLOBAL_IDX);
+
     uint8_t *output = g_fuzzing_constants->return_buffer;
-    // printf("Thread %d TransparentAttacker return buffer: %p\n", INSTANCE_GLOBAL_IDX, output);
+
     call_context->set_parent_return_data(output, RETURN_BUFFER_SIZE);
     return ERROR_RETURN;
 }
@@ -585,19 +585,12 @@ __device__ int32_t operation_TransparentAttacker(CuEVM::gas_t &gas_limit, CuEVM:
 __device__ int32_t operation_TransparentAttackerEnhanced(CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
                                                          CuEVM::evm_call_context_t *call_context,
                                                          const transaction::TransactionList *transaction_list_ptr) {
-    // todo when optimizing, attacker becomes a precompile
-    // printf("Thread %d: TransparentAttackerEnhanced\n", INSTANCE_GLOBAL_IDX);
-    // uint8_t *output = g_fuzzing_constants->return_buffer;
-    // // printf("Thread %d TransparentAttacker return buffer: %p\n", INSTANCE_GLOBAL_IDX, output);
-    // call_context->set_parent_return_data(output, RETURN_BUFFER_SIZE);
-
     if (call_context->parent == nullptr) return ERROR_RETURN;
     uint8_t *buf =
         CuEVM::memory_pool::preallocated_return_data_base + INSTANCE_GLOBAL_IDX * memory_pool_return_data_preallocate;
     memset(buf, 0, memory_pool_return_data_preallocate);  // Zero entire 128 bytes upfront for simplicity.
     uint8_t mode = transaction_list_ptr->block_number[INSTANCE_GLOBAL_IDX] % 3;
-    uint8_t *start_ptr = nullptr;  // to copy 32 bytes to return data.
-    uint64_t word = 0;             // for randomly generated value
+
     uint32_t seed = 0;
     if (mode == 0) {
         // start_ptr = g_fuzzing_constants->return_buffer;

@@ -174,7 +174,7 @@ __host__ __device__ uint512 *uint256_mul_wide(uint512 *dst, const uint256 *a, co
     memcpy(dst->words, tmp.words, sizeof(tmp.words));
     return dst;
 }
-__host__ __device__ uint256 *uint256_from_hex(uint256 *dst, const char *src) {
+__host__ uint256 *uint256_from_hex(uint256 *dst, const char *src) {
     size_t len = strlen(src);
     memset(dst->words, 0, sizeof(dst->words));
 
@@ -594,7 +594,7 @@ __host__ __device__ uint256 *uint256_signed_mod(uint256 *dst, const uint256 *num
 }
 
 __host__ __device__ uint256 *uint256_signed_div(uint256 *dst, const uint256 *numerator, const uint256 *denominator) {
-    uint256 remainder;
+    // uint256 remainder;
     bool numerator_neg = numerator->words[UINT256_WORDS - 1] & 0x80000000;
     bool denominator_neg = denominator->words[UINT256_WORDS - 1] & 0x80000000;
     uint256 numerator_abs;

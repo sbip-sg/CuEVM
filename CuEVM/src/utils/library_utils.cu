@@ -53,13 +53,17 @@ __host__ void serialized_worldstate_data::print() {
     printf("no_accounts: %d\n", no_accounts);
     printf("no_storage_elements: %d\n", no_storage_elements);
     for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        printf("address: %s\n", addresses[idx]);
-        printf("balance: %s\n", balance[idx]);
+        printf("address: \n");
+        addresses[idx].print();
+        printf("balance: \n");
+        balance[idx].print();
         printf("nonce: %d\n", nonce[idx]);
     }
     for (uint32_t idx = 0; idx < no_storage_elements; idx++) {
-        printf("storage_key: %s\n", storage_keys[idx]);
-        printf("storage_value: %s\n", storage_values[idx]);
+        printf("storage_key: \n");
+        storage_keys[idx].print();
+        printf("storage_value: \n");
+        storage_values[idx].print();
         printf("storage_index: %d\n", storage_indexes[idx]);
     }
 }

@@ -5,8 +5,8 @@ namespace CuEVM::utils {
 // In evm.cu (host code)
 void print_tracer_data(char* h_buffer) {
     size_t offset = 0;
-    uint32_t status;
-    memcpy(&status, h_buffer + offset, sizeof(uint32_t));
+    int32_t status;
+    memcpy(&status, h_buffer + offset, sizeof(int32_t));
     offset += sizeof(uint32_t);
     printf("status: %d\n", status);
     if (status == -1) {
@@ -19,7 +19,7 @@ void print_tracer_data(char* h_buffer) {
     // Read number of trace data points
     uint32_t size;
     memcpy(&size, h_buffer + offset, sizeof(uint32_t));
-    printf("offset %d size: %d\n", offset, size);
+    printf("offset %lu size: %u\n", offset, size);
 
     offset += sizeof(uint32_t);
 
@@ -212,7 +212,7 @@ __device__ void trace_data_t::print_err() {
 
     printf("\"depth\":%d,", depth);
 
-    printf("\"refund\":%u", refund);
+    printf("\"refund\":%lu", refund);
 
     printf("}\n");
 }
@@ -289,8 +289,8 @@ __device__ void tracer_t::print() {
     for (uint32_t i = 0; i < size; i++) {
         printf("PC: %d\n", data[i].pc);
         printf("Opcode: %d\n", data[i].op);
-        printf("Gas: %d\n", data[i].gas);
-        printf("Gas cost: %d\n", data[i].gas_cost);
+        printf("Gas: %lu\n", data[i].gas);
+        printf("Gas cost: %lu\n", data[i].gas_cost);
         printf("Stack: ");
         for (uint32_t j = 0; j < data[i].stack_size; j++) {
             data[i].stack[j].print();
@@ -299,7 +299,7 @@ __device__ void tracer_t::print() {
         printf("Memory size: %d\n", data[i].mem_size);
         // printf("Return data: ");
         // data[i].return_data->print();
-        printf("Refund: %d\n", data[i].refund);
+        printf("Refund: %lu\n", data[i].refund);
 #ifdef EIP_3155_OPTIONAL
         printf("Error code: %d\n", data[i].error_code);
         printf("Memory: ");

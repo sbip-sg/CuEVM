@@ -62,7 +62,8 @@ struct ValueStatus {
     }
 
     // the only time we set the original value is when we read from the pre-state db
-    __host__ __device__ void from_hex(const char *hex_str) {
+    // host - only function
+    __host__ void from_hex(const char *hex_str) {
         value.from_hex(hex_str);
         original_value = value;
         is_warm = false;
@@ -236,13 +237,7 @@ struct evm_memory_t {
     /**
      * Print the memory data structure.
      */
-    __host__ __device__ void print() const;
-
-    /**
-     * Get the json object from the memory data structure.
-     * @return The json object.
-     */
-    __host__ cJSON *to_json() const;
+    __device__ void print() const;
 
     /**
      * Increase the memory cost.
@@ -328,7 +323,7 @@ struct evm_stack_t {
     /**
      * The destructor
      */
-    __host__ __device__ ~evm_stack_t();
+    __device__ ~evm_stack_t();
 
     /**
      * The copy constructor
@@ -339,24 +334,24 @@ struct evm_stack_t {
     /**
      * Free the memory
      */
-    __host__ __device__ void free();
+    __device__ void free();
 
     /**
      * Clear the content
      */
-    __host__ __device__ void clear();
+    __device__ void clear();
 
     /**
      * Extract the stack data for tracing
      * @param[in] other The other stack
      */
-    __host__ __device__ void extract_data(evm_word_t *other) const;
+    __device__ void extract_data(evm_word_t *other) const;
 
     /**
      * Get the size of the stack
      * @return The size of the stack
      */
-    __host__ __device__ uint32_t size() const;
+    __device__ uint32_t size() const;
 
     /**
      * Reduce the size (remove items) of the stack without memory operations
@@ -368,7 +363,7 @@ struct evm_stack_t {
      * Get the top of the stack
      * @return The top of the stack pointer
      */
-    __host__ __device__ evm_word_t *top();
+    __device__ evm_word_t *top();
 
     /**
      * Push a value to the stack
@@ -376,18 +371,18 @@ struct evm_stack_t {
      * @param[in] value The value to be pushed
      * @return 0 if the value is pushed, error code otherwise
      */
-    __host__ __device__ int32_t push(const evm_word_t &value);
-    __host__ __device__ int32_t push_uint32(uint32_t value);
-    __host__ __device__ int32_t push_uint64(uint64_t value);
-    __host__ __device__ int32_t push_evm_word_t(const evm_word_t *value);
+    __device__ int32_t push(const evm_word_t &value);
+    __device__ int32_t push_uint32(uint32_t value);
+    __device__ int32_t push_uint64(uint64_t value);
+    __device__ int32_t push_evm_word_t(const evm_word_t *value);
     /**
      * Pop a value from the stack
      * @param[in] arith The arithmetical environment
      * @param[out] y The value popped from the stack
      * @return 0 if the value is popped, error code otherwise
      */
-    __host__ __device__ int32_t pop(evm_word_t &y);
-    __host__ __device__ int32_t pop_evm_word(evm_word_t *&y);
+    __device__ int32_t pop(evm_word_t &y);
+    __device__ int32_t pop_evm_word(evm_word_t *&y);
     /**
      * Push a value to the stack from a byte array
      * @param[in] arith The arithmetical environment
@@ -396,7 +391,7 @@ struct evm_stack_t {
      * @param[in] src_byte_size The size of the source byte data
      * @return 0 if the value is pushed, error code otherwise
      */
-    __host__ __device__ int32_t pushx(uint8_t x, const uint8_t __restrict__ *src_byte_data, uint8_t src_byte_size);
+    __device__ int32_t pushx(uint8_t x, const uint8_t __restrict__ *src_byte_data, uint8_t src_byte_size);
 
     /**
      * Get the value from the stack at the given index
@@ -405,9 +400,9 @@ struct evm_stack_t {
      * @param[out] y The value at the given index
      * @return 0 if the value is popped, error code otherwise
      */
-    __host__ __device__ int32_t get_index(uint32_t index, evm_word_t &y);
+    __device__ int32_t get_index(uint32_t index, evm_word_t &y);
 
-    __host__ __device__ evm_word_t *get_address_at_index(uint32_t index) const;
+    __device__ evm_word_t *get_address_at_index(uint32_t index) const;
     /**
      * Duplicvate the value at the given index and push
      * it at the top of the stack.
@@ -415,7 +410,7 @@ struct evm_stack_t {
      * @param[in] x The index of the value
      * @return 0 if the value is duplicated, error code otherwise
      */
-    __host__ __device__ int32_t dupx(uint32_t x);
+    __device__ int32_t dupx(uint32_t x);
 
     /**
      * Swap the values at the given index with the top of the stack
@@ -423,33 +418,12 @@ struct evm_stack_t {
      * @param[in] x The index of the value
      * @return 0 if the value is swapped, error code otherwise
      */
-    __host__ __device__ int32_t swapx(uint32_t x);
+    __device__ int32_t swapx(uint32_t x);
 
     /**
      * Print the stack
      */
-    __host__ __device__ void print() const;
-
-    /**
-     * Get the JSON object from the stack
-     * @return The JSON object
-     */
-    __host__ cJSON *to_json();
-
-    /**
-     * Generate the stack gpu instances from the stack cpu instances
-     * @param[in] cpu_instances The stack cpu instances
-     * @param[in] count The number of instances
-     * @return The stack gpu instances
-     */
-    __host__ static evm_stack_t *gpu_from_cpu(evm_stack_t *cpu_instances, uint32_t count);
-
-    /**
-     * Free the stack gpu instances
-     * @param[in] gpu_instances The stack gpu instances
-     * @param[in] count The number of instances
-     */
-    __host__ static void gpu_free(evm_stack_t *gpu_instances, uint32_t count);
+    __device__ void print() const;
 };
 
 }  // namespace stack
