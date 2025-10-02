@@ -17,8 +17,9 @@ RUN cd goevmlab && \
   go build ./cmd/runtest && \
   go build ./cmd/tracediff && \
   go build ./cmd/traceview
-RUN git clone https://github.com/ethereum/go-ethereum --depth 1
-RUN cd go-ethereum && go run build/ci.go install -static ./cmd/evm
+
+RUN git clone --depth 1 --branch v1.14.12 https://github.com/ethereum/go-ethereum
+RUN cd go-ethereum && go build ./cmd/evm 
 
 FROM nvidia/cuda:12.8.0-devel-ubuntu24.04
 
@@ -26,33 +27,29 @@ FROM nvidia/cuda:12.8.0-devel-ubuntu24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Update and install basic dependencies
-RUN apt-get update
-
-RUN apt-get install -y \
-    build-essential \
-    curl \
-    git \
-    wget \
-    z3 \
-    libz3-dev \
-    libfontconfig1 \
-    cmake
-
-RUN apt-get install -y python3 python3-pip pipx
-RUN apt-get install -y libcjson1  libcjson-dev
+RUN apt-get update && \
+    apt-get install -y \
+        build-essential \
+        curl \
+        git \
+        wget \
+        z3 \
+        libz3-dev \
+        libfontconfig1 \
+        cmake \
+        unzip \
+        python3 \
+        python3-pip \
+        pipx \
+        libcjson1 \
+        libcjson-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install beautifulsoup4 --break-system-packages
-COPY python-dependencies/slither-fix /tmp/slither-fix
-COPY python-dependencies/crytic-compile-etherscan-offline /tmp/crytic-compile-etherscan-offline
-COPY python-dependencies/solc-json-parser /tmp/solc-json-parser
-
 RUN pip3 install --break-system-packages slither-analyzer==0.11.3
 RUN pip3 install --break-system-packages crytic-compile==0.3.10
 RUN pip3 install --break-system-packages matplotlib pandas numpy
 RUN pip3 install solc-json-parser --break-system-packages
-RUN pip3 install --force-reinstall --no-deps --break-system-packages /tmp/slither-fix
-RUN pip3 install --force-reinstall --no-deps --break-system-packages /tmp/crytic-compile-etherscan-offline
-RUN pip3 install --force-reinstall --no-deps --break-system-packages /tmp/solc-json-parser
 
 RUN pip3 install lxml --break-system-packages
 RUN pip3 install --break-system-packages py-solc-x solc-select && \
@@ -91,13 +88,15 @@ if versions:
 PY
 
 COPY . /opt/cuevm
-RUN cmake -DBUILD_GO_LIBRARY=ON -DENABLE_EIP_3155=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY=86 -S /opt/cuevm -B /opt/cuevm/build \
+# note: update the compute capability here if you need to support newer GPUs
+RUN rm -rf /opt/cuevm/build
+RUN cmake -DBUILD_GO_LIBRARY=ON -DENABLE_EIP_3155=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY="86;89" -S /opt/cuevm -B /opt/cuevm/build \
     && cmake --build /opt/cuevm/build -j "$(nproc)" \
     && cp /opt/cuevm/build/libcuevm_go.so /usr/local/lib/
 RUN rm -rf /opt/cuevm/build \
     && cmake -DBUILD_GO_LIBRARY=OFF -DENABLE_EIP_3155=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY="86;89" -S /opt/cuevm -B /opt/cuevm/build \
     && cmake --build /opt/cuevm/build -j "$(nproc)" \
-    && cp /opt/cuevm/build/medusa-cuevm /usr/local/bin/
+    && cp /opt/cuevm/build/cuevm_GPU /usr/local/bin/cuevm
 
 # todo update this once we release the medusa source code  
 COPY medusa /usr/local/bin/
@@ -111,10 +110,9 @@ COPY --from=golang-builder /go/goevmlab/repro /usr/local/bin
 COPY --from=golang-builder /go/goevmlab/runtest /usr/local/bin
 COPY --from=golang-builder /go/goevmlab/tracediff /usr/local/bin
 COPY --from=golang-builder /go/goevmlab/traceview /usr/local/bin
-COPY --from=golang-builder /go/go-ethereum/build/bin/evm /usr/local/bin
+COPY --from=golang-builder /go/go-ethereum/evm /usr/local/bin/go-evm
 
 WORKDIR /tmp
-RUN apt install -y wget unzip
 RUN wget https://github.com/ethereum/tests/archive/refs/heads/shanghai.zip
 RUN unzip shanghai.zip
 RUN mv /tmp/tests-shanghai/GeneralStateTests /ethereum-tests-shanghai
@@ -122,6 +120,7 @@ RUN mv /tmp/tests-shanghai/GeneralStateTests /ethereum-tests-shanghai
 RUN ldconfig
 
 COPY scripts/run-ethtest-without-stateroot-comparison.py /usr/local/bin/run-ethtest-without-stateroot-comparison.py
+RUN chmod +x /usr/local/bin/run-ethtest-without-stateroot-comparison.py
 
 # Set working directory
 WORKDIR /app

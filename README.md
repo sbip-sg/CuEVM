@@ -30,12 +30,37 @@ cmake -DBUILD_GO_LIBRARY=ON -DENABLE_EIP_3155=OFF -DCMAKE_EXPORT_COMPILE_COMMAND
 cmake --build build -j $(nproc)
 ```
 
-### Build in Docker
+### Docker image
+
+To produce the prebuilt image used in our releases:
 
 ```bash
-# Inside the CuEVM project folder
-docker run --rm -it -v ./:/workspace/cuevm -w /workspace/cuevm augustus/goevmlab-cuevm:20241216 /bin/bash
-# You can compile in the docker container with the same commands as above
+docker build -t cuevm:latest .
+```
+
+The Dockerfile currently compiles both the shared library and the standalone binary with `-DCUDA_COMPUTE_CAPABILITY="86;89"`. Adjust these flags in the Dockerfile before building if you need support for newer GPU architectures. The bundled Medusa binary is built for compute capability 86; rebuild it if your deployment targets newer GPUs.
+
+Run the trace-comparison test suite directly in the container (mount a host directory for the temporary artifacts):
+
+```bash
+docker run --rm --gpus all \
+  -v /tmp/ethtest:/tmp/ethtest \
+  -v .:/app \
+  cuevm:latest \
+  run-ethtest-without-stateroot-comparison.py \
+    --input /ethereum-tests-shanghai/ \
+    --temporary-path /tmp/ethtest \
+    --runtest-bin runtest \
+    --geth go-evm \
+    --cuevm cuevm \
+    --ignore-errors
+```
+
+Run the sample Medusa fuzz campaign from the image:
+
+```bash
+docker run --rm --gpus all cuevm:latest \
+  medusa fuzz --config /opt/cuevm/medusa_sample_config/medusa.json
 ```
 
 ## Usage

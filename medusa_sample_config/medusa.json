@@ -1,0 +1,74 @@
+{
+  "fuzzing": {
+    "workers": 16384,
+    "workerResetLimit": 50,
+    "timeout": 100,
+    "testLimit": 10000,
+    "callSequenceLength": 1,
+    "corpusDirectory": "",
+    "coverageEnabled": true,
+    "targetContracts": ["Test"],
+    "targetContractsBalances": ["0x0"],
+    "constructorArgs": {},
+    "constructorArgsBytes": "0x000000000000000000000000a9f488b9144d14d6d0de723f7ddd39b5f33ada8f",
+    "deployerAddress": "0x30000",
+    "senderAddresses": ["0x10000", "0x20000"],
+    "blockNumberDelayMax": 60480,
+    "blockTimestampDelayMax": 604800,
+    "blockGasLimit": 125000000,
+    "transactionGasLimit": 12500000,
+    "testing": {
+      "stopOnFailedTest": false,
+      "stopOnFailedContractMatching": false,
+      "stopOnNoTests": true,
+      "testAllContracts": false,
+      "traceAll": false,
+      "testViewMethods": true,
+      "assertionTesting": {
+        "enabled": true,
+        "testViewMethods": false,
+        "panicCodeConfig": {
+          "failOnCompilerInsertedPanic": false,
+          "failOnAssertion": true,
+          "failOnArithmeticUnderflow": true,
+          "failOnDivideByZero": false,
+          "failOnEnumTypeConversionOutOfBounds": false,
+          "failOnIncorrectStorageAccess": false,
+          "failOnPopEmptyArray": false,
+          "failOnOutOfBoundsArrayAccess": false,
+          "failOnAllocateTooMuchMemory": false,
+          "failOnCallUninitializedVariable": false
+        }
+      },
+      "propertyTesting": {
+        "enabled": true,
+        "testPrefixes": ["property_"]
+      },
+      "optimizationTesting": {
+        "enabled": false,
+        "testPrefixes": ["optimize_"]
+      }
+    },
+    "chainConfig": {
+      "codeSizeCheckDisabled": true,
+      "cheatCodes": {
+        "cheatCodesEnabled": false,
+        "enableFFI": false
+      }
+    }
+  },
+  "compilation": {
+    "platform": "crytic-compile",
+    "platformConfig": {
+      "target": "test.sol",
+      "solcVersion": "0.7.6",
+      "exportDirectory": "",
+      "args": []
+    }
+  },
+  "logging": {
+    "level": "info",
+    "logDirectory": "",
+    "noColor": false
+  }
+}
