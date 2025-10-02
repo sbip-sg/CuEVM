@@ -239,11 +239,13 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
 
     // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for
     // each address in transaction.access_list
-
-    // for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
+    gas_intrinsic += transaction_list->access_list_gas_cost;
+#ifdef EIP_3155
+    // for (uint32_t idx = 0; idx < transaction_list->access_list.accounts_count; idx++) {
     //     gas_intrinsic += GAS_ACCESS_LIST_ADDRESS;
     //     gas_intrinsic += GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count;
     // }
+#endif
 
 #ifdef EIP_3860
     // gas_intrinsic += GAS_INITCODE_COST if create transaction

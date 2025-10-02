@@ -56,9 +56,11 @@ __device__ int32_t JUMPI(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
         evm_word_t *condition = stack.get_address_at_index(2);
         stack.reduce_size(2);
         uint32_t destination_u32 = uint256_get_uint32_t(destination);
-        if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
 
         if ((error_code == ERROR_SUCCESS) && (uint256_cmp_word(condition, 0) != 0)) {
+            // eth-tests, do not check destination overflow if we dont jump there (else branch)
+            if (uint256_cmp_word(destination, destination_u32)) return ERROR_INVALID_JUMP_DESTINATION;
+
 #ifdef BUILD_LIBRARY
             error_code =
                 simplified_trace_data_ptr->record_branch(pc, destination_u32, pc + 1) ? ERROR_FUZZING_STOP : error_code;

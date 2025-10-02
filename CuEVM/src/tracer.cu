@@ -61,7 +61,7 @@ void print_tracer_data(char* h_buffer) {
             "{\"pc\":%u,\"op\":%u,\"gas\":\"0x%lx\",\"gasCost\":\"0x%lx\","
             "\"memSize\":%u,\"stack\":[",
             pc, op, gas, gas_cost, mem_size);
-        if (stack_size > 100) {
+        if (stack_size > 1025) {
             printf("stack_size error : %u\n", stack_size);
             break;
         }

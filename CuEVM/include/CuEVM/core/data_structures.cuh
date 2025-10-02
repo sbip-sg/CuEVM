@@ -184,7 +184,8 @@ class TransactionList {
     uint8_t *call_data;
     uint32_t *call_data_offset;
     uint32_t *call_data_size;
-    // TODO: access list
+
+    uint64_t access_list_gas_cost;  // calculate on the host
 
     // different for each transaction (go library)
 #ifdef BUILD_GO_LIBRARY

@@ -285,7 +285,8 @@ __host__ __device__ uint256 *uint256_addmod(uint256 *dst, const uint256 *a, cons
     uint256_div_mod(&tmp, &tmp_b, b, N);
     uint256 t;
     // Compute t = N - b
-    uint256_sub(&t, N, b);
+    uint256_sub(&t, N, &tmp_b);
+
     if (uint256_cmp(&tmp_a, &t) >= 0) {
         uint256_sub(dst, &tmp_a, &t);
         return dst;

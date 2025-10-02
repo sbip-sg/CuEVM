@@ -452,6 +452,7 @@ __device__ void StateDb::update_account(const evm_word_t *address, const evm_wor
 }
 __device__ void StateDb::update_code(const evm_word_t *address, const uint32_t code_size, uint8_t *code) {
     int32_t address_index = get_address_index(address);
+    // printf("update_code address index %d instance %d\n", address_index, INSTANCE_GLOBAL_IDX);
     if (address_index != -1) {
         address_list[address_index] = 1;  // non-collision address, precompiled
         contract_index[address_index] = -1;
@@ -566,7 +567,6 @@ __device__ int32_t StateDb::deduct_balance_sender(const evm_word_t *address, con
         return ERROR_INSUFFICIENT_FUNDS;
     }
     uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-    // printf("address index %d instance %d\n", address_index, INSTANCE_GLOBAL_IDX);
     evm_word_t *current_balance;
 
     account_is_warm[instance_idx] = true;
@@ -577,6 +577,12 @@ __device__ int32_t StateDb::deduct_balance_sender(const evm_word_t *address, con
         return ERROR_INSUFFICIENT_FUNDS;
     }
     uint256_sub(current_balance, current_balance, amount);
+#ifdef EIP_3155
+    // EIP3607 check if sender has code, revert
+    if (account_codes_size[address_index] > 0) {
+        return ERROR_TRANSACTION_SENDER_CODE;
+    }
+#endif
     return ERROR_SUCCESS;
 }
 

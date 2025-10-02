@@ -109,11 +109,36 @@ __host__ int32_t get_transactions(std::vector<TransactionList *> &transaction_li
     }
 
     host_transaction_list_ptr->size = transactions_count;
-    // uint32_t access_list_counts = 0;
-    // const cJSON *access_list_json = cJSON_GetObjectItem(transaction_json, "accessLists");
-    // if (access_list_json != nullptr) access_list_counts = cJSON_GetArraySize(access_list_json);
+    uint32_t access_list_counts = 0;
+    const cJSON *access_list_json = cJSON_GetObjectItem(transaction_json, "accessLists");
+    if (access_list_json != nullptr) access_list_counts = cJSON_GetArraySize(access_list_json);
 
-    // TODO: access list
+    host_transaction_list_ptr->access_list_gas_cost = 0;
+    if (access_list_counts > 0) {
+        // retrieve the first access list
+        const cJSON *first_access_list_json = cJSON_GetArrayItem(access_list_json, 0);
+
+        // Check if the access list is empty (array with 0 elements)
+        if (first_access_list_json != nullptr && cJSON_IsArray(first_access_list_json)) {
+            uint32_t access_list_size = cJSON_GetArraySize(first_access_list_json);
+
+            // Iterate through each address entry in the access list
+            for (uint32_t i = 0; i < access_list_size; i++) {
+                const cJSON *address_entry = cJSON_GetArrayItem(first_access_list_json, i);
+                if (address_entry != nullptr && cJSON_IsObject(address_entry)) {
+                    // Add gas cost for the address
+                    host_transaction_list_ptr->access_list_gas_cost += GAS_ACCESS_LIST_ADDRESS;
+
+                    // Add gas cost for storage keys
+                    const cJSON *storage_keys_json = cJSON_GetObjectItemCaseSensitive(address_entry, "storageKeys");
+                    if (storage_keys_json != nullptr && cJSON_IsArray(storage_keys_json)) {
+                        uint32_t storage_keys_count = cJSON_GetArraySize(storage_keys_json);
+                        host_transaction_list_ptr->access_list_gas_cost += GAS_ACCESS_LIST_STORAGE * storage_keys_count;
+                    }
+                }
+            }
+        }
+    }
 
     if ((max_fee_per_gas_json != nullptr) && (max_priority_fee_per_gas_json != nullptr) &&
         (gas_price_json == nullptr)) {

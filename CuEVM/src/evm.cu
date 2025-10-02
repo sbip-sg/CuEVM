@@ -68,8 +68,8 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
 #endif
     int32_t bytecode_offset = -1;
 
-    // new CuEVM::evm_memory_t();  // memory_pool::global_memory_pool->get_memory(threadIdx.x);
     if (transaction_list_ptr->type == SPECIAL_CREATE_TRANSACTION_TYPE) {
+        // Create transaction. Special treatment
         uint32_t sender_nonce_uint = CuEVM::global_state_db_ptr->get_nonce(sender);
         evm_word_t sender_nonce(sender_nonce_uint);
 
@@ -77,21 +77,22 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         // special case ? Tests allow create to acc with storage
         // TODO: simplify this
 
-        transaction_list_ptr->to.print();
+        // transaction_list_ptr->to.print();
         if (!CuEVM::global_state_db_ptr->is_empty_create(&transaction_list_ptr->to)) {
             // todo: return error code
             return;
         }
+        // calldatasize = 0 for create transaction
 #ifdef BUILD_GO_LIBRARY
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit, stack_ptr, memory_ptr, *sender,
                                         transaction_list_ptr->to, transaction_list_ptr->to,
-                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CREATE, call_data,
-                                        call_data_size, call_data, call_data_size, bytecode_offset);
+                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CREATE, call_data, 0,
+                                        call_data, call_data_size, bytecode_offset);
 #else
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX], stack_ptr, memory_ptr,
                                         *sender, transaction_list_ptr->to, transaction_list_ptr->to,
-                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CREATE, call_data,
-                                        call_data_size, call_data, call_data_size, bytecode_offset);
+                                        transaction_list_ptr->value[INSTANCE_GLOBAL_IDX], OP_CREATE, call_data, 0,
+                                        call_data, call_data_size, bytecode_offset);
 #endif
     } else {
         byte_code = global_state_db_ptr->get_code(byte_code_size, &transaction_list_ptr->to);
@@ -116,14 +117,42 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
     // deduct upfront cost
 #ifdef BUILD_GO_LIBRARY
     evm_word_t upfront_cost = transaction_list_ptr->gas_limit;
-#else
-    evm_word_t upfront_cost = transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX];
-#endif
-
     uint256_mul(&upfront_cost, &upfront_cost, &transaction_list_ptr->gas_price);
     global_state_db_ptr->deduct_balance_sender(sender, &upfront_cost);
 
+#else
+    // Skip checking condition on  max_priority_fee_per_gas & miner adding priority fee. Todo check later
+    // assert transaction.max_fee_per_gas >= transaction.max_priority_fee_per_gas
+    // assert transaction.max_fee_per_gas >= block.base_fee_per_gas
+    /*
+        bool cond1 = uint256_cmp(&transaction_list_ptr->max_fee_per_gas, &global_block_info->base_fee) >= 0;
+        bool cond2 =
+            uint256_cmp(&transaction_list_ptr->max_fee_per_gas, &transaction_list_ptr->max_priority_fee_per_gas) >= 0;
+        if (!cond1 || !cond2) {
+            asm("exit;");
+            // return;
+        }
+    */
+
+    evm_word_t upfront_cost = transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX];
+    evm_word_t effective_gas_price = transaction_list_ptr->gas_price;
+    if (uint256_is_zero(&transaction_list_ptr->gas_price)) effective_gas_price = transaction_list_ptr->max_fee_per_gas;
+
+    if (transaction_list_ptr->max_priority_fee_per_gas.words[0] > 0) {
+        // check this condition to clear more tests
+    }
+
+    uint256_mul(&upfront_cost, &upfront_cost, &effective_gas_price);
+    int32_t error_code = global_state_db_ptr->deduct_balance_sender(sender, &upfront_cost);
+    if (error_code != ERROR_SUCCESS || gas_intrinsic > transaction_list_ptr->gas_limit[INSTANCE_GLOBAL_IDX]) {
+        // printf("deduct balance sender error code %d\n", error_code);
+        asm("exit;");
+        // return;
+    }
+#endif
+
 #ifdef EIP_3155
+
     this->tracer_ptr = new CuEVM::utils::tracer_t();
 #endif
 }
@@ -755,7 +784,9 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                     // setting address = 0 to the stack
                     evm_word_t create_output = 0;
                     call_state_ptr->stack_ptr->push(create_output);
-                    // TODO: fix this
+                    call_state_ptr->fixed_ret_size = 0;
+                    call_state_ptr->dynamic_ret_size = 0;
+                    // TODO: fix this; Oct 25: do we need to clear data manually ?
                     // call_state_ptr->message_ptr->copy_from(call_state_ptr->message_ptr_copy);
                     // CuEVM::byte_array_t::reset_return_data(call_state_ptr->last_return_data_ptr);
                 }
@@ -1094,14 +1125,8 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
     uint32_t num_transactions_per_gpu = num_transactions / num_gpus;
     // generate the evm instances
 
-    // CUDA_CHECK(cudaMallocManaged(&evm_instances, num_transactions * sizeof(evm_instance_t)));
     printf("CuEVM: num_transactions %d, num_transactions_per_gpu %d\n", num_transactions, num_transactions_per_gpu);
 
-    // evm_instance_t *evm_instances = new evm_instance_t[num_transactions];
-
-    // CuEVM::StateDb *snapshot_state_db_ptr = nullptr;
-
-    // CuEVM::StateDb::GPUfromJson(state_db_ptr, world_state_json, num_transactions, num_accounts
     // for multiGPU version
     CuEVM::StateDb::GPUfromJsonMultiGPU(state_db_ptrs, world_state_json, num_transactions_per_gpu, num_accounts,
                                         snapshot_state_db_ptrs);
