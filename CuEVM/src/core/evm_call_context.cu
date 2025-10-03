@@ -193,6 +193,8 @@ __device__ void evm_call_context_t::copy_return_data_to_memory(uint32_t memory_o
 
     uint32_t actual_size = min(size, dynamic_ret_size);
 
+    if (actual_size == 0) return;
+
     uint32_t remaining_size = size > actual_size ? size - actual_size : 0;
     if (dynamic_ret_size <= memory_pool_return_data_preallocate) {
         memory_ptr->set_buffer_data(preallocated_base, data_offset, actual_size, memory_offset, actual_size);

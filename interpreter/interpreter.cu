@@ -67,7 +67,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     test_json = cJSON_GetArrayItem(read_root, 0);
 // tracer
 #ifdef EIP_3155
-    const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
+    const size_t BUFFER_SIZE = 500 * 1024 * 1024;  // 500 MB
     // char *d_buffer;
     std::vector<char *> d_buffers(num_gpus);
     for (int i = 0; i < num_gpus; i++) {

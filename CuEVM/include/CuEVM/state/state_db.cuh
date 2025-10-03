@@ -216,7 +216,7 @@ class StateDb {
      * @param[in] address The address of the account.
      * @param[in] nonce The new nonce.
      */
-    __device__ void update_nonce(const evm_word_t *address, const uint32_t nonce);
+    __device__ void update_nonce(const evm_word_t *address, const uint32_t nonce, bool is_warm = false);
 
     /**
      * @brief Update the code of an account.

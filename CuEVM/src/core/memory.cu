@@ -8,6 +8,7 @@
 #ifdef BUILD_LIBRARY
 #include <CuEVM/utils/library_utils.h>
 #endif
+#define MAX_MEMORY_PRINT_SIZE 1024
 namespace CuEVM::memory {
 
 // experimental, not used
@@ -116,6 +117,7 @@ __device__ void evm_memory_t::print() const {
         } else {
             printf("%02x", dynamic_data[preallocated_base_offset + i - memory_prealloc_size]);
         }
+        if (i > MAX_MEMORY_PRINT_SIZE) break;
     }
     printf("\n");
 }

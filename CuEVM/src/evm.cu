@@ -78,10 +78,14 @@ __device__ evm_t::evm_t(CuEVM::transaction::TransactionList *transaction_list_pt
         // TODO: simplify this
 
         // transaction_list_ptr->to.print();
-        if (!CuEVM::global_state_db_ptr->is_empty_create(&transaction_list_ptr->to)) {
-            // todo: return error code
-            return;
+        // printf("Create account check, code size %d\n", call_data_size);
+        // EIP-3860
+        if (!CuEVM::global_state_db_ptr->is_empty_create(&transaction_list_ptr->to) ||
+            max_initcode_size < call_data_size) {
+            // printf("Error: Create transaction check failed\n");
+            asm("exit;");
         }
+        CuEVM::global_state_db_ptr->update_nonce(&transaction_list_ptr->to, 1, true);
         // calldatasize = 0 for create transaction
 #ifdef BUILD_GO_LIBRARY
         call_state_ptr->initiate_values(1, transaction_list_ptr->gas_limit, stack_ptr, memory_ptr, *sender,
@@ -253,7 +257,9 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
         } else {
             // operation stop
             call_state_ptr->dynamic_ret_size = 0;
-
+            if (call_state_ptr->parent != nullptr) {
+                call_state_ptr->parent->dynamic_ret_size = 0;
+            }
             return ERROR_RETURN;
         }
     }
@@ -794,11 +800,16 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         }
 
         if (error_code != ERROR_SUCCESS) {
-            if ((error_code == ERROR_RETURN) &&
-                (call_state_ptr->call_type == OP_CREATE || call_state_ptr->call_type == OP_CREATE2)) {
-                // TODO: finish create call add the contract to the state
-                // printf("Create call\n");
-                error_code = finish_CREATE(cached_call_state);
+            if ((call_state_ptr->call_type == OP_CREATE || call_state_ptr->call_type == OP_CREATE2)) {
+                if (error_code == ERROR_RETURN) {
+                    // TODO: finish create call add the contract to the state
+                    error_code = finish_CREATE(cached_call_state);
+                    if (error_code != ERROR_SUCCESS && error_code != ERROR_RETURN) {
+                        global_state_db_ptr->update_nonce(&call_state_ptr->to, 0, true);
+                    }
+                } else {
+                    global_state_db_ptr->update_nonce(&call_state_ptr->to, 0, true);
+                }
             }
             // TODO: remove this, read cached state inside finish_CALL
             cached_call_state.write_cache_to_state(call_state_ptr);
@@ -960,9 +971,7 @@ __device__ int32_t evm_t::finish_CALL(int32_t error_code) {
         call_state_ptr->parent->dynamic_ret_size = 0;
         call_state_ptr->fixed_ret_size = 0;
     }
-    // printf("finish_CALL thread %d, error_code %d, call_state_ptr->snapshot_state %p\n", INSTANCE_GLOBAL_IDX,
-    // error_code,
-    //        call_state_ptr->snapshot_state);
+
     if (error_code != ERROR_RETURN && call_state_ptr->snapshot_state != nullptr) {
         call_state_ptr->revert();
     }
@@ -1041,8 +1050,6 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
     // bn_t sender_address;
     // call_state_ptr->message_ptr->get_sender(sender_address);
 
-    // printf("finish_CREATE thread %d, call_state_ptr %p\n", INSTANCE_GLOBAL_IDX, call_state_ptr);
-
     CuEVM::gas_cost::code_cost(cached_call_state.gas_used, call_state_ptr->dynamic_ret_size);
     int32_t error_code = ERROR_SUCCESS;
     error_code |= CuEVM::gas_cost::has_gas(cached_call_state.gas_limit, cached_call_state.gas_used);
@@ -1053,22 +1060,24 @@ __device__ int32_t evm_t::finish_CREATE(cached_evm_call_context &cached_call_sta
         return ERROR_RETURN;
     }
 #endif
-    if (error_code == ERROR_SUCCESS && code_size > 0) {
+    // printf("finish_CREATE thread %d, error_code %d, code_size %d\n", INSTANCE_GLOBAL_IDX, error_code, code_size);
+    if (error_code == ERROR_SUCCESS) {
 #ifdef EIP_3541
         uint8_t *code = new uint8_t[code_size];
         // printf("THREAD %d: code_size %u\n", INSTANCE_GLOBAL_IDX, code_size, );
         call_state_ptr->parent->copy_return_data(code, 0, code_size);
 #endif
 
-        if (code_size <= CuEVM::max_code_size) {
-#ifdef EIP_3541
-            if ((code_size > 0) && (code[0] == 0xef)) {
-                error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
-            }
-#endif
-            global_state_db_ptr->update_code(&call_state_ptr->to, code_size, code);
-        } else {
+        if (code_size > CuEVM::max_code_size) {
             error_code = ERROR_CREATE_CODE_SIZE_EXCEEDED;
+        }
+#ifdef EIP_3541
+        else if ((code_size > 0) && (code[0] == 0xef)) {
+            error_code = ERROR_CREATE_CODE_FIRST_BYTE_INVALID;
+        }
+#endif
+        else {
+            global_state_db_ptr->update_code(&call_state_ptr->to, code_size, code);
         }
 
         delete[] code;
@@ -1093,14 +1102,18 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
     // Default constructor initializes with 0 elements
     std::vector<CuEVM::StateDb *> state_db_ptrs(num_gpus, nullptr);
     std::vector<CuEVM::StateDb *> snapshot_state_db_ptrs(num_gpus, nullptr);
-    const cJSON *world_state_json = NULL;  // the json for the world state
+    // const cJSON *world_state_json = NULL;  // the json for the world state
     // get the world state json
-    if (cJSON_IsObject(test_json))
-        world_state_json = cJSON_GetObjectItemCaseSensitive(test_json, "pre");
-    else if (cJSON_IsArray(test_json))
-        world_state_json = test_json;
-    else
+    // if (cJSON_IsObject(test_json))
+    //     world_state_json = cJSON_GetObjectItemCaseSensitive(test_json, "pre");
+    // else if (cJSON_IsArray(test_json))
+    //     world_state_json = test_json;
+    // else
+    //     return std::vector<CuEVM::transaction::TransactionList *>();
+    if (!cJSON_IsObject(test_json)) {
+        printf("Error: expecting cjson object as state input\n");
         return std::vector<CuEVM::transaction::TransactionList *>();
+    }
 
     for (int i = 0; i < num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
@@ -1128,7 +1141,7 @@ __host__ std::vector<CuEVM::transaction::TransactionList *> get_evm_instances(co
     printf("CuEVM: num_transactions %d, num_transactions_per_gpu %d\n", num_transactions, num_transactions_per_gpu);
 
     // for multiGPU version
-    CuEVM::StateDb::GPUfromJsonMultiGPU(state_db_ptrs, world_state_json, num_transactions_per_gpu, num_accounts,
+    CuEVM::StateDb::GPUfromJsonMultiGPU(state_db_ptrs, test_json, num_transactions_per_gpu, num_accounts,
                                         snapshot_state_db_ptrs);
 
     num_instances = num_transactions_per_gpu;

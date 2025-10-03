@@ -268,10 +268,6 @@ __device__ int32_t CREATE(CuEVM::evm_call_context_t *current_context, CuEVM::evm
 __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                         CuEVM::cached_evm_call_context &cached_state) {
     evm_word_t *gas_word, *original_address, *value, *args_offset, *args_size, *ret_offset, *ret_size;
-    // if (INSTANCE_GLOBAL_IDX == 1) {
-    //     printf("stack before call %p\n", cached_state.stack_ptr);
-    //     printf("snapshot state before call %p\n", current_context->snapshot_state);
-    // }
 
     if (cached_state.stack_ptr->size() < 7) return ERROR_STACK_UNDERFLOW;
     gas_word = cached_state.stack_ptr->get_address_at_index(1);

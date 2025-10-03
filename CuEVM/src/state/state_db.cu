@@ -452,7 +452,6 @@ __device__ void StateDb::update_account(const evm_word_t *address, const evm_wor
 }
 __device__ void StateDb::update_code(const evm_word_t *address, const uint32_t code_size, uint8_t *code) {
     int32_t address_index = get_address_index(address);
-    // printf("update_code address index %d instance %d\n", address_index, INSTANCE_GLOBAL_IDX);
     if (address_index != -1) {
         address_list[address_index] = 1;  // non-collision address, precompiled
         contract_index[address_index] = -1;
@@ -586,7 +585,7 @@ __device__ int32_t StateDb::deduct_balance_sender(const evm_word_t *address, con
     return ERROR_SUCCESS;
 }
 
-__device__ void StateDb::update_nonce(const evm_word_t *address, const uint32_t nonce) {
+__device__ void StateDb::update_nonce(const evm_word_t *address, const uint32_t nonce, bool is_warm) {
     int32_t address_index = get_address_index(address);
     if (address_index == -1) {
         DynamicAccount *dynamic_account = get_dynamic_account(address);
@@ -594,6 +593,7 @@ __device__ void StateDb::update_nonce(const evm_word_t *address, const uint32_t 
             dynamic_account = StateDb::new_account(address, 0, nonce, 0, nullptr);
         }
         dynamic_account->nonce = nonce;
+        if (is_warm) dynamic_account->is_warm = is_warm;
         return;
     }
     account_nonces[address_index * num_states + INSTANCE_GLOBAL_IDX] = nonce;
@@ -1435,8 +1435,27 @@ __host__ void StateDb::GPUfromJsonMultiGPU(std::vector<StateDb *> &state_db, con
 }
 
 // Return a pointer to the StateDb object on device memory
-__host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, uint32_t num_states) {
+__host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *full_json, uint32_t num_states) {
     // if (!cJSON_IsArray(state_json)) return 0;
+    const cJSON *state_json = NULL;  // the json for the world state
+    if (cJSON_IsObject(full_json)) {
+        state_json = cJSON_GetObjectItemCaseSensitive(full_json, "pre");
+    }
+    if (state_json == nullptr || !cJSON_IsObject(state_json)) {
+        printf("Error: state_json not found or input format not compatible\n");
+        exit(0);
+    }
+
+    // get coinbase
+    cJSON *coinbase_json = cJSON_GetObjectItemCaseSensitive(full_json, "env");
+    evm_word_t coinbase;
+    if (coinbase_json != nullptr) {
+        cJSON *coinbase_element_json = cJSON_GetObjectItemCaseSensitive(coinbase_json, "currentCoinbase");
+        if (coinbase_element_json != nullptr && coinbase_element_json->valuestring != nullptr) {
+            coinbase.from_hex(coinbase_element_json->valuestring);
+        }
+    }
+
     uint32_t num_accounts = cJSON_GetArraySize(state_json);
     // if (num_accounts == 0)
     //     ;
@@ -1502,13 +1521,9 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
         state_db->account_nonces[idx * num_states] = uint256_get_uint32_t(&nonce);
         state_db->account_balances[idx * num_states].from_hex(balance_json->valuestring);
 
-        // TODO: justify if it is appropriate to perform here
-        // if (state_db->address_list[idx] == sender) {
-        //     uint256_sub(&state_db->account_balances[idx * num_states], &state_db->account_balances[idx *
-        //     num_states],
-        //                 &upfront_cost);
-        // }
-
+        if (uint256_cmp(&state_db->address_list[idx], &coinbase) == 0) {
+            state_db->account_is_warm[idx * num_states] = true;
+        }
         byte_array_t byte_code;
         byte_code.from_hex(cJSON_GetObjectItemCaseSensitive(account_json, "code")->valuestring, LITTLE_ENDIAN,
                            NO_PADDING);
@@ -1559,6 +1574,7 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *state_json, 
             state_db->account_storage_size[idx * num_states + i] = state_db->account_storage_size[idx * num_states];
             state_db->account_balances[idx * num_states + i] = state_db->account_balances[idx * num_states];
             state_db->account_nonces[idx * num_states + i] = state_db->account_nonces[idx * num_states];
+            state_db->account_is_warm[idx * num_states + i] = state_db->account_is_warm[idx * num_states];
         }
 
         for (uint32_t i = 0; i < state_db->account_storage_size[idx * num_states]; i++) {
