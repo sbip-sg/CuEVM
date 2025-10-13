@@ -25,7 +25,7 @@ __device__ byte_array_t::byte_array_t(uint8_t *data, uint32_t size) : size(size)
 
 __device__ byte_array_t::byte_array_t(const byte_array_t &src_byte_array, uint32_t offset, uint32_t size) : size(size) {
     uint8_t *local_data = nullptr;
-    // printf("byte_array_t::byte_array_t %d %d %d %d\n", THREADIDX, THREAD_IDX_PER_INSTANCE, offset, size);
+
     if (size > 0) {
         local_data = new uint8_t[size];
 
@@ -100,8 +100,6 @@ __device__ byte_array_t &byte_array_t::operator=(const byte_array_t &other) {
 }
 
 __device__ int32_t byte_array_t::grow(uint32_t new_size, int32_t zero_padding) {
-    // printf("byte_array_t::grow %d %d size %d zero_padding %d, new_size %d, data %p\n", THREADIDX,
-    //        THREAD_IDX_PER_INSTANCE, size, zero_padding, new_size, data);
     if (new_size == size) return ERROR_SUCCESS;
     uint8_t *new_data;
 
@@ -257,11 +255,7 @@ __host__ int32_t byte_array_t::from_hex(const char *hex_string, int32_t endian, 
         data = nullptr;
         size = 0;
     }
-    // printf("end of byte array from hex\n");
-    // for (uint32_t idx = 0; idx < size; idx++) {
-    //     printf("%02x", data[idx]);
-    // }
-    // printf("\n");
+
     return error_code;
 }
 

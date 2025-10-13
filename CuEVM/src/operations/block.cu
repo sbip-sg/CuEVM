@@ -19,8 +19,7 @@ __device__ int32_t BLOCKHASH(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_us
 // even if error of invalid number/index, the hash is set to zero
 #ifdef BUILD_GO_LIBRARY
         uint256_from_uint32(&hash, transaction_list_ptr->block_number[INSTANCE_GLOBAL_IDX]);
-        // printf("thread %d  block number %lu, block hash %u\n", INSTANCE_GLOBAL_IDX,
-        //        transaction_list_ptr->block_number[INSTANCE_GLOBAL_IDX], hash.words[0]);
+
 #else
         uint32_t tmp_error_code;
         tmp_error_code = global_block_info->get_previous_hash(hash, number);

@@ -25,11 +25,6 @@ static std::vector<uint64_t*> device_block_numbers;  // vector size = num gpus f
 static std::vector<uint64_t*> device_time_stamps;    // vector size = num gpus for persistent time stamps
 
 static int call_counter = 0;
-// Global variable to hold persistent jump table
-// CuEVM::ContractPCsMap contract_pcs_map;
-
-// Global variable to hold the last execution result
-static char* g_last_result = nullptr;
 
 static int g_num_gpus = 1;
 
@@ -89,8 +84,7 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
 
         // create and set the coverage bitmap once for each fuzzing campaign
         uint32_t* d_coverage_bitmap;
-        // CUDA_CHECK(cudaMalloc(&d_coverage_bitmap, BITMAP_SIZE_IN_INTS * sizeof(uint32_t)));
-        // CUDA_CHECK(cudaMemset(d_coverage_bitmap, 0, BITMAP_SIZE_IN_INTS * sizeof(uint32_t)));
+
         CUDA_CHECK(cudaMalloc(&d_coverage_bitmap, BITMAP_SIZE * sizeof(uint32_t)));
         CUDA_CHECK(cudaMemset(d_coverage_bitmap, 0, BITMAP_SIZE * sizeof(uint32_t)));
 
@@ -132,16 +126,11 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
 
         uint32_t num_integer_elements_bitmap = (num_instances + 31) / 32;
         printf("num_integer_elements_bitmap: %u\n", num_integer_elements_bitmap);
-        uint32_t* d_new_coverage_bitmap;
-
-        // TODO: do we need txBatchCount or g_num_instances_per_device?
-        // CUDA_CHECK(cudaMalloc(&d_new_coverage_bitmap, num_integer_elements_bitmap * sizeof(uint32_t)));
-        // CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_bitmap, &d_new_coverage_bitmap, sizeof(uint32_t*)));
 
         d_branch_infos.push_back(d_new_branch_info);
         d_storage_infos.push_back(d_new_storage_info);
         d_bug_infos.push_back(d_new_bug_info);
-        // d_new_coverage_bitmaps.push_back(d_new_coverage_bitmap);
+
         d_gpu_feedback_counts.push_back(d_gpu_feedback_count);
 
         // block number and timestamp
@@ -193,10 +182,7 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
             g_snapshot_state_db_ptr[i] = nullptr;
         }
     }
-    // if (g_state_db_ptr != nullptr) {
-    //     delete g_state_db_ptr;
-    //     g_state_db_ptr = nullptr;
-    // }
+
     // Initialize and store the state DB and account count globally
     // Modify GPUfromJson to use the persistent jump table
 
@@ -340,9 +326,9 @@ void setup_fuzzing_constants(const char* fuzzing_constants, uint32_t* markerData
     CUDA_CHECK(cudaMalloc(&d_return_data_buffer, RETURN_BUFFER_SIZE * sizeof(uint8_t)));
     // CUDA_CHECK(cudaMalloc(&d_address_list, address_count * sizeof(evm_word_t)));
     CUDA_CHECK(cudaMalloc(&d_sender_list, sender_count * sizeof(evm_word_t)));
-    printf("Copying address constants to device address array size: %d %d\n", address_count * sizeof(evm_word_t),
+    printf("Copying address constants to device address array size: %lu %lu\n", address_count * sizeof(evm_word_t),
            address_count * 32 * sizeof(uint8_t));
-    printf("Copying integer constants to device integer array size: %d %d\n", integer_count * sizeof(evm_word_t),
+    printf("Copying integer constants to device integer array size: %lu %lu\n", integer_count * sizeof(evm_word_t),
            integer_count * 32 * sizeof(uint8_t));
     CUDA_CHECK(cudaMemcpy(d_address_constants, host_address_constants, address_count * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
@@ -472,136 +458,6 @@ void reset_state_db() {
     CuEVM::memory_pool::clear_memory_pool(g_num_gpus);
 }
 
-void print_evm_instances_results(bool copy_state_data) {
-    // deprecated golibrary code
-    /*
-        // Copy trace data from device memory
-        CuEVM::simplified_trace_data* trace_data =
-            new CuEVM::simplified_trace_data[g_num_instances_per_device * g_num_gpus];
-
-        for (int i = 0; i < g_num_gpus; i++) {
-            CuEVM::simplified_trace_data* d_trace_data;
-
-            // Retrieve the device pointers stored in the global symbols
-            CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
-
-            // Copy the data arrays from device to host memory
-            CUDA_CHECK(cudaMemcpy(&trace_data[i * g_num_instances_per_device], d_trace_data,
-                                  sizeof(CuEVM::simplified_trace_data) * g_num_instances_per_device,
-                                  cudaMemcpyDeviceToHost));
-        }
-        // Copy world state data if requested
-        CuEVM::serialized_worldstate_data* world_data = nullptr;
-        if (copy_state_data) {
-            CuEVM::serialized_worldstate_data* d_world_data;
-            world_data = new CuEVM::serialized_worldstate_data[g_num_instances_per_device * g_num_gpus];
-
-            for (int i = 0; i < g_num_gpus; i++) {
-                CUDA_CHECK(cudaMemcpyFromSymbol(&d_world_data, global_serialized_worldstate, sizeof(d_world_data)));
-                CUDA_CHECK(cudaMemcpy(&world_data[i * g_num_instances_per_device], d_world_data,
-                                      sizeof(CuEVM::serialized_worldstate_data) * g_num_instances_per_device,
-                                      cudaMemcpyDeviceToHost));
-            }
-        }
-        printf("===== Printing results for %u EVM instances =====\n", g_num_instances_per_device * g_num_gpus);
-
-        // Print information for each instance
-        for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
-            printf("\n----- Instance %u -----\n", idx);
-
-            // Print trace data
-            printf("Trace Data:\n");
-            printf("  Events: %u\n", trace_data[idx].no_events);
-            printf("  Calls: %u\n", trace_data[idx].no_calls);
-            printf("  Branches: %u\n", trace_data[idx].no_branches);
-
-            // Print ALL events
-            if (trace_data[idx].no_events > 0) {
-                printf("  All Events:\n");
-                for (uint32_t e = 0; e < trace_data[idx].no_events; e++) {
-                    printf("    Event[%u]: PC=%u, OP=%u, Operand1=", e, trace_data[idx].events[e].pc,
-                           trace_data[idx].events[e].op);
-                    trace_data[idx].events[e].operand_1.print();
-                    printf(", Operand2=");
-                    trace_data[idx].events[e].operand_2.print();
-                    printf(", Result=");
-                    trace_data[idx].events[e].res.print();
-                    printf("\n");
-                }
-            }
-
-            // Print ALL calls
-            if (trace_data[idx].no_calls > 0) {
-                printf("  All Calls:\n");
-                for (uint32_t c = 0; c < trace_data[idx].no_calls; c++) {
-                    printf("    Call[%u]: PC=%u, OP=%u, Sender=", c, trace_data[idx].calls[c].pc,
-                           trace_data[idx].calls[c].op);
-                    trace_data[idx].calls[c].sender.print();
-                    printf(", Receiver=");
-                    trace_data[idx].calls[c].receiver.print();
-                    printf(", Value=");
-                    trace_data[idx].calls[c].value.print();
-                    printf(", Error_code=%u\n", trace_data[idx].calls[c].error_code);
-                }
-            }
-
-            // Print ALL branches
-            if (trace_data[idx].no_branches > 0) {
-                printf("  All Branches:\n");
-                for (uint32_t b = 0; b < trace_data[idx].no_branches; b++) {
-                    printf("    Branch[%u]: PC_src=%u, PC_dst=%u, PC_missed=%u, Distance=", b,
-                           trace_data[idx].branches[b].pc_src, trace_data[idx].branches[b].pc_dst,
-                           trace_data[idx].branches[b].pc_missed);
-                    trace_data[idx].branches[b].distance.print();
-                    printf("\n");
-                }
-            }
-
-            // Print ALL world state data if available
-            if (copy_state_data && world_data != nullptr) {
-                printf("\n  World State:\n");
-                printf("    Accounts: %u\n", world_data[idx].no_accounts);
-                printf("    Storage Elements: %u\n", world_data[idx].no_storage_elements);
-
-                // Print ALL account info
-                if (world_data[idx].no_accounts > 0) {
-                    printf("    All Accounts:\n");
-                    for (uint32_t a = 0; a < world_data[idx].no_accounts; a++) {
-                        char addr_buf[70];
-                        world_data[idx].addresses[a].to_hex(addr_buf);
-                        char balance_buf[70];
-                        world_data[idx].balance[a].to_hex(balance_buf);
-
-                        printf("      Account[%u]: Address=%s, Balance=%s, Nonce=%u\n", a, addr_buf, balance_buf,
-                               world_data[idx].nonce[a]);
-                    }
-                }
-
-                // Print ALL storage elements
-                if (world_data[idx].no_storage_elements > 0) {
-                    printf("    All Storage Elements:\n");
-                    for (uint32_t s = 0; s < world_data[idx].no_storage_elements; s++) {
-                        char key_buf[70];
-                        world_data[idx].storage_keys[s].to_hex(key_buf);
-                        char value_buf[70];
-                        world_data[idx].storage_values[s].to_hex(value_buf);
-
-                        printf("      Storage[%u]: Account_Index=%u, Key=%s, Value=%s\n", s,
-                               world_data[idx].storage_indexes[s], key_buf, value_buf);
-                    }
-                }
-            }
-        }
-
-        printf("\n===== End of results =====\n");
-
-        // Clean up memory
-        delete[] trace_data;
-        if (copy_state_data && world_data != nullptr) {
-            delete[] world_data;
-        }
-        */
-}
 // Creates transaction list on both host and device
 
 std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
@@ -611,35 +467,6 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     const uint32_t* markerData, int markerDataLen, uint32_t start_seed = 0, uint32_t sequence_idx = 0) {
     printf("create transaction list with start seed %u\n", start_seed);
     // Create TransactionList on host
-
-    // Allocate memory for transaction data on host
-    // evm_word_t* converted_values = new evm_word_t[txCount];
-
-#ifdef BUILD_GO_LIBRARY
-    // do we need to memcpy ?
-    // memcpy(host_transaction_list->block_number, blockNumber, txCount * sizeof(uint64_t));
-    // memcpy(host_transaction_list->time_stamp, timeStamp, txCount * sizeof(uint64_t));
-
-#endif
-    // TODO optimize this pattern (set pointers directly)
-
-#ifndef BUILD_GO_LIBRARY
-    // Handle single sender (common for all transactions)
-    // uint256_from_bytes(&host_transaction_list->sender, fromAddr, 32);
-#endif
-
-    // Handle recipient (common for all transactions)
-    // uint256_from_bytes(&host_transaction_list->to, toAddr, 32);
-
-    // Set fixed gas price and nonce
-    // host_transaction_list->gas_price = 1;  // 1 wei fixed gas price
-    // host_transaction_list->nonce = 0;      // Fixed nonce
-
-    // Handle values for each transaction
-
-    // for (int i = 0; i < txCount; i++) {
-    //     uint256_from_bytes(&converted_values[i], &values[i * 32], 32);
-    // }
 
     std::vector<CuEVM::transaction::TransactionList*> d_transaction_list_ptrs;
     uint32_t transaction_per_gpu = txCount / g_num_gpus;
@@ -671,10 +498,6 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         // Allocate GPU memory for sender array
         CUDA_CHECK(cudaMalloc(&temp_transaction_list->sender, transaction_per_gpu * sizeof(uint8_t)));
 
-        // CUDA_CHECK(cudaMalloc(&temp_transaction_list->block_number, transaction_per_gpu * sizeof(uint64_t)));
-        // CUDA_CHECK(cudaMalloc(&temp_transaction_list->time_stamp, transaction_per_gpu * sizeof(uint64_t)));
-        // use persistent block number and timestamp
-
         temp_transaction_list->block_number = device_block_numbers[i];
         temp_transaction_list->time_stamp = device_time_stamps[i];
 
@@ -692,8 +515,6 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
         }
 
         // Copy data from host to GPU
-        // CUDA_CHECK(cudaMemcpy(temp_transaction_list->value, converted_values + i * transaction_per_gpu,
-        //                       transaction_per_gpu * sizeof(evm_word_t), cudaMemcpyHostToDevice));
 
         // CuEVM debug June 27, disable value for now
         // memset zero for blocknumber
@@ -717,7 +538,8 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
                                   transaction_per_gpu * sizeof(uint64_t), cudaMemcpyHostToDevice));
         }
         // Copy marker data from host to GPU
-        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset, markerOffsets,
+        CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_offset,
+                              markerOffsets + i * transaction_per_gpu / g_skipTxSize,
                               transaction_per_gpu / g_skipTxSize * sizeof(int32_t), cudaMemcpyHostToDevice));
         CUDA_CHECK(cudaMemcpy(temp_transaction_list->marker_data, markerData, markerDataLen * sizeof(uint32_t),
                               cudaMemcpyHostToDevice));
@@ -745,7 +567,6 @@ std::vector<CuEVM::transaction::TransactionList*> create_transaction_list(
     }
     // Free host memory
 
-    // delete[] converted_values;
     return d_transaction_list_ptrs;
 }
 
@@ -769,33 +590,10 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
                 printf("txBatchCount: %u, g_num_instances_per_device: %u\n", txBatchCount, g_num_instances_per_device);
                 assert(txBatchCount == g_num_instances_per_device * g_num_gpus);
             }
-
-            // g_num_instances = txCount;
-            // g_num_instances_per_device = txCount / g_num_gpus;
         }
 
-        // for (int i = 0; i < markerDataLen; i++) {
-        //     printf("markerData[%d]: %u\n", i, markerData[i]);
-        // }
-        // printf("g_skipTxSize: %u\n", g_skipTxSize);
-        // for (int i = 0; i< txBatchCount/g_skipTxSize; i++){
-        //     printf("markerOffsets[%d]: %u, markerCounts[%d]: %u\n", i, markerOffsets[i], i, markerCounts[i]);
-        // }
-
-        // print the call data for debugging
-        // printf("calldata : \n");
-        // for (int i = 0; i < callDataLen; i++) {
-        //     printf("%x", callData[i]);
-        // }
-        // printf("\n");
-        // printf("dataOffsets and size : \n");
-        // for (int i = 0; i < txBatchCount * sequenceLength; i++) {
-        //     printf("index :%u, offset :%u, size :%u\n", i, dataOffsets[i], dataSizes[i]);
-        // }
-        // printf("\n");
-
         uint32_t current_calldata_offset = 0;
-        uint32_t current_marker_offset = 0;
+
         SimplifiedGPUResultC* final_result = new SimplifiedGPUResultC();
         final_result->results = new SimplifiedGPUResultSingleBatchC[sequenceLength];
         final_result->num_results = sequenceLength;
@@ -822,10 +620,7 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
                 callData + current_calldata_offset, callDataLen, dataOffsets + current_idx, txBatchCount,
                 dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize, markerData,
                 markerDataLen, start_seed + sequenceIdx * txBatchCount, sequenceIdx);
-            // auto d_transaction_list_ptrs = create_transaction_list(
-            //     newFromAddr, toAddr, callData + current_calldata_offset, callDataLen, dataOffsets + current_idx,
-            //     txBatchCount, dataSizes + current_idx, txBatchCount, markerOffsets + current_idx / g_skipTxSize,
-            //     markerData, markerDataLen, start_seed + sequenceIdx);
+
             // Initialize memory pool using the globally stored account count
             // Only create memory pool if not reusing state or first call
 
@@ -833,44 +628,14 @@ SimplifiedGPUResultC* process_batch_transactions(const uint64_t* blockNumber, co
             for (int i = 0; i < g_num_gpus; i++) {
                 // Set device
                 CUDA_CHECK(cudaSetDevice(i));
-                // TODO: Avoid memcpy and alloc, just memset is good enough
-                // Branch tracker
+
                 // reset trackers
                 CUDA_CHECK(cudaMemset(d_branch_infos[i], 0, MAX_NEW_BRANCHES * sizeof(BranchInfoEntry)));
                 CUDA_CHECK(cudaMemset(d_storage_infos[i], 0, MAX_NEW_STORAGE * sizeof(StorageInfoEntry)));
                 CUDA_CHECK(cudaMemset(d_bug_infos[i], 0, MAX_NEW_BUGS * sizeof(BugInfoEntry)));
 
-                // CuEVM july: dont use new coverage bitmap for now
-                // uint32_t num_integer_elements_bitmap = (txBatchCount + 31) / 32;
-                // printf("num_integer_elements_bitmap: %u\n", num_integer_elements_bitmap);
-                // CUDA_CHECK(cudaMemset(d_new_coverage_bitmaps[i], 0, num_integer_elements_bitmap * sizeof(uint32_t)));
-
                 // reset counters
                 CUDA_CHECK(cudaMemset(d_gpu_feedback_counts[i], 0, sizeof(GPUFeedbackCount)));
-
-                // uint32_t* d_new_branches;
-                // uint32_t* d_new_count;
-                // CUDA_CHECK(cudaMalloc(&d_new_branches, MAX_NEW_BRANCHES * sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMalloc(&d_new_count, sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMemset(d_new_branches, 0, MAX_NEW_BRANCHES * sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMemset(d_new_count, 0, sizeof(uint32_t)));
-
-                // CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_idx, &d_new_branches, sizeof(uint32_t*)));
-                // CUDA_CHECK(cudaMemcpyToSymbol(g_new_coverage_count, &d_new_count, sizeof(uint32_t*)));
-
-                // Bug tracker
-                // uint32_t* d_new_bug_idx;
-                // uint32_t* d_new_bug_pc;
-                // uint32_t* d_new_bug_count;
-                // CUDA_CHECK(cudaMalloc(&d_new_bug_idx, MAX_NEW_BUGS * sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMalloc(&d_new_bug_pc, MAX_NEW_BUGS * sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMalloc(&d_new_bug_count, sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMemset(d_new_bug_idx, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMemset(d_new_bug_pc, 0, MAX_NEW_BUGS * sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMemset(d_new_bug_count, 0, sizeof(uint32_t)));
-                // CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_idx, &d_new_bug_idx, sizeof(uint32_t*)));
-                // CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_pc, &d_new_bug_pc, sizeof(uint32_t*)));
-                // CUDA_CHECK(cudaMemcpyToSymbol(g_new_bug_count, &d_new_bug_count, sizeof(uint32_t*)));
             }
 
 #ifdef EIP_3155
@@ -1141,261 +906,8 @@ void get_gpu_execution_results_optimized(SimplifiedGPUResultSingleBatchC* result
 // For debugging, tracking unique marker patterns
 std::unordered_map<std::string, std::vector<uint32_t>> unique_marker_patterns;
 
-// deprecated golibrary code due to performance concern
-/*
-GPUExecutionResultC* get_gpu_execution_results() {
-    // Allocate and initialize result structure
-    GPUExecutionResultC* result = (GPUExecutionResultC*)calloc(1, sizeof(GPUExecutionResultC));
-    if (result == nullptr) {
-        printf("Failed to allocate memory for GPUExecutionResultC\n");
-        return nullptr;
-    }
-    result->allocations_valid = 1;
-
-    // Retrieve trace data from device memory - similar to print_evm_instances_results
-    CuEVM::simplified_trace_data* trace_data =
-        new CuEVM::simplified_trace_data[g_num_instances_per_device * g_num_gpus];
-    for (int i = 0; i < g_num_gpus; i++) {
-        CUDA_CHECK(cudaSetDevice(i));
-        CuEVM::simplified_trace_data* d_trace_data;
-        // Retrieve the device pointers stored in the global symbols
-        CUDA_CHECK(cudaMemcpyFromSymbol(&d_trace_data, global_simplified_trace, sizeof(d_trace_data)));
-
-        // Copy the data arrays from device to host memory
-        CUDA_CHECK(cudaMemcpy(&trace_data[i * g_num_instances_per_device], d_trace_data,
-                              sizeof(CuEVM::simplified_trace_data) * g_num_instances_per_device,
-                              cudaMemcpyDeviceToHost));
-    }
-
-    // Initialize return data
-    result->num_return_data = g_num_instances_per_device * g_num_gpus;
-    result->return_data = (ReturnDataEntry*)malloc(sizeof(ReturnDataEntry) * result->num_return_data);
-    if (result->return_data == nullptr) {
-        printf("Failed to allocate memory for return_data\n");
-        delete[] trace_data;
-        free(result);
-        return nullptr;
-    }
-    memset(result->return_data, 0, sizeof(ReturnDataEntry) * result->num_return_data);
-
-    // Set up coverage data for all instances
-    result->num_coverage = g_num_instances_per_device * g_num_gpus;
-    result->coverage = (CoverageDataEntry*)malloc(sizeof(CoverageDataEntry) * result->num_coverage);
-    if (result->coverage == nullptr) {
-        printf("Failed to allocate memory for coverage\n");
-        delete[] trace_data;
-        free(result->return_data);
-        free(result);
-        return nullptr;
-    }
-
-    result->error_codes = (uint8_t*)malloc(sizeof(uint8_t) * g_num_instances_per_device * g_num_gpus);
-    memset(result->error_codes, 0, sizeof(uint8_t) * g_num_instances_per_device * g_num_gpus);
-
-    printf("===== Initializing Coverage Data for %u Instances =====\n", g_num_instances_per_device * g_num_gpus);
-    // Constants for marker types
-    const uint64_t REVERT_MARKER_XOR = 0x40000000;
-    const uint64_t RETURN_MARKER_XOR = 0x80000000;
-    const uint64_t ENTER_MARKER_XOR = 0xC0000000;
-
-    // Process each instance's trace data in parallel
-#pragma omp parallel for
-    for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
-        // Create hashmap to track unique addresses and their indices
-        std::unordered_map<std::string, uint32_t> address_to_index;
-        std::vector<std::string> unique_addresses;
-
-        // First pass: collect all unique addresses from calls
-        for (uint32_t i = 0; i < trace_data[idx].no_calls; i++) {
-            char addr_buf[70];
-            trace_data[idx].calls[i].receiver.to_hex(addr_buf);
-            std::string addr_str(addr_buf);
-
-            if (address_to_index.find(addr_str) == address_to_index.end()) {
-                // New unique address found
-                address_to_index[addr_str] = unique_addresses.size();
-                unique_addresses.push_back(addr_str);
-            }
-        }
-
-        // printf("Unique addresses: %zu\n", unique_addresses.size());
-        // for (uint32_t i = 0; i < unique_addresses.size(); i++) {
-        //     printf("  %s\n", unique_addresses[i].c_str());
-        //     printf("  %u\n", address_to_index[unique_addresses[i]]);
-        // }
-
-        // If no addresses found, use placeholder
-        if (unique_addresses.empty()) {
-            unique_addresses.push_back("0x0000000000000000000000000000000000000000");
-            address_to_index["0x0000000000000000000000000000000000000000"] = 0;
-        }
-
-        // Set up coverage data structure
-        result->coverage[idx].num_addresses = unique_addresses.size();
-        result->coverage[idx].addresses = (char**)malloc(sizeof(char*) * result->coverage[idx].num_addresses);
-        result->coverage[idx].branch_coverage =
-            (uint64_t**)malloc(sizeof(uint64_t*) * result->coverage[idx].num_addresses);
-        result->coverage[idx].branch_coverage_lengths =
-            (uint32_t*)malloc(sizeof(uint32_t) * result->coverage[idx].num_addresses);
-
-        // Initialize all branch coverage arrays to nullptr
-        for (uint32_t j = 0; j < result->coverage[idx].num_addresses; j++) {
-            result->coverage[idx].branch_coverage[j] = nullptr;
-            result->coverage[idx].branch_coverage_lengths[j] = 0;
-        }
-
-        // Fill in the addresses array
-        for (uint32_t j = 0; j < unique_addresses.size(); j++) {
-            result->coverage[idx].addresses[j] = strdup(unique_addresses[j].c_str());
-        }
-
-        // Set error code from first call if available
-        if (trace_data[idx].no_calls > 0) {
-            result->error_codes[idx] = trace_data[idx].calls[0].error_code;
-        } else {
-            result->error_codes[idx] = 0;
-        }
-
-        std::vector<std::vector<uint64_t>> markers(unique_addresses.size());
-
-        int32_t current_call_idx = -1;
-        char current_address[70];
-        uint32_t current_address_idx = 0;
-        // Count branch markers and associate with correct contract
-        for (uint32_t i = 0; i < trace_data[idx].no_branches; i++) {
-            // Find which contract this branch belongs to by matching call context
-            uint32_t branch_pc = trace_data[idx].branches[i].pc_src;
-
-            if (branch_pc == START_CALL_BRANCH_MARKER) {
-                current_call_idx += 1;
-                if (current_call_idx >= trace_data[idx].no_calls) {
-                    printf("CuEVM Warning: current_call_idx %d >= trace_data[idx].no_calls %d\n", current_call_idx,
-                           trace_data[idx].no_calls);
-                    current_call_idx -= 1;
-                    continue;
-                }
-                trace_data[idx].calls[current_call_idx].receiver.to_hex(current_address);
-                current_address_idx = address_to_index[current_address];
-                markers[current_address_idx].push_back(ENTER_MARKER_XOR << 32);
-            } else if (branch_pc == END_CALL_BRANCH_MARKER) {
-                if (current_call_idx >= trace_data[idx].no_calls) {
-                    printf("CuEVM Warning: current_call_idx %d >= trace_data[idx].no_calls %d\n", current_call_idx,
-                           trace_data[idx].no_calls);
-                    current_call_idx -= 1;
-                    continue;
-                }
-                trace_data[idx].calls[current_call_idx].receiver.to_hex(current_address);
-                uint32_t last_pc = trace_data[idx].calls[current_call_idx].last_pc;
-                if (last_pc > 0) {
-                    last_pc = last_pc - 1;
-                } else {
-                    last_pc = 0;
-                }
-
-                uint64_t term_marker = ((uint64_t)last_pc << 32) | REVERT_MARKER_XOR;
-
-                if (trace_data[idx].calls[current_call_idx].error_code == ERROR_SUCCESS) {
-                    term_marker = ((uint64_t)last_pc << 32) | RETURN_MARKER_XOR;
-                }
-
-                markers[current_address_idx].push_back(term_marker);
-
-                // Go back to the previous call
-                current_call_idx -= 1;
-                if (current_call_idx < 0) {
-                    current_call_idx = 0;
-                }
-                // printf("Current call idx: %d\n", current_call_idx);
-                trace_data[idx].calls[current_call_idx].receiver.to_hex(current_address);
-                current_address_idx = address_to_index[current_address];
-            } else {
-                // Add branch marker
-                uint32_t src_pc = trace_data[idx].branches[i].pc_src;
-                uint32_t dst_pc = trace_data[idx].branches[i].pc_dst;
-                markers[current_address_idx].push_back(((uint64_t)src_pc << 32) | dst_pc);
-            }
-        }
-        // printf("Current call idx after processing branches: %d\n", current_call_idx);
-
-        // Allocate branch coverage arrays based on count
-        for (uint32_t i = 0; i < unique_addresses.size(); i++) {
-            result->coverage[idx].branch_coverage_lengths[i] = markers[i].size();
-
-            if (markers[i].size() > 0) {
-                result->coverage[idx].branch_coverage[i] = (uint64_t*)malloc(markers[i].size() * sizeof(uint64_t));
-                // Copy data from vector to C array
-                memcpy(result->coverage[idx].branch_coverage[i], markers[i].data(),
-                       markers[i].size() * sizeof(uint64_t));
-            }
-        }
-
-    }  // End of parallel loop
-
-    for (uint32_t idx = 0; idx < g_num_instances_per_device * g_num_gpus; idx++) {
-        // Debug print coverage info - Keep commented out for parallel execution
-        printf("CuEVM Instance %u coverage:\n", idx);
-
-        // Create a serialized representation of this instance's markers for hashing
-        std::stringstream marker_hash;
-
-        for (uint32_t i = 0; i < result->coverage[idx].num_addresses; i++) {
-            // printf("  Contract address: %s\n", result->coverage[idx].addresses[i]);
-
-            // Add address and marker count to hash
-            // marker_hash << result->coverage[idx].addresses[i] << ":" <<
-            // result->coverage[idx].branch_coverage_lengths[i]
-            //             << ";";
-
-            // Print each marker in a similar format to Go's debug output
-            for (uint32_t j = 0; j < result->coverage[idx].branch_coverage_lengths[i]; j++) {
-                uint64_t marker = result->coverage[idx].branch_coverage[i][j];
-                uint32_t src = marker >> 32;
-                uint32_t dst = marker & 0xFFFFFFFF;
-
-                // Add marker to hash
-                marker_hash << std::hex << "0x" << std::setw(16) << std::setfill('0') << marker << std::dec << ",";
-
-                // printf("    Marker %u: Raw: 0x%016lx, Src: 0x%08x (%u), Dst: 0x%08x (%u)", j, marker, src, src,
-                // dst,
-                //        dst);
-
-                // if (src == ENTER_MARKER_XOR) {
-                //     printf(" (ENTER)\n");
-                // } else if (dst == REVERT_MARKER_XOR) {
-                //     printf(" (REVERT)\n");
-                // } else if (dst == RETURN_MARKER_XOR) {
-                //     printf(" (RETURN)\n");
-                // } else {
-                //     printf(" (JUMP)\n");
-                // }
-            }
-        }
-
-        // Check if this marker pattern is new
-        std::string pattern_key = marker_hash.str();
-        if (unique_marker_patterns.find(pattern_key) == unique_marker_patterns.end()) {
-            // First time seeing this pattern
-            printf("NEW UNIQUE MARKER PATTERN at idx %u\n", idx);
-            printf("pattern_key: %s\n", pattern_key.c_str());
-            unique_marker_patterns[pattern_key] = std::vector<uint32_t>{idx};
-        } else {
-            // Pattern seen before
-            unique_marker_patterns[pattern_key].push_back(idx);
-        }
-    }
-
-    // Clean up trace data
-    delete[] trace_data;
-
-    return result;
-}
-*/
-
 void free_simplified_gpu_result(SimplifiedGPUResultC* result) {
-    // TODO: Implement this
-    // if (result == nullptr || result->allocations_valid == 0) return;
-
-    // free_gpu_execution_results(result->results);
+    // TODO:
 }
 void free_gpu_execution_results(GPUExecutionResultC* result) {
     if (result == nullptr || result->allocations_valid == 0) return;

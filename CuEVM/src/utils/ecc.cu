@@ -226,7 +226,7 @@ __device__ int ec_mul(Curve curve, evm_word_t *ResX, evm_word_t *ResY, evm_word_
     return 0;
 }
 
-__host__ __device__ void convert_point_to_address(evm_word_t *address, evm_word_t *X, evm_word_t *Y) {
+__device__ void convert_point_to_address(evm_word_t *address, evm_word_t *X, evm_word_t *Y) {
     uint8_t input[64];
 
     uint32_t array_length = 0;
@@ -1284,6 +1284,8 @@ __host__ __device__ int pairing_multiple(ArithEnv &arith, EccConstants *ecc_cons
     return FQP_equals(arith, final_res, one_fq12) ? 1 : 0;
 }
 #else  // dummy delc to avoid compilation error
-  __host__ __device__ int pairing_multiple(EccConstants *ecc_constants_ptr, uint8_t *points_data, size_t data_len) { return -1;}
+__host__ __device__ int pairing_multiple(EccConstants *ecc_constants_ptr, uint8_t *points_data, size_t data_len) {
+    return -1;
+}
 #endif
 }  // namespace ecc

@@ -281,13 +281,10 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
 
         while (PyDict_Next(data, &pos, &key, &value)) {
             int address_index = pos - 1;  // Adjust index since PyDict_Next increments pos
-            // printf("address_index: %d\n", address_index);
-            // const char* address_str = PyUnicode_AsUTF8(key);
+
             uint32_t instance_idx = address_index * num_states + state_idx;
             // Extract balance, nonce, and code
-            // const char* balance = GET_STR_FROM_DICT_WITH_DEFAULT(value, "balance", "0x0");
-            // const char* nonce = GET_STR_FROM_DICT_WITH_DEFAULT(value, "nonce", "0x0");
-            // const char* code = GET_STR_FROM_DICT_WITH_DEFAULT(value, "code", "");
+
             PyObject* code = PyDict_GetItemString(value, "code");
             PyObject* storage_dict = PyDict_GetItemString(value, "storage");
             uint32_t storage_size = PyDict_Size(storage_dict);
@@ -321,16 +318,9 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
                 }
             }
 
-            // state_db_cpu->account_balances[instance_idx].from_hex(balance);
-            // t_word.from_hex(nonce);
-            // state_db_cpu->account_nonces[instance_idx] = uint256_get_uint32_t(&t_word);
             py_long_to_uint256(PyDict_GetItemString(value, "balance"), &state_db_cpu->account_balances[instance_idx]);
             py_long_to_uint256(PyDict_GetItemString(value, "nonce"), &t_word);
             state_db_cpu->account_nonces[instance_idx] = uint256_get_uint32_t(&t_word);
-            // printf("account_nonces[%d] = %d\n", instance_idx, state_db_cpu->account_nonces[instance_idx]);
-            // printf("account_balances[%d] = %s\n", instance_idx,
-            // state_db_cpu->account_balances[instance_idx].to_hex()); printf("address_list[%d] = %s\n", address_index,
-            // state_db_cpu->address_list[address_index].to_hex());
 
             state_db_cpu->account_storage_size[instance_idx] = storage_size;
             // Storage
@@ -341,8 +331,6 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
                 return;
             }
 
-            // printf("state_idx: %d instance_idx: %d address_index: %d contract_idx: %d\n", state_idx, instance_idx,
-            //        address_index, state_db_cpu->contract_index[address_index]);
             // Iterate through the dictionary
             PyObject *key_storage, *value_storage;
             Py_ssize_t pos_1 = 0;
@@ -356,9 +344,7 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
                 // printf("contract_idx: %d\n", contract_idx);
                 uint32_t pre_alloc_keys_idx =
                     (account_prealloc_keys_size * contract_idx + storage_idx) * num_states + state_idx;
-                // printf("pre_alloc_keys_idx: %d\n", pre_alloc_keys_idx);
-                // state_db_cpu->prealloc_keys_pool[pre_alloc_keys_idx].from_hex(PyUnicode_AsUTF8(key_storage));
-                // state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].from_hex(PyUnicode_AsUTF8(value_storage));
+
                 py_long_to_uint256(key_storage, &state_db_cpu->prealloc_keys_pool[pre_alloc_keys_idx]);
                 py_long_to_uint256(value_storage, &state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].value);
                 state_db_cpu->prealloc_values_pool[pre_alloc_keys_idx].original_value =
@@ -368,10 +354,6 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
         }
     }
 
-    // printf("state_db_cpu->num_accounts: %d\n", state_db_cpu->num_accounts);
-    // printf("statedb cpu\n");
-    // state_db_cpu->print();
-    // printf("end of statedb cpu\n");
     // copy to device. c.f., StateDb::GPUfromJson
     StateDb* tmp_state_db = new StateDb(num_states);
     tmp_state_db->num_accounts = state_db_cpu->num_accounts;
@@ -408,8 +390,6 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
 
     CUDA_CHECK(cudaMalloc(&tmp_state_db->dynamic_accounts, num_states * sizeof(DynamicAccount*)));
 
-    // CUDA_CHECK(cudaMalloc(&tmp_state_db->snapshot_total_storage_size, num_states * num_accounts *
-    // sizeof(uint32_t))); Grouped memory copy
     CUDA_CHECK(cudaMemcpy(tmp_state_db->address_list, state_db_cpu->address_list, num_accounts * sizeof(evm_word_t),
                           cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(tmp_state_db->contract_index, state_db_cpu->contract_index, num_accounts * sizeof(int16_t),
@@ -455,7 +435,6 @@ void getPreStateDataFromListofPyObject(PyObject* readroot, uint32_t num_states) 
     delete tmp_state_db;
 }
 
-
 TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t& num_instances, bool reuse_state_data,
                                                  bool copy_state_data, uint32_t call_counter) {
     uint32_t num_transactions = PyList_Size(read_roots);
@@ -470,7 +449,6 @@ TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t&
         getPreStateDataFromListofPyObject(read_roots, num_transactions);
     }
     all_transactions = getTransactionDataFromListofPyObject(read_roots);
-
 
     // Simplified trace data
     CuEVM::simplified_trace_data* d_trace_data;
@@ -487,7 +465,6 @@ TransactionList* get_evm_instances_from_PyObject(PyObject* read_roots, uint32_t&
         cudaMemcpyToSymbol(global_serialized_worldstate, &d_serialized_worldstate_data,
                            sizeof(CuEVM::serialized_worldstate_data*));
     }
-
 
     return all_transactions;
 }
@@ -558,27 +535,7 @@ __host__ void get_block_info_from_PyObject(PyObject* data) {
     // Copy pointer to symbol
     cudaMemcpyToSymbol(global_block_info, &d_block_info, sizeof(block_info_t*));
 }
-// static PyObject* get_utils_class(const char* class_name) {
-//     // Get the main module's dict
-//     PyObject* main_module = PyImport_AddModule("__main__");
-//     PyObject* main_dict = PyModule_GetDict(main_module);
 
-//     // Get the utils module (assuming it's imported as 'utils')
-//     PyObject* utils = PyDict_GetItemString(main_dict, "utils");
-//     if (!utils) {
-//         PyErr_SetString(PyExc_ImportError, "Cannot find utils module");
-//         return nullptr;
-//     }
-
-//     // Get the class from utils module
-//     PyObject* class_obj = PyObject_GetAttrString(utils, class_name);
-//     if (!class_obj) {
-//         PyErr_SetString(PyExc_AttributeError, "Cannot find class in utils module");
-//         return nullptr;
-//     }
-
-//     return class_obj;
-// }
 static PyObject* get_utils_class(const char* class_name) {
     // Get the main module's dict
     PyObject* main_module = PyImport_AddModule("__main__");
@@ -592,15 +549,6 @@ static PyObject* get_utils_class(const char* class_name) {
         printf("Failed to get main module dict\n");
         return nullptr;
     }
-
-    // // Debug: Print all keys in main_dict
-    // PyObject *key, *value;
-    // Py_ssize_t pos = 0;
-    // printf("Available modules in __main__:\n");
-    // while (PyDict_Next(main_dict, &pos, &key, &value)) {
-    //     const char* key_str = PyUnicode_AsUTF8(key);
-    //     printf("  - %s\n", key_str);
-    // }
 
     // Try different ways to get the utils module
     PyObject* utils = nullptr;
@@ -616,19 +564,6 @@ static PyObject* get_utils_class(const char* class_name) {
         printf("Cannot find utils module\n");
         return nullptr;
     }
-
-    // // Debug: Print all attributes of utils module
-    // printf("Available classes in utils module:\n");
-    // PyObject* dir = PyObject_Dir(utils);
-    // if (dir != nullptr) {
-    //     Py_ssize_t size = PyList_Size(dir);
-    //     for (Py_ssize_t i = 0; i < size; i++) {
-    //         PyObject* attr = PyList_GetItem(dir, i);
-    //         const char* attr_str = PyUnicode_AsUTF8(attr);
-    //         printf("  - %s\n", attr_str);
-    //     }
-    //     Py_DECREF(dir);
-    // }
 
     // Get the class from utils module
     PyObject* class_obj = PyObject_GetAttrString(utils, class_name);
@@ -735,24 +670,12 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* tr
     PyObject* events = PyList_New(0);
     PyObject* calls = PyList_New(0);
     PyObject* storage_writes = PyList_New(0);
-    // PyObject* bugs = PyList_New(0);
 
-    // printf("trace data before conversion\n");
-    // trace_data->print();
     // Process calls
     for (size_t idx = 0; idx < trace_data->no_calls; idx++) {
         PyObject* call_item = create_evm_call(trace_data->calls[idx]);
         PyList_Append(calls, call_item);
         Py_DECREF(call_item);
-        // Detect ether leaking
-        // if (detect_bug && trace_data->calls[idx].pc != 0) {
-        //     evm_word_t zero;
-
-        //     if (!uint256_is_zero(&trace_data->calls[idx].value)) {
-        //         PyList_Append(bugs,
-        //                       create_evm_bug(trace_data->calls[idx].pc, trace_data->calls[idx].op, "Leaking Ether"));
-        //     }
-        // }
     }
 
     // Process events
@@ -760,14 +683,6 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* tr
         PyObject* event_item = create_trace_event(trace_data->events[idx]);
         PyList_Append(events, event_item);
         Py_DECREF(event_item);
-
-        // // Handle storage writes
-        // if (trace_data->events[idx].opcode == OP_SSTORE) {
-        //     PyObject* storage_write = create_evm_storage_write(
-        //         trace_data->events[idx].pc, trace_data->events[idx].operand_1, trace_data->events[idx].operand_2);
-        //     PyList_Append(storage_writes, storage_write);
-        //     Py_DECREF(storage_write);
-        // }
     }
 
     // Process branches
@@ -780,8 +695,6 @@ static PyObject* pyobject_from_simplified_trace(CuEVM::simplified_trace_data* tr
     PyDict_SetItemString(tracer_root, "events", events);
     PyDict_SetItemString(tracer_root, "branches", branches);
     PyDict_SetItemString(tracer_root, "calls", calls);
-    // PyDict_SetItemString(tracer_root, "storage_write", storage_writes);
-    // PyDict_SetItemString(tracer_root, "bugs", bugs);
 
     Py_DECREF(events);
     Py_DECREF(branches);
@@ -796,19 +709,16 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
     PyObject* state_dict = PyDict_New();
 
     // Add accounts and storage elements
-    // PyObject* accounts_list = PyList_New(0);
+
     uint32_t account_idx = 0;
     uint32_t storage_idx = 0;
     if (serialized_worldstate_instance == nullptr) {
         return state_dict;
     }
-    // printf("cpu side\n");
 
     for (uint32_t i = 0; i < serialized_worldstate_instance->no_accounts; i++) {
         PyObject* account_dict = PyDict_New();
-        // uint256_to_hex(hex_string_1, &serialized_worldstate_instance->balance[i]);
-        // serialized_worldstate_instance->balance[i].to_hex(hex_string_1, 1);
-        // printf("balance: %s\n", serialized_worldstate_instance->balance[i].to_hex());
+
         PyObject *py_long_1, *py_long_2;
         py_long_1 = uint256_to_py_long(&serialized_worldstate_instance->balance[i]);
 
@@ -821,10 +731,6 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
                serialized_worldstate_instance->storage_indexes[storage_idx] == i) {
             PyObject* storage_key_value = PyDict_New();
 
-            // serialized_worldstate_instance->storage_keys[storage_idx].to_hex(hex_string_1, 1);
-            // printf("storage_key: %s\n", hex_string_1);
-            // serialized_worldstate_instance->storage_values[storage_idx].to_hex(hex_string_2, 1);
-            // printf("storage_value: %s\n", hex_string_2);
             py_long_1 = uint256_to_py_long(&serialized_worldstate_instance->storage_keys[storage_idx]);
             py_long_2 = uint256_to_py_long(&serialized_worldstate_instance->storage_values[storage_idx]);
             PyDict_SetItem(storage_dict, py_long_1, py_long_2);
@@ -833,15 +739,13 @@ PyObject* pyobject_from_serialized_state(CuEVM::serialized_worldstate_data* seri
         }
 
         PyDict_SetItemString(account_dict, "storage", storage_dict);
-        // PyList_Append(accounts_list, account_dict);
-        // uint256_to_hex(hex_string_1, &serialized_worldstate_instance->addresses[i]);
+
         PyObject* py_long_3 = uint256_to_py_long(&serialized_worldstate_instance->addresses[i]);
 
         PyDict_SetItem(state_dict, py_long_3, account_dict);
         Py_DECREF(account_dict);
     }
-    // printf("state dict \n");
-    // print_dict_recursive(state_dict, 1);
+
     return state_dict;
 }
 
@@ -865,13 +769,10 @@ PyObject* pyobject_from_evm_instances(uint32_t num_instances, bool copy_state_da
         CUDA_CHECK(cudaMemcpy(world_data, d_world_data, sizeof(CuEVM::serialized_worldstate_data) * num_instances,
                               cudaMemcpyDeviceToHost));
     }
-    // PyObject* world_state_json = pyobject_from_state_data_t(arith, instances.world_state_data);
-    // PyDict_SetItemString(root, "pre", world_state_json);
-    // Py_DECREF(world_state_json);
+
     PyObject* state_list = PyList_New(0);
     PyObject* trace_list = PyList_New(0);
-    // PyDict_SetItemString(root, "post", instances_json);
-    // Py_DECREF(instances_json);  // Decrement here because PyDict_SetItemString increases the ref count
+
     printf("num_instances: %d\n", num_instances);
     for (uint32_t idx = 0; idx < num_instances; idx++) {
         // printf("idx: %d\n", idx);

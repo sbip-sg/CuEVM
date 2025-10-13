@@ -3,10 +3,6 @@
 
 namespace CuEVM {
 __host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) {
-    // #pragma unroll
-    //     for (int32_t index = 0; index < 8; index++) {
-    //         words[index] = src.words[index];
-    //     }
     memcpy(words, src.words, sizeof(uint32_t) * uint256_limbs);
 }
 
@@ -68,15 +64,12 @@ __host__ __device__ void evm_word_t::print() const {
 
 __host__ __device__ char *evm_word_t::to_hex(char *hex_string, int32_t pretty, uint32_t count) const {
     if (hex_string == nullptr) {
-        // printf("hex_string is nullptr\n");
         hex_string = new char[count * 8 + 3];
     }
-    // printf("hex_string: %s %d\n", hex_string, count * 8 + 3);
 
     hex_string[0] = '0';
     hex_string[1] = 'x';
     uint256_to_hex(&hex_string[2], this);
-    // printf("hex_string: %s %d\n", hex_string, count * 8 + 3);
     if (pretty) {
         // remove leading zeros
         uint32_t idx = 2;

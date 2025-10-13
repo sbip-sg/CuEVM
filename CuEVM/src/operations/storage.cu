@@ -21,8 +21,7 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
         gas_used += GAS_COLD_SLOAD;
         int error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) error_code |= stack.push_uint32(simplified_trace_data_ptr->reentrancy_count);
-        // printf("Thread %d read reentrancy_count %d\n", INSTANCE_GLOBAL_IDX,
-        //        simplified_trace_data_ptr->reentrancy_count);
+
         return error_code;
     }
 #endif
@@ -35,14 +34,6 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
     else
         gas_used += GAS_COLD_SLOAD;
 
-    // printf("SLOAD \n");
-    // key->print();
-    // printf("address_index %d\n", address_index);
-    // if (found_value != nullptr) {
-    //     printf("found_value %p is warm %d\n", found_value, found_value->is_warm);
-    //     found_value->value.print();
-    // }
-
     int error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
@@ -53,7 +44,7 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
                                                    false
 #endif
             );
-// printf("finish get storage thread %d, value %p\n", INSTANCE_GLOBAL_IDX, value);
+
 #ifdef BUILD_LIBRARY
         if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
             simplified_trace_data_ptr->update_storage_coverage(call_context->pc, key->words[0], 0);
@@ -96,8 +87,7 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
         gas_used += GAS_COLD_SLOAD;
         int error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) simplified_trace_data_ptr->reentrancy_count++;
-        // printf("Thread %d update reentrancy_count %d\n", INSTANCE_GLOBAL_IDX,
-        //        simplified_trace_data_ptr->reentrancy_count);
+
         return error_code;
     }
 #endif
@@ -106,15 +96,6 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     ValueStatus *found_value;
     error_code |= CuEVM::gas_cost::sstore_cost(gas_used, gas_refund, state_db, &call_context->storage_address, key,
                                                value, address_index, found_value, call_context->snapshot_state);
-
-    // printf("SSTORE\n");
-    // key->print();
-    // value->print();
-    // printf("address_index %d\n", address_index);
-    // if (found_value != nullptr) {
-    //     printf("found_value %p is warm %d\n", found_value, found_value->is_warm);
-    //     found_value->value.print();
-    // }
 
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
     if (error_code == ERROR_SUCCESS) {
