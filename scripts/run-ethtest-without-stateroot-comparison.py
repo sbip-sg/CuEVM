@@ -1,18 +1,40 @@
-# python ~/projects/sbip-sg/CuEVM/scripts/run-ethtest-by-fork.py   -t /tmp/out --runtest-bin runtest --geth geth --cuevm ~/projects/sbip-sg/CuEVM/out/cpu_debug_interpreter  --ignore-errors  -i GeneralStateTests/
+# Usage:
+# python ~/projects/cassc/py-scripts/run-ethtest-without-stateroot-comparison.py --runtest-bin runtest --geth geth --cuevm ~/projects/sbip-sg/CuEVM-internal/build/cuevm_GPU --ignore-errors -t /tmp/
+
+
 import copy
 import json
 import subprocess
 import shutil
 import os
-from uuid import uuid4
+from datetime import datetime
+import time
+
+log_file_prefix = "run-ethtest-by-fork-traces-only"
+TIMEOUT = 120
+
+# Performance related tests are excluded
+exclude_tests = [
+    "vmPerformance",
+    "stQuadraticComplexityTest",
+    "stTimeConsuming",
+]
+
+# default_folders = os.listdir("GeneralStateTests")
+default_folders = ["VMTests"]
 
 log_file = open("run-ethtest-by-fork.log", "a")
 
-TIME_OUT = 90
+
+def current_time():
+    return datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")
 
 
 def debug_print(*args, **kwargs):
-    print(*args, **kwargs)
+    now = current_time()
+    args = [now] + list(args)
+    print(*args, **kwargs, file=log_file, flush=True)
+    print(*args, **kwargs, flush=True)
 
 
 def assert_command_in_path(cmd):
@@ -43,29 +65,22 @@ def check_output(output, error, without_state_root):
 
 
 def run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root):
-    if "/tmp/" not in output_filepath:
-        outdir = f"./{uuid4()}"
-    else:
-        outdir = f"./tmp/{uuid4()}"
-    os.makedirs(outdir, exist_ok=True)
-    command = [runtest_bin, f"--outdir={outdir}", f"--geth={geth_bin}", f"--cuevm={cuevm_bin}", output_filepath]
+    command = [runtest_bin, f"--outdir=./", f"--geth={geth_bin}", f"--cuevm={cuevm_bin}", output_filepath]
 
     debug_print(" ".join(command))
 
     clean_test_out()
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, preexec_fn=os.setsid)
     try:
-        stdout, stderr = proc.communicate(timeout=TIME_OUT)
-        check_output(stdout, stderr, without_state_root)
+        stdout, stderr = proc.communicate(timeout=TIMEOUT)
+        check_output(stdout, stderr, without_state_root=without_state_root)
+        debug_print(f"\033[92m🎉\033[0m Test passed for {output_filepath}")
     finally:
-        print(f"Killing child processes of {proc.pid}")
         try:
             os.killpg(proc.pid, 9)
             proc.wait()
         except ProcessLookupError:
             pass
-
-    debug_print(f"🎉 Test passed for {output_filepath}")
 
 
 def runtest_fork(
@@ -77,27 +92,23 @@ def runtest_fork(
     cuevm_bin="cuevm",
     ignore_errors=False,
     result={},
-    without_state_root=False,
-    microtests=False,
-    skip_folder="",
 ):
     result = result or {"n_success": 0, "failed_files": []}
-    if "," in skip_folder:
-        skip_folder = skip_folder.split(",")
-    else:
-        skip_folder = [skip_folder]
     output_filepath = None
     for dirpath, dirnames, filenames in os.walk(input_directory):
         rel_path = os.path.relpath(dirpath, input_directory)
-        if skip_folder != "" and any(skip_folder in rel_path for skip_folder in skip_folder):
-            debug_print(f"Skipping {rel_path}")
-            continue
         for filename in filenames:
             debug_print("Processing", dirpath, filename)
+            rootname = filename.split(".")[0]
             try:
-                rootname = filename.split(".")[0]
                 if filename.endswith(".json"):
                     input_filepath = os.path.join(dirpath, filename)
+
+                    if any(exclude in input_filepath for exclude in exclude_tests):
+                        debug_print(f"Skipping {rootname} as it is in exclude list")
+                        if result:
+                            result["skip_files"].append(input_filepath)
+                        continue
 
                     with open(input_filepath, "r", encoding="utf-8") as file:
                         data = json.load(file)
@@ -153,17 +164,19 @@ def runtest_fork(
                             debug_print(f"Processed and saved {output_filepath} successfully.")
 
                             try:
-                                run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, without_state_root)
+                                run_single_test(output_filepath, runtest_bin, geth_bin, cuevm_bin, True)
                                 result["n_success"] += 1
+                            except subprocess.TimeoutExpired:
+                                result["timeout_files"].append(output_filepath)
+                                debug_print(f"Test timed out for {output_filepath}")
                             except Exception as e:
                                 result["failed_files"].append(output_filepath)
-                                if microtests:
+                                if ignore_errors:
                                     debug_print(f"{str(e)}")
                                 else:
                                     raise
             except Exception as e:
-                if output_filepath not in result["failed_files"]:
-                    result["failed_files"].append(output_filepath)
+                result["failed_files"].append(output_filepath)
                 if ignore_errors:
                     debug_print(f"{str(e)}")
                 else:
@@ -174,7 +187,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Filter JSON files for entries related to "Shanghai"')
-    parser.add_argument("--input", "-i", type=str, required=True, help="Input directory containing JSON files")
+    parser.add_argument("--input", "-i", type=str, required=False, help="Input directory containing JSON files")
     parser.add_argument(
         "--temporary-path", "-t", type=str, required=True, help="Temporary directory to save the test files"
     )
@@ -182,48 +195,63 @@ def main():
     parser.add_argument("--geth", type=str, required=True, help="geth binary path")
     parser.add_argument("--cuevm", type=str, required=True, help="cuevm binary path")
     parser.add_argument("--ignore-errors", action="store_true", help="Continue testing even when test errors occur")
-    parser.add_argument(
-        "--without-state-root", action="store_true", help="verify without the state root", default=False
-    )
-    parser.add_argument("--microtests", action="store_true", help="verify without the state root", default=False)
-    parser.add_argument("--skip-folder", type=str, help="Skip folder", default="")
-    parser.add_argument("--timeout", type=int, help="Timeout in seconds for each test", default=90)
+
     args = parser.parse_args()
 
-    global TIME_OUT
-    TIME_OUT = args.timeout
     for cmd in [args.runtest_bin, args.geth, args.cuevm]:
         assert_command_in_path(cmd)
 
-    result = {"n_success": 0, "failed_files": [], "skip_files": []}
-    try:
-        test_root = args.input
-        print(f"Running tests for {test_root}")
-        runtest_fork(
-            test_root,
-            args.temporary_path,
-            fork="Shanghai",
-            runtest_bin=args.runtest_bin,
-            geth_bin=args.geth,
-            cuevm_bin=args.cuevm,
-            ignore_errors=args.ignore_errors,
-            result=result,
-            without_state_root=args.without_state_root,
-            microtests=args.microtests,
-            skip_folder=args.skip_folder,
-        )
-    except Exception:
-        pass
-    finally:
-        skipped = result["skip_files"]
-        n_skipped = len(skipped)
-        n_failed = len(result["failed_files"])
+    # test_folders = [args.input] if args.input else default_folders
+    if args.input:
+        test_folders = os.listdir(args.input)
 
-        debug_print(f"Test result, Passed: {result['n_success']}, Failed: {n_failed}, Skipped: {n_skipped}")
-        debug_print("Skipped files:")
-        debug_print(skipped)
-        debug_print("Failed files:")
-        debug_print(result["failed_files"])
+    global log_file
+    summary_output_file = f"summary-{current_time()}.md"
+    with open(summary_output_file, "w") as f:
+        f.write(f"Test result summary\n\n")
+        f.write(f"| Test folder | Passed | Failed | Skipped | Timeout | Time taken (seconds) |\n")
+        f.write(f"| --- | --- | --- | --- | --- | --- |\n")
+
+    for folder in test_folders:
+        start = time.time()
+        log_file = open(f"{log_file_prefix}-{folder}.log", "a")
+        result = {"n_success": 0, "failed_files": [], "skip_files": [], "timeout_files": []}
+        try:
+            test_root = os.path.join(args.input, folder)
+            print(f"Running tests for {test_root}")
+            runtest_fork(
+                test_root,
+                args.temporary_path,
+                fork="Shanghai",
+                runtest_bin=args.runtest_bin,
+                geth_bin=args.geth,
+                cuevm_bin=args.cuevm,
+                ignore_errors=args.ignore_errors,
+                result=result,
+            )
+        except Exception:
+            pass
+        finally:
+            period = time.time() - start
+            skipped = result["skip_files"]
+            n_skipped = len(skipped)
+            n_failed = len(result["failed_files"])
+            n_timeout = len(result["timeout_files"])
+
+            debug_print(
+                f"Test result, Passed: {result['n_success']}, Failed: {n_failed}, Skipped: {n_skipped}, Timeout: {n_timeout}"
+            )
+            debug_print("Skipped files:")
+            debug_print(skipped)
+            debug_print("Failed files:")
+            debug_print(result["failed_files"])
+            debug_print("Timeout files:")
+            debug_print(result["timeout_files"])
+            debug_print(f"Time taken: {period:.2f} seconds")
+            with open(summary_output_file, "a") as f:
+                f.write(
+                    f"| {folder} | {result['n_success']} | {n_failed} | {n_skipped} | {n_timeout} | {period:.2f} |\n"
+                )
 
 
 if __name__ == "__main__":
