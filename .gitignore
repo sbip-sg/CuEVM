@@ -28,3 +28,6 @@ geth.out
 # fuzzing
 **/__pycache__/
 .aider*
+compile_commands.json
+
+crytic-export
