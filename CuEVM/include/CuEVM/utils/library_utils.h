@@ -145,9 +145,9 @@ struct serialized_worldstate_data {
 
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
-#define MAX_CALLS_TRACING 32
-#define MAX_BRANCHES_TRACING 256  // only track this number of branches in one trace
-#define MAX_BUGS_TRACING 32       // only track this number of bugs in one tx
+#define MAX_CALLS_TRACING 64
+#define MAX_BRANCHES_TRACING 2048  // only track this number of branches in one trace
+#define MAX_BUGS_TRACING 32        // only track this number of bugs in one tx
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
 #define MAX_FUZZING_LOOP_LIMIT 200

@@ -217,7 +217,7 @@ We also acknowledge leadership and contribution from:
 - [**Ta Quang Trung**](https://github.com/taquangtrung) — *National University of Singapore*
 - [**Fredrik Svantes**](https://github.com/fredrik0x) — *Ethereum Foundation*
 
-This project is funded by the Ethereum Foundation.
+This project is funded by the Ethereum Foundation and developed under the [Singapore Blockchain Innovation Programme (SBIP)](https://sbip.sg/).
 ## Documentation
 
 An auto generated source code documentation is available at [https://sbip-sg.github.io/CuEVM/files.html](https://sbip-sg.github.io/CuEVM/files.html)
