@@ -89,6 +89,9 @@ extern __device__ GPUFeedbackCount* g_gpu_feedback_count;  // counter for intere
 #define BUG_LEAKING_ETHER 0x03
 #define BUG_ARBITRARY_CALL 0x04
 #define BUG_REENTRANCY 0x05
+#define BUG_INTEGER_ADD 0x11
+#define BUG_INTEGER_SUB 0x12
+#define BUG_INTEGER_MUL 0x13
 #define BUG_INVALID_OPCODE 0xFF
 
 // special attacker address for oracles (last 32 bit)
