@@ -598,12 +598,7 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
                 gas_used += GAS_NEW_ACCOUNT;
             }
         }
-        // printf("sender \n");
-        // call_context->to.print();
-        // printf("recipient \n");
-        // recipient.print();
-        // printf("sender balance \n");
-        // sender_balance->print();
+
         error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
         if (error_code == ERROR_SUCCESS) {
             global_state_db_ptr->increase_balance(&recipient, sender_balance, call_context->snapshot_state);
@@ -614,7 +609,7 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
             error_code |= ERROR_RETURN;
         }
 #ifdef BUILD_GO_LIBRARY
-        trace_data->selfdestruct_oracle(call_context->pc);
+        trace_data->selfdestruct_oracle(call_context->depth, call_context->pc);
 #endif
     }
     return error_code;

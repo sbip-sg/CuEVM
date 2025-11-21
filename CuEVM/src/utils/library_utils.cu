@@ -162,8 +162,6 @@ __device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint
 }
 __device__ void simplified_trace_data::add_bugs_for_later(uint32_t pc, uint8_t bug_type) {
     uint32_t bug_id = pc << 16 | bug_type << 8 | (current_account_id & 0xFF);
-    // printf("thread %d add_bugs_for_later pc %u bug_type %u bug_id 0x%08x to_addr 0x%08x\n", INSTANCE_GLOBAL_IDX, pc,
-    //        bug_type, bug_id, current_account_id);
 
     bugs[no_bugs] = bug_id;
     if (no_bugs >= MAX_BUGS_TRACING) {
@@ -244,7 +242,8 @@ __device__ void simplified_trace_data::finalize_coverage_bitmap(int32_t error_co
             // printf("thread %d add bug %x state_written %d\n", INSTANCE_GLOBAL_IDX, bugs[i], state_written);
             uint8_t bug_type = static_cast<uint8_t>((bugs[i] >> 8) & 0xFF);
 
-            if (bug_type == BUG_INTEGER_BUG) {
+            if (bug_type == BUG_INTEGER_BUG || bug_type == BUG_INTEGER_ADD || bug_type == BUG_INTEGER_SUB ||
+                bug_type == BUG_INTEGER_MUL) {
                 if (state_written) update_bugs(bugs[i]);
             } else {
                 update_bugs(bugs[i]);
@@ -372,7 +371,8 @@ __device__ void simplified_trace_data::start_create() {
     no_branches += MAX_BRANCHES_TRACING / 2;
     state_written = true;
 }
-__device__ void simplified_trace_data::selfdestruct_oracle(uint32_t pc) {
+__device__ void simplified_trace_data::selfdestruct_oracle(uint32_t depth, uint32_t pc) {
+    if (depth > 1) return;
     // printf("thread %d selfdestruct_oracle\n", INSTANCE_GLOBAL_IDX);
     if (calls[0].sender_id == RANDOM_ATTACKER_ADDRESS)
         update_bugs(pc << 16 | BUG_SELF_DESTRUCT << 8 | (current_account_id & 0xFF));
@@ -446,9 +446,11 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
     if (i < 0) i = 0;
 
 #ifdef BUILD_GO_LIBRARY
+#ifdef ASSERTION_ORACLE
     if (error_code == ERROR_INVALID_OPCODE) {
         invalid_opcode_oracle(last_pc);
     }
+#endif
 
     if (no_calls > 1 && calls[i].receiver_id == RANDOM_ATTACKER_ADDRESS) {
         // current value is greater than the first call value

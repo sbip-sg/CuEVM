@@ -81,7 +81,9 @@ __device__ int32_t SUB(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, Cu
         bool underflow = uint256_sub_overflow(&r, stack->get_address_at_index(1), stack->get_address_at_index(2));
         if (underflow) {
             // simple reducing FP:the common case to calculate uint256 0xff... mask
-            if (!(uint256_is_zero(stack->get_address_at_index(1)) && stack->get_address_at_index(2)->words[0] == 1)) {
+            uint32_t a = stack->get_address_at_index(1)->words[0];
+            uint32_t b = stack->get_address_at_index(2)->words[0];
+            if (!(a == 0 && b == 1) && b != 0xffffffff) {
                 simplified_trace_data_ptr->add_bugs_for_later(pc, BUG_INTEGER_SUB);
             }
         }

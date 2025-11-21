@@ -800,11 +800,16 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                 //   + other (inside start_CALL)
                 if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS) {
                     // bypass the below by setting error_code == ERROR_SUCCESS
-                    printf("ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS\n");
+                    // printf("ERROR_MESSAGE_CALL_CREATE_CONTRACT_Exists thread %d\n", INSTANCE_GLOBAL_IDX);
+#ifdef BUILD_LIBRARY
+                    finish_TRANSACTION(ERROR_FUZZING_STOP, false);
+#endif
                     error_code = ERROR_SUCCESS;
                     // setting address = 0 to the stack
-                    evm_word_t create_output = 0;
-                    call_state_ptr->stack_ptr->push(create_output);
+                    call_state_ptr->stack_ptr->push_uint32(0);
+                    // call_state_ptr->stack_ptr->push(0);
+                    // evm_word_t create_output = 0;
+                    // call_state_ptr->stack_ptr->push(create_output);
                     // TODO: fix this
                     // call_state_ptr->message_ptr->copy_from(call_state_ptr->message_ptr_copy);
                     // CuEVM::byte_array_t::reset_return_data(call_state_ptr->last_return_data_ptr);

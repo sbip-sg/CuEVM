@@ -278,7 +278,7 @@ struct simplified_trace_data {
      * @brief Add selfdestruct oracle.
      * @param[in] pc The program counter.
      */
-    __device__ void selfdestruct_oracle(uint32_t pc);
+    __device__ void selfdestruct_oracle(uint32_t depth, uint32_t pc);
 
     /**
      * @brief Add reentrancy oracle.
