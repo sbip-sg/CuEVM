@@ -159,9 +159,10 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     }
 #endif
 
-    // printf("Start %d call sender %x receipient %x  code size %d value %d\n", THREADIDX,
-    // call_state_ptr->from.words[0],
-    //        call_state_ptr->to.words[0], call_state_ptr->byte_code_size, call_state_ptr->value.words[0]);
+    // printf("Start %d call depth %d sender %x receipient %x  code size %d value %d\n", THREADIDX,
+    // call_state_ptr->depth,
+    //        call_state_ptr->from.words[0], call_state_ptr->to.words[0], call_state_ptr->byte_code_size,
+    //        call_state_ptr->value.words[0]);
     // if (INSTANCE_GLOBAL_IDX == DEBUG_THREAD) {
     //     printf("Start %d call sender %x receipient %x  code size %d value %d\n", THREADIDX,
     //            call_state_ptr->from.words[0], call_state_ptr->to.words[0], call_state_ptr->byte_code_size,
@@ -196,6 +197,10 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     if (call_state_ptr->byte_code_size == 4 && recipient->words[1] != 0)  // the fuzzable return address
         return CuEVM::precompile_operations::operation_TransparentAttackerEnhanced(
             cached_call_state.gas_limit, cached_call_state.gas_used, call_state_ptr, transaction_list_ptr);
+
+    // reset reentrancy count
+    if (call_state_ptr->depth == 2 && recipient->words[0] == 0xCAFECAFE)
+        global_simplified_trace[INSTANCE_GLOBAL_IDX].reentrancy_count = 0;
 #endif
 
     if (call_state_ptr->byte_code_size == 0) {

@@ -421,7 +421,8 @@ __device__ void simplified_trace_data::invalid_opcode_oracle(uint32_t pc) {
 }
 
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc, uint32_t _current_account_id) {
-    // printf("thread %d finish_call error_code %u last_pc %u, no_calls %u\n", INSTANCE_GLOBAL_IDX, error_code, last_pc,
+    // printf("thread %d finish_call error_code %u last_pc %u, no_calls %u\n", INSTANCE_GLOBAL_IDX, error_code,
+    // last_pc,
     //        no_calls);
 
     if (no_calls > MAX_CALLS_TRACING) {
@@ -802,7 +803,8 @@ __device__ uint32_t mutate_block_values_senders(uint32_t seed, uint64_t* block_n
     // printf("Thread %d mutated block_numbers %lu block_timestamps %lu\n", INSTANCE_GLOBAL_IDX,
     //        block_numbers[INSTANCE_GLOBAL_IDX], block_timestamps[INSTANCE_GLOBAL_IDX]);
     senders[INSTANCE_GLOBAL_IDX] = rand_range(seed, g_fuzzing_constants->sender_counts);
-    // printf("Thread %d sender_counts %d sender %d seed %d\n", INSTANCE_GLOBAL_IDX, g_fuzzing_constants->sender_counts,
+    // printf("Thread %d sender_counts %d sender %d seed %d\n", INSTANCE_GLOBAL_IDX,
+    // g_fuzzing_constants->sender_counts,
     //        senders[INSTANCE_GLOBAL_IDX], seed);
     return seed;
 }

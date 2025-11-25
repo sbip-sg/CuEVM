@@ -586,7 +586,6 @@ __device__ int32_t operation_TransparentAttackerEnhanced(CuEVM::gas_t &gas_limit
                                                          CuEVM::evm_call_context_t *call_context,
                                                          const transaction::TransactionList *transaction_list_ptr) {
     // todo when optimizing, attacker becomes a precompile
-    // printf("Thread %d: TransparentAttackerEnhanced\n", INSTANCE_GLOBAL_IDX);
     // uint8_t *output = g_fuzzing_constants->return_buffer;
     // // printf("Thread %d TransparentAttacker return buffer: %p\n", INSTANCE_GLOBAL_IDX, output);
     // call_context->set_parent_return_data(output, RETURN_BUFFER_SIZE);

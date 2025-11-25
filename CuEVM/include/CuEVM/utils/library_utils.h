@@ -57,7 +57,7 @@ constexpr CONSTANT uint32_t MAX_NEW_BUGS = 128;
 constexpr CONSTANT uint32_t MAX_NEW_MEMORY = 32768;       // per instance
 constexpr CONSTANT uint32_t MAX_RETURN_DATA_SIZE = 4096;  // per call
 
-constexpr CONSTANT uint32_t MAX_ARBITRARY_CALL_CHECK = 6;  // store 3 different calls
+constexpr CONSTANT uint32_t MAX_ARBITRARY_CALL_CHECK = 8;  // store 8 different calls
 // persistent state across kernel launches
 extern __device__ uint32_t* g_events_bitmap;
 extern __device__ uint32_t* g_total_bug_table;
@@ -148,8 +148,8 @@ struct serialized_worldstate_data {
 
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
-#define MAX_CALLS_TRACING 64
-#define MAX_BRANCHES_TRACING 2048  // only track this number of branches in one trace
+#define MAX_CALLS_TRACING 32
+#define MAX_BRANCHES_TRACING 1024  // only track this number of branches in one trace
 #define MAX_BUGS_TRACING 32        // only track this number of bugs in one tx
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
