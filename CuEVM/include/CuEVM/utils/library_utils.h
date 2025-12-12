@@ -149,8 +149,8 @@ struct serialized_worldstate_data {
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
 #define MAX_CALLS_TRACING 32
-#define MAX_BRANCHES_TRACING 1024  // only track this number of branches in one trace
-#define MAX_BUGS_TRACING 32        // only track this number of bugs in one tx
+#define MAX_BRANCHES_TRACING 512  // only track this number of branches in one trace
+#define MAX_BUGS_TRACING 8        // one thread only track this number of bugs in one tx
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
 #define MAX_FUZZING_LOOP_LIMIT 200
@@ -221,27 +221,26 @@ struct branch_trace {
 struct simplified_trace_data {
     // simple_event_trace events[MAX_TRACE_EVENTS];
     // evm_word_t addresses[MAX_ADDRESSES_TRACING];
-
     call_trace calls[MAX_CALLS_TRACING];
-
     uint32_t no_calls = 0;
     uint32_t no_branches = 0;
     evm_word_t last_distance;         // use to track branch distance by comparison opcodes
     uint32_t last_covered_branch_id;  // use to track last branch id that has improved distance
     uint32_t last_missed_branch_id;   // use to track last branch id that has improved distance
-    uint8_t last_distance_bits;       // use to track last distance bits
-    uint8_t state_written = false;
     uint32_t current_account_id = 0;
     uint32_t no_bugs = 0;
-    uint8_t reentrancy_count = 0;
     uint32_t bugs[MAX_BUGS_TRACING];
-
+    uint8_t last_distance_bits = 0;  // use to track last distance bits
+    bool state_written = false;
+    bool state_accessed = false;  // both read and write
+    uint8_t reentrancy_count = 0;
     /**
      * @brief Check if coverage exists.
      * @return True if coverage exists, false otherwise.
      */
     // __device__ void update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug = false);
 
+    __device__ void reset_and_start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
     /**
      * @brief Update the coverage bitmap with the distance between pc_src and pc_dst.
      * @param[in] pc_src The source program counter.

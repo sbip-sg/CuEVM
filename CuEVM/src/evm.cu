@@ -1,6 +1,6 @@
 #include <CuEVM/evm.cuh>
 #include <cassert>
-#define DEBUG_THREAD 24
+#define DEBUG_THREAD 0
 namespace CuEVM {
 
 // define the kernel function
@@ -263,7 +263,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 
 __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy_state_data) {
 #ifdef BUILD_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(0, call_state_ptr);  // pc is 0?
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].reset_and_start_call(0, call_state_ptr);  // pc is 0?
 #endif
 
     int32_t error_code = start_CALL(cached_call_state);
@@ -292,7 +292,7 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         }
 #endif
 #ifdef DEBUG
-        if (INSTANCE_GLOBAL_IDX == 0) {
+        if (INSTANCE_GLOBAL_IDX == DEBUG_THREAD) {
             printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
                    INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
                    call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
@@ -315,17 +315,20 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
         // }
 #endif
 
-        // if (INSTANCE_GLOBAL_IDX == DEBUG_THREAD) {
-        //     printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used %lu\n",
-        //            INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
-        //            call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
-        //            cached_call_state.gas_limit, cached_call_state.gas_used);
-
-        //     printf("\n\n");
-        //     cached_call_state.stack_ptr->print();
-        //     printf("\n\n call_state_ptr->memory_ptr %p \n", call_state_ptr->memory_ptr);
-        //     call_state_ptr->memory_ptr->print();
-        // }
+        //         if (INSTANCE_GLOBAL_IDX == DEBUG_THREAD) {
+        //             printf("\nId %d, pc: %d opcode: %d, depth %d, memsize %d stacksize %d gas_limit %lu gas_used
+        //             %lu\n",
+        //                    INSTANCE_GLOBAL_IDX, cached_call_state.pc, opcode, call_state_ptr->depth,
+        //                    call_state_ptr->memory_ptr->size, cached_call_state.stack_ptr->stack_offset,
+        //                    cached_call_state.gas_limit, cached_call_state.gas_used);
+        // #ifdef BUILD_LIBRARY
+        //             printf("reentrancy_count %u\n", global_simplified_trace[INSTANCE_GLOBAL_IDX].reentrancy_count);
+        // #endif
+        //             printf("\n\n");
+        //             cached_call_state.stack_ptr->print();
+        //             // printf("\n\n call_state_ptr->memory_ptr %p \n", call_state_ptr->memory_ptr);
+        //             // call_state_ptr->memory_ptr->print();
+        //         }
 
 #ifdef BUILD_PYTHON_LIBRARY
         // comparison, arithmetic, revert/invalid

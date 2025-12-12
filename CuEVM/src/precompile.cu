@@ -534,8 +534,8 @@ __device__ int32_t operation_ecMul(CuEVM::EccConstants *constants, CuEVM::gas_t 
 
 __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
                                        CuEVM::evm_call_context_t *call_context) {
-    printf("ecPairing\n");
-    printf("input size %d\n", call_context->call_data_size);
+    // printf("ecPairing\n");
+    // printf("input size %d\n", call_context->call_data_size);
     // input = message.get_data(index, length, size);
 
     CuEVM::gas_cost::ecpairing_cost(gas_used, call_context->call_data_size);
@@ -555,7 +555,7 @@ __device__ int32_t operation_ecPairing(CuEVM::EccConstants *constants, CuEVM::ga
             int res = 1;  // ecc::pairing_multiple(constants, input.data, call_context->call_data_size);
 #endif
 
-            printf("res: %d, idx %d \n", res, threadIdx.x);
+            // printf("res: %d, idx %d \n", res, threadIdx.x);
 
             if (res == -1) {
                 error_code = ERROR_PRECOMPILE_UNEXPECTED_INPUT;
