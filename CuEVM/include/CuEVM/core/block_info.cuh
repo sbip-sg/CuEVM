@@ -34,9 +34,9 @@ struct block_info_t {
     evm_word_t coin_base;              /**< The address of the block miner (YP: \f$H_{c}\f$) */
     evm_word_t difficulty;             /**< The difficulty of the block (YP: \f$H_{d}\f$) */
     evm_word_t prevrandao;             /**< The prevrandao EIP-4399 */
-    gas_t number;                 /**< The number of the block (YP: \f$H_{i}\f$) */
+    gas_t number;                      /**< The number of the block (YP: \f$H_{i}\f$) */
     evm_word_t gas_limit;              /**< The gas limit of the block (YP: \f$H_{l}\f$) */
-    gas_t time_stamp;             /**< The timestamp of the block (YP: \f$H_{s}\f$) */
+    gas_t time_stamp;                  /**< The timestamp of the block (YP: \f$H_{s}\f$) */
     evm_word_t base_fee;               /**< The base fee of the block (YP: \f$H_{f}\f$)*/
     evm_word_t chain_id;               /**< The chain id of the block */
     block_hash_t previous_blocks[256]; /**< The previous block hashes (YP: \f$H_{p}\f$) */
@@ -76,7 +76,6 @@ struct block_info_t {
      * Print the block information.
      */
     __host__ __device__ void print() const;
-
 };
 
 /**

@@ -37,7 +37,6 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         CUDA_CHECK(cudaEventCreate(&stop));
         start_events.push_back(start);
         stop_events.push_back(stop);
-        float milliseconds = 0;
 
         size_t size_value;
         cudaDeviceGetLimit(&size_value, cudaLimitStackSize);
@@ -63,13 +62,12 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
         write_root = cJSON_CreateObject();
     }
     uint32_t num_instances = 0;
-    int32_t managed = 1;
 
     const cJSON *test_json = nullptr;
     test_json = cJSON_GetArrayItem(read_root, 0);
 // tracer
 #ifdef EIP_3155
-    const size_t BUFFER_SIZE = 100 * 1024 * 1024;  // 100 MB
+    const size_t BUFFER_SIZE = 500 * 1024 * 1024;  // 500 MB
     // char *d_buffer;
     std::vector<char *> d_buffers(num_gpus);
     for (int i = 0; i < num_gpus; i++) {
@@ -88,7 +86,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     // Move CPU timing end point here to measure only setup time
     auto end_cpu = std::chrono::high_resolution_clock::now();
     auto duration_cpu = std::chrono::duration_cast<std::chrono::milliseconds>(end_cpu - start_cpu);
-    printf("CPU setup time: %lld milliseconds\n", duration_cpu.count());
+    printf("CPU setup time: %ld milliseconds\n", duration_cpu.count());
 
     // Launch kernels on each GPU with proper timing
 
@@ -159,11 +157,7 @@ void run_interpreter(char *read_json_filename, char *write_json_filename, size_t
     for (int i = 0; i < num_gpus; i++) {
         CUDA_CHECK(cudaSetDevice(i));
         cudaMemcpy(h_buffer, d_buffers[i], BUFFER_SIZE, cudaMemcpyDeviceToHost);
-        // printf("h_buffer: %p\n", h_buffer);
-        // uint32_t *buffer_as_uint = (uint32_t *)h_buffer;
-        // for (int i = 0; i < 20; i++) {
-        //     printf("buffer[%d]: %x\n", i, buffer_as_uint[i]);
-        // }
+
         // Parse and print the data (implemented later)
         CuEVM::utils::print_tracer_data(h_buffer);
         cudaFree(d_buffers[i]);

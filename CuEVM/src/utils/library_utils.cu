@@ -17,21 +17,12 @@
 
 namespace CuEVM {
 
-// __device__ uint32_t* g_coverage_bitmap = nullptr;
-// __device__ uint32_t* g_new_coverage_bitmap = nullptr;
-// __device__ uint32_t* g_new_coverage_count = nullptr;
-// __device__ uint32_t* g_new_coverage_idx = nullptr;
-// __device__ uint32_t* g_new_bug_pc = nullptr;
-// __device__ uint32_t* g_new_bug_count = nullptr;
-// __device__ uint32_t* g_new_bug_idx = nullptr;
-
 __device__ uint32_t* g_events_bitmap = nullptr;
 __device__ uint32_t* g_total_bug_table = nullptr;
 __device__ uint32_t* g_total_bug_count = nullptr;
 
 // event trackers, reset every kernel launch
-// __device__ uint32_t* g_new_coverage_bitmap =
-//     nullptr;  // for each thread to set a flag if they encounter a new branch or a
+
 __device__ BranchInfoEntry* g_new_branch_info = nullptr;
 __device__ StorageInfoEntry* g_new_storage_info = nullptr;
 __device__ BugInfoEntry* g_new_bug_info = nullptr;
@@ -62,13 +53,17 @@ __host__ void serialized_worldstate_data::print() {
     printf("no_accounts: %d\n", no_accounts);
     printf("no_storage_elements: %d\n", no_storage_elements);
     for (uint32_t idx = 0; idx < no_accounts; idx++) {
-        printf("address: %s\n", addresses[idx]);
-        printf("balance: %s\n", balance[idx]);
+        printf("address: \n");
+        addresses[idx].print();
+        printf("balance: \n");
+        balance[idx].print();
         printf("nonce: %d\n", nonce[idx]);
     }
     for (uint32_t idx = 0; idx < no_storage_elements; idx++) {
-        printf("storage_key: %s\n", storage_keys[idx]);
-        printf("storage_value: %s\n", storage_values[idx]);
+        printf("storage_key: \n");
+        storage_keys[idx].print();
+        printf("storage_value: \n");
+        storage_values[idx].print();
         printf("storage_index: %d\n", storage_indexes[idx]);
     }
 }
@@ -85,13 +80,9 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
     uint32_t bitmap_idx_missed = afl_hash_missed % BITMAP_SIZE;
 
     unsigned int prev_dist = atomicAdd(&g_events_bitmap[bitmap_idx_covered], 1);
-    // printf("thread %d atomic add prev_dist %x\n", INSTANCE_GLOBAL_IDX, prev_dist);
+
     // Fast check: if 24 bit lower bits of prev_dist is 0, then this is a new coverage
     if ((prev_dist & 0xFFFFFF) == 0) {
-        // printf(
-        //     "thread %d update_coverage_bitmap_with_distance covered branch pc_src %u pc_dst %u pc_missed %u, "
-        //     "prev_dist %u\n",
-        //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, prev_dist);
         last_covered_branch_id = bitmap_idx_covered + 1;  // +1 to avoid 0
     } else {
         // only track the last one
@@ -103,12 +94,7 @@ __device__ void simplified_trace_data::update_coverage_bitmap_with_distance(uint
     // update missed branch
     prev_dist = atomicMax(&g_events_bitmap[bitmap_idx_missed], dist_compare);
 
-    // printf("thread %d atomic max prev_dist %x %x\n", INSTANCE_GLOBAL_IDX, prev_dist, dist_compare);
     if (dist_compare > prev_dist) {
-        // printf(
-        //     "thread %d update_coverage_bitmap_with_distance missed branch pc_src %u pc_dst %u pc_missed %u, "
-        //     "distance_bits %u\n",
-        //     INSTANCE_GLOBAL_IDX, pc_src, pc_dst, pc_missed, distance_bits);
         last_missed_branch_id = bitmap_idx_missed + 1;  // +1 to avoid 0
         last_distance_bits = distance_bits;
     } else {
@@ -129,8 +115,7 @@ __device__ __forceinline__ uint32_t fnv1a(uint32_t value) {
 }
 __device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint16_t storage_slot, uint8_t is_write) {
     if (current_account_id == REENTRANCY_ATTACKER_ADDRESS) return;
-    // printf("thread %d update_storage_coverage pc %u storage_slot %u is_write %u current_account_id %u\n",
-    //        INSTANCE_GLOBAL_IDX, pc, storage_slot, is_write, current_account_id);
+
     uint32_t storage_hash_id =
         is_write ? pc ^ (storage_slot + BITMAP_SIZE / 2) ^ current_account_id : pc ^ storage_slot ^ current_account_id;
 
@@ -138,15 +123,7 @@ __device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint
     uint32_t bitmap_idx = storage_hash_id % BITMAP_SIZE;
     unsigned int prev_dist = atomicMax(&g_events_bitmap[bitmap_idx], 1);
 
-    // printf(
-    //     "thread %d update_storage_coverage pc %u storage_slot %u account_idx %u is_write %u storage_id 0x%08x, "
-    //     "prev_dist %u bitmap_idx %u\n",
-    //     INSTANCE_GLOBAL_IDX, pc, storage_slot, account_idx, is_write, storage_id, prev_dist, bitmap_idx);
-
     if (prev_dist == 0) {
-        // printf("thread %d new_storage_coverage pc %u storage_slot %u account_idx %u is_write %u storage_id 0x%08x\n",
-        //        INSTANCE_GLOBAL_IDX, pc, storage_slot, account_idx, is_write, storage_id);
-
         int idx = atomicAdd(&g_gpu_feedback_count->new_storage_count, 1);
         if (idx < CuEVM::MAX_NEW_STORAGE) {
             g_new_storage_info[idx].storage_thread_idx = INSTANCE_GLOBAL_IDX;
@@ -171,8 +148,6 @@ __device__ void simplified_trace_data::add_bugs_for_later(uint32_t pc, uint8_t b
 }
 // Completed bugs: FNV-1a hash (citable, e.g., from Fowler–Noll–Vo papers) + quadratic probing (optimized, bounded)
 __device__ void simplified_trace_data::update_bugs(uint32_t bug_id) {
-    // uint32_t bug_id = (pc << 16) | bug_type;  // Unique ID
-    // printf("thread %d update_bugs bug_id 0x%08x\n", INSTANCE_GLOBAL_IDX, bug_id);
     // FNV-1a:
     uint32_t hash = fnv1a(bug_id);
 
@@ -184,12 +159,10 @@ __device__ void simplified_trace_data::update_bugs(uint32_t bug_id) {
         unsigned int cas_result = atomicCAS(&g_total_bug_table[idx], 0, bug_id);
         if (cas_result == 0) {
             // Successful insert into empty slot
-            // printf("thread %d update_bugs inserted\n", INSTANCE_GLOBAL_IDX);
             inserted = true;
             break;
         } else if (cas_result == bug_id) {
             // Another thread already inserted this exact bug
-            // printf("thread %d update_bugs duplicate found\n", INSTANCE_GLOBAL_IDX);
             return;
         }
         // Slot contains different bug_id, continue probing
@@ -251,27 +224,6 @@ __device__ void simplified_trace_data::finalize_coverage_bitmap(int32_t error_co
             }
         }
     }
-
-    // int bitmap_idx = INSTANCE_GLOBAL_IDX / 32;
-    // int bit_pos = INSTANCE_GLOBAL_IDX % 32;
-    // uint32_t mask = 1U << bit_pos;
-
-    // // Check if this thread's bit is set in the new coverage bitmap
-    // if (g_new_coverage_bitmap[bitmap_idx] & mask) {
-    //     // Atomically increment the counter and get the previous value
-    //     int idx = atomicAdd(&g_gpu_feedback_count->new_branch_count, 1);
-
-    //     // If we haven't exceeded the maximum number of new branches to track
-    //     if (idx < CuEVM::MAX_NEW_BRANCHES) {
-    //         // Record this thread's global index in the coverage index array
-    //         g_new_branch_info[idx].branch_thread_idx = INSTANCE_GLOBAL_IDX;
-    //         g_new_branch_info[idx].branch_id = last_branch_id;
-    //     }
-
-    //     // printf("g_new_coverage_bitmap[idx] %d\n", g_new_coverage_bitmap[idx]);
-    // }
-
-    // printf("g_new_coverage_count %d\n", g_new_coverage_count[0]);
 }
 
 __device__ bool simplified_trace_data::increase_branch_count() {
@@ -298,9 +250,7 @@ __device__ bool simplified_trace_data::record_branch(uint32_t pc_src, uint32_t p
     if (distance_bits > 255) {
         distance_bits = 255;
     }
-    // printf("record branch thread %d pc_src %u pc_dst %u pc_missed %u, distance_bits %d\n", INSTANCE_GLOBAL_IDX,
-    // pc_src,
-    //        pc_dst, pc_missed, distance_bits);
+
     // go library: branch info is recorded on CPU side
     // TODO Aug: remove this check after we bypass logic of two attackers
     if (current_account_id != REENTRANCY_ATTACKER_ADDRESS && current_account_id != RANDOM_ATTACKER_ADDRESS &&
@@ -479,9 +429,6 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
         }
 
         if (calls[i].call_data_size > 1) {
-            // printf("arbitrary_call_oracle thread %d last_pc %u first_byte_call_data %x\n", INSTANCE_GLOBAL_IDX,
-            // last_pc,
-            //        calls[i].first_byte_call_data);
             arbitrary_call_oracle(last_pc, calls[i].first_byte_call_data);
         }
     }
@@ -498,11 +445,7 @@ __host__ __device__ void simplified_trace_data::print() {
     for (uint32_t i = 0; i < no_bugs; i++) {
         printf("bug %u\n", bugs[i]);
     }
-    // printf("events\n");
-    // for (uint32_t i = 0; i < no_events; i++) {
-    //     printf("pc %u op %u operand_1 %s operand_2 %s res %s\n", events[i].pc, events[i].op,
-    //            events[i].operand_1.to_hex(), events[i].operand_2.to_hex(), events[i].res.to_hex());
-    // }
+
     printf("calls\n");
     for (uint32_t i = 0; i < no_calls; i++) {
         printf("pc %u op %u sender_id %u receiver_id %u value_leaking %u first_byte_call_data %x error_code %u\n",
@@ -601,20 +544,12 @@ __device__ __forceinline__ uint32_t next_rand(uint32_t& seed) {
     // seed = (LCG_A * seed + LCG_C) % LCG_M;
     uint64_t temp = (uint64_t)GLIBC_LCG_A * seed + GLIBC_LCG_C;
     seed = temp & 0x7FFFFFFF;  // Modulo 2^31
-    // printf("Thread %d next_rand seed %u\n", INSTANCE_GLOBAL_IDX, seed);
-    return seed;  // 31-bit output
+    return seed;               // 31-bit output
 }
 
 // Helper: Get random in range [0, max)
 __device__ __forceinline__ uint32_t rand_range(uint32_t& seed, uint32_t max) {
-    // printf("Thread %d rand_range seed %u max %u\n", INSTANCE_GLOBAL_IDX, seed, max);
     return max == 0 ? 0 : next_rand(seed) % max;
-    // if (max == 0) return 0;
-    // uint32_t rand_val = next_rand(seed);
-    // printf("Thread %d rand_range seed %u max %u rand_val %u  rand_val %% max %u\n", INSTANCE_GLOBAL_IDX, seed,
-    // max,
-    //    rand_val, rand_val % max);
-    // return rand_val % max;
 }
 
 // AFL mutation types
@@ -932,15 +867,6 @@ __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
     // Start with no storage elements serialized.
     data->no_storage_elements = 0;
 
-    // uint32_t new_offset =
-    // (contract_index[address_index] * account_prealloc_keys_size + storage_size) * num_states +
-    // INSTANCE_GLOBAL_IDX; uint32_t instance_idx = address_index * num_states + INSTANCE_GLOBAL_IDX;
-    // // printf("get_value_status address_index %d, instance_idx %d instance %d\n", address_index,
-    // instance_idx,
-    // //        INSTANCE_GLOBAL_IDX);
-    // uint32_t contract_idx = contract_index[address_index];
-    // uint32_t storage_size = account_storage_size[instance_idx];
-
     // Iterate through each account.
     // We assume that the account data (address, balance, nonce) is stored in parallel arrays,
     // and for simplicity we pick the first state (index 0) as the canonical view.
@@ -955,16 +881,6 @@ __device__ void serialize_state_data(CuEVM::serialized_worldstate_data* data) {
         data->balance[acct] = state->account_balances[instance_idx];
         // Copy the account's nonce (again using state index 0).
         data->nonce[acct] = state->account_nonces[instance_idx];
-
-        // if (INSTANCE_GLOBAL_IDX == 0) {
-        //     printf("address: \n");
-        //     state->address_list[acct].print();
-        //     printf("balance: \n");
-        //     state->account_balances[instance_idx].print();
-
-        //     // Get the storage size for this account (again, from the first snapshot).
-        //     printf("account %d instance %d storage size: %d\n", acct, instance_idx, storage_size);
-        // }
 
         if (storage_size > 0) {
             // The contract index tells us which section of the preallocated storage pool to use.

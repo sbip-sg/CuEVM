@@ -146,10 +146,8 @@ __device__ void ecpairing_cost(gas_t &gas_used, const gas_t &data_size) {
 __device__ int32_t access_account_cost(gas_t &gas_used, CuEVM::StateDb *state_db, const evm_word_t *address,
                                        SnapshotState *snapshot_state, bool set_warm) {
     if (state_db->is_warm_account(address, snapshot_state, set_warm)) {
-        // printf("warm account\n");
         gas_used += GAS_WARM_ACCESS;
     } else {
-        // printf("cold account\n");
         gas_used += GAS_COLD_ACCOUNT_ACCESS;
         // set the account warm in case it's cold
         // assuming this function is called only when the account is accessed
@@ -178,31 +176,7 @@ __device__ int32_t sstore_cost(gas_t &gas_used, gas_t &gas_refund, CuEVM::StateD
         original_value = &found_value->original_value;
         current_value = &found_value->value;
     }
-    // if (THREADIDX == 0) {
-    //     printf("original value %p\n", original_value);
-    //     if (original_value != nullptr) {
-    //         original_value->print();
-    //     }
-    //     printf("current value %p\n", current_value);
-    //     if (current_value != nullptr) {
-    //         current_value->print();
-    //     }
 
-    //     new_value->print();
-    // }
-    // __syncthreads();
-    // if (THREADIDX == 1) {
-    //     printf("original value %p\n", original_value);
-    //     if (original_value != nullptr) {
-    //         original_value->print();
-    //     }
-    //     printf("current value %p\n", current_value);
-    //     if (current_value != nullptr) {
-    //         current_value->print();
-    //     }
-
-    //     new_value->print();
-    // }
     // EIP-2200
     if (uint256_cmp(new_value, current_value) == 0) {
         gas_used += GAS_SLOAD;
@@ -263,11 +237,13 @@ __device__ int32_t transaction_intrinsic_gas(const CuEVM::transaction::Transacti
 
     // gas_intrinsic += GAS_ACCESS_LIST_ADDRESS/GAS_ACCESS_LIST_STORAGE for
     // each address in transaction.access_list
-
-    // for (uint32_t idx = 0; idx < transaction.access_list.accounts_count; idx++) {
+    gas_intrinsic += transaction_list->access_list_gas_cost;
+#ifdef EIP_3155
+    // for (uint32_t idx = 0; idx < transaction_list->access_list.accounts_count; idx++) {
     //     gas_intrinsic += GAS_ACCESS_LIST_ADDRESS;
     //     gas_intrinsic += GAS_ACCESS_LIST_STORAGE * transaction.access_list.accounts[idx].storage_keys_count;
     // }
+#endif
 
 #ifdef EIP_3860
     // gas_intrinsic += GAS_INITCODE_COST if create transaction

@@ -31,26 +31,6 @@ __device__ jump_destinations_t::jump_destinations_t(CuEVM::byte_array_t &byte_co
             destinations[size - 1] = pc;
         }
     }
-
-    // #ifdef __CUDA_ARCH__
-    //     printf("jump destination initialized size %d capapcity %d\n", size, capacity, threadIdx.x);
-    // #endif
-    // if (size > 0) {
-    //     destinations.grow(size, 1);
-    //     uint32_t index = 0;
-    //     for (pc = 0; pc < byte_code.size; pc++) {
-    //         opcode = byte_code.data[pc];
-    //         // if a push x
-    //         if (((opcode & 0xF0) == 0x60) || ((opcode & 0xF0) == 0x70)) {
-    //             push_size = (opcode & 0x1F) + 1;
-    //             pc = pc + push_size;
-    //         }
-    //         if (opcode == OP_JUMPDEST) {
-    //             destinations[index] = pc;
-    //             index++;
-    //         }
-    //     }
-    // }
 }
 __device__ void jump_destinations_t::set_bytecode(CuEVM::byte_array_t &byte_code) {
     return;  // temporarily disabled
@@ -63,8 +43,6 @@ __device__ void jump_destinations_t::set_bytecode(CuEVM::byte_array_t &byte_code
         current_capacity = 16;
         grow_capacity(current_capacity);
     }
-
-    // grow_capacity(current_capacity);
 
     for (pc = 0; pc < byte_code.size; pc++) {
         opcode = byte_code.data[pc];
@@ -82,9 +60,6 @@ __device__ void jump_destinations_t::set_bytecode(CuEVM::byte_array_t &byte_code
             destinations[size - 1] = pc;
         }
     }
-    // #ifdef __CUDA_ARCH__
-    //     printf("jump destination copied set_bytecode size %d capapcity %d\n", size, capacity, threadIdx.x);
-    // #endif
 }
 __device__ jump_destinations_t::~jump_destinations_t() {
     if (capacity > 0) {
@@ -94,7 +69,6 @@ __device__ jump_destinations_t::~jump_destinations_t() {
 
 __device__ uint32_t jump_destinations_t::has(uint32_t pc) {
     return ERROR_SUCCESS;  // Temporarily disabled
-    // return destinations.has_value(pc) == ERROR_SUCCESS ? ERROR_SUCCESS : ERROR_INVALID_JUMP_DESTINATION;
 
     uint32_t error_code = ERROR_INVALID_JUMP_DESTINATION;
     uint32_t index;
@@ -113,11 +87,6 @@ __device__ int32_t jump_destinations_t::grow_capacity(uint32_t new_capacity) {
     if (new_capacity == capacity) return ERROR_SUCCESS;
     uint16_t *new_data = new uint16_t[new_capacity];
     if (capacity > 0) {
-        // printf("Copying destinations\n");
-        // printf("New capacity: %d\n", new_capacity);
-        // printf("Old capacity: %d\n", capacity);
-        // printf("destination ptr: %p\n", destinations);
-        // if (new_size > size) {
         memcpy(new_data, destinations, min(new_capacity, capacity) * sizeof(uint16_t));
 
         delete[] destinations;
@@ -128,7 +97,6 @@ __device__ int32_t jump_destinations_t::grow_capacity(uint32_t new_capacity) {
 }
 
 __device__ void jump_destinations_t::print() {
-    // // Temporarily disabled
     // for (uint32_t i = 0; i < real_size; i++) {
     //     printf("Jump destination %d: %d\n", i, destinations[i]);
     // }

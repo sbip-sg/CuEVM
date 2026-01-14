@@ -19,7 +19,7 @@ __device__ void evm_stack_t::free() {
 
 __device__ void evm_stack_t::clear() {
     stack_offset = 0;
-    // capacity = 0;
+
     global_stack_base = nullptr;
 }
 
@@ -89,7 +89,6 @@ __device__ int32_t evm_stack_t::push(const evm_word_t &value) {
     if (stack_offset < max_stack_size) {
         *top() = value;
         stack_offset++;
-        // printf("Stack offset %d pointer %p  top %p\n", stack_offset, shared_stack_base, top());
 
         return ERROR_SUCCESS;
     } else {
@@ -101,7 +100,6 @@ __device__ int32_t evm_stack_t::push_evm_word_t(const evm_word_t *value) {
     if (stack_offset < max_stack_size) {
         *top() = *value;
         stack_offset++;
-        // printf("Stack offset %d pointer %p  top %p\n", stack_offset, shared_stack_base, top());
 
         return ERROR_SUCCESS;
     } else {
@@ -114,8 +112,7 @@ __device__ int32_t evm_stack_t::pop(evm_word_t &y) {
 
     y = *get_address_at_index(1);
     stack_offset--;
-    // printf("Stack pop offset %d idx %d\n", stack_offset, THREADIDX);
-    // cgbn_load(arith.env, y, top());
+
     return ERROR_SUCCESS;
 }
 
@@ -151,19 +148,15 @@ __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) const {
             return global_stack_base + stack_offset - index;
         }
     }
-    // return global_stack_base + stack_base_offset + stack_offset - index - memory_pool_stack_preallocate;
 }
 
 __device__ int32_t evm_stack_t::dupx(uint32_t x) {
     if ((stack_offset < max_stack_size) && (x <= stack_offset)) {
-        // cgbn_store(arith.env, top(), value);
         *top() = *get_address_at_index(x);
 
         stack_offset++;
         return ERROR_SUCCESS;
     } else {
-        // TODO: check this
-        // printf("THREAD %d dupx overflow or underflow stack offset %d\n", INSTANCE_GLOBAL_IDX, stack_offset);
         return ERROR_STACK_OVERFLOW;  // represent underflow also
     };
 }
@@ -171,7 +164,6 @@ __device__ int32_t evm_stack_t::dupx(uint32_t x) {
 __device__ int32_t evm_stack_t::swapx(uint32_t x) {
     x++;
     if (x > stack_offset) {
-        // printf("THREAD %d swap overflow or underflow stack offset %d\n", INSTANCE_GLOBAL_IDX, stack_offset);
         return ERROR_STACK_UNDERFLOW;
     }
     evm_word_t tmp;

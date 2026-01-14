@@ -32,8 +32,7 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     }
     error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, args_offset_ui32, args_size_ui32,
                                                     memory_expansion_cost_args, temp_memory_gas_used);
-    // printf("temp memory gas used %u, memory_expansion_cost_args %u\n", temp_memory_gas_used,
-    //        memory_expansion_cost_args);
+
     // memory return data
     evm_word_t ret_offset = new_context_ptr->fixed_ret_offset;
     evm_word_t ret_size = new_context_ptr->fixed_ret_size;
@@ -46,21 +45,18 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
     error_code |= CuEVM::gas_cost::memory_grow_cost(parent_memory_ptr, ret_offset_ui32, ret_size_ui32,
                                                     memory_expansion_cost_ret, temp_memory_gas_used);
 
-    // printf("temp memory gas used %u, memory_expansion_cost_ret %u\n", temp_memory_gas_used,
-    // memory_expansion_cost_ret); compute the total memory expansion cost
     gas_t memory_expansion_cost;
     if (memory_expansion_cost_args > memory_expansion_cost_ret) {
         memory_expansion_cost = memory_expansion_cost_args;
     } else {
         memory_expansion_cost = memory_expansion_cost_ret;
     }
-    // printf("memory expansion cost %u\n", memory_expansion_cost);
+
     cached_state.gas_used += memory_expansion_cost;
 
     // adress warm call
     evm_word_t *contract_address_ptr = &new_context_ptr->to;
     // move access account cost to before this function
-    // CuEVM::gas_cost::access_account_cost(cached_state.gas_used, CuEVM::global_state_db_ptr, contract_address_ptr);
 
     gas_t gas_stippend = 0;
     if (new_context_ptr->call_type != OP_DELEGATECALL && non_zero_value) {
@@ -103,7 +99,6 @@ __device__ int32_t generic_CALL(const evm_word_t *args_offset, const evm_word_t 
         }
 #ifdef BUILD_LIBRARY
         if (new_context_ptr->from.words[0] == REENTRANCY_ATTACKER_ADDRESS) {
-            // printf("Thread %d bypass args logic for reentrancy attacker\n", INSTANCE_GLOBAL_IDX);
             // bypass args logic for reentrancy attacker
             CuEVM::evm_call_context_t *parent_context = new_context_ptr->parent;
             while (parent_context->parent != nullptr) {
@@ -157,11 +152,9 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
     int32_t error_code = CuEVM::gas_cost::memory_grow_cost(current_context->memory_ptr, memory_offset_ui32, length_ui32,
                                                            memory_expansion_cost, cached_state.gas_used);
 
-    // printf("memory expansion cost %lu\n", memory_expansion_cost);
-    // printf("gas used %lu\n", cached_state.gas_used);
     // compute the initcode gas cost
     CuEVM::gas_cost::initcode_cost(cached_state.gas_used, uint256_get_uint32_t(length));
-    // printf("gas used %lu, length %u\n", cached_state.gas_used, uint256_get_uint32_t(length));
+
     evm_word_t salt;
     if (call_type == OP_CREATE2) {
         error_code |= cached_state.stack_ptr->pop(salt);
@@ -185,8 +178,6 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
         evm_word_t sender_nonce(sender_nonce_uint);
         // Do not get_account after this to reuse sender_account
         if (call_type == OP_CREATE2) {
-            // printf("create2 %p %p %p init code size %d\n", &contract_address, &current_context->to, &salt,
-            // length_ui32);
             CuEVM::utils::get_contract_address_create2(&contract_address, &current_context->to, &salt,
                                                        initialisation_code, length_ui32);
 
@@ -202,7 +193,7 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
 
         // gas capped limit
         gas_t gas_capped = CuEVM::gas_cost::max_gas_call(cached_state.gas_limit, cached_state.gas_used);
-        // printf("gas capped %lu\n", gas_capped);
+
         // // add the gas sent to the gas used
         cached_state.gas_used += gas_capped;
         // the return data offset and size
@@ -228,20 +219,16 @@ __device__ int32_t generic_CREATE(CuEVM::evm_call_context_t *current_context,
                                                    ERROR_SUCCESS
 #endif
         );
-        // printf("generic_CREATE error_code: %d\n", error_code);
+
         // todo update nonce
         if (CuEVM::global_state_db_ptr->is_contract(&current_context->to)) {
             CuEVM::global_state_db_ptr->update_nonce(&current_context->to,
                                                      CuEVM::global_state_db_ptr->get_nonce(&current_context->to) + 1);
         }
-        // if (THREADIDX == 1) {
-        //     printf("CREATE contract address\n");
-        //     contract_address.print();
-        // }
+
         CuEVM::global_state_db_ptr->update_nonce(&contract_address, 1);
     }
 
-    // printf("generic_CREATE error_code: %d\n", error_code);
     return error_code;
 }
 
@@ -281,10 +268,6 @@ __device__ int32_t CREATE(CuEVM::evm_call_context_t *current_context, CuEVM::evm
 __device__ int32_t CALL(CuEVM::evm_call_context_t *current_context, CuEVM::evm_call_context_t *&new_context_ptr,
                         CuEVM::cached_evm_call_context &cached_state) {
     evm_word_t *gas_word, *original_address, *value, *args_offset, *args_size, *ret_offset, *ret_size;
-    // if (INSTANCE_GLOBAL_IDX == 1) {
-    //     printf("stack before call %p\n", cached_state.stack_ptr);
-    //     printf("snapshot state before call %p\n", current_context->snapshot_state);
-    // }
 
     if (cached_state.stack_ptr->size() < 7) return ERROR_STACK_UNDERFLOW;
     gas_word = cached_state.stack_ptr->get_address_at_index(1);
@@ -401,12 +384,7 @@ __device__ int32_t DELEGATECALL(CuEVM::evm_call_context_t *current_context, CuEV
     uint32_t byte_code_size = 0;
     uint8_t *byte_code =
         CuEVM::global_state_db_ptr->get_code(byte_code_size, &address, current_context->snapshot_state);
-    // if (current_context->depth < memory_pool_call_context_preallocate) {
-    //     new_context_ptr = memory_pool::get_call_context(current_context->depth);
-    // } else {
-    //     new_context_ptr = new CuEVM::evm_call_context_t();
-    // }
-    // new_context_ptr = new CuEVM::evm_call_context_t();
+
     new_context_ptr = memory_pool::get_call_context(current_context->depth);
     int32_t bytecode_offset = find_global_bytecode_offset(&address);
 
@@ -504,12 +482,6 @@ __device__ int32_t RETURN(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        // printf("RETURN : set return data %u %u\n", memory_offset_ui32, length_ui32);
-        // memory.increase_memory_cost(memory_expansion_cost); // dont need to increase memory cost when return
-        // if (length_ui32 > 2048) {
-        //     printf("THREAD %d RETURN : set return data %u %u\n", INSTANCE_GLOBAL_IDX, memory_offset_ui32,
-        //     length_ui32);
-        // }
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
         error_code = ERROR_RETURN;
     }
@@ -544,13 +516,7 @@ __device__ int32_t REVERT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     error_code |= CuEVM::gas_cost::has_gas(gas_limit, gas_used);
 
     if (error_code == ERROR_SUCCESS) {
-        // memory.increase_memory_cost(memory_expansion_cost);
-        // if (length_ui32 > 2048) {
-        //     printf("THREAD %d REVERT : set return data %u %u\n", INSTANCE_GLOBAL_IDX, memory_offset_ui32,
-        //     length_ui32);
-        // }
         call_state_ptr->set_parent_return_data(memory_offset_ui32, length_ui32);
-        // error_code |= memory.get(memory_offset_ui32, length_ui32, return_data.data) | ERROR_REVERT;
         error_code = ERROR_REVERT;
     }
     return error_code;
