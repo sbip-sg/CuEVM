@@ -185,8 +185,8 @@ int process_json_state_gpu(const char* json_state, uint32_t num_instances, bool 
 
     // Initialize and store the state DB and account count globally
     // Modify GPUfromJson to use the persistent jump table
-
-    CuEVM::StateDb::GPUfromJsonMultiGPU(g_state_db_ptr, stateJson, g_num_instances_per_device, g_num_accounts,
+    const cJSON* world_state_json = cJSON_GetObjectItemCaseSensitive(stateJson, "pre");
+    CuEVM::StateDb::GPUfromJsonMultiGPU(g_state_db_ptr, world_state_json, g_num_instances_per_device, g_num_accounts,
                                         g_snapshot_state_db_ptr);
 
     for (int i = 0; i < g_num_gpus; i++) {

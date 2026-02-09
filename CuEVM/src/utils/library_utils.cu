@@ -139,15 +139,11 @@ __device__ void simplified_trace_data::update_storage_coverage(uint32_t pc, uint
 }
 __device__ void simplified_trace_data::add_bugs_for_later(uint32_t pc, uint8_t bug_type) {
     uint32_t bug_id = pc << 16 | bug_type << 8 | (current_account_id & 0xFF);
-    // printf("thread %d add_bugs_for_later pc %u bug_type %u bug_id 0x%08x to_addr 0x%08x\n", INSTANCE_GLOBAL_IDX, pc,
-    //        bug_type, bug_id, current_account_id);
-
+    // simple check for duplicates
+    if (bugs[0] == bug_id) return;
+    // circular buffer
+    if (no_bugs >= MAX_BUGS_TRACING) no_bugs = 0;
     bugs[no_bugs] = bug_id;
-    if (no_bugs >= MAX_BUGS_TRACING) {
-        // printf("thread %d no_bugs >= MAX_BUGS_TRACING, %d\n", INSTANCE_GLOBAL_IDX, no_bugs);
-        no_bugs = 0;
-        return;
-    }
     no_bugs++;
 }
 // Completed bugs: FNV-1a hash (citable, e.g., from Fowler–Noll–Vo papers) + quadratic probing (optimized, bounded)
@@ -212,12 +208,16 @@ __device__ void simplified_trace_data::finalize_coverage_bitmap(int32_t error_co
 
     // add bugs that require sucess tx
     if (no_bugs > 0 && (error_code == ERROR_SUCCESS || error_code == ERROR_RETURN)) {
-        // printf("thread %d finalize_coverage_bitmap state_written %d\n", INSTANCE_GLOBAL_IDX, state_written);
+        // printf("thread %d finalize_coverage_bitmap state_written %d error_code %d\n", INSTANCE_GLOBAL_IDX,
+        //        state_written, error_code);
         for (uint32_t i = 0; i < no_bugs; i++) {
-            // printf("thread %d add bug %x state_written %d\n", INSTANCE_GLOBAL_IDX, bugs[i], state_written);
+            // printf("thread %d add bug %x state_written %d error_code %d\n", INSTANCE_GLOBAL_IDX, bugs[i],
+            // state_written,
+            //        error_code);
             uint8_t bug_type = static_cast<uint8_t>((bugs[i] >> 8) & 0xFF);
 
-            if (bug_type == BUG_INTEGER_BUG) {
+            if (bug_type == BUG_INTEGER_BUG || bug_type == BUG_INTEGER_ADD || bug_type == BUG_INTEGER_SUB ||
+                bug_type == BUG_INTEGER_MUL) {
                 if (state_written) update_bugs(bugs[i]);
             } else {
                 update_bugs(bugs[i]);
@@ -278,12 +278,29 @@ __device__ void simplified_trace_data::record_distance(uint8_t op, const CuEVM::
     last_distance = distance;
 }
 
-__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
-    assert(call_context_ptr != nullptr);
-    // if (current_account_id != 0)
-    //     printf("thread %d start_call pc %u current_account_id %x\n", INSTANCE_GLOBAL_IDX, pc, current_account_id);
-#ifdef BUILD_GO_LIBRARY
+__device__ void simplified_trace_data::reset_and_start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
+    last_distance = 0;
+    last_covered_branch_id = 0;
+    last_missed_branch_id = 0;
+    last_distance_bits = 0;
+    current_account_id = 0;
+    no_bugs = 0;
+    no_branches = 0;
+    state_written = false;
+    state_accessed = false;
+    reentrancy_count = 0;
+    calls[0].sender_id = call_context_ptr->from.words[0];  // & 0xffff;
+    current_account_id = call_context_ptr->to.words[0];    // & 0xffff;
+    calls[0].receiver_id = current_account_id;
 
+    calls[0].pc = pc;
+    calls[0].op = call_context_ptr->call_type;
+    calls[0].error_code = RESERVED_ERROR_CODE;
+    calls[0].last_pc = 0;
+    no_calls = 1;
+}
+__device__ void simplified_trace_data::start_call(uint32_t pc, evm_call_context_t* call_context_ptr) {
+#ifdef BUILD_GO_LIBRARY
     no_branches += 10;  // call saturates the branch limit faster than normal jumps
                         // state_written = true;
 #endif
@@ -322,22 +339,24 @@ __device__ void simplified_trace_data::start_create() {
     no_branches += MAX_BRANCHES_TRACING / 2;
     state_written = true;
 }
-__device__ void simplified_trace_data::selfdestruct_oracle(uint32_t pc) {
+__device__ void simplified_trace_data::selfdestruct_oracle(uint32_t depth, uint32_t pc) {
+    if (depth > 1) return;
     // printf("thread %d selfdestruct_oracle\n", INSTANCE_GLOBAL_IDX);
-    if (calls[0].sender_id == RANDOM_ATTACKER_ADDRESS)
-        update_bugs(pc << 16 | BUG_SELF_DESTRUCT << 8 | (current_account_id & 0xFF));
+    if (calls[0].sender_id == RANDOM_ATTACKER_ADDRESS) add_bugs_for_later(pc, BUG_SELF_DESTRUCT);
+    // update_bugs(pc << 16 | BUG_SELF_DESTRUCT << 8 | (current_account_id & 0xFF));
 }
 
 __device__ void simplified_trace_data::reentrancy_oracle(uint32_t pc) {
     // printf("thread %d reentrancy_oracle pc %u\n", INSTANCE_GLOBAL_IDX, pc);
-    update_bugs(pc << 16 | BUG_REENTRANCY << 8 | (current_account_id & 0xFF));
+    // update_bugs(pc << 16 | BUG_REENTRANCY << 8 | (current_account_id & 0xFF));
+    if (calls[0].sender_id == REENTRANCY_ATTACKER_ADDRESS) add_bugs_for_later(pc, BUG_REENTRANCY);
 }
 __device__ void simplified_trace_data::leaking_ether_oracle(uint32_t pc) {
     // printf("thread %d leaking_ether_oracle pc %u receiver_id %x\n", INSTANCE_GLOBAL_IDX, pc, receiver_id);
 
     // printf("thread %d leaking_ether_oracle\n", INSTANCE_GLOBAL_IDX);
     // update_bugs(pc << 16 | BUG_LEAKING_ETHER << 8 | (current_account_id & 0xFF));
-    add_bugs_for_later(pc, BUG_LEAKING_ETHER);
+    if (calls[0].sender_id == RANDOM_ATTACKER_ADDRESS) add_bugs_for_later(pc, BUG_LEAKING_ETHER);
 }
 
 __device__ void simplified_trace_data::arbitrary_call_oracle(uint32_t pc, uint8_t first_byte_call_data) {
@@ -371,7 +390,8 @@ __device__ void simplified_trace_data::invalid_opcode_oracle(uint32_t pc) {
 }
 
 __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t last_pc, uint32_t _current_account_id) {
-    // printf("thread %d finish_call error_code %u last_pc %u, no_calls %u\n", INSTANCE_GLOBAL_IDX, error_code, last_pc,
+    // printf("thread %d finish_call error_code %u last_pc %u, no_calls %u\n", INSTANCE_GLOBAL_IDX, error_code,
+    // last_pc,
     //        no_calls);
 
     if (no_calls > MAX_CALLS_TRACING) {
@@ -396,9 +416,11 @@ __device__ void simplified_trace_data::finish_call(uint8_t error_code, uint32_t 
     if (i < 0) i = 0;
 
 #ifdef BUILD_GO_LIBRARY
+#ifdef ASSERTION_ORACLE
     if (error_code == ERROR_INVALID_OPCODE) {
         invalid_opcode_oracle(last_pc);
     }
+#endif
 
     if (no_calls > 1 && calls[i].receiver_id == RANDOM_ATTACKER_ADDRESS) {
         // current value is greater than the first call value
@@ -735,7 +757,8 @@ __device__ uint32_t mutate_block_values_senders(uint32_t seed, uint64_t* block_n
     // printf("Thread %d mutated block_numbers %lu block_timestamps %lu\n", INSTANCE_GLOBAL_IDX,
     //        block_numbers[INSTANCE_GLOBAL_IDX], block_timestamps[INSTANCE_GLOBAL_IDX]);
     senders[INSTANCE_GLOBAL_IDX] = rand_range(seed, g_fuzzing_constants->sender_counts);
-    // printf("Thread %d sender_counts %d sender %d seed %d\n", INSTANCE_GLOBAL_IDX, g_fuzzing_constants->sender_counts,
+    // printf("Thread %d sender_counts %d sender %d seed %d\n", INSTANCE_GLOBAL_IDX,
+    // g_fuzzing_constants->sender_counts,
     //        senders[INSTANCE_GLOBAL_IDX], seed);
     return seed;
 }

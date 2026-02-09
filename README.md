@@ -38,7 +38,7 @@ To produce the prebuilt image used in our releases:
 docker build -t cuevm:latest .
 ```
 
-The Dockerfile currently compiles both the shared library and the standalone binary with `-DCUDA_COMPUTE_CAPABILITY="86;89;90"`. Adjust these flags in the Dockerfile before building if you need support for other GPU architectures. 
+The Dockerfile currently compiles both the shared library and the standalone binary with `-DCUDA_COMPUTE_CAPABILITY="86;89;90"`. Adjust these flags in the Dockerfile before building if you need support for other GPU architectures.
 
 Run the trace-comparison test suite directly in the container (mount a host directory for the temporary artifacts):
 
@@ -56,13 +56,6 @@ docker run --rm --gpus all \
     --ignore-errors
 ```
 
-Run the sample Medusa fuzz campaign from the image:
-
-```bash
-docker run --rm --gpus all cuevm:latest \
-  medusa fuzz --config /opt/cuevm/medusa_sample_config/medusa.json
-```
-
 ## Usage
 
 ### Using the standalone binary executor
@@ -77,7 +70,8 @@ The executor takes an input JSON file and outputs the result to standard output 
 
 We developed a python library in `fuzzing/` to showcase interfacing with `libcuevm_go.so` for bug detection in solidity smart contracts.
 
-For a performant and ready-to-use fuzzer, please refer to [medusa-cuevm](https://github.com/minhhn2910/medusa-cuevm) for the official fuzzing tool built from [Medusa v1.2.1](https://github.com/crytic/medusa) utilizing cuevm library.
+For a performant and ready-to-use fuzzer, please refer to our [in-house fuzzing tool](https://github.com/minhhn2910/medusa-cuevm) built based on [Medusa v1.2.1](https://github.com/crytic/medusa).
+
 ### Multi-GPU mode
 
 If your system has multiple GPUs, CuEVM can automatically distribute the workload (N transactions) evenly across all available GPUs for improved performance.
@@ -203,21 +197,29 @@ python3 run-ethtest-without-stateroot-comparison.py --runtest-bin runtest --geth
 - Passed: 13,833 (96.2%)
 - Failed: 295 ; Timeout: 252 ; Skipped: 37
 
-## Contributors
+### Contribution
+We welcome all valuable contributions from the community. We also acknowledge the early contributors to this project:
 
-- [**Nhut-Minh Ho**](https://github.com/minhhn2910) — *National University of Singapore*
+##### Core Developers
+- [**Nhut-Minh Ho**](https://github.com/minhhn2910) — *National University of Singapore* (**Maintainer**)
 - [**Stefan-Dan Ciocirlan**](https://github.com/sdcioc) — *University Politehnica of Bucharest*
-- [**Chen Li**](https://github.com/cassc) — *National University of Singapore*
+- [**Chen Li**](https://github.com/cassc)
 
-We also acknowledge leadership and contribution from:
-
-- [**Prof. Ooi Beng Chin**](https://github.com/ooibc) — *National University of Singapore and Zhejiang University*
-- [**Prof. Xiao Xiaokui**](https://github.com/xkxiao) — *National University of Singapore*
-- [**Prof. Anh Dinh**](https://github.com/ug93tad) — *Deakin University*
+##### Contributors from SBIP:
 - [**Ta Quang Trung**](https://github.com/taquangtrung) — *National University of Singapore*
+- [**Prof. Xiao Xiaokui**](https://github.com/xkxiao) — *National University of Singapore* (SBIP lead)
+- [**Prof. Ooi Beng Chin**](https://github.com/ooibc) — *National University of Singapore and Zhejiang University* (SBIP lead)
+
+##### External contributors:
+- [**Prof. Anh Dinh**](https://github.com/ug93tad) — *Deakin University*
 - [**Fredrik Svantes**](https://github.com/fredrik0x) — *Ethereum Foundation*
 
-This project is funded by the Ethereum Foundation.
-## Documentation
+We acknowledge contributions and support from colleagues at the [Singapore Blockchain Innovation Programme (SBIP)](https://sbip.sg/). This project is funded by the Ethereum Foundation.
+
+
+### Documentation
 
 An auto generated source code documentation is available at [https://sbip-sg.github.io/CuEVM/files.html](https://sbip-sg.github.io/CuEVM/files.html)
+
+### Repository Status
+This repository is the original home of CuEVM. Active development will continue on the maintainer's fork: https://github.com/minhhn2910/CuEVM, with occasional syncs back to this repository when possible.

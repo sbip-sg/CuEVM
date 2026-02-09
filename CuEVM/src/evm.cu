@@ -1,6 +1,5 @@
 #include <CuEVM/evm.cuh>
 #include <cassert>
-// #define DEBUG
 #define DEBUG_THREAD 0
 namespace CuEVM {
 
@@ -207,6 +206,10 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
     if (call_state_ptr->byte_code_size == 4 && recipient->words[1] != 0)  // the fuzzable return address
         return CuEVM::precompile_operations::operation_TransparentAttackerEnhanced(
             cached_call_state.gas_limit, cached_call_state.gas_used, call_state_ptr, transaction_list_ptr);
+
+    // reset reentrancy count
+    if (call_state_ptr->depth == 2 && recipient->words[0] == 0xCAFECAFE)
+        global_simplified_trace[INSTANCE_GLOBAL_IDX].reentrancy_count = 0;
 #endif
 
     if (call_state_ptr->byte_code_size == 0) {
@@ -271,7 +274,7 @@ __device__ int32_t evm_t::start_CALL(cached_evm_call_context &cached_call_state)
 
 __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy_state_data) {
 #ifdef BUILD_LIBRARY
-    global_simplified_trace[INSTANCE_GLOBAL_IDX].start_call(0, call_state_ptr);  // pc is 0?
+    global_simplified_trace[INSTANCE_GLOBAL_IDX].reset_and_start_call(0, call_state_ptr);  // pc is 0?
 #endif
 
     int32_t error_code = start_CALL(cached_call_state);
@@ -785,14 +788,16 @@ __device__ void evm_t::run(cached_evm_call_context &cached_call_state, bool copy
                 //   + other (inside start_CALL)
                 if (error_code == ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS) {
                     // bypass the below by setting error_code == ERROR_SUCCESS
-                    printf("ERROR_MESSAGE_CALL_CREATE_CONTRACT_EXISTS\n");
+                    // printf("ERROR_MESSAGE_CALL_CREATE_CONTRACT_Exists thread %d\n", INSTANCE_GLOBAL_IDX);
+#ifdef BUILD_LIBRARY
+                    finish_TRANSACTION(ERROR_FUZZING_STOP, false);
+#endif
                     error_code = ERROR_SUCCESS;
                     // setting address = 0 to the stack
-                    evm_word_t create_output = 0;
-                    call_state_ptr->stack_ptr->push(create_output);
+                    call_state_ptr->stack_ptr->push_uint32(0);
+                    // Feb 9: may not need this
                     call_state_ptr->fixed_ret_size = 0;
                     call_state_ptr->dynamic_ret_size = 0;
-                    // TODO: fix this; Oct 25: do we need to clear data manually ?
                     // call_state_ptr->message_ptr->copy_from(call_state_ptr->message_ptr_copy);
                     // CuEVM::byte_array_t::reset_return_data(call_state_ptr->last_return_data_ptr);
                 }

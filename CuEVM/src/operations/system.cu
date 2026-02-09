@@ -575,7 +575,7 @@ __device__ int32_t SELFDESTRUCT(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas
             error_code |= ERROR_RETURN;
         }
 #ifdef BUILD_GO_LIBRARY
-        trace_data->selfdestruct_oracle(call_context->pc);
+        trace_data->selfdestruct_oracle(call_context->depth, call_context->pc);
 #endif
     }
     return error_code;

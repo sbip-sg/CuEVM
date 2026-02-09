@@ -57,7 +57,7 @@ constexpr CONSTANT uint32_t MAX_NEW_BUGS = 128;
 constexpr CONSTANT uint32_t MAX_NEW_MEMORY = 32768;       // per instance
 constexpr CONSTANT uint32_t MAX_RETURN_DATA_SIZE = 4096;  // per call
 
-constexpr CONSTANT uint32_t MAX_ARBITRARY_CALL_CHECK = 6;  // store 3 different calls
+constexpr CONSTANT uint32_t MAX_ARBITRARY_CALL_CHECK = 8;  // store 8 different calls
 // persistent state across kernel launches
 extern __device__ uint32_t* g_events_bitmap;
 extern __device__ uint32_t* g_total_bug_table;
@@ -89,6 +89,9 @@ extern __device__ GPUFeedbackCount* g_gpu_feedback_count;  // counter for intere
 #define BUG_LEAKING_ETHER 0x03
 #define BUG_ARBITRARY_CALL 0x04
 #define BUG_REENTRANCY 0x05
+#define BUG_INTEGER_ADD 0x11
+#define BUG_INTEGER_SUB 0x12
+#define BUG_INTEGER_MUL 0x13
 #define BUG_INVALID_OPCODE 0xFF
 
 // special attacker address for oracles (last 32 bit)
@@ -146,8 +149,8 @@ struct serialized_worldstate_data {
 #define MAX_TRACE_EVENTS 512
 #define MAX_ADDRESSES_TRACING 16
 #define MAX_CALLS_TRACING 32
-#define MAX_BRANCHES_TRACING 256  // only track this number of branches in one trace
-#define MAX_BUGS_TRACING 32       // only track this number of bugs in one tx
+#define MAX_BRANCHES_TRACING 512  // only track this number of branches in one trace
+#define MAX_BUGS_TRACING 8        // one thread only track this number of bugs in one tx
 // In fuzzing mode if gas exceed this value, considered DOS / out of gas flag raised
 #define MAX_GAS_FUZZING 1000000
 #define MAX_FUZZING_LOOP_LIMIT 200
@@ -218,27 +221,26 @@ struct branch_trace {
 struct simplified_trace_data {
     // simple_event_trace events[MAX_TRACE_EVENTS];
     // evm_word_t addresses[MAX_ADDRESSES_TRACING];
-
     call_trace calls[MAX_CALLS_TRACING];
-
     uint32_t no_calls = 0;
     uint32_t no_branches = 0;
     evm_word_t last_distance;         // use to track branch distance by comparison opcodes
     uint32_t last_covered_branch_id;  // use to track last branch id that has improved distance
     uint32_t last_missed_branch_id;   // use to track last branch id that has improved distance
-    uint8_t last_distance_bits;       // use to track last distance bits
-    uint8_t state_written = false;
     uint32_t current_account_id = 0;
     uint32_t no_bugs = 0;
-    uint8_t reentrancy_count = 0;
     uint32_t bugs[MAX_BUGS_TRACING];
-
+    uint8_t last_distance_bits = 0;  // use to track last distance bits
+    bool state_written = false;
+    bool state_accessed = false;  // both read and write
+    uint8_t reentrancy_count = 0;
     /**
      * @brief Check if coverage exists.
      * @return True if coverage exists, false otherwise.
      */
     // __device__ void update_coverage_bitmap(uint32_t pc_src, uint32_t pc_dst, bool is_bug = false);
 
+    __device__ void reset_and_start_call(uint32_t pc, evm_call_context_t* call_context_ptr);
     /**
      * @brief Update the coverage bitmap with the distance between pc_src and pc_dst.
      * @param[in] pc_src The source program counter.
@@ -275,7 +277,7 @@ struct simplified_trace_data {
      * @brief Add selfdestruct oracle.
      * @param[in] pc The program counter.
      */
-    __device__ void selfdestruct_oracle(uint32_t pc);
+    __device__ void selfdestruct_oracle(uint32_t depth, uint32_t pc);
 
     /**
      * @brief Add reentrancy oracle.

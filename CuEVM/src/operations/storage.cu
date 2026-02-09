@@ -23,6 +23,8 @@ __device__ int32_t SLOAD(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used, 
         if (error_code == ERROR_SUCCESS) error_code |= stack.push_uint32(simplified_trace_data_ptr->reentrancy_count);
 
         return error_code;
+    } else {
+        simplified_trace_data_ptr->state_accessed = true;
     }
 #endif
     // get the key warm
@@ -86,9 +88,21 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (simplified_trace_data_ptr->current_account_id == REENTRANCY_ATTACKER_ADDRESS) {
         gas_used += GAS_COLD_SLOAD;
         int error_code = CuEVM::gas_cost::has_gas(gas_limit, gas_used);
-        if (error_code == ERROR_SUCCESS) simplified_trace_data_ptr->reentrancy_count++;
-
+        // only detect reentrnacy if state is accessed
+        if (error_code == ERROR_SUCCESS && simplified_trace_data_ptr->state_accessed)
+            simplified_trace_data_ptr->reentrancy_count++;
+        // printf("Thread %d update reentrancy_count %d\n", INSTANCE_GLOBAL_IDX,
+        //        simplified_trace_data_ptr->reentrancy_count);
         return error_code;
+    } else {
+        simplified_trace_data_ptr->state_accessed = true;
+        simplified_trace_data_ptr->no_branches += 2;
+        simplified_trace_data_ptr->state_written = true;
+        if (simplified_trace_data_ptr->reentrancy_count >= 2) {
+            simplified_trace_data_ptr->reentrancy_oracle(call_context->pc);
+        }
+        if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
+            simplified_trace_data_ptr->update_storage_coverage(call_context->pc, key->words[0], 1);
     }
 #endif
 
@@ -101,16 +115,6 @@ __device__ int32_t SSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
     if (error_code == ERROR_SUCCESS) {
         state_db->write_storage_with_known_index(&call_context->storage_address, key, value, address_index,
                                                  found_value);
-#ifdef BUILD_LIBRARY
-        simplified_trace_data_ptr->no_branches += 2;
-        simplified_trace_data_ptr->state_written = 1;
-        if (simplified_trace_data_ptr->reentrancy_count >= 2) {
-            simplified_trace_data_ptr->reentrancy_oracle(call_context->pc);
-        }
-        if (key->words[0] < 65535 && key->words[1] == 0)  // 16-bit quick check
-            simplified_trace_data_ptr->update_storage_coverage(call_context->pc, key->words[0], 1);
-
-#endif
     }
 
     return error_code;
