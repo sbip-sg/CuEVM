@@ -3,7 +3,7 @@
 #include <CuEVM/utils/error_codes.cuh>
 #include <cassert>
 #include <sstream>
-
+#define ASSERTION_ORACLE
 #define CHECK_AND_RETURN_ON_ERROR(expr)                                                                            \
     do {                                                                                                           \
         auto status = (expr);                                                                                      \

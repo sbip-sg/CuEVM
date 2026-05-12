@@ -1442,8 +1442,13 @@ __host__ void StateDb::CPUfromJson(StateDb *&state_db, const cJSON *full_json, u
         state_json = cJSON_GetObjectItemCaseSensitive(full_json, "pre");
     }
     if (state_json == nullptr || !cJSON_IsObject(state_json)) {
-        printf("Error: state_json not found or input format not compatible\n");
-        exit(0);
+        // Fallback: caller may have already passed the "pre" object directly
+        if (cJSON_IsObject(full_json) && full_json->child != nullptr) {
+            state_json = full_json;
+        } else {
+            printf("Error: state_json not found or input format not compatible\n");
+            exit(0);
+        }
     }
 
     // get coinbase

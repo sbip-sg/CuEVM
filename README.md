@@ -1,16 +1,43 @@
 # CuEVM
-CUDA implementation of an EVM bytecode executor for fuzzing and beyond.
 
-## Prerequisites
-- CUDA Toolkit, Version 12.4 or above
-- A CUDA-capable GPU (CUDA compute capability 8+; older GPUs' compatibility has not been fully tested)
-- A C++ compiler compatible with the CUDA Toolkit (gcc/g++ version 10+)
+High-throughput CUDA implementation of  Ethereum Virtual Machine, designed for smart contract fuzzing, transaction simulation, and beyond.
+
+
+## Highlights
+
+- ⚡ **8M+ TPS** ERC20 transfers (no state conflicts) on RTX 5000 Ada
+- 🧪 **1M+ fuzzing TPS** for end-to-end smart contract fuzzing with [medusa-cuevm](https://github.com/minhhn2910/medusa-cuevm)
+- 🔍 **Fuzzing integration**: [medusa-cuevm](https://github.com/minhhn2910/medusa-cuevm), built on top of [Crytic's Medusa v1.2.1](https://github.com/crytic/medusa/releases/tag/v1.2.1)
+- ✅ 96%+ traces indentical to `go-ethereum` (on eth-tests Shanghai)
+- 🐳 Fully reproducible Docker container
+
+### Ecosystem Integration
+
+- [medusa-cuevm](https://github.com/minhhn2910/medusa-cuevm) built based on [Crytic's Medusa](https://github.com/crytic/medusa/releases/tag/v1.2.1)
+- [go-evmlab](https://github.com/cassc/goevmlab) forked from [holiman/goevmlab](https://github.com/holiman/goevmlab)
+
+
+### Reproducibility
+
+A fully reproducible environment is available via Docker:
+
+👉 [minhhn2910/CuEVM-container](https://github.com/minhhn2910/CuEVM-container)
+
 
 ## Build
 
 ### Build standalone binary
 
-This builds the standalone executable binary `cuevm_GPU` inside the `build` folder:
+This builds the standalone executable binary `cuevm_GPU` (with **EIP3155 disabled** - for performance testing) inside the `build` folder:
+
+```bash
+# From the project root folder
+rm -rf build
+cmake -DBUILD_GO_LIBRARY=OFF -DENABLE_EIP_3155=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCUDA_COMPUTE_CAPABILITY=86 -S . -B build
+cmake --build build -j $(nproc)
+```
+
+This builds the standalone executable binary `cuevm_GPU` (with **EIP3155 enabled** - for correctness testing) inside the `build` folder:
 
 ```bash
 # From the project root folder
@@ -32,29 +59,11 @@ cmake --build build -j $(nproc)
 
 ### Docker image
 
-To produce the prebuilt image used in our releases:
-
+We provide sample docker file to build in `Dockerfile`. However, this build is only for standalone CuEVM without fuzzing use case. Please find the sample docker with benchmarking, fuzzing, and example usages at: [minhhn2910/CuEVM-container](https://github.com/minhhn2910/CuEVM-container). 
 ```bash
-docker build -t cuevm:latest .
+docker pull minhhn2910/cuevm:latest
 ```
-
-The Dockerfile currently compiles both the shared library and the standalone binary with `-DCUDA_COMPUTE_CAPABILITY="86;89;90"`. Adjust these flags in the Dockerfile before building if you need support for other GPU architectures.
-
-Run the trace-comparison test suite directly in the container (mount a host directory for the temporary artifacts):
-
-```bash
-docker run --rm --gpus all \
-  -v /tmp/ethtest:/tmp/ethtest \
-  -v .:/app \
-  cuevm:latest \
-  run-ethtest-without-stateroot-comparison.py \
-    --input /ethereum-tests-shanghai/ \
-    --temporary-path /tmp/ethtest \
-    --runtest-bin runtest \
-    --geth go-evm \
-    --cuevm cuevm \
-    --ignore-errors
-```
+Please visit the repository for detailed instruction how to run fuzzing and benchmark.
 
 ## Usage
 
@@ -63,7 +72,7 @@ docker run --rm --gpus all \
 The executor takes an input JSON file and outputs the result to standard output after execution. The input format follows the [ethereum/tests](https://github.com/ethereum/tests/) format, with the minor difference that CuEVM currently supports only one test transaction in each test json.
 
 ```bash
-./build/cuevm_GPU --input fuzzing/eth-tests/erc20_mint.json
+./build/cuevm_GPU --input erc20_mint.json
 ```
 
 ### Using the dynamic library
@@ -80,10 +89,10 @@ By default, CuEVM detects and utilizes all available GPUs without additional con
 
 For example, to use only GPU 0 and GPU 2 on a system with 4 GPUs:
 
-  * `CUDA_VISIBLE_DEVICES=0,2 ./build/cuevm_GPU  --input fuzzing/eth-tests/erc20_mint.json `
+  * `CUDA_VISIBLE_DEVICES=0,2 ./build/cuevm_GPU  --input erc20_mint.json `
   * `CUDA_VISIBLE_DEVICES=0,2 medusa fuzz --config medusa.json`
 
-## Correctness Testing
+## Correctness Testing 
 
 ### Testing Methodology
 
@@ -108,9 +117,9 @@ We use goevmlab to compare execution traces between the [ethereum/tests](https:/
      --cuevm ./build/cuevm_GPU
    ```
 
-### Run trace comparison between geth and cuevm
+### Run trace comparison between geth and CuEVM 
 
-We use test files from [ethereum/tests/GeneralStateTests](https://github.com/ethereum/tests/tree/develop/GeneralStateTests) to verify consistency with go-ethereum results. Test results were collected using a [Python script](https://gist.github.com/cassc/b300005b38d7c01461b443ef67169659) run from the [ethereum/tests](https://github.com/ethereum/tests) root folder:
+We use test files from [ethereum/tests/GeneralStateTests](https://github.com/ethereum/tests/tree/develop/GeneralStateTests) to verify consistency with go-ethereum results. Test results were collected using a [Python script](https://gist.github.com/cassc/b300005b38d7c01461b443ef67169659):
 
 ```bash
 python3 run-ethtest-without-stateroot-comparison.py --runtest-bin runtest --geth geth --cuevm ./build/cuevm_GPU --ignore-errors -t /tmp/ethtest/
