@@ -92,6 +92,9 @@ For example, to use only GPU 0 and GPU 2 on a system with 4 GPUs:
   * `CUDA_VISIBLE_DEVICES=0,2 ./build/cuevm_GPU  --input erc20_mint.json `
   * `CUDA_VISIBLE_DEVICES=0,2 medusa fuzz --config medusa.json`
 
+Performance on multi-gpu mode:
+We experimented on 2xA100 GPU system where the multi-GPU solution has 1.85x speedup compared to running on a single GPU. The difference between 1.85 and the ideal 2x speedup is attributed to cross-device data synchronization and communication. 
+
 ## Correctness Testing 
 
 ### Testing Methodology
