@@ -1,4 +1,5 @@
 #include <CuEVM/utils/uint256.cuh>
+#include <cstdint>
 
 __host__ __device__ int uint256_cmp(const uint256 *a, const uint256 *b) {
     if (a == nullptr) return !uint256_is_zero(b);
@@ -53,7 +54,10 @@ __host__ __device__ bool uint256_is_zero(const uint256 *a) {
 }
 
 __host__ __device__ int uint256_set_zero(uint256 *a) {
-    memset(a->words, 0, sizeof(a->words));
+#pragma unroll
+    for (int i = 0; i < UINT256_WORDS; i++) {
+        a->words[i] = 0;
+    }
     return 0;
 }
 
@@ -227,16 +231,12 @@ __host__ __device__ void print_uint512(const uint512 *a) {
 // }
 
 __host__ __device__ uint256 *uint256_from_uint32(uint256 *dst, uint32_t src) {
-    memset(dst->words, 0, sizeof(dst->words));
+    uint256_set_zero(dst);
     dst->words[0] = src;
     return dst;
 }
 
-__host__ __device__ uint256 *uint256_from_word(uint256 *dst, uint32_t a) {
-    memset(dst->words, 0, sizeof(dst->words));
-    dst->words[0] = a;
-    return dst;
-}
+__host__ __device__ uint256 *uint256_from_word(uint256 *dst, uint32_t a) { return uint256_from_uint32(dst, a); }
 
 __host__ __device__ uint256 *uint256_add(uint256 *dst, const uint256 *a, const uint256 *b) {
     uint32_t carry = 0;
@@ -832,6 +832,19 @@ __host__ __device__ uint256 *uint256_bitwise_not(uint256 *dst, const uint256 *a)
 }
 
 __host__ __device__ uint8_t *uint256_to_bytes(uint8_t *dst, const uint256 *src, size_t len) {
+    if (len >= UINT256_BYTES && ((uintptr_t)dst & 3u) == 0) {
+        uint32_t *d = (uint32_t *)dst;
+#pragma unroll
+        for (int i = 0; i < UINT256_WORDS; ++i) {
+            const uint32_t w = src->words[UINT256_WORDS - 1 - i];
+#ifdef __CUDA_ARCH__
+            d[i] = __byte_perm(w, 0, 0x0123);
+#else
+            d[i] = ((w & 0xFFu) << 24) | ((w & 0xFF00u) << 8) | ((w >> 8) & 0xFF00u) | (w >> 24);
+#endif
+        }
+        return dst;
+    }
     size_t total_bytes = sizeof(src->words);
     for (size_t i = 0; i < len && i < total_bytes; i++) {
         size_t word_index = (total_bytes - 1 - i) / sizeof(uint32_t);
@@ -842,30 +855,19 @@ __host__ __device__ uint8_t *uint256_to_bytes(uint8_t *dst, const uint256 *src, 
 }
 
 __host__ __device__ uint256 *uint256_from_bytes(uint256 *dst, const uint8_t *src, size_t len) {
-    // Initialize the words array to zero
-    // memset(dst->words, 0, sizeof(dst->words));
-
-    memset(dst->words, 0, UINT256_BYTES);
-    uint8_t offset = UINT256_BYTES - len;
-    // Convert the byte array to the uint256 structure
-
-    for (size_t i = 0; i < len && i < UINT256_BYTES; i++) {
-        uint8_t word_index = UINT256_WORDS - 1 - (i + offset) / UINT256_LIMBS_BYTES;
-        uint8_t byte_position = (i + offset) % UINT256_LIMBS_BYTES;
-        dst->words[word_index] |= ((uint32_t)src[i]) << (8 * (UINT256_LIMBS_BYTES - 1 - byte_position));
+    if (len > UINT256_BYTES) len = UINT256_BYTES;
+    const uint32_t offset = UINT256_BYTES - (uint32_t)len;
+#pragma unroll
+    for (int wi = 0; wi < UINT256_WORDS; ++wi) {
+        const uint32_t p0 = (uint32_t)(UINT256_WORDS - 1 - wi) * 4u;
+        uint32_t acc = 0;
+#pragma unroll
+        for (int b = 0; b < 4; ++b) {
+            const uint32_t p = p0 + (uint32_t)b;
+            acc = (acc << 8) | ((p >= offset) ? (uint32_t)src[p - offset] : 0u);
+        }
+        dst->words[wi] = acc;
     }
-    // size_t offset = UINT256_BYTES - len;
-
-    // for (size_t i = 0; i < UINT256_BYTES; i++) {
-    //     if (i < len) {
-    //         size_t word_index = UINT256_WORDS - 1 - (i + offset) / UINT256_LIMBS_BYTES;
-    //         size_t byte_position = (i + offset) % UINT256_LIMBS_BYTES;
-    //         dst->words[word_index] |= ((uint32_t)src[i]) << (8 * (UINT256_LIMBS_BYTES - 1 - byte_position));
-    //     } else {
-    //         dst->words[i] = 0;
-    //     }
-    // }
-
     return dst;
 }
 __host__ __device__ uint256 *uint256_extract_byte(uint256 *dst, const uint256 *src, uint32_t byte_index) {

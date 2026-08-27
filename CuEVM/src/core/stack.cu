@@ -40,8 +40,7 @@ __device__ void evm_stack_t::reduce_size(uint32_t num_items) {
 
 __device__ evm_word_t *evm_stack_t::top() {
     if (stack_base_offset + stack_offset < memory_pool_stack_preallocate) {
-        return shared_stack_base + stack_offset * CuEVM::memory_pool::global_memory_pool->num_instances +
-               INSTANCE_GLOBAL_IDX;
+        return shared_stack_base + stack_offset * CuEVM::memory_pool::g_num_instances + INSTANCE_GLOBAL_IDX;
     } else {
         if (global_stack_base == nullptr) {
 #ifdef DEBUG_PERF
@@ -139,8 +138,7 @@ __device__ int32_t evm_stack_t::pushx(uint8_t x, const uint8_t __restrict__ *src
 // The caller must check underflow
 __device__ evm_word_t *evm_stack_t::get_address_at_index(uint32_t index) const {
     if (stack_base_offset + stack_offset - index < memory_pool_stack_preallocate)  // stack_offset is after added
-        return shared_stack_base + (stack_offset - index) * CuEVM::memory_pool::global_memory_pool->num_instances +
-               INSTANCE_GLOBAL_IDX;
+        return shared_stack_base + (stack_offset - index) * CuEVM::memory_pool::g_num_instances + INSTANCE_GLOBAL_IDX;
     else {
         if (stack_base_offset <= memory_pool_stack_preallocate) {
             return global_stack_base + stack_base_offset + stack_offset - index - memory_pool_stack_preallocate;

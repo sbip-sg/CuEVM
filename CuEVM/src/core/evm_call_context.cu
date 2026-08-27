@@ -169,7 +169,7 @@ __device__ void evm_call_context_t::initiate_values(evm_call_context_t* parent, 
     if (parent->stack_ptr != nullptr) {
         this->stack_ptr->init(
             parent->stack_ptr->shared_stack_base +
-                (parent->stack_ptr->stack_offset) * CuEVM::memory_pool::global_memory_pool->num_instances,
+                (parent->stack_ptr->stack_offset) * CuEVM::memory_pool::g_num_instances,
             parent->stack_ptr->stack_base_offset + parent->stack_ptr->stack_offset);
 
     } else {

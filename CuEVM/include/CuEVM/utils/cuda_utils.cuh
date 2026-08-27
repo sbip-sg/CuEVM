@@ -1,6 +1,6 @@
 #pragma once
 
-#define INSTANCES_PER_BLOCK 128
+#define INSTANCES_PER_BLOCK 64
 // #define SHARED_STACK_SIZE 12
 
 #include <cuda.h>

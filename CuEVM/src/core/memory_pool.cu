@@ -4,6 +4,7 @@
 
 namespace CuEVM::memory_pool {
 __device__ memory_pool_t* global_memory_pool = nullptr;
+__device__ __constant__ uint32_t g_num_instances = 0;
 __device__ evm_word_t* preallocated_stack_base = nullptr;
 __device__ uint8_t* preallocated_return_data_base = nullptr;
 __device__ SnapshotValue* preallocated_snapshot_values = nullptr;
@@ -13,6 +14,7 @@ __device__ CuEVM::EccConstants* ecc_constants_ptr = nullptr;
 __host__ void create_memory_pool(uint32_t num_instances, uint32_t num_accounts, uint32_t num_devices) {
     for (int i = 0; i < num_devices; i++) {
         CUDA_CHECK(cudaSetDevice(i));
+        CUDA_CHECK(cudaMemcpyToSymbol(g_num_instances, &num_instances, sizeof(uint32_t)));
         memory_pool_t* memory_pool = new memory_pool_t();
         memory_pool->num_instances = num_instances;
 
@@ -180,7 +182,7 @@ __host__ void clear_memory_pool(uint32_t num_devices) {
 __device__ evm_call_context_t* get_call_context(uint16_t depth) {
     assert(global_memory_pool != nullptr);
     if (depth < memory_pool_call_context_preallocate) {
-        return &global_memory_pool->call_context[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
+        return &global_memory_pool->call_context[depth * g_num_instances + INSTANCE_GLOBAL_IDX];
     } else {
         return new evm_call_context_t();
     }
@@ -188,8 +190,7 @@ __device__ evm_call_context_t* get_call_context(uint16_t depth) {
 
 __device__ evm_stack_t* get_stack(uint16_t depth) {
     if (depth < memory_pool_call_context_preallocate) {
-        return &global_memory_pool
-                    ->prealloc_stack_instances[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
+        return &global_memory_pool->prealloc_stack_instances[depth * g_num_instances + INSTANCE_GLOBAL_IDX];
     } else {
 #ifdef DEBUG_PERF
         printf("stack dynamic allocation\n");
@@ -234,8 +235,7 @@ __device__ void reset_snapshot_account_offset(uint32_t offset) {
 
 __device__ evm_memory_t* get_memory(uint16_t depth) {
     if (depth < memory_pool_call_context_preallocate) {
-        return &global_memory_pool
-                    ->prealloc_mem_instances[depth * global_memory_pool->num_instances + INSTANCE_GLOBAL_IDX];
+        return &global_memory_pool->prealloc_mem_instances[depth * g_num_instances + INSTANCE_GLOBAL_IDX];
     } else {
 #ifdef DEBUG_PERF
         printf("memory dynamic allocation\n");

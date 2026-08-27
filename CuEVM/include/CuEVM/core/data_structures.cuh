@@ -522,6 +522,7 @@ struct memory_pool_t {
     __host__ memory_pool_t() {};
 };
 extern __device__ memory_pool_t *global_memory_pool;
+extern __device__ __constant__ uint32_t g_num_instances;
 extern __device__ CuEVM::EccConstants *ecc_constants_ptr;
 extern __device__ evm_word_t *preallocated_stack_base;
 extern __device__ uint8_t *preallocated_return_data_base;

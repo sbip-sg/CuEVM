@@ -54,9 +54,9 @@ __device__ int32_t MSTORE(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used,
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
-        __shared__ uint8_t data[INSTANCES_PER_BLOCK][UINT256_BYTES];
-        uint256_to_bytes(data[threadIdx.x], &value, UINT256_BYTES);
-        error_code |= memory.set(data[threadIdx.x], UINT256_BYTES, memory_offset_u32, UINT256_BYTES);
+        alignas(4) uint8_t data[UINT256_BYTES];
+        uint256_to_bytes(data, &value, UINT256_BYTES);
+        error_code |= memory.set(data, UINT256_BYTES, memory_offset_u32, UINT256_BYTES);
     }
     return error_code;
 }
@@ -81,11 +81,8 @@ __device__ int32_t MSTORE8(const CuEVM::gas_t &gas_limit, CuEVM::gas_t &gas_used
 
     if (error_code == ERROR_SUCCESS) {
         memory.increase_memory_cost(memory_expansion_cost);
-        // uint8_ *data = new uint8_t[1];
-        __shared__ uint8_t data[INSTANCES_PER_BLOCK][1];
-        data[threadIdx.x][0] = value.words[0] & 0xFF;
-        error_code |= memory.set(data[threadIdx.x], 1, memory_offset_u32, 1);
-        // delete[] data;
+        uint8_t data = value.words[0] & 0xFF;
+        error_code |= memory.set(&data, 1, memory_offset_u32, 1);
     }
     return error_code;
 }

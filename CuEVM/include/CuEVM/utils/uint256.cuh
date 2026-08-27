@@ -32,13 +32,15 @@
 #define UINT256_BYTES 32
 #define UINT256_LIMBS_BYTES 4
 
-typedef struct uint256 {
+typedef struct alignas(16) uint256 {
     uint32_t words[UINT256_WORDS];
 } uint256;
 // wide type for 256 bit operations
-typedef struct uint512 {
+typedef struct alignas(16) uint512 {
     uint32_t words[UINT256_WORDS * 2];
 } uint512;
+static_assert(sizeof(uint256) == UINT256_BYTES, "uint256 must remain 32 bytes");
+static_assert(alignof(uint256) >= 16, "uint256 must be 16-byte aligned");
 typedef void (*bigint_rand_func)(uint8_t *dst, int n);
 
 __host__ __device__ int uint256_cmp(const uint256 *a, const uint256 *b);

@@ -2,9 +2,7 @@
 #include <CuEVM/utils/error_codes.cuh>
 
 namespace CuEVM {
-__host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) {
-    memcpy(words, src.words, sizeof(uint32_t) * uint256_limbs);
-}
+__host__ __device__ evm_word_t::evm_word_t(const evm_word_t &src) { uint256_cpy(this, &src); }
 
 __host__ __device__ evm_word_t::evm_word_t(uint32_t value) : evm_word_t() { this->from_uint32_t(value); }
 
